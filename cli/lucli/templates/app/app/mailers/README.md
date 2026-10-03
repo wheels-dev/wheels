@@ -51,4 +51,4 @@ set(
 `from`, `to`, and `subject` are required at every call site — configure
 everything else as defaults, pass those three explicitly.
 
-See [Sending Email](https://guides.wheels.dev/v4-1-0/digging-deeper/sending-email/) in the guides for the full walkthrough.
+See [Sending Email](https://guides.wheels.dev/v4-2-0/digging-deeper/sending-email/) in the guides for the full walkthrough.

@@ -11,18 +11,20 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 Upgrading from any 4.1.x to 4.2 is the same `vendor/wheels/` swap as a patch upgrade (see [Manual upgrades](/v4-2-0/upgrading/manual-upgrades/)). What the swap does **not** do for you is update the files `wheels new` created once and then handed to you: `public/Application.cfc`, `config/environment.cfm`, `config/settings.cfm` and the `app/events/*.cfm` templates. Framework updates never reach them. This page lists each of those edits with the issue it came from and whether skipping it fails safe, then the behaviour changes worth checking in your code.
 
 <Aside type="tip" title="The fastest way to find the drift">
-Run `wheels upgrade check --to=4.2.0` on a workstation. It diffs `public/Application.cfc` and `public/index.cfm` against the bundled template and flags known code patterns. For the other app-owned files, compare against a fresh `wheels new` app. The template is the authority; keep your local customizations.
+Upgrade the CLI first (step 1 below), then run `wheels upgrade check --to=4.2.0` on a workstation. It diffs `public/Application.cfc` and `public/index.cfm` against the template bundled with the CLI and flags known code patterns. A 4.1 CLI compares against its own 4.1 template, so it reports no drift even when the 4.2 edits below are missing. For the other app-owned files, compare against a fresh `wheels new` app made with the 4.2 CLI. The template is the authority; keep your local customizations.
 </Aside>
 
 ## Swap the framework
 
 <Steps>
 
-1. **Back up the current framework.** Move (don't delete) `vendor/wheels/` aside, e.g. to `vendor/wheels-4.1.x.bak/` outside version control. Moving it back is the whole rollback.
+1. **Upgrade the `wheels` CLI to 4.2.** See [Upgrading](/v4-2-0/start-here/installing/#upgrading) (`brew upgrade wheels`, `scoop update wheels`, `apt upgrade wheels` or `dnf upgrade wheels`). The steps below rely on it: `wheels upgrade check --to=4.2.0` and a fresh `wheels new` app only show the 4.2 files when the CLI is 4.2, and the dev-server changes under [CLI and deployment changes](#cli-and-deployment-changes) come with the CLI, not with `vendor/wheels/`.
 
-2. **Install 4.2.x.** Extract the 4.2 `vendor/wheels/` in its place (or `git checkout` the tag if you vendor the framework).
+2. **Back up the current framework outside `vendor/`.** Move (don't delete) `vendor/wheels/` out of the project, e.g. to `../wheels-4.1.x.bak/`. Moving it back is the whole rollback. Don't leave the backup inside `vendor/`: 4.2 loads every folder there as a package, so a `vendor/wheels-4.1.x.bak/` logs a "skipped: unsafe directory name" error on every start, and [committing `vendor/`](#commit-vendor-420) would commit it.
 
-3. **Reload and run your suite.** Use `?reload=true&password=…` and `/wheels/app/tests`. Then apply the edits below.
+3. **Install 4.2.x.** Extract the 4.2 `vendor/wheels/` in its place (or `git checkout` the tag if you vendor the framework).
+
+4. **Restart the server and run your suite.** Use `wheels stop` then `wheels start`, and `/wheels/app/tests`. Then apply the edits below, and restart again after them: `?reload=true` rebuilds the application but doesn't recompile changed `app/events/*.cfm` or `public/Application.cfc` files on a running dev server.
 
 </Steps>
 
@@ -32,9 +34,15 @@ Run `wheels upgrade check --to=4.2.0` on a workstation. It diffs `public/Applica
 
 ### `config/environment.cfm` reads `WHEELS_ENV` (4.2.0)
 
-Apps generated before 4.2 hardcode the environment: `config/environment.cfm` contains `set(environment="development")`, so a `WHEELS_ENV=production` set by a Docker image, systemd unit or host has no effect ([#3946](https://github.com/wheels-dev/wheels/issues/3946)). The 4.2 template reads `WHEELS_ENV` through `env()` (`.env` first, then the process environment). Unset or empty means `development`. Any value other than `development`, `testing`, `maintenance` or `production` stops the app at startup with `Wheels.InvalidEnvironment`, because Wheels shows error details in any environment that isn't `production`. The template's `config/settings.cfm` likewise reads `set(dataSourceName=env("WHEELS_DATASOURCE", "<app name>"))`.
+Apps generated before 4.2 hardcode the environment: `config/environment.cfm` contains `set(environment="development")`, so a `WHEELS_ENV=production` set by a Docker image, systemd unit or host has no effect ([#3946](https://github.com/wheels-dev/wheels/issues/3946)). The 4.2 template reads `WHEELS_ENV` through `env()` (`.env` first, then the process environment). Unset or empty means `development`. Any value other than `development`, `testing`, `maintenance` or `production` stops the app at startup with `Wheels.InvalidEnvironment`, because Wheels shows error details in any environment that isn't `production`.
 
-Replace `config/environment.cfm` with the one from a fresh `wheels new` app (see [Environments and Configuration](/v4-2-0/core-concepts/environments-and-configuration/)), or keep yours and hardcode `set(environment="production");` on production servers. A `WHEELS_ENV` line in `.env` wins over the process environment, so make sure a production server's `.env` doesn't say `development`.
+Replace `config/environment.cfm` with the one from a fresh `wheels new` app (see [Environments and Configuration](/v4-2-0/core-concepts/environments-and-configuration/)), or keep yours and hardcode `set(environment="production");` on production servers.
+
+A `WHEELS_ENV` line in `.env` wins over the process environment, and `wheels new` writes `WHEELS_ENV=development` into `.env` (and `.env.example`). So on a production server, or in an image that carries the app's `.env`, remove that line or set it to `production`; otherwise `WHEELS_ENV=production` from the host has no effect.
+
+Two related template changes are optional:
+- The template's `config/settings.cfm` reads the datasource name the same way: `set(dataSourceName=env("WHEELS_DATASOURCE", "<app name>"))`. Copy it if you want to choose the datasource per server; an app that keeps `set(dataSourceName="…")` works as before.
+- New apps ship `config/development/settings.cfm`, `config/testing/settings.cfm`, `config/maintenance/settings.cfm` and `config/production/settings.cfm` with only comments. They run after `config/settings.cfm` in that environment; add them only when you have per-environment settings.
 
 **Does not fail safe:** an app deployed with only `WHEELS_ENV=production` set keeps running in development mode, with full error details shown to visitors.
 
@@ -100,13 +108,24 @@ Replace the `return local.redirectPath;` at the end of `$buildRedirectUrl()` wit
 
 The `app/events/*.cfm` templates (`onrequeststart.cfm`, `onrequestend.cfm`, `onsessionstart.cfm` and their siblings) are included straight into the response buffer, where a bare `cfscript` block and a trailing newline put blank lines before every response ([#3882](https://github.com/wheels-dev/wheels/issues/3882)). New apps wrap them in `cfsilent` with no trailing newline.
 
-**Fails safe** for HTML pages. It does not for byte-exact responses: a `renderText()` of an XML document is ill-formed when blank lines come before `<?xml …?>`. Wrap each `app/events/*.cfm` file in `<cfsilent>…</cfsilent>` with no trailing newline, or delete the empty placeholders you don't use. `cfsilent` suppresses only output, so event code (including `cfheader`) still runs.
+**Fails safe** for HTML pages. It does not for byte-exact responses: a `renderText()` of an XML document is ill-formed when blank lines come before `<?xml …?>`.
+
+Wrap these seven files in `<cfsilent>…</cfsilent>` with no trailing newline, or delete the empty placeholders you don't use:
+- `onabort.cfm`
+- `onapplicationend.cfm`
+- `onapplicationstart.cfm`
+- `onrequestend.cfm`
+- `onrequeststart.cfm`
+- `onsessionend.cfm`
+- `onsessionstart.cfm`
+
+`cfsilent` suppresses only output, so event code (including `cfheader`) still runs. **Leave the output templates alone:** `onerror.cfm`, `onerror.json.cfm`, `onerror.xml.cfm`, `onmaintenance.cfm` and `onmissingtemplate.cfm` are the pages Wheels shows for errors, maintenance and missing files, and wrapping them in `cfsilent` would make those pages blank. Restart the server after the edit; a reload keeps serving the old templates.
 
 ### Commit `vendor/` (4.2.0)
 
 `wheels new` apps now commit `vendor/`: the generated `.gitignore` no longer ignores it, so a clone, CI run or image build has the framework and every package added with `wheels packages add`.
 
-**Fails safe** on the machine that has `vendor/`. A fresh clone of an app that ignores it has no framework and nothing to restore it from. Remove the `/vendor/` line from `.gitignore` and commit `vendor/`.
+**Fails safe** on the machine that has `vendor/`. A fresh clone of an app that ignores it has no framework and nothing to restore it from. Remove the `/vendor/` line from `.gitignore` and commit `vendor/`. Check `git status` first: `vendor/` should hold `wheels/` and your packages, not a backup of the old framework.
 
 ### AI coding docs (optional)
 
@@ -250,7 +269,7 @@ From [#3914](https://github.com/wheels-dev/wheels/issues/3914), [#3925](https://
 
 <Steps>
 
-1. Reload (`?reload=true&password=…`) and confirm the app starts clean; check `wheels.log` for warnings.
+1. Restart the server (`wheels stop`, then `wheels start`) and confirm the app starts clean; check `wheels.log` for warnings.
 2. Run your suite (`/wheels/app/tests`), including the model specs that cover conditional validations.
 3. On a production server, confirm the app runs in production mode: an error must not show a stack trace.
 4. Behind a reverse proxy, confirm absolute URLs (for example in emails or redirects) still start with `https://`.

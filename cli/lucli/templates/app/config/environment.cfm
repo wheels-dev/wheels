@@ -2,7 +2,7 @@
 // Use this file to set the current environment for your application.
 // You can set it to "development", "testing", "maintenance" or "production".
 // Don't forget to issue a reload request (e.g. reload=true) after making changes.
-// See https://guides.wheels.dev/v4-1-0/core-concepts/environments-and-configuration/ for more info.
+// See https://guides.wheels.dev/v4-2-0/core-concepts/environments-and-configuration/ for more info.
 
 // The environment comes from WHEELS_ENV: the value in .env if it has one, otherwise the
 // process environment (a Dockerfile ENV, a systemd unit, your deploy script).
