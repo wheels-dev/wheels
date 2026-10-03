@@ -131,6 +131,59 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("SQLite DATE / TIME columns written before ##4093", () => {
+
+			// Before #4093, SQLiteModel bound a declared DATE as cf_sql_date and TIME as cf_sql_time,
+			// and the driver stored them as epoch milliseconds. Such columns exist only if created by
+			// raw SQL or another tool. Writes now store ISO text, so the upgrade note gives a recipe to
+			// convert the old integers first; this pins that the recipe works.
+			it("converts legacy epoch-millisecond DATE and TIME values with the documented recipe", () => {
+				if (!variables.applies) {
+					skip("SQLite only.");
+				}
+				var legacy = "c_o_r_e_sqlitelegacydates";
+				QueryExecute("DROP TABLE IF EXISTS #legacy#", [], {datasource = variables.ds});
+				QueryExecute("CREATE TABLE #legacy# (id INTEGER PRIMARY KEY, d DATE, t TIME)", [], {datasource = variables.ds});
+				try {
+					// What the old binding wrote.
+					QueryExecute(
+						"INSERT INTO #legacy# (id, d, t) VALUES (1, ?, ?)",
+						[{value = CreateDate(2026, 10, 2), cfsqltype = "cf_sql_date"}, {value = CreateTime(9, 30, 0), cfsqltype = "cf_sql_time"}],
+						{datasource = variables.ds}
+					);
+					var before = QueryExecute("SELECT typeof(d) AS dk, typeof(t) AS tk FROM #legacy#", [], {datasource = variables.ds});
+					if (before.dk != "integer") {
+						skip("This engine and driver stored the old DATE binding as #before.dk#, not epoch milliseconds; nothing to convert.");
+					}
+					// The recipe from the upgrade note.
+					QueryExecute(
+						"UPDATE #legacy# SET d = strftime('%Y-%m-%d', d / 1000, 'unixepoch', 'localtime') WHERE typeof(d) = 'integer'",
+						[],
+						{datasource = variables.ds}
+					);
+					QueryExecute(
+						"UPDATE #legacy# SET t = strftime('%H:%M:%S', t / 1000, 'unixepoch', 'localtime') WHERE typeof(t) = 'integer'",
+						[],
+						{datasource = variables.ds}
+					);
+					var after = QueryExecute(
+						"SELECT typeof(d) AS dk, typeof(t) AS tk, d || '' AS d, t || '' AS t FROM #legacy#",
+						[],
+						{datasource = variables.ds}
+					);
+					expect(after.dk).toBe("text");
+					expect(after.d).toBe("2026-10-02");
+					if (before.tk == "integer") {
+						expect(after.tk).toBe("text");
+						expect(after.t).toBe("09:30:00");
+					}
+				} finally {
+					QueryExecute("DROP TABLE IF EXISTS #legacy#", [], {datasource = variables.ds});
+				}
+			});
+
+		});
+
 		describe("SQLite TEXT date columns from before ##4093", () => {
 
 			it("keeps the column-name heuristic: a TEXT column named 'created' is a date", () => {
