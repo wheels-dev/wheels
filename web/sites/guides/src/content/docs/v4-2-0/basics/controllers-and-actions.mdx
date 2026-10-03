@@ -220,6 +220,32 @@ component extends="Controller" {
 
 Any extra argument that isn't a known `redirectTo` parameter (like `success` above) is set into the flash for the next request. `redirectTo` doesn't `return` on its own — if more statements follow the redirect, add your own `return`. The common case where the redirect is the last statement just works.
 
+### Redirecting to a URL from the request
+
+`redirectTo(url=…)` accepts a relative URL or an absolute URL on the current host. For any other host it throws `Wheels.UnsafeRedirect` before sending anything, unless the `allowExternalRedirects` setting is `true` (it's `false` by default). So you can pass a URL that comes from the request, such as a `return_to` parameter after sign-in, as long as you handle that exception:
+
+```cfm {test:compile} title="app/controllers/Sessions.cfc"
+component extends="Controller" {
+    function create() {
+        // ... sign the user in ...
+        if (Len(params.return_to ?: "")) {
+            try {
+                redirectTo(url = params.return_to);
+                return;
+            } catch (Wheels.UnsafeRedirect e) {
+                // Another host: ignore it and land on the default page.
+            }
+        }
+        redirectTo(route = "root");
+    }
+}
+```
+
+- Catch `Wheels.UnsafeRedirect` rather than `any`, so other errors still surface.
+- Keep the `return`. With delayed redirects (`delay=true`, which test runs use), the action would otherwise go on to call `redirectTo` a second time.
+- Don't set `allowExternalRedirects=true` to make a return-to link work: it turns the check off for every redirect in the app.
+- `redirectTo(back=true)` applies the same check to the `Referer` header. If it points at another host, Wheels falls back to the `route` / `controller` / `action` you pass, or to the site root.
+
 ## Flash messages
 
 The flash is a struct that survives exactly one redirect. Write to it during one request, read from it on the next, and it clears automatically.

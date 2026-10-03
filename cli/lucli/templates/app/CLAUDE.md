@@ -26,6 +26,7 @@ ships to consumers.
 - **Nested resources use `callback=`**: `.resources(name="posts", callback=function(map) { map.resources("comments"); })`. `scope()`, `namespace()`, `package()` and `controller()` take `callback=` too.
 - **Routes match first to last** — resources, then custom named routes, then root, then the wildcard last. Placeholder-free patterns (`/posts/featured`) win over `/posts/[key]` regardless of order.
 - **Controller filters are `private`** — a public method is a routable action. Action names can't reuse framework helper names (`redirectTo`, `linkTo`, …).
+- **Redirecting to a URL from the request** (`return_to`, `next`): `redirectTo(url=…)` throws `Wheels.UnsafeRedirect` for another host. Catch that type and fall back (see `.ai/auth.md`); don't turn on `allowExternalRedirects`.
 - **`cfparam` every variable a view reads.**
 - **Never name a parameter or local variable after a CFML scope** (`url`, `form`, `request`, `session`, `application`, …) — the scope can win over the argument.
 - **Structs and arrays aren't booleans**: `!x` and `x ? a : b` throw on a struct or array ("Can't cast Complex Object Type Struct to a boolean value"). Test the shape you mean: `IsBoolean(x) && x`, `IsSimpleValue(x) && Len(x)`, `IsStruct(x) && !StructIsEmpty(x)`, `IsArray(x) && ArrayLen(x)`.
