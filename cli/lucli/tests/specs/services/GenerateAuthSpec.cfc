@@ -116,6 +116,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(content).toInclude('t.string(columnNames="passwordHash"');
 				expect(content).toInclude('t.string(columnNames="resetTokenDigest"');
 				expect(content).toInclude('t.datetime(columnNames="resetTokenExpiresAt"');
+				// Nullable, so a cleared digest (set to "") is stored as NULL, never as an empty string.
+				expect(content).toInclude('t.string(columnNames="resetTokenDigest", allowNull=true');
+				expect(content).toInclude('t.datetime(columnNames="resetTokenExpiresAt", allowNull=true');
 				expect(content).toInclude("t.timestamps();");
 				expect(content).toInclude('addIndex(table="users", columnNames="email", unique=true)');
 				expect(content).notToInclude("apiTokenDigest");
@@ -228,6 +231,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(reFindNoCase("new\s+wheels\.auth\.[A-Za-z]+\([^)]*=\s*function", bootstrap)).toBe(0);
 			});
 
+			it("looks a reset token up only by its digest, after rejecting an empty token", () => {
+				var stripped = $strippedFile(fixtures.session.root & "/app/controllers/Passwords.cfc");
+				var guardPos = find("if (!Len(arguments.token))", stripped);
+				var lookupPos = find('.where("resetTokenDigest", digest)', stripped);
+				expect(guardPos).toBeGT(0);
+				expect(lookupPos).toBeGT(guardPos);
+				expect(stripped).toInclude('Hash(arguments.token, "SHA-256")');
+				expect(stripped).notToInclude('.where("resetTokenDigest", arguments.token');
+			});
+
 			it("rejects a blank password on reset instead of burning the token (Passwords##update)", () => {
 				var stripped = $strippedFile(fixtures.session.root & "/app/controllers/Passwords.cfc");
 				// Presence is only validated onCreate and the hash callback
@@ -325,6 +338,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(arrayLen(files)).toBe(1);
 				var content = fileRead(fixtures.token.root & "/app/migrator/migrations/" & files[1]);
 				expect(content).toInclude('t.string(columnNames="apiTokenDigest"');
+				// Nullable, so a revoked token's digest (set to "") is stored as NULL.
+				expect(content).toInclude('t.string(columnNames="apiTokenDigest", allowNull=true');
+			});
+
+			it("looks a bearer token up only by its digest", () => {
+				var bootstrap = $stripComments(fileRead(fixtures.token.root & "/app/events/onapplicationstart.cfm"));
+				expect(bootstrap).toInclude('Hash(arguments.token, "SHA-256")');
+				expect(bootstrap).toInclude('.where("apiTokenDigest", digest)');
+				expect(bootstrap).notToInclude('.where("apiTokenDigest", arguments.token');
 			});
 
 			it("stores only the SHA-256 digest and returns the plaintext token once", () => {
