@@ -48,6 +48,8 @@ function Use-WebConfig([string]$Source, [string]$Target) {
 
 function Test-Variant([string]$Variant, [string]$Base) {
 	$h = 'http://127.0.0.1'
+	$d = Invoke-Probe "$h$Base/probe/diag"
+	Write-Host "[DIAG] $Variant $Base/probe/diag -> $($d.Status) $($d.Body)"
 	Add-Check $Variant 'index.cfm directly' "$h$Base/index.cfm" { param($r) $r.Status -eq 200 } '200'
 	Add-Check $Variant 'home' "$h$Base/" { param($r) $r.Status -eq 200 } '200'
 	Add-Check $Variant 'pretty URL' "$h$Base/probe/hello" { param($r) $r.Status -eq 200 -and $r.Body -match 'probe:hello' } '200 probe:hello'
