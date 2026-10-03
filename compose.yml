@@ -10,8 +10,11 @@ services:
     build:
       context: ./tools/docker/testui
     image: wheels-testui:v2.0.0
+    # Opt-in (not started by a bare `docker compose up`): docker compose --profile ui up -d
+    profiles: ["ui"]
+    # Localhost only: the UI can stop and restart containers through the Docker socket.
     ports:
-      - "3000:80"
+      - "127.0.0.1:3000:80"
     # Add extra_hosts to allow container to access host services
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -332,7 +335,7 @@ services:
       MYSQL_USER: wheelstestdb
       MYSQL_PASSWORD: wheelstestdb
     ports:
-      - "3307:3306"
+      - "127.0.0.1:3307:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
@@ -352,7 +355,7 @@ services:
       POSTGRES_PASSWORD: wheelstestdb
       POSTGRES_INITDB_ARGS: --auth-host=md5
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U wheelstestdb"]
       interval: 10s
@@ -376,7 +379,7 @@ services:
       MSSQL_PID: Developer
       MSSQL_MEMORY_LIMIT_MB: 2048
     ports:
-      - "1434:1433"
+      - "127.0.0.1:1434:1433"
     healthcheck:
       test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" -C || exit 1
       interval: 30s
@@ -399,8 +402,8 @@ services:
     restart: always
     command: start-single-node --insecure --advertise-addr=cockroachdb
     ports:
-      - "26258:26257"
-      - "8081:8080"
+      - "127.0.0.1:26258:26257"
+      - "127.0.0.1:8081:8080"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health?ready=1"]
       interval: 10s
@@ -431,7 +434,7 @@ services:
       APP_USER: wheelstestdb
       APP_USER_PASSWORD: wheelstestdb
     ports:
-      - "1522:1521"
+      - "127.0.0.1:1522:1521"
     volumes:
       - ./tools/docker/Oracle:/container-entrypoint-startdb.d
     healthcheck:
