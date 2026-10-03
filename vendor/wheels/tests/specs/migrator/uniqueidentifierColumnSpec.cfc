@@ -88,6 +88,8 @@ component extends="wheels.WheelsTest" {
 				expect(probe.$uuidDefaultVersionSupported(dbType = "MySQL", version = "9.7.0")).toBeTrue();
 				expect(probe.$uuidDefaultVersionSupported(dbType = "MySQL", version = "10.1.48-MariaDB")).toBeFalse();
 				expect(probe.$uuidDefaultVersionSupported(dbType = "MySQL", version = "10.11.6-MariaDB-1:10.11.6+maria")).toBeTrue();
+				expect(probe.$uuidDefaultVersionSupported(dbType = "MySQL", version = "5.5.5-10.11.6-MariaDB")).toBeTrue();
+				expect(probe.$uuidDefaultVersionSupported(dbType = "MySQL", version = "5.5.5-10.1.48-MariaDB")).toBeFalse();
 				expect(probe.$serverSupportsUuidDefault(dbType = "SQLite")).toBeTrue();
 			});
 
@@ -111,6 +113,16 @@ component extends="wheels.WheelsTest" {
 					var value = application.wo.$randomUuidV4();
 					expect(ReFind(variables.v4Pattern, value)).toBe(1, value);
 				}
+			});
+
+			// A seedable generator (RandRange/Rand) would repeat after the same Randomize() seed.
+			it("draws from a strong source that a seeded generator cannot repeat", () => {
+				Randomize(42);
+				var firstFallback = application.wo.$randomUuidV4();
+				var firstUuid = application.wo.generateUUID();
+				Randomize(42);
+				expect(application.wo.$randomUuidV4()).notToBe(firstFallback);
+				expect(application.wo.generateUUID()).notToBe(firstUuid);
 			});
 
 		});

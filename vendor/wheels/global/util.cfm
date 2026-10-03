@@ -932,26 +932,41 @@
 	 * @return A valid 36-character UUID string (e.g., 123e4567-e89b-12d3-a456-426614174000)
 	 */
 	public string function generateUUID() {
-		// Java's version 4 UUID where the JVM is available; a formatted random value otherwise
-		// (RustCFML has no Java objects). CreateUUID() is not used: it returns a 35-character
-		// 8-4-4-16 string, not a UUID.
+		// Java's version 4 UUID where the JVM provides one. The result is checked, not trusted:
+		// RustCFML answers CreateObject("java", "java.util.UUID") with a zero-filled value rather
+		// than an error. CreateUUID() is not used: it returns a 35-character 8-4-4-16 string.
+		local.candidate = "";
 		try {
-			return CreateObject("java", "java.util.UUID").randomUUID().toString();
+			local.candidate = LCase(CreateObject("java", "java.util.UUID").randomUUID().toString());
 		} catch (any e) {
-			return $randomUuidV4();
+			// no JVM UUID; use the fallback below
 		}
+		if (ReFind("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", local.candidate)) {
+			return local.candidate;
+		}
+		return $randomUuidV4();
 	}
 
 	/**
-	 * Internal function. A version 4 UUID (8-4-4-4-12, lowercase) built from random hex digits.
+	 * Internal function. A version 4 UUID (8-4-4-4-12, lowercase) built from 16 bytes of
+	 * GenerateSecretKey(), a cryptographically strong source on every supported engine, unlike
+	 * RandRange()/Rand(), whose generator is seedable (RustCFML ignores their algorithm
+	 * argument). Throws when no strong source is available rather than returning a weak value.
 	 */
 	public string function $randomUuidV4() {
-		local.hex = "";
-		for (local.i = 1; local.i <= 32; local.i++) {
-			local.hex &= FormatBaseN(RandRange(0, 15), 16);
+		try {
+			local.hex = LCase(BinaryEncode(BinaryDecode(GenerateSecretKey("AES", 128), "base64"), "hex"));
+		} catch (any e) {
+			Throw(
+				type = "Wheels.NoSecureRandom",
+				message = "generateUUID() needs a cryptographically strong random source, and none is available on this engine.",
+				extendedInfo = e.message
+			);
 		}
-		local.hex = LCase(local.hex);
-		local.variant = Mid("89ab", RandRange(1, 4), 1);
+		if (Len(local.hex) != 32) {
+			Throw(type = "Wheels.NoSecureRandom", message = "generateUUID() could not read 16 random bytes on this engine.");
+		}
+		local.variant = FormatBaseN(8 + (InputBaseN(Mid(local.hex, 17, 1), 16) MOD 4), 16);
 		return Mid(local.hex, 1, 8) & "-" & Mid(local.hex, 9, 4) & "-4" & Mid(local.hex, 14, 3) & "-" & local.variant & Mid(local.hex, 18, 3) & "-" & Mid(local.hex, 21, 12);
 	}
 

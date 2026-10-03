@@ -177,7 +177,10 @@ component extends="wheels.Global"{
 	 * e.g. "18.4 (Debian 18.4-1)", "8.0.12", "10.11.6-MariaDB".
 	 */
 	public boolean function $uuidDefaultVersionSupported(required string dbType, required string version) {
-		local.parts = ReMatch("[0-9]+", arguments.version);
+		// MariaDB through the MySQL driver often reports "5.5.5-10.11.6-MariaDB": drop the
+		// 5.5.5- compatibility prefix so the real version is read.
+		local.version = ReReplace(arguments.version, "^5\.5\.5-", "");
+		local.parts = ReMatch("[0-9]+", local.version);
 		if (ArrayLen(local.parts) < 2) {
 			return true;
 		}
@@ -187,7 +190,7 @@ component extends="wheels.Global"{
 		if (arguments.dbType == "PostgreSQL") {
 			return local.major >= 13;
 		}
-		if (FindNoCase("mariadb", arguments.version)) {
+		if (FindNoCase("mariadb", local.version)) {
 			return local.major > 10 || (local.major == 10 && local.minor >= 2);
 		}
 		return local.major > 8 || (local.major == 8 && (local.minor > 0 || local.patch >= 13));
