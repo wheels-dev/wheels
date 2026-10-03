@@ -85,7 +85,18 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
 
     **16b-ext — a closure whose first two statements are a zero-arg `$`-member call then an argumented `$`-member call, Adobe 2025.** The same `MissingNameException` fires when a closure body *opens* with `_controller.$clearCachableActions()` followed by `g.$clearCache("action")` (any receivers — local, `g = application.wo`, or `application.wo` itself). Probe-verified boundaries: the pair compiles when it is **not** the first two statements (an assignment, an argumented call, or even another zero-arg call before it rescues it), when the first call has arguments, when the first call is not `$`-prefixed (`_controller.flashClear()` then `_controller.$setFlashStorage("x")` compiles), or when the second call is zero-arg. Fix by reordering (`g.$clearCache("action")` first) or hoisting a `var`/assignment ahead of the pair. Hit by `ControllerHardenerSpec` / `ControllerHardenerShouldSpec` `afterEach` blocks (the Aug 28 matrix dispatch showed the whole adobe2025 leg at `tests="0"`).
 
-    Bisect this class of bug with a single probe against a running container instead of CI (~13s vs ~19min):
+    **16c — a quoted-string named argument in a direct call, Adobe 2023 ONLY.** `obj.method("name" = value)` — a named argument whose *name* is a quoted string literal, in a direct method/function call — is a compile error on **Adobe CF 2023** (`MissingNameException`), but compiles on Lucee 6/7, BoxLang, **and Adobe 2025**. This is the inverse footprint of its siblings: 16a fails both Adobe engines, 16b/16b-ext are Adobe 2025 only, and this one is the lone **2023-only** shape — so an adobe2025-green smoke does NOT cover it. The trigger is specifically a `"string"` name needed for a `$`-prefixed or hyphenated argument; an *unquoted* named argument (`name = value`) is fine on every engine, and a quoted *struct-literal* key (`{"$x" = 1}`) is fine everywhere (it is not a function-argument name). Like the others, Adobe blames the enclosing `describe(...)` / `function` line, and one occurrence zeroes the **entire adobe2023 leg** (`tests="0"` on every database) because the core suite compiles via `directory=`. Fix: build the arguments in a struct and pass them through `argumentCollection`, which sidesteps argument-name parsing and is byte-identical in effect:
+    ```cfm
+    // WRONG — MissingNameException on adobe2023 (green on Lucee/BoxLang/adobe2025)
+    var out = c.URLFor(controller = "posts", action = "index", "$argsResolved" = true);
+    // RIGHT — the $-prefixed name lives on a struct key, not an argument name
+    var args = {controller = "posts", action = "index"};
+    args["$argsResolved"] = true;
+    var out = c.URLFor(argumentCollection = args);
+    ```
+    Hit by `linkToUrlForDifferentialSpec` ([#4192](https://github.com/wheels-dev/wheels/pull/4192)); it was pre-existing and only the adobe2023 matrix legs caught it (Lucee-only local verification did not).
+
+    Bisect this class of bug with a single probe against a running container instead of CI (~13s vs ~19min) — use the engine's own port (`62025` for the Adobe 2025 shapes above, `62023` for the 16c Adobe 2023 shape):
     ```bash
     curl -s "http://localhost:62025/wheels/core/tests?db=sqlite&format=json&cli=true" | \
       python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('totalPass','COMPILE FAIL'), d.get('RootCause',{}).get('snippet',''))"
