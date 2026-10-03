@@ -34,9 +34,13 @@ component extends="wheels.WheelsTest" {
 		return StructKeyExists(application.wheels, "migratorLockTableName") ? application.wheels.migratorLockTableName : "wheels_migrator_locks";
 	}
 
-	function rawQuery(required string sql, array params = []) {
-		var rv = QueryExecute(arguments.sql, arguments.params, {datasource = variables.ds});
-		return IsQuery(rv) ? rv : QueryNew("");
+	// `params` is an array of plain values, or a struct of named typed values. Typed values go by
+	// name: RustCFML binds a typed struct in a positional array as its text.
+	function rawQuery(required string sql, any params = []) {
+		var result = {};
+		result.rows = QueryExecute(arguments.sql, arguments.params, {datasource = variables.ds});
+		// Adobe 2023 returns nothing for an UPDATE or DELETE, which leaves the key unset.
+		return StructKeyExists(result, "rows") && IsQuery(result.rows) ? result.rows : QueryNew("");
 	}
 
 	// An epoch-milliseconds query parameter, typed so PostgreSQL compares it as a number.
@@ -55,8 +59,8 @@ component extends="wheels.WheelsTest" {
 	// The lease row another instance would hold, expiring `expiresInMs` from now.
 	function holdAsAnotherInstance(required numeric expiresInMs) {
 		rawQuery(
-			"INSERT INTO #lockTable()# (lockname, lockowner, lockhost, acquiredat, expiresat) VALUES (?, ?, ?, ?, ?)",
-			["migrate", "spec-other-instance", "spec-host", ms(GetTickCount()), ms(GetTickCount() + arguments.expiresInMs)]
+			"INSERT INTO #lockTable()# (lockname, lockowner, lockhost, acquiredat, expiresat) VALUES ('migrate', 'spec-other-instance', 'spec-host', :acquiredAt, :expiresAt)",
+			{acquiredAt = ms(GetTickCount()), expiresAt = ms(GetTickCount() + arguments.expiresInMs)}
 		);
 	}
 
@@ -66,8 +70,11 @@ component extends="wheels.WheelsTest" {
 		var threadName = "migrationLockSpecHolder" & Replace(CreateUUID(), "-", "", "all");
 		thread name="#threadName#" action="run" table="#lockTable()#" ds="#variables.ds#" holdMs="#arguments.holdMs#" {
 			QueryExecute(
-				"INSERT INTO #attributes.table# (lockname, lockowner, lockhost, acquiredat, expiresat) VALUES (?, ?, ?, ?, ?)",
-				["migrate", "spec-other-instance", "spec-host", {value = GetTickCount(), cfsqltype = "cf_sql_bigint"}, {value = GetTickCount() + 60000, cfsqltype = "cf_sql_bigint"}],
+				"INSERT INTO #attributes.table# (lockname, lockowner, lockhost, acquiredat, expiresat) VALUES ('migrate', 'spec-other-instance', 'spec-host', :acquiredAt, :expiresAt)",
+				{
+					acquiredAt = {value = GetTickCount(), cfsqltype = "cf_sql_bigint"},
+					expiresAt = {value = GetTickCount() + 60000, cfsqltype = "cf_sql_bigint"}
+				},
 				{datasource = attributes.ds}
 			);
 			sleep(attributes.holdMs);
@@ -215,6 +222,9 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("is re-entrant within a request", () => {
+				if (!Len(variables.migrator.$migrationLockThreadId())) {
+					skip("Re-entrancy needs a thread identity; this engine has none.");
+				}
 				var outer = variables.migrator.$acquireMigrationLock();
 				var inner = variables.migrator.$acquireMigrationLock();
 				expect(inner.reentered).toBeTrue();
@@ -222,6 +232,87 @@ component extends="wheels.WheelsTest" {
 				expect(lockRows()).toBe(1);
 				variables.migrator.$releaseMigrationLock(outer);
 				expect(lockRows()).toBe(0);
+			});
+
+			// A JVM-free engine has no thread id, and a cfthread shares its parent's request scope:
+			// a second caller must take the database lock, never count as re-entering the first's.
+			it("doesn't re-enter another caller's lock without a thread identity", () => {
+				application.wheels.migrationLockTimeout = 1;
+				var m = CreateObject("component", "wheels.Migrator").init(
+					migratePath = "/wheels/tests/_assets/migrator/migrations_4134/",
+					sqlPath = "/wheels/tests/_assets/migrator/sql_4134/"
+				);
+				prepareMock(m);
+				m.$("$migrationLockThreadId", "");
+				var first = m.$acquireMigrationLock();
+				var state = {type = "", renewType = ""};
+				try {
+					m.$acquireMigrationLock();
+				} catch (any e) {
+					state.type = e.type;
+				}
+				try {
+					m.$renewMigrationLock();
+				} catch (any e) {
+					state.renewType = e.type;
+				}
+				m.$releaseMigrationLock(first);
+				expect(first.reentered).toBeFalse();
+				expect(state.type).toBe("Wheels.MigrationLockTimeout");
+				expect(state.renewType).toBe("");
+				expect(lockRows()).toBe(0);
+			});
+
+			it("tolerates a re-entered release after the outer lock was released", () => {
+				if (!Len(variables.migrator.$migrationLockThreadId())) {
+					skip("Re-entrancy needs a thread identity; this engine has none.");
+				}
+				var outer = variables.migrator.$acquireMigrationLock();
+				var inner = variables.migrator.$acquireMigrationLock();
+				variables.migrator.$releaseMigrationLock(outer);
+				variables.migrator.$releaseMigrationLock(inner);
+				expect(lockRows()).toBe(0);
+			});
+
+			it("reports a failed lease insert instead of waiting when no row exists", () => {
+				var m = CreateObject("component", "wheels.Migrator").init(
+					migratePath = "/wheels/tests/_assets/migrator/migrations_4134/",
+					sqlPath = "/wheels/tests/_assets/migrator/sql_4134/"
+				);
+				prepareMock(m);
+				m.$("$migrationLockOwner", "");
+				m.$(method = "$migrationLockQuery", throwException = true, throwType = "Spec.LeaseInsertFailed", throwMessage = "insert failed");
+				var state = {type = ""};
+				try {
+					m.$tryTakeMigrationLock({owner = "spec"});
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Spec.LeaseInsertFailed");
+				// The INSERT's own error, and no takeover UPDATE after it found no row to take over.
+				var statements = [];
+				for (var call in m.$callLog()["$migrationLockQuery"]) {
+					ArrayAppend(statements, Trim(ListFirst(call.sql, " ")));
+				}
+				expect(ArrayFind(statements, "INSERT")).toBeGT(0);
+				expect(ArrayFindNoCase(statements, "UPDATE")).toBe(0);
+			});
+
+			it("takes no lock, and warns once, when createMigratorTable is off and the table is missing", () => {
+				var saved = {table = application.wheels.migratorLockTableName, create = application.wheels.createMigratorTable};
+				application.wheels.migratorLockTableName = "wheels_spec_absent_locks";
+				application.wheels.createMigratorTable = false;
+				var state = {available = true, warned = false};
+				try {
+					state.available = variables.migrator.$migrationLockAvailable(variables.ds);
+					state.warned = StructKeyExists(application.wheels, "$migrationLockWarned")
+						&& StructKeyExists(application.wheels["$migrationLockWarned"], variables.ds);
+				} finally {
+					application.wheels.migratorLockTableName = saved.table;
+					application.wheels.createMigratorTable = saved.create;
+				}
+				expect(state.available).toBeFalse();
+				expect(state.warned).toBeTrue();
 			});
 
 			it("is not taken in SQL preview mode", () => {

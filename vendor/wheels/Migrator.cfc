@@ -431,12 +431,17 @@ component output="false" extends="wheels.Global"{
 		local.dataSource = $migratorDataSource();
 		local.key = $migrationLockKey(local.dataSource);
 		local.held = $heldMigrationLocks();
-		if (StructKeyExists(local.held, local.key)) {
+		if (Len(local.key) && StructKeyExists(local.held, local.key)) {
 			local.held[local.key].depth++;
 			return {dataSource = local.dataSource, key = local.key, active = true, reentered = true};
 		}
 		if (!$migrationLockAvailable(local.dataSource)) {
 			return {dataSource = local.dataSource, key = local.key, active = false, reentered = false};
+		}
+		local.owner = Replace(CreateUUID(), "-", "", "all");
+		// Without a thread identity every acquisition is its own holder and takes the database lock.
+		if (!Len(local.key)) {
+			local.key = local.dataSource & "|untracked-" & local.owner;
 		}
 		local.migrationLock = {
 			key = local.key,
@@ -444,7 +449,7 @@ component output="false" extends="wheels.Global"{
 			active = true,
 			reentered = false,
 			depth = 1,
-			owner = Replace(CreateUUID(), "-", "", "all")
+			owner = local.owner
 		};
 		$waitForMigrationLock(local.migrationLock);
 		local.held[local.key] = local.migrationLock;
@@ -461,14 +466,17 @@ component output="false" extends="wheels.Global"{
 		}
 		local.held = $heldMigrationLocks();
 		if (arguments.migrationLock.reentered) {
-			local.held[arguments.migrationLock.key].depth--;
+			// The outer holder may already have released it (it then deleted the entry).
+			if (StructKeyExists(local.held, arguments.migrationLock.key)) {
+				local.held[arguments.migrationLock.key].depth--;
+			}
 			return;
 		}
 		StructDelete(local.held, arguments.migrationLock.key);
 		try {
 			$migrationLockQuery(
-				sql = "DELETE FROM #$migrationLockTable()# WHERE lockname = ? AND lockowner = ?",
-				params = [$migrationLockName(), arguments.migrationLock.owner]
+				sql = "DELETE FROM #$migrationLockTable()# WHERE lockname = :lockName AND lockowner = :owner",
+				params = {lockName = $migrationLockText($migrationLockName()), owner = $migrationLockText(arguments.migrationLock.owner)}
 			);
 		} catch (any e) {
 			WriteLog(type = "error", file = "wheels", text = "Migrator: could not release the migration lock: #e.message#");
@@ -482,14 +490,18 @@ component output="false" extends="wheels.Global"{
 	 */
 	public void function $renewMigrationLock() {
 		local.held = $heldMigrationLocks();
-		local.key = $migrationLockKey($migratorDataSource());
-		if (!StructKeyExists(local.held, local.key)) {
+		local.key = $currentMigrationLockKey($migratorDataSource());
+		if (!Len(local.key)) {
 			return;
 		}
 		local.migrationLock = local.held[local.key];
 		$migrationLockQuery(
-			sql = "UPDATE #$migrationLockTable()# SET expiresat = ? WHERE lockname = ? AND lockowner = ?",
-			params = [$migrationLockMs($migrationLockExpiry()), $migrationLockName(), local.migrationLock.owner]
+			sql = "UPDATE #$migrationLockTable()# SET expiresat = :expiresAt WHERE lockname = :lockName AND lockowner = :owner",
+			params = {
+				expiresAt = $migrationLockMs($migrationLockExpiry()),
+				lockName = $migrationLockText($migrationLockName()),
+				owner = $migrationLockText(local.migrationLock.owner)
+			}
 		);
 		if ($migrationLockOwner() != local.migrationLock.owner) {
 			StructDelete(local.held, local.key);
@@ -534,12 +546,23 @@ component output="false" extends="wheels.Global"{
 		}
 		try {
 			$migrationLockQuery(
-				sql = "INSERT INTO #$migrationLockTable()# (lockname, lockowner, lockhost, acquiredat, expiresat) VALUES (?, ?, ?, ?, ?)",
-				params = [$migrationLockName(), arguments.migrationLock.owner, $migrationLockHost(), $migrationLockMs(local.now), $migrationLockMs($migrationLockExpiry())]
+				sql = "INSERT INTO #$migrationLockTable()# (lockname, lockowner, lockhost, acquiredat, expiresat) VALUES (:lockName, :owner, :host, :acquiredAt, :expiresAt)",
+				params = {
+					lockName = $migrationLockText($migrationLockName()),
+					owner = $migrationLockText(arguments.migrationLock.owner),
+					host = $migrationLockText($migrationLockHost()),
+					acquiredAt = $migrationLockMs(local.now),
+					expiresAt = $migrationLockMs($migrationLockExpiry())
+				}
 			);
 			return true;
 		} catch (any e) {
-			// The row exists: take it over only if its lease has expired.
+			// No row even now: the INSERT failed for another reason (a missing table, a lost
+			// connection), so report it instead of waiting out migrationLockTimeout.
+			if (!Len($migrationLockOwner())) {
+				rethrow;
+			}
+			// Another instance inserted it first: take it over only if its lease has expired.
 			return $takeOverExpiredMigrationLock(migrationLock = arguments.migrationLock, now = local.now);
 		}
 	}
@@ -550,8 +573,14 @@ component output="false" extends="wheels.Global"{
 	 */
 	public boolean function $takeOverExpiredMigrationLock(required struct migrationLock, required numeric now) {
 		$migrationLockQuery(
-			sql = "UPDATE #$migrationLockTable()# SET lockowner = ?, lockhost = ?, acquiredat = ?, expiresat = ? WHERE lockname = ? AND expiresat < ?",
-			params = [arguments.migrationLock.owner, $migrationLockHost(), $migrationLockMs(arguments.now), $migrationLockMs($migrationLockExpiry()), $migrationLockName(), $migrationLockMs(arguments.now)]
+			sql = "UPDATE #$migrationLockTable()# SET lockowner = :owner, lockhost = :host, acquiredat = :now, expiresat = :expiresAt WHERE lockname = :lockName AND expiresat < :now",
+			params = {
+				owner = $migrationLockText(arguments.migrationLock.owner),
+				host = $migrationLockText($migrationLockHost()),
+				now = $migrationLockMs(arguments.now),
+				expiresAt = $migrationLockMs($migrationLockExpiry()),
+				lockName = $migrationLockText($migrationLockName())
+			}
 		);
 		return $migrationLockOwner() == arguments.migrationLock.owner;
 	}
@@ -569,6 +598,7 @@ component output="false" extends="wheels.Global"{
 			return true;
 		}
 		if (!application[$appKey()].createMigratorTable) {
+			$warnMigrationLockTableMissing(dataSource = arguments.dataSource, table = local.table);
 			return false;
 		}
 		try {
@@ -586,12 +616,32 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. One log warning per datasource that migrations run without the
+	 * cross-process lock, because createMigratorTable is off and the lock table is missing.
+	 */
+	public void function $warnMigrationLockTableMissing(required string dataSource, required string table) {
+		local.app = application[$appKey()];
+		if (!StructKeyExists(local.app, "$migrationLockWarned")) {
+			local.app["$migrationLockWarned"] = {};
+		}
+		if (StructKeyExists(local.app["$migrationLockWarned"], arguments.dataSource)) {
+			return;
+		}
+		local.app["$migrationLockWarned"][arguments.dataSource] = true;
+		WriteLog(
+			type = "warning",
+			file = "wheels",
+			text = "Migrator: createMigratorTable is off and #arguments.table# is missing on #arguments.dataSource#, so migrations run without the cross-process lock. Create it to enable the lock: CREATE TABLE #arguments.table# (lockname VARCHAR(100) NOT NULL PRIMARY KEY, lockowner VARCHAR(64) NOT NULL, lockhost VARCHAR(255), acquiredat DECIMAL(15,0) NOT NULL, expiresat DECIMAL(15,0) NOT NULL)"
+		);
+	}
+
+	/**
 	 * Internal function. The owner id holding the migration lock, or "" when it is free.
 	 */
 	public string function $migrationLockOwner() {
 		local.rows = $migrationLockQuery(
-			sql = "SELECT lockowner FROM #$migrationLockTable()# WHERE lockname = ?",
-			params = [$migrationLockName()]
+			sql = "SELECT lockowner FROM #$migrationLockTable()# WHERE lockname = :lockName",
+			params = {lockName = $migrationLockText($migrationLockName())}
 		);
 		return local.rows.recordCount ? local.rows.lockowner : "";
 	}
@@ -601,8 +651,8 @@ component output="false" extends="wheels.Global"{
 	 */
 	public string function $migrationLockHolder() {
 		local.rows = $migrationLockQuery(
-			sql = "SELECT lockowner, lockhost, acquiredat, expiresat FROM #$migrationLockTable()# WHERE lockname = ?",
-			params = [$migrationLockName()]
+			sql = "SELECT lockowner, lockhost, acquiredat, expiresat FROM #$migrationLockTable()# WHERE lockname = :lockName",
+			params = {lockName = $migrationLockText($migrationLockName())}
 		);
 		if (!local.rows.recordCount) {
 			return "no instance any more";
@@ -613,9 +663,11 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * Internal function. Runs a parameterised query against the migrator's datasource.
+	 * Internal function. Runs a query with named, typed parameters against the migrator's
+	 * datasource. Named, not positional: RustCFML binds a `{value, cfsqltype}` struct in a
+	 * positional array as its text, so the lease columns held "{value: ..., cfsqltype: ...}".
 	 */
-	public query function $migrationLockQuery(required string sql, required array params) {
+	public query function $migrationLockQuery(required string sql, required struct params) {
 		local.options = {datasource = $migratorDataSource()};
 		local.credentials = $migratorDataSourceCredentials();
 		if (Len(local.credentials.username)) {
@@ -625,7 +677,11 @@ component output="false" extends="wheels.Global"{
 			local.options.password = local.credentials.password;
 		}
 		local.rv = QueryExecute(arguments.sql, arguments.params, local.options);
-		return IsQuery(local.rv) ? local.rv : QueryNew("");
+		// Adobe 2023 returns nothing at all for an UPDATE or DELETE, so `local.rv` is never created.
+		if (StructKeyExists(local, "rv") && IsQuery(local.rv)) {
+			return local.rv;
+		}
+		return QueryNew("");
 	}
 
 	/**
@@ -634,12 +690,40 @@ component output="false" extends="wheels.Global"{
 	 * let a thread and its parent both think they hold the same lock.
 	 */
 	public string function $migrationLockKey(required string dataSource) {
+		local.threadId = $migrationLockThreadId();
+		return Len(local.threadId) ? arguments.dataSource & "|" & local.threadId : "";
+	}
+
+	/**
+	 * Internal function. The current thread's id, or "" on an engine without one (a JVM-free
+	 * engine). Without it there is no re-entrancy: every acquisition takes the database lock.
+	 */
+	public string function $migrationLockThreadId() {
 		try {
-			return arguments.dataSource & "|" & CreateObject("java", "java.lang.Thread").currentThread().getId();
+			return CreateObject("java", "java.lang.Thread").currentThread().getId();
 		} catch (any e) {
-			// A JVM-free engine: one key per datasource.
-			return arguments.dataSource & "|0";
+			return "";
 		}
+	}
+
+	/**
+	 * Internal function. The key of the migration lock this thread holds for `dataSource`, or "".
+	 * Without a thread identity it is the one untracked entry for the datasource: only one caller
+	 * can hold the database lock, so there is at most one.
+	 */
+	public string function $currentMigrationLockKey(required string dataSource) {
+		local.held = $heldMigrationLocks();
+		local.key = $migrationLockKey(arguments.dataSource);
+		if (Len(local.key)) {
+			return StructKeyExists(local.held, local.key) ? local.key : "";
+		}
+		local.prefix = arguments.dataSource & "|untracked-";
+		for (local.candidate in local.held) {
+			if (Left(local.candidate, Len(local.prefix)) == local.prefix) {
+				return local.candidate;
+			}
+		}
+		return "";
 	}
 
 	/**
@@ -670,7 +754,9 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * Internal function. A new lease's expiry, in epoch milliseconds.
+	 * Internal function. A new lease's expiry, in epoch milliseconds. Lease times use GetTickCount(),
+	 * which is epoch milliseconds on Lucee, Adobe, BoxLang and RustCFML (the same contract the
+	 * RateLimiter's database store relies on), so hosts compare them on one clock.
 	 */
 	public numeric function $migrationLockExpiry() {
 		return GetTickCount() + $get("migrationLockLease") * 1000;
@@ -683,6 +769,13 @@ component output="false" extends="wheels.Global"{
 	 */
 	public struct function $migrationLockMs(required numeric value) {
 		return {value = arguments.value, cfsqltype = "cf_sql_bigint"};
+	}
+
+	/**
+	 * Internal function. A text value as a typed query parameter.
+	 */
+	public struct function $migrationLockText(required string value) {
+		return {value = arguments.value, cfsqltype = "cf_sql_varchar"};
 	}
 
 	/**
