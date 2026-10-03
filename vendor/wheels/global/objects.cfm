@@ -191,6 +191,10 @@
 				local.plan = $buildComponentIntegrationPlan(arguments.path);
 				lock name="wheels.integrationPlans.#application.applicationName#" type="exclusive" timeout="10" {
 					application.wheels.integrationPlans[arguments.path] = local.plan;
+					// Cached controller integration results hold refs from the old plan (#4149).
+					if (StructKeyExists(application.wheels, "controllerIntegration")) {
+						StructClear(application.wheels.controllerIntegration);
+					}
 				}
 				$warnNullIntegrationPlanRefs(arguments.path);
 			}
@@ -504,6 +508,9 @@
 	 */
 	public void function $clearControllerInitializationCache() {
 		StructClear(application.wheels.controllers);
+		if (StructKeyExists(application.wheels, "controllerIntegration")) {
+			StructClear(application.wheels.controllerIntegration);
+		}
 	}
 
 
