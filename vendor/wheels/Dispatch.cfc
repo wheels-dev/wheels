@@ -334,25 +334,61 @@ component output="false" extends="wheels.Global"{
 
 	/**
 	 * Internal function. The route index for `routes`, cached on the application
-	 * and rebuilt whenever the table changed since it was built: `$addRoute()` and
-	 * route reloads bump `routeTableGeneration`, and a table replaced outright
-	 * (as specs do) changes the count or the generation.
+	 * and reused only while it still describes the live table:
+	 * - `routeTableGeneration` is unchanged (`$addRoute()` and route reloads bump it);
+	 * - the route count is unchanged;
+	 * - a sampled signature of the table is unchanged (`$routeTableSignature()`).
+	 *   This catches a table assigned to `application.wheels.routes` directly,
+	 *   which bumps nothing. Specs restore saved tables that way, and app code may.
 	 */
 	public struct function $dynamicRouteIndex(required array routes) {
 		local.generation = StructKeyExists(application.wheels, "routeTableGeneration") ? application.wheels.routeTableGeneration : 0;
 		local.count = ArrayLen(arguments.routes);
+		local.signature = $routeTableSignature(arguments.routes);
 		if (
 			StructKeyExists(application.wheels, "dynamicRouteIndex")
 			&& application.wheels.dynamicRouteIndex.generation == local.generation
 			&& application.wheels.dynamicRouteIndex.count == local.count
+			&& application.wheels.dynamicRouteIndex.signature == local.signature
 		) {
 			return application.wheels.dynamicRouteIndex;
 		}
 		local.index = $buildDynamicRouteIndex(routes = arguments.routes);
 		local.index.generation = local.generation;
 		local.index.count = local.count;
+		local.index.signature = local.signature;
 		application.wheels.dynamicRouteIndex = local.index;
 		return local.index;
+	}
+
+	/**
+	 * Internal function. A fixed-cost fingerprint of a route table: the name, pattern
+	 * and methods of its first and last routes and of up to 16 evenly spaced routes
+	 * between them. Two different tables of the same length differ here unless they
+	 * agree on every sampled route.
+	 */
+	public string function $routeTableSignature(required array routes) {
+		local.count = ArrayLen(arguments.routes);
+		if (!local.count) {
+			return "";
+		}
+		local.step = Max(1, Int(local.count / 16));
+		local.positions = [1];
+		for (local.i = 1 + local.step; local.i < local.count; local.i += local.step) {
+			ArrayAppend(local.positions, local.i);
+		}
+		ArrayAppend(local.positions, local.count);
+		local.parts = [];
+		for (local.i in local.positions) {
+			local.route = arguments.routes[local.i];
+			ArrayAppend(
+				local.parts,
+				(StructKeyExists(local.route, "name") ? local.route.name : "")
+				& "|" & local.route.pattern
+				& "|" & (StructKeyExists(local.route, "methods") ? local.route.methods : "")
+			);
+		}
+		return ArrayToList(local.parts, Chr(10));
 	}
 
 	/**

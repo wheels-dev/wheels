@@ -78,6 +78,42 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
+			it("never serves a stale index after a same-length table is assigned back directly (no generation bump)", () => {
+				var saved = {
+					routes = application.wheels.routes,
+					staticRoutes = application.wheels.staticRoutes,
+					named = application.wheels.namedRoutePositions
+				};
+				try {
+					$clearRoutes();
+					application.wo.mapper()
+						.get(name = "alphaThing", pattern = "alpha/[key]", to = "alpha##show")
+						.get(name = "gammaThing", pattern = "gamma/[key]", to = "gamma##show")
+						.end();
+					expect(d.$findMatchingRoute(path = "alpha/1", requestMethod = "GET").name).toBe("alphaThing");
+					var tableA = application.wheels.routes;
+
+					$clearRoutes();
+					application.wo.mapper()
+						.get(name = "betaThing", pattern = "beta/[key]", to = "beta##show")
+						.get(name = "deltaThing", pattern = "delta/[key]", to = "delta##show")
+						.end();
+					expect(d.$findMatchingRoute(path = "beta/1", requestMethod = "GET").name).toBe("betaThing");
+
+					// Restore table A the way specs (and app code) do: plain assignment,
+					// same length, nothing bumped.
+					application.wheels.routes = tableA;
+					expect(d.$findMatchingRoute(path = "alpha/1", requestMethod = "GET").name).toBe("alphaThing");
+					expect(() => {
+						d.$findMatchingRoute(path = "beta/1", requestMethod = "GET");
+					}).toThrow("Wheels.RouteNotFound");
+				} finally {
+					application.wheels.routes = saved.routes;
+					application.wheels.staticRoutes = saved.staticRoutes;
+					application.wheels.namedRoutePositions = saved.named;
+				}
+			});
+
 			it("keeps the exact-path static index ahead of an earlier placeholder route (##3073)", () => {
 				expect(d.$findMatchingRoute(path = "dogs/featured", requestMethod = "GET").name).toBe("featuredDogs");
 			});
