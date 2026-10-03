@@ -313,9 +313,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     /**
      * The in-flight servlet request's local listen port, or 0 when unavailable
      * (e.g. a non-servlet engine such as RustCFML, which then skips the whole
-     * step). Private; the pure candidate logic lives in $servletLoopbackCandidates.
+     * step). Public so a test double can stub it; the pure candidate logic lives
+     * in $servletLoopbackCandidates.
      */
-    private numeric function $servletLocalPort() {
+    public numeric function $servletLocalPort() {
         try {
             if (getFunctionList().keyExists("getPageContext")) {
                 var req = getPageContext().getRequest();
@@ -334,23 +335,34 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
     /**
      * $probeHttpEndpoint memoized per candidate URL (scheme+port) in the
-     * application scope, so a fallback app pays the probe timeout at most once
-     * rather than on every $testClient() call. Negative results are cached too.
+     * application scope. A positive result is cached for the app lifetime; a
+     * negative is cached only for a short TTL, so a transient failure (e.g. a
+     * cold-start blip) self-heals rather than permanently pinning the candidate
+     * as "no HTTP here", while a real AJP front end still avoids paying the
+     * timeout on every single $testClient() call within the TTL window.
      * Lock-free: the read/write is a cheap struct op and the probe (which waits)
      * runs outside any lock; concurrent first-use probes are idempotent.
      */
     private boolean function $probeHttpEndpointCached(required string candidate) {
         var cacheKey = "$testClientLoopbackProbe";
+        var negativeTtlMs = 60000;
         try {
             var appScope = application[$appKey()];
             if (!structKeyExists(appScope, cacheKey)) {
                 appScope[cacheKey] = {};
             }
-            if (structKeyExists(appScope[cacheKey], arguments.candidate)) {
-                return appScope[cacheKey][arguments.candidate];
+            var cache = appScope[cacheKey];
+            if (structKeyExists(cache, arguments.candidate)) {
+                var entry = cache[arguments.candidate];
+                // A positive result is cached for the app lifetime; a negative
+                // expires after a short TTL so a transient failure self-heals
+                // (never permanently pins a cold-start timeout as "no HTTP here").
+                if (entry.answer || (GetTickCount() - entry.at) < negativeTtlMs) {
+                    return entry.answer;
+                }
             }
             var answered = $probeHttpEndpoint(arguments.candidate);
-            appScope[cacheKey][arguments.candidate] = answered;
+            cache[arguments.candidate] = {answer = answered, at = GetTickCount()};
             return answered;
         } catch (any e) {
             // If the cache scope is unavailable, probe directly (uncached).
@@ -371,7 +383,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         try {
             cfhttp(
                 method = "GET",
-                url = arguments.candidate & "/wheels/info",
+                url = arguments.candidate & "/WEB-INF/wheels-loopback-probe",
                 redirect = false,
                 timeout = 1,
                 throwonerror = false,

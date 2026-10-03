@@ -86,7 +86,8 @@ component extends="wheels.WheelsTest" {
 					var inet = CreateObject("java", "java.net.InetAddress").getByName("127.0.0.1");
 					serverSocket = CreateObject("java", "java.net.ServerSocket").init(JavaCast("int", 0), JavaCast("int", 1), inet);
 				} catch (any e) {
-					return; // java.net unavailable on this engine — capability skip
+					skip("java.net unavailable on this engine — the AJP socket shape only runs where CreateObject(java) works");
+					return;
 				}
 				var state = {result = true, elapsed = 0};
 				try {
@@ -120,6 +121,54 @@ component extends="wheels.WheelsTest" {
 				var cgiScope = {server_port = 443};
 				var expected = ["http://127.0.0.1:8080", "https://127.0.0.1:8080"];
 				expect(bt.$servletLoopbackCandidates(cgiScope, 8080)).toBe(expected);
+			});
+		});
+
+		// Drive the COMPLETE resolvers (WheelsTest.$getTestBaseUrl + BrowserTest.$resolveBaseUrl)
+		// through the mapped-success, cgi-fallback, and cache paths, using a double that stubs the
+		// servlet local port and the HTTP probe (no live server). 9001 is a port the runner never
+		// listens on, so the local/Host mismatch always registers as a mapping.
+		describe("complete resolver paths via a stubbed probe (4195)", () => {
+
+			var stub = new wheels.tests._assets.wheelstest.LoopbackResolverStub();
+
+			it("WheelsTest resolver: mapped + probe answers -> loopback on the local port", () => {
+				stub.$setLoopbackStub(9001, true);
+				expect(stub.$resolveTestClientBaseUrl()).toBe("http://127.0.0.1:9001");
+			});
+
+			it("WheelsTest resolver: mapped + probe fails -> falls back to cgi (not the loopback)", () => {
+				stub.$setLoopbackStub(9001, false);
+				var expectedFallback = stub.$detectTestBaseUrlFromCgi(cgi);
+				if (!len(expectedFallback)) {
+					expectedFallback = "http://localhost:8080";
+				}
+				var resolved = stub.$resolveTestClientBaseUrl();
+				expect(resolved).notToBe("http://127.0.0.1:9001", "must not use a loopback the probe rejected");
+				expect(resolved).toBe(expectedFallback, "must fall back to the existing cgi resolution");
+			});
+
+			it("WheelsTest resolver: the probe result is cached (probed once across two resolves)", () => {
+				stub.$setLoopbackStub(9001, true);
+				stub.$resolveTestClientBaseUrl();
+				stub.$resolveTestClientBaseUrl();
+				expect(stub.$probeCalls()).toBe(1, "a positive probe must be cached, not repeated per resolve");
+			});
+
+			it("BrowserTest resolver: mapped + probe answers -> loopback on the local port", () => {
+				stub.$setLoopbackStub(9001, true);
+				expect(stub.$resolveBaseUrl()).toBe("http://127.0.0.1:9001");
+			});
+
+			it("BrowserTest resolver: mapped + probe fails -> falls back to cgi (not the loopback)", () => {
+				stub.$setLoopbackStub(9001, false);
+				var expectedFallback = stub.$detectBaseUrlFromCgi(cgi);
+				if (!len(expectedFallback)) {
+					expectedFallback = "http://localhost:8080";
+				}
+				var resolved = stub.$resolveBaseUrl();
+				expect(resolved).notToBe("http://127.0.0.1:9001", "must not use a loopback the probe rejected");
+				expect(resolved).toBe(expectedFallback, "must fall back to the existing cgi resolution");
 			});
 		});
 	}
