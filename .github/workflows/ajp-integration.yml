@@ -1,0 +1,42 @@
+name: TestClient works behind an AJP front end
+
+# Optional, manual regression check (#4210): runs the internal TestClient specs through Apache
+# httpd -> mod_proxy_ajp -> Lucee 7's AJP connector, the shape of IIS+BonCode / mod_jk
+# deployments, and asserts they pass. See tools/ci/ajp/run.sh for what the servlet reports there.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ajp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Build the Lucee 7 image
+        run: |
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          until docker compose build lucee7; do
+            if [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ]; then
+              echo "::error::docker compose build failed after ${MAX_ATTEMPTS} attempts"
+              exit 1
+            fi
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 15
+          done
+
+      - name: Run the TestClient specs through httpd and AJP
+        run: AJP_HTTPD_PORT=9590 AJP_RESULT_JSON=ajp-result.json bash tools/ci/ajp/run.sh wheels-ajp
+
+      - name: Upload the result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ajp-result
+          path: ajp-result.json
+          if-no-files-found: ignore

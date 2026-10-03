@@ -1,0 +1,25 @@
+{
+	"profile": "development",
+	"force": true,
+	"web": {
+		"host": "localhost",
+		"webroot": "public",
+		"http": {
+			"port": "60007",
+			"enable": true
+		},
+		"rewrites": {
+			"enable": true,
+			"config": "public/urlrewrite.xml"
+		},
+		"ajp": {
+			"enable": true,
+			"port": "8009"
+		}
+	},
+	"app": {
+		"cfengine": "lucee@7.0.1+100",
+		"libDirs": "/opt/wheels-lib"
+	},
+	"cfconfigFile": "CFConfig.json"
+}
