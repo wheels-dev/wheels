@@ -27,25 +27,38 @@
 	 * @name A unique name for the lock. Different callers using the same name will contend for the same lock.
 	 * @timeout Maximum number of seconds to wait for the lock in all: first for another caller in this application, then for the database lock with the time that is left (at least one second), so the wait is about `timeout` at most.
 	 * @callback A function or closure to execute while holding the lock. Its return value is returned by this method.
+	 * @transaction When `true`, acquire the lock, run the callback, and release the lock on one connection pinned by a transaction, so the lock genuinely covers the callback's own queries and (on PostgreSQL / SQL Server) auto-releases at transaction end (#4198). The callback then runs inside a transaction: its writes commit or roll back together, and a `transaction()` inside it nests. Recommended for short critical sections; avoid for long-running callbacks, which would hold their row locks and a pooled connection — and block PostgreSQL VACUUM — for the whole call. Supported on PostgreSQL, MySQL, and SQL Server; `true` on any other database throws. Defaults to `false` (the session-scoped behaviour).
 	 */
 	public any function withAdvisoryLock(
 		required string name,
 		numeric timeout = 10,
-		required any callback
+		required any callback,
+		boolean transaction = false
 	) {
 		// MySQL and PostgreSQL locks belong to the pooled session that took them, and a session can
 		// take its own lock again. Without this named lock a second caller in this application could
-		// borrow that idle session, get the lock too, and leave it held (#4197).
+		// borrow that idle session, get the lock too, and leave it held (#4197). The named lock is
+		// kept on the transaction path too: it serialises in-app waiters so they don't each pin a
+		// pooled connection while blocked in the database acquire loop (#4198).
 		local.state = {entered = false};
 		local.startedAt = GetTickCount();
 		try {
 			lock name="#$advisoryLockLocalName(arguments.name)#" type="exclusive" timeout="#arguments.timeout#" {
 				local.state.entered = true;
-				local.result = $runWithAdvisoryLock(
-					name = arguments.name,
-					timeout = $advisoryLockSecondsLeft(timeout = arguments.timeout, startedAt = local.startedAt),
-					callback = arguments.callback
-				);
+				local.dbTimeout = $advisoryLockSecondsLeft(timeout = arguments.timeout, startedAt = local.startedAt);
+				if (arguments.transaction) {
+					local.result = $runWithAdvisoryLockTransactional(
+						name = arguments.name,
+						timeout = local.dbTimeout,
+						callback = arguments.callback
+					);
+				} else {
+					local.result = $runWithAdvisoryLock(
+						name = arguments.name,
+						timeout = local.dbTimeout,
+						callback = arguments.callback
+					);
+				}
 			}
 		} catch (any e) {
 			if (!local.state.entered) {
@@ -121,6 +134,120 @@
 				rethrow;
 			}
 			WriteLog(type = "error", file = "wheels", text = "withAdvisoryLock: #e.message#");
+		}
+	}
+
+	/**
+	 * Internal function. The transaction-scoped path for withAdvisoryLock(transaction = true) (#4198).
+	 * Pins acquire + callback + release to one connection by running them in a transaction, so the
+	 * lock genuinely covers the callback's own queries. An unsupported database throws rather than
+	 * falling back silently: the opt-in asks for a guarantee this adapter can't give. When a
+	 * transaction is already open on this connection the lock joins it (no second transaction), so a
+	 * transaction-scoped lock is held until that OUTER transaction ends.
+	 */
+	public any function $runWithAdvisoryLockTransactional(required string name, required numeric timeout, required any callback) {
+		local.adapter = variables.wheels.class.adapter;
+		if (!local.adapter.$supportsTransactionalAdvisoryLock()) {
+			Throw(
+				type = "Wheels.AdvisoryLockNotSupported",
+				message = "Transaction-scoped advisory locks (transaction = true) are not supported for this database.",
+				extendedInfo = "Call withAdvisoryLock() without transaction = true to use the default behaviour, or use PostgreSQL, MySQL, or SQL Server."
+			);
+		}
+		if ($transactionIsOpen($hashedConnectionArgs())) {
+			return $runAdvisoryLockInOpenTransaction(
+				adapter = local.adapter,
+				name = arguments.name,
+				timeout = arguments.timeout,
+				callback = arguments.callback
+			);
+		}
+		return $runAdvisoryLockInNewTransaction(
+			adapter = local.adapter,
+			name = arguments.name,
+			timeout = arguments.timeout,
+			callback = arguments.callback
+		);
+	}
+
+	/**
+	 * Internal function. Opens a transaction, acquires the lock on its pinned connection, runs the
+	 * callback and releases the lock (#4198). A session-scoped lock (MySQL) is released explicitly in
+	 * a finally-style step before the block commits or rolls back; a transaction-scoped lock
+	 * (PostgreSQL / SQL Server) auto-releases at transaction end, so its release step is a no-op. A
+	 * callback failure rolls the transaction back and rethrows; a release that fails during that
+	 * failure is logged, never allowed to replace the callback's own error.
+	 */
+	public any function $runAdvisoryLockInNewTransaction(required any adapter, required string name, required numeric timeout, required any callback) {
+		local.ctx = {hasResult = false, result = ""};
+		transaction {
+			arguments.adapter.$acquireAdvisoryLockTransactional(name = arguments.name, timeout = arguments.timeout);
+			try {
+				local.cbResult = arguments.callback();
+				if (StructKeyExists(local, "cbResult")) {
+					local.ctx.hasResult = true;
+					local.ctx.result = local.cbResult;
+				}
+			} catch (any e) {
+				$releaseTransactionalAdvisoryLockQuietly(adapter = arguments.adapter, name = arguments.name);
+				transaction action="rollback";
+				rethrow;
+			}
+			$releaseTransactionalAdvisoryLock(adapter = arguments.adapter, name = arguments.name);
+		}
+		if (local.ctx.hasResult) {
+			return local.ctx.result;
+		}
+	}
+
+	/**
+	 * Internal function. Acquires the lock on the connection of an already-open transaction and runs
+	 * the callback without opening a second transaction (#4198). A transaction-scoped lock
+	 * (PostgreSQL / SQL Server) is NOT released here: it belongs to the OUTER transaction and is held
+	 * until that owner commits or rolls back. A session-scoped lock (MySQL) is released at call end,
+	 * since the outer transaction keeps running. A callback failure rethrows; the session-scoped lock
+	 * is released first (logged on failure) so it is not leaked onto the still-open outer transaction.
+	 */
+	public any function $runAdvisoryLockInOpenTransaction(required any adapter, required string name, required numeric timeout, required any callback) {
+		arguments.adapter.$acquireAdvisoryLockTransactional(name = arguments.name, timeout = arguments.timeout);
+		local.ctx = {hasResult = false, result = ""};
+		try {
+			local.cbResult = arguments.callback();
+			if (StructKeyExists(local, "cbResult")) {
+				local.ctx.hasResult = true;
+				local.ctx.result = local.cbResult;
+			}
+		} catch (any e) {
+			$releaseTransactionalAdvisoryLockQuietly(adapter = arguments.adapter, name = arguments.name);
+			rethrow;
+		}
+		$releaseTransactionalAdvisoryLock(adapter = arguments.adapter, name = arguments.name);
+		if (local.ctx.hasResult) {
+			return local.ctx.result;
+		}
+	}
+
+	/**
+	 * Internal function. Releases a transaction-scoped advisory lock only when the adapter's lock is
+	 * actually session-scoped (MySQL); transaction-scoped locks (PostgreSQL / SQL Server) auto-release
+	 * at transaction end, so this is a no-op for them (#4198).
+	 */
+	public void function $releaseTransactionalAdvisoryLock(required any adapter, required string name) {
+		if (arguments.adapter.$transactionalAdvisoryLockIsSessionScoped()) {
+			arguments.adapter.$releaseAdvisoryLockTransactional(name = arguments.name);
+		}
+	}
+
+	/**
+	 * Internal function. Releases the lock as $releaseTransactionalAdvisoryLock() does, but after the
+	 * callback has already failed: a release error is logged and swallowed so the callback's own error
+	 * is the one that propagates (#4198).
+	 */
+	public void function $releaseTransactionalAdvisoryLockQuietly(required any adapter, required string name) {
+		try {
+			$releaseTransactionalAdvisoryLock(adapter = arguments.adapter, name = arguments.name);
+		} catch (any e) {
+			WriteLog(type = "error", file = "wheels", text = "withAdvisoryLock(transaction=true): #e.message#");
 		}
 	}
 </cfscript>

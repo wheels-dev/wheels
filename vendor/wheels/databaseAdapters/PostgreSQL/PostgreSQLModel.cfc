@@ -259,6 +259,45 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * PostgreSQL supports transaction-scoped advisory locks via pg_advisory_xact_lock, which
+	 * auto-releases at transaction commit or rollback (#4198).
+	 */
+	public boolean function $supportsTransactionalAdvisoryLock() {
+		return true;
+	}
+
+	/**
+	 * Internal function. Acquires a PostgreSQL transaction-scoped advisory lock on the current
+	 * (pinned) connection by polling pg_try_advisory_xact_lock until the timeout expires (#4198).
+	 * The blocking pg_advisory_xact_lock would ignore the timeout, so the try form is polled, exactly
+	 * as the session-scoped acquire does. The lock auto-releases when the enclosing transaction ends,
+	 * so there is no release step. The query never raises on contention (pg_try_* returns a boolean),
+	 * which matters here: a statement error inside the transaction would abort the whole transaction.
+	 */
+	public void function $acquireAdvisoryLockTransactional(required string name, numeric timeout = 10) {
+		local.startedAt = GetTickCount();
+		local.timeoutMs = arguments.timeout * 1000;
+		while (true) {
+			local.result = queryExecute(
+				"SELECT pg_try_advisory_xact_lock(hashtext(?)) AS lockresult",
+				[arguments.name],
+				{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			);
+			if (IsQuery(local.result) && IsBoolean(local.result.lockresult) && local.result.lockresult) {
+				return;
+			}
+			if (GetTickCount() - local.startedAt >= local.timeoutMs) {
+				Throw(
+					type = "Wheels.AdvisoryLockTimeout",
+					message = "Could not acquire advisory lock '#arguments.name#' within #arguments.timeout# seconds.",
+					extendedInfo = "The PostgreSQL pg_try_advisory_xact_lock function kept returning false, indicating another transaction holds the lock."
+				);
+			}
+			Sleep(250);
+		}
+	}
+
+	/**
 	 * Override Base adapter's function.
 	 * PostgreSQL uses double-quotes to quote identifiers (ANSI SQL standard).
 	 */

@@ -996,6 +996,57 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. Reports whether this adapter supports transaction-scoped advisory locks —
+	 * the opt-in `withAdvisoryLock(transaction = true)` path (#4198). The lock is acquired on the
+	 * connection pinned by an enclosing transaction, so it covers the callback's own queries and
+	 * (where the lock is transaction-scoped) auto-releases when that transaction ends.
+	 *
+	 * Distinct from `$supportsAdvisoryLocks()`, which reports standalone (session) support. An
+	 * adapter may support one and not the other: SQL Server supports only the transaction-scoped
+	 * form (`sp_getapplock @LockOwner = 'Transaction'` needs an open transaction), so it leaves
+	 * `$supportsAdvisoryLocks()` false but overrides this to true.
+	 */
+	public boolean function $supportsTransactionalAdvisoryLock() {
+		return false;
+	}
+
+	/**
+	 * Internal function. Reports whether this adapter's transaction-scoped lock is actually
+	 * session-scoped and so must be released explicitly before the transaction closes (#4198).
+	 * MySQL's `GET_LOCK` is session- not transaction-scoped: pinning it to the transaction's
+	 * connection still guards the callback, but it does not auto-release at transaction end, so the
+	 * caller releases it with `$releaseAdvisoryLockTransactional()` first. PostgreSQL
+	 * (`pg_advisory_xact_lock`) and SQL Server (`@LockOwner = 'Transaction'`) auto-release and
+	 * leave this false.
+	 */
+	public boolean function $transactionalAdvisoryLockIsSessionScoped() {
+		return false;
+	}
+
+	/**
+	 * Internal function. Acquires a transaction-scoped advisory lock on the current (pinned)
+	 * connection (#4198). Called only inside an open transaction, and only after
+	 * `$supportsTransactionalAdvisoryLock()` has reported true, so the default is never reached in
+	 * practice; it throws for safety. Throws `Wheels.AdvisoryLockTimeout` when the lock cannot be
+	 * taken in time.
+	 */
+	public void function $acquireAdvisoryLockTransactional(required string name, numeric timeout = 10) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "Transaction-scoped advisory locks are not supported for this database adapter.",
+			extendedInfo = "The #GetMetaData(this).name# adapter does not implement transaction-scoped advisory locking. Call withAdvisoryLock() without transaction = true, or use a database that supports it (PostgreSQL, MySQL, or SQL Server)."
+		);
+	}
+
+	/**
+	 * Internal function. Releases a transaction-scoped advisory lock before the transaction closes
+	 * (#4198). Only session-scoped locks (MySQL) need this; transaction-scoped locks auto-release at
+	 * transaction end, so the default is a no-op.
+	 */
+	public void function $releaseAdvisoryLockTransactional(required string name) {
+	}
+
+	/**
 	 * Reports whether auto-derived property names should be lowercased.
 	 *
 	 * When a model declares no property() mappings, Wheels derives its
