@@ -5,6 +5,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 	variables.sqlTypes['biginteger'] = { name = 'INTEGER' };
 	variables.sqlTypes['binary'] = { name = 'BLOB' };
 	variables.sqlTypes['boolean'] = { name = 'BOOLEAN' }; // NUMERIC affinity, stores 0/1; declared name lets SQLiteModel.$getType map it to cf_sql_bit
+	variables.sqlTypes['char'] = { name = 'CHAR', limit = 1 }; // TEXT affinity; declared name lets SQLiteModel.$getType map it
 	variables.sqlTypes['date'] = { name = 'TEXT' };
 	variables.sqlTypes['datetime'] = { name = 'TEXT' };
 	// NUMERIC keeps the declared type distinct from REAL so the model layer binds

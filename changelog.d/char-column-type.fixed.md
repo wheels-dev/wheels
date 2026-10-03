@@ -1,0 +1,1 @@
+- `t.char()` now creates a `CHAR` column on SQLite, H2, MySQL and Oracle. Those adapters had no `char` type mapping, so the column was created with no type, and on SQLite every model on the table then failed to load (#4092)
