@@ -230,6 +230,58 @@ try {
 
 **Reference example**: `$restoreEmailViewVariables()` in [`vendor/wheels/controller/miscellaneous.cfc`](../../vendor/wheels/controller/miscellaneous.cfc) — the `sendEmail` variables-scope restore runs from `finally` via a `public` `$`-prefixed helper (mixin invariant: helpers must be public). Found while addressing review on [#2922](https://github.com/wheels-dev/wheels/pull/2922).
 
+### `continue` and `break` in One `try`/`catch` Inside a Loop: `continue` Exits the Loop (Lucee 6/7)
+
+Inside a loop, a `try`/`catch` that contains **both** a `continue` and a `break` makes the `continue` leave the loop, as if it were a `break`. The `break` doesn't have to run: an `if (false) break;` in the `catch` is enough. Where the two keywords sit doesn't matter either: `continue` in the `try` and `break` in the `catch`, or both in the `catch`.
+
+```cfm
+// WRONG: on Lucee 6/7 this returns "first", not "first,second,third"
+local.trace = "";
+for (local.item in ["first", "second", "third"]) {
+    local.trace = ListAppend(local.trace, local.item);
+    try {
+        if (true) {
+            continue;
+        }
+    } catch (any e) {
+        break;
+    }
+}
+
+// RIGHT: no continue; let if/else carry control to the end of the iteration
+for (local.item in local.items) {
+    try {
+        if (skip(local.item)) {
+            recordSkip(local.item);
+        } else {
+            process(local.item);
+        }
+    } catch (any e) {
+        if (stopOnError) break;
+    }
+}
+```
+
+**Measured** with the same probe spec (compat-matrix dispatch, SQLite):
+
+| Engine (build) | `continue` + `break` in one `try`/`catch` inside a loop |
+|---|---|
+| Lucee 6.2.5.48 | **`continue` exits the loop** |
+| Lucee 7.0.1.100 (the CI pin) | **`continue` exits the loop** |
+| Lucee 7.0.0.395 (local) | **`continue` exits the loop** |
+| Adobe CF 2023.0.11, 2025.0.06 | correct |
+| BoxLang 1.11.0+52 | correct |
+
+The RustCFML v0.693.0 lane reported no failures in the same run; its per-spec result wasn't checked individually.
+
+**Measured as correct on every engine above:**
+- the same `try`/`catch` with a `continue` but no `break`;
+- a loop **inside** a `try` that uses both `continue` and `break` for that loop. This covers a `for`-in loop that continues and then breaks, a `while` with `break` around a nested `for` with `continue`, and one loop with both.
+
+The failing shape reproduces with `for`-in and index loops, with or without an outer `try`/`finally`.
+
+**Where it bit:** `TenantMigrator.migrateAll()`. A `continue` in the inner `try` (after recording a failed tenant), next to `if (arguments.stopOnError) break;` in its `catch`, recorded only the first failed tenant with `stopOnError = false`. The fix uses `if`/`else` ([#4169](https://github.com/wheels-dev/wheels/pull/4169)). A source sweep of `vendor/wheels/` when this was found turned up no other occurrence of the failing shape.
+
 ### `DirectoryCreate()` Second Argument Is Lucee-Only
 
 Lucee accepts `DirectoryCreate(path, createPath, mode)` and recurses parent directories when `createPath=true`. Adobe CF's signature varies by version and at least some Adobe builds reject any second argument with `"The function takes 1 parameter"` (issue #2567).
