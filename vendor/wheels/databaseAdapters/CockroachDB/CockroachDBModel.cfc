@@ -75,6 +75,29 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLModel" output=fa
 	}
 
 	/**
+	 * CockroachDB does not support transaction-scoped advisory locks either (#4198). It inherits the
+	 * PostgreSQL adapter's pg_advisory_xact_lock methods, but CockroachDB has no working advisory-lock
+	 * primitive: at best it exposes the pg_advisory_* functions as no-op compatibility stubs that
+	 * acquire nothing, which is worse than reporting unsupported (a silent no-op would guard nothing).
+	 * Overriding to false routes callers to the clear error instead. Use forUpdate() for row-level
+	 * locking within a transaction.
+	 */
+	public boolean function $supportsTransactionalAdvisoryLock() {
+		return false;
+	}
+
+	/**
+	 * CockroachDB does not support transaction-scoped advisory locks (#4198).
+	 */
+	public void function $acquireAdvisoryLockTransactional(required string name, numeric timeout = 10) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "CockroachDB does not support advisory locks.",
+			extendedInfo = "Use forUpdate() for row-level locking inside a transaction instead."
+		);
+	}
+
+	/**
 	 * Override query setup to append RETURNING clause to INSERTs.
 	 * CockroachDB does not support pg_get_serial_sequence()/currval(),
 	 * so the RETURNING clause is the correct way to retrieve generated keys.
