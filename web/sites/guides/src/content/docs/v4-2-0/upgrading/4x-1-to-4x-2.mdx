@@ -128,6 +128,8 @@ UPDATE tbl SET timeCol = strftime('%H:%M:%S', timeCol / 1000, 'unixepoch', 'loca
 
 Keep `'localtime'`: the old values are midnight (or the time of day) in the server's timezone, and without it a server east of UTC converts each date to the previous day. Run the conversion with the same timezone as the app server.
 
+If you upgrade before converting, records still save: Wheels updates only the columns that changed, so a save that doesn't touch these columns leaves the old integers as they are. But the first time the app writes a new value to one of these columns, it stores text, and the column mixes formats until you convert. The recipe changes only `integer` rows, so it's safe to run more than once. Run it again after every app process is on 4.2: processes still on 4.1 keep writing integers.
+
 ### `LocalDisk` storage keys are checked per segment
 
 `LocalDisk` now validates an object key one path segment at a time ([#3912](https://github.com/wheels-dev/wheels/issues/3912)):

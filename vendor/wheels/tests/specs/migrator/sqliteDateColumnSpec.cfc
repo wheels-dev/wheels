@@ -137,6 +137,50 @@ component extends="wheels.WheelsTest" {
 			// and the driver stored them as epoch milliseconds. Such columns exist only if created by
 			// raw SQL or another tool. Writes now store ISO text, so the upgrade note gives a recipe to
 			// convert the old integers first; this pins that the recipe works.
+			// What happens to a record whose old epoch-millisecond values haven't been converted yet.
+			// Wheels updates only the columns that changed, so an unrelated save works and leaves the
+			// old integers alone; writing a new value to a date column stores ISO text, which is what
+			// mixes formats in the column until the recipe runs.
+			it("saves a record with unconverted legacy values, leaving them as integers until a date column is written", () => {
+				if (!variables.applies) {
+					skip("SQLite only.");
+				}
+				var legacy = "c_o_r_e_sqlitelegacyrows";
+				QueryExecute("DROP TABLE IF EXISTS #legacy#", [], {datasource = variables.ds});
+				QueryExecute("CREATE TABLE #legacy# (id INTEGER PRIMARY KEY, label TEXT, d DATE, t TIME)", [], {datasource = variables.ds});
+				try {
+					// What the pre-#4093 binding wrote.
+					QueryExecute(
+						"INSERT INTO #legacy# (id, label, d, t) VALUES (1, 'before', ?, ?)",
+						[{value = CreateDate(2026, 10, 2), cfsqltype = "cf_sql_date"}, {value = CreateTime(9, 30, 0), cfsqltype = "cf_sql_time"}],
+						{datasource = variables.ds}
+					);
+					var before = QueryExecute("SELECT typeof(d) AS dk FROM #legacy#", [], {datasource = variables.ds});
+					if (before.dk != "integer") {
+						skip("This engine and driver stored the old DATE binding as #before.dk#, not epoch milliseconds.");
+					}
+					StructDelete(application.wheels.models, "SqliteLegacyDateRow");
+					// 1. An unrelated change saves, and the old integers stay as they are.
+					var rec = model("SqliteLegacyDateRow").findByKey(1);
+					rec.label = "after";
+					expect(rec.save(transaction = "commit")).toBeTrue("save failed: " & SerializeJSON(rec.allErrors()));
+					var stored = QueryExecute("SELECT typeof(d) AS dk, typeof(t) AS tk, label FROM #legacy#", [], {datasource = variables.ds});
+					expect(stored.label).toBe("after");
+					expect(stored.dk).toBe("integer", "an unrelated save must not rewrite the date column");
+					expect(stored.tk).toBe("integer", "an unrelated save must not rewrite the time column");
+					// 2. Writing the date column stores ISO text, so the column now mixes formats.
+					rec = model("SqliteLegacyDateRow").findByKey(1);
+					rec.d = "2026-10-03";
+					expect(rec.save(transaction = "commit")).toBeTrue("save failed: " & SerializeJSON(rec.allErrors()));
+					stored = QueryExecute("SELECT typeof(d) AS dk, d || '' AS d FROM #legacy#", [], {datasource = variables.ds});
+					expect(stored.dk).toBe("text");
+					expect(Left(stored.d, 10)).toBe("2026-10-03");
+				} finally {
+					QueryExecute("DROP TABLE IF EXISTS #legacy#", [], {datasource = variables.ds});
+					StructDelete(application.wheels.models, "SqliteLegacyDateRow");
+				}
+			});
+
 			it("converts legacy epoch-millisecond DATE and TIME values with the documented recipe", () => {
 				if (!variables.applies) {
 					skip("SQLite only.");
