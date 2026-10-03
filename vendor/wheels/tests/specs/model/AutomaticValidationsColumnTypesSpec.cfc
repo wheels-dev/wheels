@@ -80,9 +80,6 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("rejects a string longer than its column", () => {
-				if (variables.adapterName == "CockroachDB") {
-					skip("CockroachDB automatic validations do not enforce the string length (##4101).");
-				}
 				var props = $validProperties();
 				props.requiredName = RepeatString("x", 21);
 				$expectRejectedOn(props, "requiredName");
