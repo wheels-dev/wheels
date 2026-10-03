@@ -7,10 +7,6 @@ name: IIS (Windows)
 
 on:
   workflow_dispatch:
-  # TEMP (remove before the PR): iterate on the branch, since workflow_dispatch needs the
-  # workflow on the default branch first.
-  push:
-    branches: ['peter/iis-windows-actions-job']
   pull_request:
     paths:
       - '.github/workflows/iis-windows.yml'
