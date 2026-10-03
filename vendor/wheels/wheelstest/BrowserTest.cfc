@@ -309,9 +309,13 @@ component extends="wheels.WheelsTest" {
      *   2. get("browserTestBaseUrl")          — Wheels setting
      *   3. -Dwheels.browserTest.baseUrl=...   — JVM system property
      *   4. WHEELS_BROWSER_TEST_BASE_URL env   — CI / shell
-     *   5. $detectBaseUrlFromCgi(cgi)         — derived from the in-flight
+     *   5. servlet local listen port          — loopback + the actual listen
+     *                                            port/scheme when the request's
+     *                                            local port differs from its
+     *                                            Host port (a port mapping)
+     *   6. $detectBaseUrlFromCgi(cgi)         — derived from the in-flight
      *                                            test-runner request
-     *   6. "http://localhost:8080" default    — bare LuCLI port
+     *   7. "http://localhost:8080" default    — bare LuCLI port
      *
      * For specs that use only `visitUrl(absolute)` (e.g. data:/file:), the
      * baseUrl is effectively unused.
@@ -335,6 +339,15 @@ component extends="wheels.WheelsTest" {
         } catch (any e) {
             // Best-effort: a SecurityManager could deny system access.
             // Falling through to CGI detection / default is correct.
+        }
+
+        try {
+            var endpoint = $servletLocalEndpoint();
+            var mapped = $detectBaseUrlFromServletPort(cgi, endpoint.port, endpoint.scheme);
+            if (len(mapped)) return mapped;
+        } catch (any e) {
+            // Servlet request unavailable (e.g. a non-servlet engine) — fall
+            // through to cgi detection.
         }
 
         try {

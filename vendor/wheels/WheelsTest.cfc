@@ -182,9 +182,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
      *   2. get("testClientBaseUrl")           — Wheels setting
      *   3. -Dwheels.testClient.baseUrl=...    — JVM system property
      *   4. WHEELS_TEST_CLIENT_BASE_URL env    — CI / shell
-     *   5. $detectTestBaseUrlFromCgi(cgi)     — scheme/host/port of the
+     *   5. servlet local listen port          — when the request's local port
+     *                                            differs from its Host port (a
+     *                                            port mapping), loopback + the
+     *                                            actual listen port/scheme
+     *   6. $detectTestBaseUrlFromCgi(cgi)     — scheme/host/port of the
      *                                            in-flight test-runner request
-     *   6. "http://localhost:8080" default    — bare LuCLI port
+     *   7. "http://localhost:8080" default    — bare LuCLI port
      */
     private string function $getTestBaseUrl() {
         if (len(this.testClientBaseUrl ?: "")) {
@@ -215,6 +219,17 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         }
 
         try {
+            var endpoint = $servletLocalEndpoint();
+            var mapped = $detectBaseUrlFromServletPort(cgi, endpoint.port, endpoint.scheme);
+            if (len(mapped)) {
+                return mapped;
+            }
+        } catch (any e) {
+            // Servlet request unavailable (e.g. a non-servlet engine) — fall
+            // through to cgi detection.
+        }
+
+        try {
             var detected = $detectTestBaseUrlFromCgi(cgi);
             if (len(detected)) {
                 return detected;
@@ -241,6 +256,57 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         var scheme = (arguments.cgiScope.https ?: "off") == "on" ? "https" : "http";
         var isCanonicalPort = (scheme == "http" && port == 80) || (scheme == "https" && port == 443);
         return scheme & "://" & host & (isCanonicalPort ? "" : ":" & port);
+    }
+
+    /**
+     * When the in-flight request's local listen port differs from its Host port
+     * (i.e. a port mapping is in play), the Host name + port is not a reliable
+     * loopback target, so return a loopback URL on the actual listen port and
+     * scheme. Returns "" when there is no mapping (unmapped stays byte-identical
+     * via the cgi step) or no servlet port is available. Public seam for specs.
+     *
+     * @cgiScope      The cgi scope (or a struct with server_port) of the request.
+     * @localPort     The servlet request's local listen port (0 when unavailable).
+     * @localScheme   The servlet request's scheme ("http"/"https").
+     */
+    public string function $detectBaseUrlFromServletPort(required any cgiScope, required numeric localPort, string localScheme = "http") {
+        if (arguments.localPort <= 0 || !structKeyExists(arguments.cgiScope, "server_port")) {
+            return "";
+        }
+        if (val(arguments.cgiScope.server_port) == arguments.localPort) {
+            return "";
+        }
+        var scheme = len(arguments.localScheme) ? arguments.localScheme : "http";
+        return scheme & "://127.0.0.1:" & arguments.localPort;
+    }
+
+    /**
+     * Best-effort read of the in-flight servlet request's local listen port and
+     * scheme. Returns {port = 0, scheme = "http"} when the servlet request is
+     * unavailable (e.g. a non-servlet engine such as RustCFML), so callers fall
+     * through to cgi detection. Private; the pure mapping logic lives in
+     * $detectBaseUrlFromServletPort for testability.
+     */
+    private struct function $servletLocalEndpoint() {
+        var endpoint = {port = 0, scheme = "http"};
+        try {
+            if (getFunctionList().keyExists("getPageContext")) {
+                var req = getPageContext().getRequest();
+                if (!isNull(req)) {
+                    var p = req.getLocalPort();
+                    if (!isNull(p) && val(p) > 0) {
+                        endpoint.port = val(p);
+                    }
+                    var s = req.getScheme();
+                    if (!isNull(s) && len(s)) {
+                        endpoint.scheme = lCase(s);
+                    }
+                }
+            }
+        } catch (any e) {
+            // Non-servlet engine or restricted request — leave defaults.
+        }
+        return endpoint;
     }
 
 }
