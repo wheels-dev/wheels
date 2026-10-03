@@ -1,6 +1,8 @@
 /**
  * $maskWhereLiterals reads the string into a one-pass char array (REMatch) and
- * indexes it in O(1), instead of one Mid() per character (#3903). Its output must
+ * indexes it in O(1) when that array rejoins to the exact input, else falls back to
+ * the index scan (REMatch drops whitespace on some engines) — instead of one Mid()
+ * per character (#3903). Its output must
  * not change, so these specs compare it with the previous per-character
  * implementation (kept here verbatim as referenceMask) on hand-picked edge cases
  * (including supplementary Unicode, combining marks, CR/LF/NUL, and the ODBC
@@ -115,6 +117,64 @@ component extends="wheels.WheelsTest" {
 					debug(var = "#shape# brace run: #ratio.summary#", label = "masker linearity");
 					expect(ratio.growth).toBeLT(plan.maxGrowth, "#shape# brace run: #ratio.summary#");
 				}
+			});
+
+			// $maskWhereLiterals uses the one-pass char array only when it rejoins to the
+			// exact input; otherwise it falls back to the index scan. BoxLang's
+			// REMatch("[\s\S]") drops whitespace matches, so a value with spaces must still
+			// mask byte-identically there (via the fallback). Exact-byte vs the reference.
+			it("preserves whitespace-only and edge-whitespace literals exactly", () => {
+				var cases = [
+					"x = ' '",
+					"x = '  '",
+					"x = ' leading'",
+					"x = 'trailing '",
+					"a = ' ' AND b = '  x  '",
+					"x = '" & Chr(9) & "'",
+					"note = 'line1" & Chr(13) & Chr(10) & "line2'",
+					"a  b = 'c  d'   AND   e = 'f'"
+				];
+				for (var w in cases) {
+					var cmp = compareMaskers(w);
+					expect(cmp.same).toBeTrue(cmp.detail);
+				}
+			});
+
+			// On RustCFML Mid()/Find() are O(index), so the fast char-array path is what
+			// keeps the binder linear there. The ASCII linearity shapes must round-trip
+			// through REMatch so RustCFML takes that path (the 25x bounds measure it, not
+			// the O(n^2)-on-RustCFML fallback). Only required on RustCFML; other engines
+			// may legitimately take the fallback (their Mid() is O(1), still linear).
+			it("takes the char-array fast path on RustCFML for the linearity shapes", () => {
+				if (!application.wheels.engineAdapter.isRustCFML()) {
+					skip("fast-path guarantee only required where Mid() is O(index) (RustCFML)");
+				}
+				var shapes = [
+					"lastName = '" & RepeatString("z", 500) & "'",
+					"firstName = '" & RepeatString("''", 500) & "'",
+					"firstName IN ('" & ArrayToList(ListToArray(RepeatString("v,", 200), ","), "','") & "')",
+					RepeatString("{", 500) & " x = 'v'"
+				];
+				for (var w in shapes) {
+					expect(Compare(ArrayToList(REMatch("[\s\S]", w), ""), w)).toBe(0, "RustCFML must round-trip (fast path): #Left(w, 40)#");
+				}
+			});
+
+			// Pin which path the supplementary-character fixture takes on this engine, and
+			// prove it masks correctly either way. The fixture is built from UTF-8 bytes so
+			// it is a real U+1F600 (not Chr() surrogate halves that a scalar-Unicode runtime
+			// may not combine).
+			it("pins the supplementary-char fixture's masker path and masks it correctly", () => {
+				var emoji = CharsetEncode(BinaryDecode("F09F9880", "hex"), "utf-8");
+				expect(LCase(BinaryEncode(CharsetDecode(emoji, "utf-8"), "hex"))).toBe("f09f9880");
+				var w = "name = '" & emoji & "x' AND y = 'z'";
+				var fastPath = (Compare(ArrayToList(REMatch("[\s\S]", w), ""), w) == 0);
+				debug(
+					var = "supplementary fixture path on #application.wheels.engineAdapter.getName()#: " & (fastPath ? "fast char-array" : "index-scan fallback"),
+					label = "masker path"
+				);
+				var cmp = compareMaskers(w);
+				expect(cmp.same).toBeTrue(cmp.detail);
 			});
 
 		});
