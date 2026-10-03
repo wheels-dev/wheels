@@ -38,6 +38,29 @@ component extends="wheels.WheelsTest" {
 				}, [], !inRepo, {path = repoRoot & relativePath});
 			}
 		});
+
+		// The old "Convert dot to format parameter" rule had doubled backslashes, so it never
+		// matched a normal URL (#4132); the router already reads a `.json`/`.xml` suffix from
+		// PATH_INFO. It must not come back as dead configuration.
+		describe("Shipped urlrewrite.xml files have no dot-to-format rule", () => {
+
+			var repoRoot = ExpandPath("/wheels") & "/../../";
+			var files = [
+				"public/urlrewrite.xml",
+				"cli/lucli/templates/app/public/urlrewrite.xml",
+				"examples/starter-app/public/urlrewrite.xml",
+				"examples/tweet/public/urlrewrite.xml"
+			];
+			var inRepo = DirectoryExists(repoRoot & "cli/lucli/templates");
+
+			for (var relativePath in files) {
+				it("#relativePath# does not rewrite a dot suffix to ?format=", (data) => {
+					var content = FileRead(data.path);
+					expect(content).notToInclude("Convert dot to format parameter");
+					expect(content).notToInclude("?format=");
+				}, [], !inRepo, {path = repoRoot & relativePath});
+			}
+		});
 	}
 
 }
