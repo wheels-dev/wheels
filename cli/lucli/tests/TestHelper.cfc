@@ -104,7 +104,7 @@ component {
 
 	/**
 	 * Detect a running server port.
-	 * Checks PORT env var first, then probes 8080 and 60007.
+	 * Checks PORT env var first, then probes 8080 and 30007.
 	 * Returns port number or 0 if no server found.
 	 */
 	public numeric function detectServerPort() {
@@ -125,7 +125,7 @@ component {
 
 		// Probe common ports
 		if (isPortResponding(8080)) return 8080;
-		if (isPortResponding(60007)) return 60007;
+		if (isPortResponding(30007)) return 30007;
 
 		return 0;
 	}

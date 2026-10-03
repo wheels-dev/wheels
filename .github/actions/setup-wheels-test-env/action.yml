@@ -15,7 +15,7 @@ inputs:
   port:
     description: 'Port to bind Lucee to'
     required: false
-    default: '60007'
+    default: '30007'
   install-playwright:
     description: 'Install Playwright + Chromium (set "false" to skip if no browser tests run)'
     required: false

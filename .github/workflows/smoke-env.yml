@@ -75,7 +75,7 @@ jobs:
 
       - name: Run smoke probes
         run: |
-          BASE_URL="http://localhost:60007" SMOKE_ENV="${{ matrix.wheels_env }}" bash tools/ci/smoke-env.sh
+          BASE_URL="http://localhost:30007" SMOKE_ENV="${{ matrix.wheels_env }}" bash tools/ci/smoke-env.sh
 
       - name: Debug server logs
         if: failure()
