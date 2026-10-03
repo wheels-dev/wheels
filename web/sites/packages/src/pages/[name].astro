@@ -65,8 +65,8 @@ const versionsDesc = [...manifest.versions].reverse();
     <section class="install-section">
       <h2>Add the package</h2>
       <p class="install-note">
-        The verb is <code>add</code>, not <code>install</code>.
-        <code>wheels packages install</code> is intercepted by LuCLI and does not install anything.
+        The verb is <code>add</code>. In Wheels 4.2, <code>install</code> is an alias of it;
+        <code>add</code> works on every 4.x CLI.
       </p>
       <div class="install">
         <code id="install-latest">wheels packages add {manifest.name}</code>
