@@ -118,6 +118,17 @@ The `CLAUDE.md` that ships with apps is now under 8 KB, with its reference topic
 
 These need no file edits, but code that relied on the old behaviour changes.
 
+### App tests use the test database and test application
+
+`/wheels/app/tests` and `wheels test` now default to the `<datasource>_test` datasource. If it doesn't exist, they refuse to run rather than using your primary datasource. Create it, or run against the primary datasource on purpose with `wheels test --no-test-db` (URL: `useTestDB=false`). Specs run in a separate test application (`<app name>_wheelsTest`), which needs `WHEELS_ENV` set to `development` or `testing`.
+
+HTTP requests your specs make reach that same test application, so they see the same datasource as the spec code, when they come from:
+- `$testClient()`;
+- a `wheels.wheelstest.TestClient` you create inside the spec run;
+- a subclass of `TestClient` whose `init()` calls `super.init()`.
+
+A client created outside a test run, such as in a thread or a script, sends requests to the live application. Create such clients inside the spec, or use `$testClient()`. To address the live application from a spec on purpose, pass `testContext=false` to `$testClient()` or to `new wheels.wheelstest.TestClient()`.
+
 ### `findAll(returnAs="structs")` returns an array
 
 `findAll()` has always documented `returnAs="structs"` (and `"struct"`) as an array of structs, but through 4.1 it returned a struct keyed by row number: `{1: {...}, 2: {...}}`. From 4.2 it returns the documented array ([#4035](https://github.com/wheels-dev/wheels/pull/4035)). `findInBatches(returnAs="structs")` hands its callback the same array.

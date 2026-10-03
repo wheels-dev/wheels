@@ -159,7 +159,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     public any function $testClient(boolean testContext = true) {
         // Do not name this local `client` — that is a reserved CFML scope
         // and Lucee throws "client scope is not enabled" (anti-pattern 11).
-        var httpClient = new wheels.wheelstest.TestClient(baseUrl = $getTestBaseUrl());
+        var httpClient = new wheels.wheelstest.TestClient(baseUrl = $getTestBaseUrl(), testContext = arguments.testContext);
         if (arguments.testContext) {
             var ctx = new wheels.events.TestContext();
             // Send the per-process runner secret (not a fixed "1").

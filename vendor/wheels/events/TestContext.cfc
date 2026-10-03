@@ -191,6 +191,21 @@ component {
 	}
 
 	/**
+	 * True when the current request already runs in the isolated test
+	 * application in development or testing, i.e. inside a test-runner request.
+	 * TestClient uses it to send the test context with its requests by default,
+	 * so in-test HTTP reaches the same application as the spec code.
+	 */
+	public boolean function currentRequestIsIsolated() {
+		if (!IsDefined("application.applicationName") || !isIsolatedApplicationName(application.applicationName)) {
+			return false;
+		}
+		return StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "environment")
+			&& $environmentAllowsTestContext(application.wheels.environment);
+	}
+
+	/**
 	 * The per-process test-runner secret. Lazily generated into the server
 	 * scope the first time a runner (or TestClient/BrowserTest) needs it, so
 	 * only server-side code in an already-running test process can learn it.

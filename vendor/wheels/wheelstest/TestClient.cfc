@@ -30,14 +30,40 @@ component {
 	 *
 	 * @baseUrl The base URL for all requests (e.g. "http://localhost:8080")
 	 */
-	public TestClient function init(string baseUrl = "http://localhost:8080") {
+	/**
+	 * @baseUrl     Origin the requests go to.
+	 * @testContext Send the test context (header and cookie) with every request
+	 *              when the client is created inside a test-runner request, so
+	 *              the requests reach the same isolated test application as the
+	 *              spec code. Pass false to address the live application.
+	 */
+	public TestClient function init(string baseUrl = "http://localhost:8080", boolean testContext = true) {
 		variables.baseUrl = arguments.baseUrl;
 		variables.lastResponse = {};
 		variables.defaultHeaders = {};
 		variables.cookies = {};
 		variables.sendAsJson = false;
 		$clearResponseCaches();
+		if (arguments.testContext) {
+			$attachTestContext();
+		}
 		return this;
+	}
+
+	/**
+	 * Adds the test-context header and cookie when this client is created
+	 * inside a test-runner request (the isolated test application, in
+	 * development or testing). A client created anywhere else, such as a thread
+	 * or a script, sends nothing extra.
+	 */
+	private void function $attachTestContext() {
+		var ctx = new wheels.events.TestContext();
+		if (!ctx.currentRequestIsIsolated()) {
+			return;
+		}
+		var testSecret = ctx.testSecret();
+		withHeader(ctx.headerName(), testSecret);
+		withCookie(ctx.cookieName(), testSecret);
 	}
 
 	// ─── HTTP Methods ────────────────────────────────────────────────
