@@ -1,9 +1,11 @@
 /**
- * $maskWhereLiterals scans with Find() jumps instead of one Mid() per character
- * (#3903). Its output must not change, so these specs compare it with the
- * previous per-character implementation (kept here verbatim as
- * referenceMask) on hand-picked edge cases and on generated strings, including
- * the exception thrown for an unbalanced quote or a control character.
+ * $maskWhereLiterals reads the string into a one-pass char array (REMatch) and
+ * indexes it in O(1), instead of one Mid() per character (#3903). Its output must
+ * not change, so these specs compare it with the previous per-character
+ * implementation (kept here verbatim as referenceMask) on hand-picked edge cases
+ * (including supplementary Unicode, combining marks, CR/LF/NUL, and the ODBC
+ * lookahead-window boundary) and on generated strings, including the exception
+ * thrown for an unbalanced quote or a control character.
  */
 component extends="wheels.WheelsTest" {
 
@@ -38,7 +40,29 @@ component extends="wheels.WheelsTest" {
 					"name = 'caf" & Chr(233) & "' AND city = '" & Chr(26085) & Chr(26412) & "'",
 					"bad = '" & Chr(7) & "'",
 					"bad = '" & Chr(2) & "x'",
-					"plain text with no quote {but a brace}"
+					"plain text with no quote {but a brace}",
+					// Supplementary (non-BMP) char U+1F600 as its UTF-16 surrogate pair
+					// (built from BMP code points so it is identical on every engine),
+					// before/inside a literal and before an ODBC escape. The char-array
+					// scan must round-trip the surrogate pair byte-for-byte like the old
+					// Mid() scan (#3903 / rev1-r2 equivalence review).
+					"x = " & Chr(55357) & Chr(56832) & " AND name = 'y'",
+					"name = '" & Chr(55357) & Chr(56832) & "smith'",
+					"name = 'sm" & Chr(55357) & Chr(56832) & "ith'",
+					"d = " & Chr(55357) & Chr(56832) & "{ts '2020-01-02 03:04:05'}",
+					"name = '" & Chr(55357) & Chr(56832) & "{ts ''2020-01-02''}'",
+					// A combining mark (U+0301) after a base letter, inside a literal.
+					"name = 'e" & Chr(769) & "clair'",
+					// CR / LF / NUL as ordinary literal data (not the rejected Chr(2)/Chr(7)).
+					"note = 'line1" & Chr(13) & Chr(10) & "line2'",
+					"note = 'a" & Chr(0) & "b'",
+					// ODBC escape lengths straddling the 60-char lookahead window: the
+					// value is [0-9:. -]+, so "{ts '" (5) + value + "'}" (2). value 52/53/54
+					// gives a 59/60/61-char escape — 60 is the last that fits the window,
+					// 61 must fall through to ordinary quote handling, identically to old.
+					"id = {ts '" & RepeatString("1", 52) & "'}",
+					"id = {ts '" & RepeatString("1", 53) & "'}",
+					"id = {ts '" & RepeatString("1", 54) & "'}"
 				];
 				for (var w in cases) {
 					var cmp = compareMaskers(w);
@@ -73,8 +97,11 @@ component extends="wheels.WheelsTest" {
 			// or after the last literal, must not make each brace search the rest of the
 			// string again for the next quote (review of #3903).
 			it("scans a long brace run in linear time", () => {
+				// The char-array rewrite is linear on RustCFML too (#3903), so the brace
+				// run holds the same 25x bound as the JVM engines (was a quadratic-tolerant
+				// 250x). RustCFML keeps a smaller size to keep the run short.
 				var superLinear = application.wheels.engineAdapter.isRustCFML();
-				var plan = {small = superLinear ? 2000 : 20000, factor = 10, maxGrowth = superLinear ? 250 : 25};
+				var plan = {small = superLinear ? 2000 : 20000, factor = 10, maxGrowth = 25};
 				for (var shape in ["leading", "trailing"]) {
 					var ratio = maskGrowth(shape, plan);
 					debug(var = "#shape# brace run: #ratio.summary#", label = "masker linearity");
