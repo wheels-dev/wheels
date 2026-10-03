@@ -12,15 +12,11 @@ component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
 		config = {path = "wheels", fileName = "Mapper", method = "$init"};
-		_originalRoutes = Duplicate(application.wheels.routes);
-		_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(
-			application.wheels.staticRoutes
-		) : {};
+		_routeSnapshot = $snapshotRoutes();
 	}
 
 	function afterAll() {
-		application.wheels.routes = _originalRoutes;
-		application.wheels.staticRoutes = _originalStaticRoutes;
+		$restoreRoutes(_routeSnapshot);
 	}
 
 	function run() {
@@ -124,11 +120,6 @@ component extends="wheels.WheelsTest" {
 		var args = Duplicate(config);
 		StructAppend(args, arguments, true);
 		return application.wo.$createObjectFromRoot(argumentCollection = args);
-	}
-
-	public void function $clearRoutes() {
-		application.wheels.routes = [];
-		application.wheels.staticRoutes = {};
 	}
 
 }
