@@ -624,8 +624,9 @@
 	 * silently, which is why only Adobe legs fail).
 	 *
 	 * Each comma-separated part is checked on its own, as a plain integer
-	 * literal against its own column's range: 32-bit columns by 2^31, BIGINT
-	 * columns by 2^63, and other columns not at all. So a BIGINT id (a 19-digit
+	 * literal against its own column's range, which the adapter gives for the
+	 * column's type ($integerKeyRange: TINYINT and SMALLINT by their own range,
+	 * INTEGER by 2^31, BIGINT by 2^63, other columns not at all). So a BIGINT id (a 19-digit
 	 * CockroachDB key, a high sequence) is an existing row, and so is a
 	 * composite key like "21474,83648" (BoxLang's IsNumeric() accepts commas).
 	 */
@@ -675,35 +676,41 @@
 	}
 
 	/**
-	 * Internal function. True when an integer literal is outside the signed range of an
-	 * integer cf_sql type (32-bit for integer, smallint and tinyint; 64-bit for bigint). Compared as
-	 * digit strings, never through a double. Other types have no range here.
+	 * Internal function. True when an integer literal is outside the range the adapter gives
+	 * for an integer cf_sql type ($integerKeyRange). Compared as digit strings, never through
+	 * a double. Types without a range never exceed it.
 	 */
 	public boolean function $integerStringExceedsSqlType(required string value, required string sqlType) {
 		local.digits = $canonicalIntegerString(arguments.value);
 		if (!Len(local.digits)) {
 			return false;
 		}
-		// Two's-complement ranges: the negative limit is one larger in magnitude.
-		local.negative = Left(local.digits, 1) == "-";
-		local.digits = ReReplace(local.digits, "^-", "");
-		switch (arguments.sqlType) {
-			case "cf_sql_bigint":
-				local.limit = local.negative ? "9223372036854775808" : "9223372036854775807";
-				break;
-			case "":
-			case "cf_sql_integer":
-			case "cf_sql_smallint":
-			case "cf_sql_tinyint":
-				local.limit = local.negative ? "2147483648" : "2147483647";
-				break;
-			default:
-				return false;
+		local.range = variables.wheels.class.adapter.$integerKeyRange(sqlType = arguments.sqlType);
+		if (!StructKeyExists(local.range, "min")) {
+			return false;
 		}
-		if (Len(local.digits) != Len(local.limit)) {
-			return Len(local.digits) > Len(local.limit);
+		return $compareIntegerStrings(local.digits, local.range.min) < 0
+			|| $compareIntegerStrings(local.digits, local.range.max) > 0;
+	}
+
+	/**
+	 * Internal function. -1, 0 or 1 as canonical integer string a is below, equal to or above b,
+	 * compared by sign, then length, then digits.
+	 */
+	public numeric function $compareIntegerStrings(required string a, required string b) {
+		local.aNegative = Left(arguments.a, 1) == "-";
+		local.bNegative = Left(arguments.b, 1) == "-";
+		if (local.aNegative != local.bNegative) {
+			return local.aNegative ? -1 : 1;
 		}
-		return Compare(local.digits, local.limit) > 0;
+		local.aDigits = ReReplace(arguments.a, "^-", "");
+		local.bDigits = ReReplace(arguments.b, "^-", "");
+		if (Len(local.aDigits) != Len(local.bDigits)) {
+			local.rv = Len(local.aDigits) > Len(local.bDigits) ? 1 : -1;
+		} else {
+			local.rv = Sgn(Compare(local.aDigits, local.bDigits));
+		}
+		return local.aNegative ? -local.rv : local.rv;
 	}
 
 	/**
