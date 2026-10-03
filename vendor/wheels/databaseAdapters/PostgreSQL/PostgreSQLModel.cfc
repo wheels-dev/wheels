@@ -206,6 +206,36 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * Internal function. pg_advisory_unlock returns true only on the session holding the lock (#4197).
+	 */
+	public boolean function $tryReleaseAdvisoryLock(required string name) {
+		local.result = queryExecute(
+			"SELECT pg_advisory_unlock(hashtext(?)) AS released",
+			[arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+		);
+		return IsQuery(local.result) && IsBoolean(local.result.released) && local.result.released;
+	}
+
+	/**
+	 * Internal function. True while any session in this database holds the lock (#4197). The key is
+	 * hashtext(name) as a bigint, which pg_locks splits into classid (high 32 bits) and objid (low).
+	 * CAST, not `::`: Lucee reads `:name` in queryExecute SQL as a named parameter.
+	 */
+	public boolean function $isAdvisoryLockHeld(required string name) {
+		local.result = queryExecute(
+			"SELECT COUNT(*) AS holders FROM pg_locks WHERE locktype = 'advisory' AND granted"
+			& " AND database = (SELECT oid FROM pg_database WHERE datname = current_database())"
+			& " AND classid = CAST(((CAST(hashtext(?) AS bigint) >> 32) & 4294967295) AS oid)"
+			& " AND objid = CAST((CAST(hashtext(?) AS bigint) & 4294967295) AS oid)"
+			& " AND objsubid = 1",
+			[arguments.name, arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+		);
+		return IsQuery(local.result) && Val(local.result.holders) > 0;
+	}
+
+	/**
 	 * PostgreSQL implements advisory locks directly via pg_advisory_lock / pg_advisory_unlock
 	 * and does not require an enclosing transaction.
 	 */

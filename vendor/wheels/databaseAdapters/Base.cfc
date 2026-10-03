@@ -925,6 +925,45 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. Releases an advisory lock and reports whether this release freed it.
+	 * Adapters whose locks belong to a pooled database session override this (#4197).
+	 */
+	public boolean function $tryReleaseAdvisoryLock(required string name) {
+		$releaseAdvisoryLock(name = arguments.name);
+		return true;
+	}
+
+	/**
+	 * Internal function. True while any database session holds the named advisory lock (#4197).
+	 */
+	public boolean function $isAdvisoryLockHeld(required string name) {
+		return false;
+	}
+
+	/**
+	 * Internal function. Releases an advisory lock and makes sure it is free (#4197). MySQL and
+	 * PostgreSQL locks belong to the database session that took them, and the release is a separate
+	 * pooled query, so it can run on another session and free nothing. The release is then retried
+	 * for up to `retrySeconds`; a lock that stays held throws Wheels.AdvisoryLockReleaseFailed.
+	 */
+	public void function $releaseAdvisoryLockVerified(required string name, numeric retrySeconds = 5) {
+		local.deadline = GetTickCount() + arguments.retrySeconds * 1000;
+		while (true) {
+			if ($tryReleaseAdvisoryLock(name = arguments.name) || !$isAdvisoryLockHeld(name = arguments.name)) {
+				return;
+			}
+			if (GetTickCount() >= local.deadline) {
+				Throw(
+					type = "Wheels.AdvisoryLockReleaseFailed",
+					message = "Advisory lock '#arguments.name#' is still held after #arguments.retrySeconds# seconds of release attempts.",
+					extendedInfo = "The lock belongs to the pooled database session that acquired it, and the release kept running on other sessions. It stays held until that connection closes or releases it."
+				);
+			}
+			Sleep(100);
+		}
+	}
+
+	/**
 	 * Reports whether this adapter supports standalone advisory locks — i.e.,
 	 * `$acquireAdvisoryLock` / `$releaseAdvisoryLock` can be invoked directly
 	 * (no enclosing transaction or extension setup required) and will succeed.

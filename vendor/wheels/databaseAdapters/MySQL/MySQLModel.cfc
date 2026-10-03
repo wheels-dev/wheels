@@ -127,6 +127,30 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * Internal function. RELEASE_LOCK returns 1 only on the session holding the lock (#4197).
+	 */
+	public boolean function $tryReleaseAdvisoryLock(required string name) {
+		local.result = queryExecute(
+			"SELECT RELEASE_LOCK(?) AS released",
+			[arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+		);
+		return IsQuery(local.result) && IsNumeric(local.result.released) && local.result.released == 1;
+	}
+
+	/**
+	 * Internal function. IS_USED_LOCK returns the holding connection's id, or NULL when free (#4197).
+	 */
+	public boolean function $isAdvisoryLockHeld(required string name) {
+		local.result = queryExecute(
+			"SELECT IS_USED_LOCK(?) AS holder",
+			[arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+		);
+		return IsQuery(local.result) && IsNumeric(local.result.holder);
+	}
+
+	/**
 	 * MySQL implements advisory locks directly via GET_LOCK / RELEASE_LOCK
 	 * and does not require an enclosing transaction.
 	 */
