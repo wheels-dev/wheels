@@ -145,7 +145,7 @@ These are the column-builder methods defined on `TableDefinition`. Every one tak
 | `t.time(columnNames=)` | TIME | |
 | `t.timestamp(columnNames=)` | DATETIME | single-column version |
 | `t.binary(columnNames=)` | BLOB / VARBINARY | |
-| `t.uniqueidentifier(columnNames=)` | UNIQUEIDENTIFIER / UUID | defaults to `newid()` |
+| `t.uniqueidentifier(columnNames=)` | UNIQUEIDENTIFIER / UUID / CHAR(36) | `UNIQUEIDENTIFIER` on SQL Server, `UUID` on PostgreSQL, CockroachDB and H2, `CHAR(36)` on MySQL, SQLite and Oracle. The default `newid()` becomes each database's own generator; Oracle's (`SYS_GUID()`) is unique but not a random version 4 UUID. PostgreSQL before 13 and MySQL before 8.0.13 can't generate one in a default, so the column is created without one and a note is logged: set the value yourself, e.g. with `generateUUID()` (on PostgreSQL a required column is filled automatically) |
 | `t.references(columnNames=, foreignKey=, onDelete=)` | INT + FK | creates `<name>id` (or `<name>_id`, see below) and a FK constraint |
 | `t.primaryKey(columnNames=, type=, autoIncrement=)` | PK column | `type` defaults to `integer`; call multiple times for composite PKs (no comma-list — `columnNames="a,b"` is treated as a single literal column name) |
 | `t.timestamps()` | creates `createdAt`, `updatedAt`, `deletedAt` | no arguments |

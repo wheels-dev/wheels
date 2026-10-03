@@ -12,6 +12,10 @@ component extends="wheels.databaseAdapters.Abstract" {
 	variables.sqlTypes['integer'] = {name = 'INTEGER'};
 	variables.sqlTypes['string'] = {name = 'VARCHAR', limit = 255};
 	variables.sqlTypes['text'] = {name = 'TEXT'};
+	variables.sqlTypes['uniqueidentifier'] = {name = 'UUID'};
+	// gen_random_uuid() is built in from PostgreSQL 13; Migration.init() turns it off for
+	// older servers (#4094).
+	variables.uuidDefaultSQL = 'gen_random_uuid()';
 	variables.sqlTypes['time'] = {name = 'TIME'};
 	variables.sqlTypes['timestamp'] = {name = 'TIMESTAMP'};
 

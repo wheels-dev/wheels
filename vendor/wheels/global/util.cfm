@@ -932,8 +932,27 @@
 	 * @return A valid 36-character UUID string (e.g., 123e4567-e89b-12d3-a456-426614174000)
 	 */
 	public string function generateUUID() {
-		// Use Java UUID generator for a 36-character format
-		return CreateObject("java", "java.util.UUID").randomUUID().toString();
+		// Java's version 4 UUID where the JVM is available; a formatted random value otherwise
+		// (RustCFML has no Java objects). CreateUUID() is not used: it returns a 35-character
+		// 8-4-4-16 string, not a UUID.
+		try {
+			return CreateObject("java", "java.util.UUID").randomUUID().toString();
+		} catch (any e) {
+			return $randomUuidV4();
+		}
+	}
+
+	/**
+	 * Internal function. A version 4 UUID (8-4-4-4-12, lowercase) built from random hex digits.
+	 */
+	public string function $randomUuidV4() {
+		local.hex = "";
+		for (local.i = 1; local.i <= 32; local.i++) {
+			local.hex &= FormatBaseN(RandRange(0, 15), 16);
+		}
+		local.hex = LCase(local.hex);
+		local.variant = Mid("89ab", RandRange(1, 4), 1);
+		return Mid(local.hex, 1, 8) & "-" & Mid(local.hex, 9, 4) & "-4" & Mid(local.hex, 14, 3) & "-" & local.variant & Mid(local.hex, 18, 3) & "-" & Mid(local.hex, 21, 12);
 	}
 
 

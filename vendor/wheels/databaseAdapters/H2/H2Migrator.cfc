@@ -15,6 +15,8 @@ component extends="wheels.databaseAdapters.Abstract" {
 	variables.sqlTypes['time'] = {name = 'TIME'};
 	variables.sqlTypes['timestamp'] = {name = 'TIMESTAMP'};
 	variables.sqlTypes['uuid'] = {name = 'VARBINARY', limit = 16};
+	variables.sqlTypes['uniqueidentifier'] = {name = 'UUID'};
+	variables.uuidDefaultSQL = 'RANDOM_UUID()';
 
 	/**
 	 * name of database adapter

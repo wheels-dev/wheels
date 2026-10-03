@@ -21,6 +21,10 @@ component extends="wheels.databaseAdapters.Abstract" {
     variables.sqlTypes['time']       = {name = 'TIMESTAMP'};
     variables.sqlTypes['timestamp']  = {name = 'TIMESTAMP'};
     variables.sqlTypes['uuid']       = {name = 'RAW', limit = 16};
+    variables.sqlTypes['uniqueidentifier'] = {name = 'CHAR', limit = 36};
+    // SYS_GUID() is RAW(16); format it as a 36-character 8-4-4-4-12 string. It is unique
+    // but not a version 4 (random) UUID (#4094).
+    variables.uuidDefaultSQL = 'LOWER(REGEXP_REPLACE(RAWTOHEX(SYS_GUID()), ''(.{8})(.{4})(.{4})(.{4})(.{12})'', ''\1-\2-\3-\4-\5''))';
 
     // Oracle 23ai+ has a native BOOLEAN type, which the model maps to cf_sql_bit.
     // Earlier releases keep NUMBER(1), which reaches the model as an integer (#3897).

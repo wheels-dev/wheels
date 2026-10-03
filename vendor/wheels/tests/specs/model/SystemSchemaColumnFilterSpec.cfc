@@ -106,7 +106,7 @@ component extends="wheels.WheelsTest" {
 				adapter = CreateObject("component", "wheels.databaseAdapters.PostgreSQL.PostgreSQLModel")
 
 				expect(adapter.$getType(type = "int8")).toBe("cf_sql_bigint")
-				expect(adapter.$getType(type = "uuid")).toBe("cf_sql_varchar")
+				expect(adapter.$getType(type = "uuid")).toBe("cf_sql_other") // #4094: the driver rejects a varchar bind against uuid
 				expect(adapter.$getType(type = "jsonb")).toBe("cf_sql_longvarchar")
 			})
 		})

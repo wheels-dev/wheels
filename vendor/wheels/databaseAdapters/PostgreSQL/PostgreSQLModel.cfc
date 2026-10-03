@@ -45,7 +45,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		"varchar": "cf_sql_varchar",
 		"varying": "cf_sql_varchar",
 		"bpchar": "cf_sql_varchar",
-		"uuid": "cf_sql_varchar",
+		// The driver rejects a varchar bind against a uuid column; OTHER lets it infer the type (#4094).
+		"uuid": "cf_sql_other",
 		"macaddr": "cf_sql_varchar",
 		"macaddr8": "cf_sql_varchar",
 		"point": "cf_sql_other",

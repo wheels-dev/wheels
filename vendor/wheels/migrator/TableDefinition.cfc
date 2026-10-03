@@ -271,9 +271,8 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function uniqueidentifier(string columnNames, default = "newid()", boolean allowNull) {
-		// NOTE: the default="newid()" parameter default is MSSQL syntax — this
-		// helper is only registered by the MicrosoftSQLServer adapter, so the
-		// outlier default is preserved as-is.
+		// The default="newid()" is SQL Server syntax; ColumnDefinition swaps it for each
+		// adapter's own UUID generator (#4094).
 		return $addTypedColumns(columnType = "uniqueidentifier", args = arguments);
 	}
 
