@@ -4,8 +4,9 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo
 		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
-		// SQLite INTEGER ids bind as cf_sql_bigint: the rowid is 64-bit (#4142).
-		var idSqlType = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "SQLite" ? "cf_sql_bigint" : "cf_sql_integer";
+		// SQLite INTEGER ids bind as cf_sql_bigint (the rowid is 64-bit, #4142), and so do
+		// Oracle NUMBER(38) / INTEGER ids (#4089).
+		var idSqlType = ListFindNoCase("SQLite,Oracle", CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName()) ? "cf_sql_bigint" : "cf_sql_integer";
 
 		// Calculate the expected WHERE column reference length dynamically based on quoting
 		// result[2] from $whereClause is: quotedTable.quotedColumn + " " + operator
