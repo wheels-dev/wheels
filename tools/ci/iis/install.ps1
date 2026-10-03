@@ -52,9 +52,13 @@ if (-not $up) { Get-ChildItem C:\lucee\logs | ForEach-Object { Write-Host "== $(
 Write-Host 'Lucee Express is up on 127.0.0.1:8888'
 
 # 4. IIS site at the root app's public\, and /app1 as an application at app1\public\.
-Import-Module WebAdministration
-Set-ItemProperty 'IIS:\Sites\Default Web Site' -Name physicalPath -Value 'C:\wheels-iis\root\public'
-New-WebApplication -Site 'Default Web Site' -Name 'app1' -PhysicalPath 'C:\wheels-iis\app1\public' -ApplicationPool 'DefaultAppPool' -Force | Out-Null
+# appcmd rather than the WebAdministration module, which PowerShell 7 only loads through a
+# compatibility session (no IIS: drive).
+$appcmd = Join-Path $env:windir 'system32\inetsrv\appcmd.exe'
+& $appcmd set vdir 'Default Web Site/' '-physicalPath:C:\wheels-iis\root\public' | Out-Host
+if ($LASTEXITCODE -ne 0) { throw "appcmd set vdir failed: $LASTEXITCODE" }
+& $appcmd add app '/site.name:Default Web Site' '/path:/app1' '/physicalPath:C:\wheels-iis\app1\public' | Out-Host
+if ($LASTEXITCODE -ne 0) { throw "appcmd add app failed: $LASTEXITCODE" }
 icacls 'C:\wheels-iis' /grant 'IIS_IUSRS:(OI)(CI)RX' 'IUSR:(OI)(CI)RX' /T /Q | Out-Null
 
 # 5. BonCode connector, global install with the CFML handlers (silent mode, per its manual).
@@ -85,5 +89,6 @@ if ($p.ExitCode -ne 0) { throw "BonCode install failed: $($p.ExitCode)" }
 if (Test-Path 'C:\Windows\BonCodeAJP13.settings') { Write-Host '== BonCodeAJP13.settings'; Get-Content 'C:\Windows\BonCodeAJP13.settings' }
 
 iisreset /restart | Out-Host
-Write-Host '== handler mappings for Default Web Site'
-Get-WebHandler -PSPath 'IIS:\Sites\Default Web Site' | Where-Object { $_.Path -like '*.cf*' } | Format-Table Name, Path, Type -AutoSize | Out-Host
+Write-Host '== CFML handler mappings for Default Web Site'
+& $appcmd list config 'Default Web Site' /section:handlers | Select-String -Pattern '\.cf' | Out-Host
+exit 0
