@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Checked on IIS by the 'IIS (Windows)' workflow (.github/workflows/iis-windows.yml):
+  IIS + URL Rewrite 2.1 + BonCode + Lucee 7, on windows-latest. See tools/ci/iis/README.md.
+
+  Wheels 4.x, app at the SITE ROOT.
+  Save as public\web.config. The IIS site's physical path must be the app's public\ folder.
+  Needs the IIS URL Rewrite module. Keep set(URLRewriting="On") in config/settings.cfm.
+
+  Sources: the inline rule in deployment/iis-and-windows.mdx, public/urlrewrite.xml (Tuckey)
+  from wheels-base-template-4.1.2, and cli/lucli/templates/app/rewrite.config.
+-->
+<configuration>
+  <system.webServer>
+
+    <defaultDocument enabled="true">
+      <files>
+        <remove value="index.cfm" />
+        <add value="index.cfm" />
+      </files>
+    </defaultDocument>
+
+    <rewrite>
+      <rules>
+
+        <!-- 1. Real files and folders under public\ are served as they are
+                (stylesheets, images, files\..., robots.txt, and so on).
+                "/" is a folder, so the default document index.cfm handles it. -->
+        <rule name="Wheels: existing files and folders" stopProcessing="true">
+          <match url=".*" />
+          <conditions logicalGrouping="MatchAny">
+            <add input="{REQUEST_FILENAME}" matchType="IsFile" />
+            <add input="{REQUEST_FILENAME}" matchType="IsDirectory" />
+          </conditions>
+          <action type="None" />
+        </rule>
+
+        <!-- 2. Paths that never go to the Wheels router: the static folders, the front
+                controller itself, and the engine/connector paths.
+                (/.*)?$ ends the match at a folder boundary, so a route such as /filesystem
+                or /images-gallery still goes to the router. The guide's ^/(files|images|...)
+                prefix would also catch those.
+                Dev-UI assets are served by a route at /wheels/assets/... and must NOT be listed
+                here. The guide's "wheels/public/assets" entry matches no folder under public\
+                and can be dropped. -->
+        <rule name="Wheels: reserved paths" stopProcessing="true">
+          <match url="^(files|images|javascripts|miscellaneous|stylesheets|index\.cfm|robots\.txt|favicon\.ico|sitemap\.xml|CFIDE|cf_scripts|jakarta|lucee)(/.*)?$" ignoreCase="true" />
+          <action type="None" />
+        </rule>
+
+        <!-- 3. Format suffix (/posts.json). This translates the Tuckey "Convert dot to format
+                parameter" rule and is DISABLED on purpose. Rule 4 alone is enough: the Wheels
+                router reads the .json/.xml suffix from PATH_INFO itself. /widgets.json returned
+                JSON on ACF 2025 without this rule. The Tuckey rule it translated never matched
+                (its regex was double-escaped) and was removed from urlrewrite.xml (#4132).
+                Enable this only if you have a reason to send ?format= explicitly. Real files
+                with an extension are already handled by rule 1. -->
+        <rule name="Wheels: format suffix to ?format=" enabled="false" stopProcessing="true">
+          <match url="^(.*)\.(\w+)$" />
+          <action type="Rewrite" url="index.cfm/{R:1}?format={R:2}" appendQueryString="true" />
+        </rule>
+
+        <!-- 4. Everything else goes to the front controller. The original path becomes PATH_INFO:
+                /posts/1/edit is rewritten to /index.cfm/posts/1/edit. -->
+        <rule name="Wheels: front controller" stopProcessing="true">
+          <match url="^(.*)$" />
+          <action type="Rewrite" url="index.cfm/{R:1}" appendQueryString="true" />
+        </rule>
+
+      </rules>
+    </rewrite>
+
+  </system.webServer>
+</configuration>
