@@ -26,17 +26,17 @@ component {
 	}
 
 
+	/** Creates dir inside the project only; an existing symlinked parent pointing outside is refused. */
+	private void function $ensureDir(required string dir) {
+		new modules.wheels.services.GeneratorPaths().ensureDirectoryInside(variables.projectRoot, arguments.dir);
+	}
+
 	/**
 	 * Dry-run-aware file writer. `wheels generate --dry-run` sets
 	 * request.$wheelsGenerateDryRun; writes are then recorded (for the
 	 * caller to print) and skipped. Creates the parent directory on the
 	 * real path.
 	 */
-	/** Creates dir inside the project only; an existing symlinked parent pointing outside is refused. */
-	private void function $ensureDir(required string dir) {
-		new modules.wheels.services.GeneratorPaths().ensureDirectoryInside(variables.projectRoot, arguments.dir);
-	}
-
 	private string function $write(required string path, required string content) {
 		new modules.wheels.services.GeneratorPaths().assertInside(variables.projectRoot, arguments.path);
 		if (request.$wheelsGenerateDryRun ?: false) {
