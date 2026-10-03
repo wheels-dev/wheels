@@ -134,6 +134,246 @@ component extends="wheels.WheelsTest" {
 				expect(events.data[1]).toBe("second");
 			});
 
+			it("poll returns events in publish order when createdAt ties (since path)", function() {
+				// The since path must order by the monotonic key, not createdAt. Force an
+				// exact createdAt tie AND give the first-published event an id that sorts
+				// AFTER the second's, so neither a createdAt tie nor an id tiebreak can
+				// produce the right order — only the publish-ordered seq / rowid can.
+				var channelName = "test.tieorder.#Replace(CreateUUID(), '-', '', 'all')#";
+				var firstId = "evt-tie-zzz-#Replace(CreateUUID(), '-', '', 'all')#";
+				var secondId = "evt-tie-aaa-#Replace(CreateUUID(), '-', '', 'all')#";
+				adapter.publish(channel = channelName, event = "e", data = '{"n":1}', id = firstId);
+				adapter.publish(channel = channelName, event = "e", data = '{"n":2}', id = secondId);
+				var tieTime = Now();
+				queryExecute(
+					"UPDATE wheels_events SET createdAt = :ts WHERE id = :a OR id = :b",
+					{
+						ts: {value: tieTime, cfsqltype: "cf_sql_timestamp"},
+						a: {value: firstId, cfsqltype: "cf_sql_varchar"},
+						b: {value: secondId, cfsqltype: "cf_sql_varchar"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+
+				var events = adapter.poll(channel = channelName, since = DateAdd("n", -1, Now()));
+
+				expect(events.recordCount).toBe(2);
+				expect(events.data[1]).toBe('{"n":1}');
+				expect(events.data[2]).toBe('{"n":2}');
+			});
+
+			it("poll resumes by sequence and does not re-deliver same-tick earlier events", function() {
+				// A and B share a createdAt tick. Resuming from B must NOT re-deliver A
+				// (published before B in the same tick). The old createdAt >= logic
+				// returned A; a strict monotonic seq/rowid resume excludes it.
+				var channelName = "test.tieresume.#Replace(CreateUUID(), '-', '', 'all')#";
+				var idA = "evt-ra-#Replace(CreateUUID(), '-', '', 'all')#";
+				var idB = "evt-rb-#Replace(CreateUUID(), '-', '', 'all')#";
+				var idC = "evt-rc-#Replace(CreateUUID(), '-', '', 'all')#";
+				adapter.publish(channel = channelName, event = "e", data = "A", id = idA);
+				adapter.publish(channel = channelName, event = "e", data = "B", id = idB);
+				var tieTime = Now();
+				queryExecute(
+					"UPDATE wheels_events SET createdAt = :ts WHERE id = :a OR id = :b",
+					{
+						ts: {value: tieTime, cfsqltype: "cf_sql_timestamp"},
+						a: {value: idA, cfsqltype: "cf_sql_varchar"},
+						b: {value: idB, cfsqltype: "cf_sql_varchar"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+				sleep(20);
+				adapter.publish(channel = channelName, event = "e", data = "C", id = idC);
+
+				var events = adapter.poll(channel = channelName, lastEventId = idB);
+				var ids = ValueList(events.id);
+
+				expect(ListFindNoCase(ids, idA) == 0).toBeTrue();
+				expect(ListFindNoCase(ids, idC) > 0).toBeTrue();
+				expect(ListFindNoCase(ids, idB) == 0).toBeTrue();
+			});
+
+			it("poll falls back to since when the lastEventId row no longer exists", function() {
+				// If the referenced event was already cleaned up, resume must degrade to
+				// the since window — returning later events, never silently empty.
+				var channelName = "test.goneresume.#Replace(CreateUUID(), '-', '', 'all')#";
+				var goneId = "evt-gone-#Replace(CreateUUID(), '-', '', 'all')#";
+				var laterId = "evt-later-#Replace(CreateUUID(), '-', '', 'all')#";
+				adapter.publish(channel = channelName, event = "e", data = "gone", id = goneId);
+				queryExecute(
+					"DELETE FROM wheels_events WHERE id = :id",
+					{id: {value: goneId, cfsqltype: "cf_sql_varchar"}},
+					{datasource: application.wheels.dataSourceName}
+				);
+				sleep(20);
+				adapter.publish(channel = channelName, event = "e", data = "later", id = laterId);
+
+				var events = adapter.poll(
+					channel = channelName,
+					lastEventId = goneId,
+					since = DateAdd("n", -1, Now())
+				);
+				var ids = ValueList(events.id);
+
+				expect(ListFindNoCase(ids, laterId) > 0).toBeTrue();
+			});
+
+			it("adds the seq column to a pre-existing table that lacks it", function() {
+				// Simulates an app whose wheels_events table predates the monotonic
+				// column: create it with seq (via ensure), drop seq to mimic the old
+				// schema, then let a fresh adapter re-probe and ALTER it back — the
+				// "ADD IDENTITY to a populated table" path that a fresh CREATE never hits.
+				var probe = new wheels.channel.DatabaseAdapter();
+				var dbType = probe.$detectDatabaseType();
+				// Only the seq dialects have a column to drop/re-add. SQLite uses rowid
+				// and unknown dialects use id — neither has a seq column.
+				if (dbType == "sqlite" || dbType == "default") {
+					skip("dialect [#dbType#] uses rowid/id, not a seq column");
+				}
+
+				// Warm the table (creates it with seq), leave a row behind so the ALTER
+				// must add the identity column to a POPULATED table.
+				probe.publish(channel = "test.upgrade.warm", event = "e", data = "warm");
+				var dropState = {ok = false};
+				try {
+					queryExecute(
+						"ALTER TABLE wheels_events DROP COLUMN seq",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					dropState.ok = true;
+				} catch (any e) {
+					// Engine won't let the column be dropped — can't simulate the old
+					// schema here, so there is nothing to assert.
+				}
+				if (!dropState.ok) {
+					skip("cannot drop seq to simulate a pre-fix table on [#dbType#]");
+				}
+
+				// Publish the first event with an id that sorts AFTER the second's, so an
+				// id-fallback (ALTER silently failed) would order them wrong — only a real
+				// monotonic seq, assigned in publish order, puts n:1 first.
+				var channelName = "test.upgrade.#Replace(CreateUUID(), '-', '', 'all')#";
+				var firstId = "evt-up-zzz-#Replace(CreateUUID(), '-', '', 'all')#";
+				var secondId = "evt-up-aaa-#Replace(CreateUUID(), '-', '', 'all')#";
+				var upgraded = new wheels.channel.DatabaseAdapter();
+				upgraded.publish(channel = channelName, event = "e", data = '{"n":1}', id = firstId);
+				upgraded.publish(channel = channelName, event = "e", data = '{"n":2}', id = secondId);
+
+				// The ALTER must have actually added the column, not silently fallen back.
+				var seqCheck = {present = false};
+				try {
+					queryExecute(
+						"SELECT seq FROM wheels_events WHERE 1=0",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					seqCheck.present = true;
+				} catch (any e) {
+					// seq absent — ALTER did not take.
+				}
+				expect(seqCheck.present).toBeTrue();
+
+				var tieTime = Now();
+				queryExecute(
+					"UPDATE wheels_events SET createdAt = :ts WHERE id = :a OR id = :b",
+					{
+						ts: {value: tieTime, cfsqltype: "cf_sql_timestamp"},
+						a: {value: firstId, cfsqltype: "cf_sql_varchar"},
+						b: {value: secondId, cfsqltype: "cf_sql_varchar"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+
+				var events = upgraded.poll(channel = channelName, since = DateAdd("n", -1, Now()));
+
+				expect(events.recordCount).toBe(2);
+				expect(events.data[1]).toBe('{"n":1}');
+				expect(events.data[2]).toBe('{"n":2}');
+			});
+
+			it("heals a half-upgraded seq column (present, no default) and resumes past a NULL seq", function() {
+				// Reproduces a wheels_events table left mid-upgrade: the seq column exists but
+				// has no default (the staged SET DEFAULT never ran), so rows can be inserted
+				// with a NULL seq. A fresh adapter must (a) finish the upgrade — SET DEFAULT +
+				// ordered backfill — and (b) resume safely past a NULL-seq row instead of
+				// returning nothing. Only the postgresql family has this staged state.
+				var probe = new wheels.channel.DatabaseAdapter();
+				var dbType = probe.$detectDatabaseType();
+				if (dbType != "postgresql") {
+					skip("the staged half-upgrade state only occurs on the postgresql family");
+				}
+
+				// Warm (creates the table), then force the half-upgraded shape: drop seq and
+				// re-add it nullable with NO default.
+				probe.publish(channel = "test.half.warm", event = "e", data = "warm");
+				var dropState = {ok = false};
+				try {
+					queryExecute(
+						"ALTER TABLE wheels_events DROP COLUMN seq",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					dropState.ok = true;
+				} catch (any e) {
+					// Can't simulate the state here.
+				}
+				if (!dropState.ok) {
+					skip("cannot drop seq to simulate the half-upgraded table on [#dbType#]");
+				}
+				queryExecute(
+					"ALTER TABLE wheels_events ADD COLUMN seq INT8",
+					{},
+					{datasource: application.wheels.dataSourceName}
+				);
+
+				var channelName = "test.half.#Replace(CreateUUID(), '-', '', 'all')#";
+				var slippedId = "evt-half-slip-#Replace(CreateUUID(), '-', '', 'all')#";
+				// A row that slipped in during the no-default window: explicit NULL seq.
+				queryExecute(
+					"INSERT INTO wheels_events (id, channel, event, data, createdAt, seq) VALUES (:id, :ch, 'e', 'slipped', :ts, NULL)",
+					{
+						id: {value: slippedId, cfsqltype: "cf_sql_varchar"},
+						ch: {value: channelName, cfsqltype: "cf_sql_varchar"},
+						ts: {value: Now(), cfsqltype: "cf_sql_timestamp"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+
+				// (a) A fresh adapter detects the column is not READY (no default) and finishes
+				// the upgrade; its publish then gets a real seq and the slipped row backfills.
+				sleep(20);
+				var laterId = "evt-half-later-#Replace(CreateUUID(), '-', '', 'all')#";
+				var healer = new wheels.channel.DatabaseAdapter();
+				healer.publish(channel = channelName, event = "e", data = "later", id = laterId);
+
+				var healed = queryExecute(
+					"SELECT COUNT(*) AS c FROM wheels_events WHERE (id = :a OR id = :b) AND seq IS NOT NULL",
+					{
+						a: {value: slippedId, cfsqltype: "cf_sql_varchar"},
+						b: {value: laterId, cfsqltype: "cf_sql_varchar"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(healed.c[1]).toBe(2);
+
+				// (b) Resume safety: force another row with an explicit NULL seq AFTER the column
+				// is ready (the ready path does not backfill), then resume from it — poll must
+				// fall back to the since window and still return the later event, not nothing.
+				var nullCursorId = "evt-half-nullcur-#Replace(CreateUUID(), '-', '', 'all')#";
+				queryExecute(
+					"INSERT INTO wheels_events (id, channel, event, data, createdAt, seq) VALUES (:id, :ch, 'e', 'nullcur', :ts, NULL)",
+					{
+						id: {value: nullCursorId, cfsqltype: "cf_sql_varchar"},
+						ch: {value: channelName, cfsqltype: "cf_sql_varchar"},
+						ts: {value: DateAdd("n", -2, Now()), cfsqltype: "cf_sql_timestamp"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+				var resumed = healer.poll(channel = channelName, lastEventId = nullCursorId, since = DateAdd("n", -5, Now()));
+				expect(ListFindNoCase(ValueList(resumed.id), laterId) > 0).toBeTrue();
+			});
+
 			it("cleanup removes old events", function() {
 				adapter.poll(channel = "test.cleanup", since = DateAdd("n", -1, Now()));
 				var eventId = "old-event-cleanup-#Replace(CreateUUID(), '-', '', 'all')#";
