@@ -148,9 +148,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			// silently got nothing back when typing `install` — even though
 			// `PackagesMainCli.install()` itself has always been a true alias
 			// for `add()`. The alias must be wired through the dispatch
-			// layer too, so that the only place `install` ever no-ops is the
-			// LuCLI extension-installer intercept (which we cannot patch),
-			// and every in-process caller gets the same behavior as `add`.
+			// layer too, so every caller gets the same behavior as `add`.
 			it("throws the same BadInput error as `add` when name is missing", () => {
 				mod.__arguments = ["install"];
 				var threw = {flag: false, message: ""};
