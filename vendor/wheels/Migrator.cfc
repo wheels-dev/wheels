@@ -27,6 +27,7 @@ component output="false" extends="wheels.Global"{
 	public string function migrateTo(string version = "", boolean missingMigFlag = false) {
 		local.rv = "";
 		local.appKey = $appKey();
+		$resetStepFailure();
 
 		// Bootstrap the migrator system tables up front — migrateTo is a
 		// mutating entry point. Read helpers (getCurrentMigrationVersion,
@@ -222,6 +223,7 @@ component output="false" extends="wheels.Global"{
 	public string function migrateIndividual(required string version) {
 		local.rv = "";
 		local.appKey = $appKey();
+		$resetStepFailure();
 		// Mutating entry point — bootstrap the system tables before any read.
 		$ensureSystemTables();
 		local.migrations = getAvailableMigrations();
@@ -352,6 +354,7 @@ component output="false" extends="wheels.Global"{
 	 */
 	public string function redoMigration(string version = "") {
 		local.appKey = $appKey();
+		$resetStepFailure();
 		// Mutating entry point — bootstrap the system tables before any read.
 		$ensureSystemTables();
 		local.currentVersion = getCurrentMigrationVersion();
@@ -394,24 +397,47 @@ component output="false" extends="wheels.Global"{
 		required string direction,
 		string errorLabel = "Error migrating to"
 	) {
+		return $recordStepResult(
+			result = $runMigrationStepUnrecorded(
+				migration = arguments.migration,
+				direction = arguments.direction,
+				errorLabel = arguments.errorLabel
+			),
+			migration = arguments.migration,
+			direction = arguments.direction
+		);
+	}
+
+	/**
+	 * Internal function for `$runMigrationStep()`: runs the step and returns
+	 * `{success, output, error}` without recording it on the instance.
+	 */
+	private struct function $runMigrationStepUnrecorded(
+		required struct migration,
+		required string direction,
+		string errorLabel = "Error migrating to"
+	) {
 		local.appKey = $appKey();
 		local.result = {success = true, output = ""};
 		// Fail-closed redo: if down cannot run, do not run up (that would
 		// double-apply) and do not change version tracking.
 		if (arguments.direction == "redo" && !application[local.appKey].allowMigrationDown) {
 			local.result.success = false;
-			local.result.output = "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)#Cannot redo migration: allowMigrationDown is false. Running up() without down() would double-apply.#Chr(13) & Chr(10)#";
+			local.result.error = "Cannot redo migration: allowMigrationDown is false. Running up() without down() would double-apply.";
+			local.result.output = "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)##local.result.error##Chr(13) & Chr(10)#";
 			return local.result;
 		}
 		// S5: a CFC that failed to load must not reach .up()/.down().
 		if (StructKeyExists(arguments.migration, "loadError") && Len(ToString(arguments.migration.loadError))) {
 			local.result.success = false;
-			local.result.output = "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)#Migration failed to load: #arguments.migration.loadError##Chr(13) & Chr(10)#";
+			local.result.error = "Migration failed to load: #arguments.migration.loadError#";
+			local.result.output = "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)##local.result.error##Chr(13) & Chr(10)#";
 			return local.result;
 		}
 		if (!StructKeyExists(arguments.migration, "cfc")) {
 			local.result.success = false;
-			local.result.output = "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)#Migration CFC was not loaded.#Chr(13) & Chr(10)#";
+			local.result.error = "Migration CFC was not loaded.";
+			local.result.output = "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)##local.result.error##Chr(13) & Chr(10)#";
 			return local.result;
 		}
 		local.divider = arguments.direction == "up" ? "--------" : "-------";
@@ -502,6 +528,7 @@ component output="false" extends="wheels.Global"{
 			}
 		} catch (any e) {
 			local.result.success = false;
+			local.result.error = e.message;
 			local.result.output &= "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
 			local.hint = $mixedDatasourceTransactionHint(e);
 			if (Len(local.hint)) {
@@ -534,6 +561,52 @@ component output="false" extends="wheels.Global"{
 		}
 		StructDelete(request, "$wheelsTransactionWrapper");
 		return local.result;
+	}
+
+	/**
+	 * Describes the step that failed during this instance's last `migrateTo()` /
+	 * `migrateToLatest()` / `migrateIndividual()` / `redoMigration()` run: `{failed, version, direction, error}`.
+	 * `failed` is false after a run with no failed step. A failed step is still
+	 * reported in the returned output text, as before; this is the structured form
+	 * for callers such as `TenantMigrator.migrateAll()` that must not parse it.
+	 */
+	public struct function $lastStepFailure() {
+		if (!StructKeyExists(variables, "$stepFailure")) {
+			$resetStepFailure();
+		}
+		return Duplicate(variables.$stepFailure);
+	}
+
+	/**
+	 * Internal function. Clears the recorded step failure at the start of a run.
+	 */
+	public void function $resetStepFailure() {
+		variables.$stepFailure = {failed = false, version = "", direction = "", error = ""};
+	}
+
+	/**
+	 * Internal function for `$runMigrationStep()`. Records the first failed step
+	 * of the current run on the instance and returns the step result unchanged.
+	 */
+	private struct function $recordStepResult(
+		required struct result,
+		required struct migration,
+		required string direction
+	) {
+		if (!arguments.result.success) {
+			if (!StructKeyExists(variables, "$stepFailure")) {
+				$resetStepFailure();
+			}
+			if (!variables.$stepFailure.failed) {
+				variables.$stepFailure = {
+					failed = true,
+					version = ToString(arguments.migration.version),
+					direction = arguments.direction,
+					error = StructKeyExists(arguments.result, "error") ? arguments.result.error : ""
+				};
+			}
+		}
+		return arguments.result;
 	}
 
 	/**
