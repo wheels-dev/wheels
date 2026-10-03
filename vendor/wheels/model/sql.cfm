@@ -1638,9 +1638,11 @@
 
 	/**
 	 * Internal function. True when a `where` value binds as SQL NULL: the unquoted NULL
-	 * keyword, or an empty value for a column that can't hold an empty string (a number,
-	 * date or boolean). An empty value for a string column binds as a real '' (#4055),
-	 * which Oracle stores and compares as NULL anyway.
+	 * keyword, or an empty value whose parameter does not bind as a string (a number, date,
+	 * time or boolean cf_sql type). An empty value that binds as a string binds as a real ''
+	 * (#4055). The bind type decides, not the column: SQLite stores datetimes as text and
+	 * binds them as cf_sql_varchar, so they take the string path there. Oracle stores and
+	 * compares '' as NULL anyway.
 	 */
 	public boolean function $whereValueBindsNull(required string value, required boolean nullKeyword, string type = "") {
 		if (arguments.nullKeyword) {

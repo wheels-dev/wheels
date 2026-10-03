@@ -137,14 +137,15 @@ An empty-string value in a `where` condition now binds as a real `''` ([#4055](h
 - `col <> ''` and `col != ''` return every row whose value is neither empty nor NULL.
 - The same applies to an interpolated value that happens to be empty: `where="col = '#x#'"` with `x = ""`.
 - It applies everywhere a `where` string is used: the finders and `count()`, dynamic finders such as `findOneByBrand("")`, the query builder's `where("brand", "")`, and `updateAll()` / `deleteAll()`. **`updateAll()` and `deleteAll()` with such a condition now change or delete those rows, where in 4.1 they touched nothing.**
+- A lookup such as `findOne(where="token = ''")` now matches rows that store an empty string. The same goes for a lookup keyed on a request value that turns out empty, such as `findOne(where="token = '#params.token#'")` or `findOneByToken(params.token)`: in 4.1 it found nothing. Reject empty input before looking it up, or store cleared values as NULL rather than `''`.
 
 **What doesn't change:**
 
 - The unquoted `NULL` keyword: `col IS NULL` and `col IS NOT NULL` work as before. To match NULL, use them or `whereNull()` / `whereNotNull()`.
-- An empty value compared with a number, date or boolean column still matches nothing, since such a column can't hold `''`.
+- An empty value whose column binds as a number, date, time or boolean still matches nothing, since such a column can't hold `''`. What counts is the type Wheels binds the column with: SQLite stores datetimes as text and binds them as strings, so on SQLite an empty value compared with a datetime column follows the new behaviour (`createdAt <> ''` matches every row).
 - On Oracle, which stores `''` as NULL, an empty-string comparison still matches no rows.
 
-To find affected code, search `app/` for `= ''`, `<> ''`, `!= ''` and for `where` strings that interpolate a value that may be empty, especially in `updateAll()` and `deleteAll()` calls.
+To find affected code, search `app/` for `= ''`, `<> ''`, `!= ''`, for `where` strings that interpolate a value that may be empty (especially `params.*` values and `updateAll()` / `deleteAll()` calls), and for dynamic finders (`findOneBy…`, `findAllBy…`) called with request values.
 
 ### `LocalDisk` storage keys are checked per segment
 

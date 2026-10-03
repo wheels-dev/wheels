@@ -1,9 +1,10 @@
 /**
  * An empty string in a `where` value binds as a real empty string (#4055), so it
  * matches rows that store '' and `<>` / `!=` match every other non-NULL row. The
- * unquoted NULL keyword still binds as NULL, and so does an empty value for a column
- * that can't hold '' (numbers, dates). Oracle stores '' as NULL, so an empty-string
- * comparison matches no row there.
+ * unquoted NULL keyword still binds as NULL, and so does an empty value whose parameter
+ * doesn't bind as a string (number, date, time and boolean cf_sql types). The bind type
+ * decides: SQLite binds its text datetimes as strings. Oracle stores '' as NULL, so an
+ * empty-string comparison matches no row there.
  */
 component extends="wheels.WheelsTest" {
 
@@ -106,6 +107,48 @@ component extends="wheels.WheelsTest" {
 			it("still binds the NULL keyword as NULL", () => {
 				expect(g.model("author").count(where = "lastName IS NULL")).toBe(rawCount("lastname IS NULL"))
 				expect(g.model("author").count(where = "lastName IS NOT NULL")).toBe(rawCount("lastname IS NOT NULL"))
+			})
+
+			it("binds an empty value as NULL only for parameters that don't bind as a string", () => {
+				var m = g.model("author")
+				var nullTypes = "cf_sql_integer,CF_SQL_BIGINT,cf_sql_smallint,cf_sql_tinyint,cf_sql_decimal,cf_sql_float,cf_sql_date,cf_sql_time,cf_sql_timestamp,CF_SQL_TIMESTAMP,cf_sql_bit,CF_SQL_BIT"
+				for (var t in ListToArray(nullTypes)) {
+					expect(m.$whereValueBindsNull(value = "", nullKeyword = false, type = t)).toBeTrue(t)
+				}
+				var stringTypes = "cf_sql_varchar,CF_SQL_VARCHAR,cf_sql_char,cf_sql_nvarchar,cf_sql_longvarchar,CF_SQL_LONGNVARCHAR"
+				for (var t in ListToArray(stringTypes)) {
+					expect(m.$whereValueBindsNull(value = "", nullKeyword = false, type = t)).toBeFalse(t)
+				}
+				// No type recorded: a string.
+				expect(m.$whereValueBindsNull(value = "", nullKeyword = false, type = "")).toBeFalse()
+				// The NULL keyword is NULL whatever the type; a non-empty value never is.
+				expect(m.$whereValueBindsNull(value = "", nullKeyword = true, type = "cf_sql_varchar")).toBeTrue()
+				expect(m.$whereValueBindsNull(value = "0", nullKeyword = false, type = "cf_sql_integer")).toBeFalse()
+			})
+
+			it("matches nothing, without an error, for an empty value on boolean and datetime columns", () => {
+				// booleanType binds as a bit/integer everywhere, so '' is NULL: no match, and no
+				// bind error on Adobe.
+				var state = {err = "", boolEq = -1, dtEq = -1, dtNe = -1, total = -1}
+				try {
+					state.total = g.model("sqlType").count()
+					state.boolEq = g.model("sqlType").count(where = "booleanType = ''")
+					state.dtEq = g.model("sqlType").count(where = "dateTimeType = ''")
+					state.dtNe = g.model("sqlType").count(where = "dateTimeType <> ''")
+				} catch (any e) {
+					state.err = e.message
+				}
+				expect(state.err).toBe("")
+				expect(state.boolEq).toBe(0)
+				expect(state.dtEq).toBe(0)
+				if (g.get("adapterName") == "SQLiteModel") {
+					// SQLite stores datetimes as text and binds them as strings, so <> '' compares
+					// text and matches every row.
+					expect(state.dtNe).toBe(state.total)
+				} else {
+					// Everywhere else a datetime binds as a date, so '' is NULL and <> matches nothing.
+					expect(state.dtNe).toBe(0)
+				}
 			})
 
 			it("matches nothing, without an error, for an empty value on a numeric column", () => {
