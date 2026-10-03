@@ -85,6 +85,61 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		// BoxLang binds cf_sql_bigint to SQLite as TEXT; SQLite converts it back only when
+		// it is compared with a column, so an expression comparison went wrong (#4089).
+		describe("Comparisons against a bigInteger column", () => {
+
+			beforeEach(() => {
+				var t = variables.migration.createTable(name = variables.valueTable, force = true);
+				t.string(columnNames = "label");
+				t.bigInteger(columnNames = "amount");
+				t.create();
+				reloadModel("BigValue", variables.valueTable);
+				model("BigValue").create(label = "a", amount = 5);
+				model("BigValue").create(label = "a", amount = 7);
+				model("BigValue").create(label = "b", amount = 1);
+				model("BigValue").create(label = "c", amount = 9000000000);
+			});
+
+			it("match an aggregate against a small value", () => {
+				var totals = model("BigValue").findAll(select = "label, amountTotal", group = "label", where = "amountTotal > 10 AND amountTotal < 100");
+				expect(totals.recordCount).toBe(1);
+				expect(totals.label).toBe("a");
+			});
+
+			it("match a column against a value above the 32-bit range", () => {
+				expect(model("BigValue").count(where = "amount > 8999999999")).toBe(1);
+				expect(model("BigValue").count(where = "amount IN (5, 9000000000)")).toBe(2);
+			});
+
+		});
+
+		describe("SQLite query params for cf_sql_bigint values", () => {
+
+			it("bind as cf_sql_integer only when every value fits in 32 bits", () => {
+				var adapter = CreateObject("component", "wheels.databaseAdapters.SQLite.SQLiteModel");
+				var cases = [
+					{value = "10", type = "cf_sql_integer"},
+					{value = "2147483647", type = "cf_sql_integer"},
+					{value = "-2147483648", type = "cf_sql_integer"},
+					{value = "+00042", type = "cf_sql_integer"},
+					{value = "2147483648", type = "cf_sql_bigint"},
+					{value = "-2147483649", type = "cf_sql_bigint"},
+					{value = "9223372036854775807", type = "cf_sql_bigint"},
+					{value = "12.5", type = "cf_sql_bigint"},
+					{value = "abc", type = "cf_sql_bigint"}
+				];
+				for (var c in cases) {
+					expect(adapter.$queryParams({type = "cf_sql_bigint", value = c.value}).cfsqltype).toBe(c.type, c.value);
+				}
+				expect(adapter.$queryParams({type = "cf_sql_bigint", value = "", null = true}).cfsqltype).toBe("cf_sql_bigint");
+				expect(adapter.$queryParams({type = "cf_sql_bigint", value = "1,2", list = true}).cfsqltype).toBe("cf_sql_integer");
+				expect(adapter.$queryParams({type = "cf_sql_bigint", value = "1,9000000000", list = true}).cfsqltype).toBe("cf_sql_bigint");
+				expect(adapter.$queryParams({type = "cf_sql_varchar", value = "10"}).cfsqltype).toBe("cf_sql_varchar");
+			});
+
+		});
+
 		describe("A biginteger primary key on SQLite", () => {
 
 			it("still auto-generates ids", () => {
