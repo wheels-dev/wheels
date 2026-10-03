@@ -508,23 +508,6 @@
 	}
 
 	/**
-	 * Internal function. "<sign><digits>" with no leading zeros for an integer literal, or ""
-	 * when the value is not one.
-	 */
-	public string function $canonicalIntegerString(required string value) {
-		local.value = Trim(arguments.value);
-		if (!ReFind("^[+-]?[0-9]+$", local.value)) {
-			return "";
-		}
-		local.sign = Left(local.value, 1) == "-" ? "-" : "";
-		local.digits = ReReplace(local.value, "^[+-]?0*", "");
-		if (!Len(local.digits)) {
-			return "0";
-		}
-		return local.sign & local.digits;
-	}
-
-	/**
 	 * Internal function. The validation type Wheels derived for a model column ("integer",
 	 * "string", ...), or "string" when the column is unknown.
 	 */
@@ -691,26 +674,6 @@
 		}
 		return $compareIntegerStrings(local.digits, local.range.min) < 0
 			|| $compareIntegerStrings(local.digits, local.range.max) > 0;
-	}
-
-	/**
-	 * Internal function. -1, 0 or 1 as canonical integer string a is below, equal to or above b,
-	 * compared by sign, then length, then digits.
-	 */
-	public numeric function $compareIntegerStrings(required string a, required string b) {
-		local.aNegative = Left(arguments.a, 1) == "-";
-		local.bNegative = Left(arguments.b, 1) == "-";
-		if (local.aNegative != local.bNegative) {
-			return local.aNegative ? -1 : 1;
-		}
-		local.aDigits = ReReplace(arguments.a, "^-", "");
-		local.bDigits = ReReplace(arguments.b, "^-", "");
-		if (Len(local.aDigits) != Len(local.bDigits)) {
-			local.rv = Len(local.aDigits) > Len(local.bDigits) ? 1 : -1;
-		} else {
-			local.rv = Sgn(Compare(local.aDigits, local.bDigits));
-		}
-		return local.aNegative ? -local.rv : local.rv;
 	}
 
 	/**

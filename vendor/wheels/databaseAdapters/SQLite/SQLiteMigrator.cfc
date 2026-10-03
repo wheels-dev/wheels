@@ -2,7 +2,9 @@ component extends="wheels.databaseAdapters.Abstract" {
 
 	// SQLite type mapping (simpler type system)
 	variables.sqlTypes = {};
-	variables.sqlTypes['biginteger'] = { name = 'INTEGER' };
+	// BIGINT has INTEGER affinity (64-bit storage) and is typed cf_sql_bigint; INTEGER was
+	// typed cf_sql_integer, which truncates or rejects values above 2^31 (#4089).
+	variables.sqlTypes['biginteger'] = { name = 'BIGINT' };
 	variables.sqlTypes['binary'] = { name = 'BLOB' };
 	variables.sqlTypes['boolean'] = { name = 'BOOLEAN' }; // NUMERIC affinity, stores 0/1; declared name lets SQLiteModel.$getType map it to cf_sql_bit
 	variables.sqlTypes['char'] = { name = 'CHAR', limit = 1 }; // TEXT affinity; declared name lets SQLiteModel.$getType map it
@@ -61,6 +63,10 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * In SQLite, only INTEGER PRIMARY KEY is auto-incrementable.
 	 */
 	public string function addPrimaryKeyOptions(required string sql, struct options = {}) {
+		// Only a column declared exactly INTEGER PRIMARY KEY is the rowid alias, which
+		// auto-generates ids and may carry AUTOINCREMENT, so a biginteger key stays INTEGER
+		// (the rowid is 64-bit already) (#4089).
+		arguments.sql = ReReplaceNoCase(arguments.sql, " BIGINT$", " INTEGER");
 		arguments.sql &= " PRIMARY KEY";
 		if (
 			StructKeyExists(arguments.options, "autoIncrement") &&

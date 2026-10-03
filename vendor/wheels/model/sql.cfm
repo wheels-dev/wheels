@@ -1546,7 +1546,13 @@
 						structDelete(arguments.sql[local.i], 'property');
 					}
 					arguments.sql[local.i].value = local.originalValues[local.pos];
-					if (local.originalValues[local.pos] == "" || local.sqlNullFlags[local.pos]) {
+					if (
+						$whereValueBindsNull(
+							value = local.originalValues[local.pos],
+							nullKeyword = local.sqlNullFlags[local.pos],
+							type = StructKeyExists(arguments.sql[local.i], "type") ? arguments.sql[local.i].type : ""
+						)
+					) {
 						arguments.sql[local.i].null = true;
 						// Dummy value so integer cfqueryparam does not try to cast
 						// the keyword string "NULL" / "[NULL]" to a number.
@@ -1628,6 +1634,24 @@
 			ArrayAppend(local.rv, ArrayToList(local.group, ","));
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. True when a `where` value binds as SQL NULL: the unquoted NULL
+	 * keyword, or an empty value whose parameter does not bind as a string (a number, date,
+	 * time or boolean cf_sql type). An empty value that binds as a string binds as a real ''
+	 * (#4055). The bind type decides, not the column: SQLite stores datetimes as text and
+	 * binds them as cf_sql_varchar, so they take the string path there. Oracle stores and
+	 * compares '' as NULL anyway.
+	 */
+	public boolean function $whereValueBindsNull(required string value, required boolean nullKeyword, string type = "") {
+		if (arguments.nullKeyword) {
+			return true;
+		}
+		if (Len(arguments.value)) {
+			return false;
+		}
+		return !ListFindNoCase("string,text", variables.wheels.class.adapter.$getValidationType(UCase(arguments.type)));
 	}
 
 	/**

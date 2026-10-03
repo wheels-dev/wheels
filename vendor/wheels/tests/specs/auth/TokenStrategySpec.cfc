@@ -373,6 +373,23 @@ component extends="wheels.WheelsTest" {
 					expect(result.success).toBeFalse();
 				});
 
+				it("never calls the validator for an empty or missing token", function() {
+					var calls = {count = 0};
+					var countingValidator = function(token) {
+						calls.count++;
+						return {id = 1};
+					};
+					var strategy = new wheels.auth.TokenStrategy(validator = countingValidator);
+
+					var emptyHeader = strategy.authenticate({headers = {authorization = "Bearer "}});
+					var noHeader = strategy.authenticate({headers = {}, params = {}});
+
+					expect(emptyHeader.success).toBeFalse();
+					expect(emptyHeader.error).toBe("No token provided");
+					expect(noHeader.success).toBeFalse();
+					expect(calls.count).toBe(0);
+				});
+
 				it("rejects when no validator and no tokens configured", function() {
 					var strategy = new wheels.auth.TokenStrategy();
 
