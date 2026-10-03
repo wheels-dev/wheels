@@ -142,7 +142,7 @@ An empty-string value in a `where` condition now binds as a real `''` ([#4055](h
 **What doesn't change:**
 
 - The unquoted `NULL` keyword: `col IS NULL` and `col IS NOT NULL` work as before. To match NULL, use them or `whereNull()` / `whereNotNull()`.
-- An empty value whose column binds as a number, date, time or boolean still matches nothing, since such a column can't hold `''`. What counts is the type Wheels binds the column with: SQLite stores datetimes as text and binds them as strings, so on SQLite an empty value compared with a datetime column follows the new behaviour (`createdAt <> ''` matches every row).
+- An empty value whose column binds as a number, date, time or boolean still matches nothing, since such a column can't hold `''`. What counts is the type Wheels binds the column with: SQLite stores datetimes as text and binds them as strings, so on SQLite an empty value compared with a datetime column follows the new behaviour (`createdAt <> ''` matches every non-empty, non-NULL datetime).
 - On Oracle, which stores `''` as NULL, an empty-string comparison still matches no rows.
 
 To find affected code, search `app/` for `= ''`, `<> ''`, `!= ''`, for `where` strings that interpolate a value that may be empty (especially `params.*` values and `updateAll()` / `deleteAll()` calls), and for dynamic finders (`findOneBy…`, `findAllBy…`) called with request values.
