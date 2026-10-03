@@ -30,14 +30,256 @@ component {
 	 *
 	 * @baseUrl The base URL for all requests (e.g. "http://localhost:8080")
 	 */
-	public TestClient function init(string baseUrl = "http://localhost:8080") {
+	/**
+	 * @baseUrl     Origin the requests go to.
+	 * @testContext Send the test context (header and cookie) with every request
+	 *              when the client is created inside a test-runner request and
+	 *              baseUrl points at the test server (see $isTestHost()), so the
+	 *              requests reach the same isolated test application as the spec
+	 *              code. Pass false to address the live application.
+	 */
+	public TestClient function init(string baseUrl = "http://localhost:8080", boolean testContext = true) {
 		variables.baseUrl = arguments.baseUrl;
 		variables.lastResponse = {};
 		variables.defaultHeaders = {};
 		variables.cookies = {};
 		variables.sendAsJson = false;
 		$clearResponseCaches();
+		if (arguments.testContext) {
+			$attachTestContext();
+		}
 		return this;
+	}
+
+	/**
+	 * Adds the test-context header and cookie when this client is created
+	 * inside a test-runner request (the isolated test application, in
+	 * development or testing; a thread started during the run is in the same
+	 * application) and baseUrl points at the test server. A client created
+	 * outside a test run, such as in a scheduled task or a script, or one aimed
+	 * at any other host, sends nothing extra.
+	 */
+	private void function $attachTestContext() {
+		var ctx = new wheels.events.TestContext();
+		if (!ctx.currentRequestIsIsolated() || !$isTestHost(variables.baseUrl)) {
+			return;
+		}
+		var testSecret = ctx.testSecret();
+		withHeader(ctx.headerName(), testSecret);
+		withCookie(ctx.cookieName(), testSecret);
+	}
+
+	/**
+	 * True when `target` points at the test server: its host is a loopback address
+	 * (localhost, 127.x.x.x, [::1]) or the host of an explicitly configured test
+	 * base URL (the testClientBaseUrl setting, -Dwheels.testClient.baseUrl, or
+	 * WHEELS_TEST_CLIENT_BASE_URL). Hosts are compared exactly after the URL is
+	 * parsed, with no DNS lookup, so localhost.example.com or
+	 * 127.0.0.1.example.com do not match. Public for specs.
+	 */
+	public boolean function $isTestHost(required string target) {
+		var host = $urlHost(arguments.target);
+		if (!Len(host)) {
+			return false;
+		}
+		if (host == "localhost" || host == "[::1]" || host == "::1" || $isLoopbackIPv4(host)) {
+			return true;
+		}
+		for (var configured in $configuredTestBaseUrls()) {
+			if (Compare($urlHost(configured), host) == 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * The lower-cased host of an absolute http(s) URL, or "" when it has none or
+	 * is not one. Parsed with java.net.URI where the engine provides it, and
+	 * with $lexicalUrlHost() otherwise (an engine without a JVM). Both paths
+	 * first refuse anything $lexicalUrlHost() refuses: another scheme, or an
+	 * authority holding a backslash, whitespace, '%' or a control character.
+	 * Public for specs.
+	 */
+	public string function $urlHost(required string target) {
+		var lexical = $lexicalUrlHost(arguments.target);
+		if (!Len(lexical) || !$uriAvailable()) {
+			return lexical;
+		}
+		var state = {host = ""};
+		try {
+			state.parsed = CreateObject("java", "java.net.URI").init(Trim(arguments.target)).getHost();
+			if (!IsNull(state.parsed)) {
+				state.host = LCase(state.parsed);
+			}
+		} catch (any e) {
+			// Not a parseable absolute URL: no host.
+		}
+		return state.host;
+	}
+
+	/** True when java.net.URI can be created and parses a known URL. Public for specs. */
+	public boolean function $uriAvailable() {
+		var state = {ok = false};
+		try {
+			state.probe = CreateObject("java", "java.net.URI").init("http://localhost:1/").getHost();
+			state.ok = !IsNull(state.probe) && Compare(state.probe, "localhost") == 0;
+		} catch (any e) {
+			// No JVM: java.net.URI is not available.
+		}
+		return state.ok;
+	}
+
+	/**
+	 * The lower-cased host of an absolute http(s) URL, parsed without
+	 * java.net.URI, or "" when it has none or is not one. The authority runs from
+	 * '://' to the first '/', '?' or '#'; anything up to its LAST '@' is user
+	 * information; a port must be digits; an IPv6 host keeps its brackets. An
+	 * authority holding a backslash, whitespace, '%' or a control character is
+	 * refused outright. Public for specs.
+	 */
+	public string function $lexicalUrlHost(required string target) {
+		var raw = Trim(arguments.target);
+		if (REFindNoCase("^https?://", raw) != 1) {
+			return "";
+		}
+		var rest = Mid(raw, Find("://", raw) + 3, Len(raw));
+		var cutAt = REFind("[/?##]", rest);
+		var authority = rest;
+		if (cutAt == 1) {
+			return "";
+		} else if (cutAt > 1) {
+			authority = Left(rest, cutAt - 1);
+		}
+		if (!Len(authority) || !$isPlainAuthority(authority)) {
+			return "";
+		}
+		var hostPort = authority;
+		var atFromEnd = Find("@", Reverse(authority));
+		if (atFromEnd > 0) {
+			hostPort = Mid(authority, Len(authority) - atFromEnd + 2, Len(authority));
+		}
+		var host = "";
+		var port = "";
+		if (Left(hostPort, 1) == "[") {
+			var closeAt = Find("]", hostPort);
+			if (closeAt < 3) {
+				return "";
+			}
+			host = Left(hostPort, closeAt);
+			var afterHost = Mid(hostPort, closeAt + 1, Len(hostPort));
+			if (Len(afterHost) && (Left(afterHost, 1) != ":")) {
+				return "";
+			}
+			port = Len(afterHost) ? Mid(afterHost, 2, Len(afterHost)) : "";
+			if (!REFind("^\[[0-9A-Fa-f:.]+\]$", host)) {
+				return "";
+			}
+		} else {
+			var colonAt = Find(":", hostPort);
+			if (colonAt == 0) {
+				host = hostPort;
+			} else {
+				host = colonAt > 1 ? Left(hostPort, colonAt - 1) : "";
+				port = Mid(hostPort, colonAt + 1, Len(hostPort));
+			}
+			if (!$isHostName(host)) {
+				return "";
+			}
+		}
+		if (Len(port) && !REFind("^[0-9]{1,5}$", port)) {
+			return "";
+		}
+		return LCase(host);
+	}
+
+	/**
+	 * A host name or IPv4 address in the RFC 2396 sense java.net.URI applies:
+	 * either four dot-separated numbers of 0-255, or dot-separated labels of
+	 * letters, digits and inner hyphens whose last label starts with a letter.
+	 */
+	private boolean function $isHostName(required string host) {
+		var labels = ListToArray(arguments.host, ".", true);
+		if (!ArrayLen(labels)) {
+			return false;
+		}
+		var allNumeric = true;
+		for (var label in labels) {
+			if (!REFind("^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$", label)) {
+				return false;
+			}
+			if (!REFind("^[0-9]+$", label)) {
+				allNumeric = false;
+			}
+		}
+		if (allNumeric) {
+			if (ArrayLen(labels) != 4) {
+				return false;
+			}
+			for (var octet in labels) {
+				if (Len(octet) > 3 || Val(octet) > 255) {
+					return false;
+				}
+			}
+			return true;
+		}
+		return REFind("^[A-Za-z]", labels[ArrayLen(labels)]) == 1;
+	}
+
+	/** False when the authority holds a backslash, whitespace, '%' or a control character. */
+	private boolean function $isPlainAuthority(required string authority) {
+		var i = 0;
+		for (i = 1; i <= Len(arguments.authority); i++) {
+			var ch = Mid(arguments.authority, i, 1);
+			var code = Asc(ch);
+			if (code <= 32 || code == 127 || ch == "\" || ch == "%") {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private boolean function $isLoopbackIPv4(required string host) {
+		if (!ReFind("^127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$", arguments.host)) {
+			return false;
+		}
+		for (var octet in ListToArray(arguments.host, ".")) {
+			if (Val(octet) > 255) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** Test base URLs configured outside the request: the Wheels setting, the JVM property and the environment variable. */
+	private array function $configuredTestBaseUrls() {
+		var urls = [];
+		if (
+			StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "testClientBaseUrl")
+			&& IsSimpleValue(application.wheels.testClientBaseUrl)
+			&& Len(application.wheels.testClientBaseUrl)
+		) {
+			ArrayAppend(urls, application.wheels.testClientBaseUrl);
+		}
+		var state = {};
+		try {
+			state.property = CreateObject("java", "java.lang.System").getProperty("wheels.testClient.baseUrl");
+			if (!IsNull(state.property) && Len(state.property)) {
+				ArrayAppend(urls, state.property);
+			}
+		} catch (any e) {
+			// No JVM: no system property.
+		}
+		if (
+			StructKeyExists(server, "system")
+			&& StructKeyExists(server.system, "environment")
+			&& StructKeyExists(server.system.environment, "WHEELS_TEST_CLIENT_BASE_URL")
+			&& Len(server.system.environment.WHEELS_TEST_CLIENT_BASE_URL)
+		) {
+			ArrayAppend(urls, server.system.environment.WHEELS_TEST_CLIENT_BASE_URL);
+		}
+		return urls;
 	}
 
 	// ─── HTTP Methods ────────────────────────────────────────────────
