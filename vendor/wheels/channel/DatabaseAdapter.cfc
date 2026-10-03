@@ -98,8 +98,21 @@ component {
 	/**
 	 * Poll for events on a channel since a given event ID or timestamp.
 	 *
+	 * Ordering is by the monotonic, insert-assigned sequence (seq / rowid) where one
+	 * exists — the database's own cross-server serialization point — NOT by createdAt,
+	 * which is each publisher's wall clock and so re-orders (and, combined with a
+	 * sequence-based resume, re-delivers) events under multi-server clock skew. The
+	 * since window still filters on createdAt; it just doesn't decide order. An
+	 * unrecognised dialect with no sequence falls back to createdAt then id.
+	 *
+	 * NOTE (insert-vs-commit gap): the sequence is assigned at INSERT, so under
+	 * concurrent transactions a higher sequence can become visible before a lower one
+	 * commits, and a consumer resuming by sequence could skip the lower one once it
+	 * lands. publish() inserts autocommit one row at a time, so the window is a single
+	 * statement; callers that wrap publish() in a longer transaction should be aware.
+	 *
 	 * @channel The channel name to poll.
-	 * @lastEventId If provided, return events after this ID (by createdAt of the referenced event).
+	 * @lastEventId If provided, return events after this event, ordered by the monotonic sequence.
 	 * @since If provided (and no lastEventId), return events created after this timestamp.
 	 * @return Query of events with columns: id, channel, event, data, createdAt.
 	 */
@@ -111,6 +124,10 @@ component {
 		$assertChannelName(arguments.channel);
 		$ensureEventsTable();
 		local.orderCol = variables.$orderColumn;
+		local.hasSeq = (local.orderCol != "id");
+		// Order by the monotonic key alone where it exists; only the id fallback (no
+		// monotonic key) tie-breaks on createdAt then id.
+		local.orderBy = local.hasSeq ? "#local.orderCol# ASC" : "createdAt ASC, id ASC";
 
 		if (Len(arguments.lastEventId)) {
 			// Resume strictly AFTER the referenced event by the monotonic order column
@@ -119,7 +136,7 @@ component {
 			// (already cleaned up), degrade to the since window below rather than
 			// returning nothing. The "id" fallback dialect has no monotonic key, so it
 			// keeps the timestamp-based resume.
-			if (local.orderCol != "id") {
+			if (local.hasSeq) {
 				local.ref = queryExecute(
 					"SELECT #local.orderCol# AS ord
 					FROM wheels_events
@@ -136,7 +153,7 @@ component {
 						FROM wheels_events
 						WHERE channel = :channel
 						AND #local.orderCol# > :ord
-						ORDER BY createdAt ASC, #local.orderCol# ASC",
+						ORDER BY #local.orderCol# ASC",
 						{
 							channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"},
 							ord: {value: local.ref.ord[1], cfsqltype: "cf_sql_bigint"}
@@ -175,7 +192,7 @@ component {
 			FROM wheels_events
 			WHERE channel = :channel
 			AND createdAt > :since
-			ORDER BY createdAt ASC, #local.orderCol# ASC",
+			ORDER BY #local.orderBy#",
 			{
 				channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"},
 				since: {value: arguments.since, cfsqltype: "cf_sql_timestamp"}
@@ -461,20 +478,32 @@ component {
 		local.alter = (arguments.dbType == "oracle")
 			? "ALTER TABLE wheels_events ADD (#local.seqDDL#)"
 			: "ALTER TABLE wheels_events ADD #local.seqDDL#";
-		var added = {ok = false};
+
+		// Attempt the add, but DON'T trust its own outcome: concurrent instances race
+		// this ALTER, and a loser throws "column already exists" even though seq now
+		// exists. The re-probe below is authoritative, so a race loser does not stick
+		// on the id fallback until restart (M2).
 		try {
 			queryExecute(local.alter, {}, {datasource: variables.$datasource});
+		} catch (any alterError) {
+			// Ignored — the re-probe decides whether seq now exists (ours or a peer's).
+		}
+
+		var added = {ok = false};
+		try {
 			queryExecute("SELECT seq FROM wheels_events WHERE 1=0", {}, {datasource: variables.$datasource});
 			added.ok = true;
+		} catch (any probeError) {
 			writeLog(
-				text="Added monotonic seq column to wheels_events (#arguments.dbType#)",
-				type="information",
+				text="Could not add a seq column to wheels_events on #arguments.dbType# (#probeError.message#); ordering falls back to createdAt+id, so events sharing a timestamp tick may order arbitrarily.",
+				type="warning",
 				file="wheels_channels"
 			);
-		} catch (any e) {
+		}
+		if (added.ok) {
 			writeLog(
-				text="Could not add a seq column to wheels_events on #arguments.dbType# (#e.message#); ordering falls back to createdAt+id, so events sharing a timestamp tick may order arbitrarily.",
-				type="warning",
+				text="Monotonic seq column present on wheels_events (#arguments.dbType#)",
+				type="information",
 				file="wheels_channels"
 			);
 		}

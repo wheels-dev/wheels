@@ -134,13 +134,14 @@ component extends="wheels.WheelsTest" {
 				expect(events.data[1]).toBe("second");
 			});
 
-			it("poll returns events in publish order when createdAt ties", function() {
-				// Force an exact createdAt tie so ordering must rely on the monotonic
-				// tiebreak (seq / rowid), deterministically on every database rather
-				// than only when SQL Server's ~3.33ms DATETIME rounding collides.
+			it("poll returns events in publish order when createdAt ties (since path)", function() {
+				// The since path must order by the monotonic key, not createdAt. Force an
+				// exact createdAt tie AND give the first-published event an id that sorts
+				// AFTER the second's, so neither a createdAt tie nor an id tiebreak can
+				// produce the right order — only the publish-ordered seq / rowid can.
 				var channelName = "test.tieorder.#Replace(CreateUUID(), '-', '', 'all')#";
-				var firstId = "evt-tie-a-#Replace(CreateUUID(), '-', '', 'all')#";
-				var secondId = "evt-tie-b-#Replace(CreateUUID(), '-', '', 'all')#";
+				var firstId = "evt-tie-zzz-#Replace(CreateUUID(), '-', '', 'all')#";
+				var secondId = "evt-tie-aaa-#Replace(CreateUUID(), '-', '', 'all')#";
 				adapter.publish(channel = channelName, event = "e", data = '{"n":1}', id = firstId);
 				adapter.publish(channel = channelName, event = "e", data = '{"n":2}', id = secondId);
 				var tieTime = Now();
@@ -249,12 +250,30 @@ component extends="wheels.WheelsTest" {
 					skip("cannot drop seq to simulate a pre-fix table on [#dbType#]");
 				}
 
+				// Publish the first event with an id that sorts AFTER the second's, so an
+				// id-fallback (ALTER silently failed) would order them wrong — only a real
+				// monotonic seq, assigned in publish order, puts n:1 first.
 				var channelName = "test.upgrade.#Replace(CreateUUID(), '-', '', 'all')#";
-				var firstId = "evt-up-a-#Replace(CreateUUID(), '-', '', 'all')#";
-				var secondId = "evt-up-b-#Replace(CreateUUID(), '-', '', 'all')#";
+				var firstId = "evt-up-zzz-#Replace(CreateUUID(), '-', '', 'all')#";
+				var secondId = "evt-up-aaa-#Replace(CreateUUID(), '-', '', 'all')#";
 				var upgraded = new wheels.channel.DatabaseAdapter();
 				upgraded.publish(channel = channelName, event = "e", data = '{"n":1}', id = firstId);
 				upgraded.publish(channel = channelName, event = "e", data = '{"n":2}', id = secondId);
+
+				// The ALTER must have actually added the column, not silently fallen back.
+				var seqCheck = {present = false};
+				try {
+					queryExecute(
+						"SELECT seq FROM wheels_events WHERE 1=0",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					seqCheck.present = true;
+				} catch (any e) {
+					// seq absent — ALTER did not take.
+				}
+				expect(seqCheck.present).toBeTrue();
+
 				var tieTime = Now();
 				queryExecute(
 					"UPDATE wheels_events SET createdAt = :ts WHERE id = :a OR id = :b",
