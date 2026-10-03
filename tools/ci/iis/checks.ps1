@@ -1,5 +1,5 @@
 # Runs the IIS checks for each web.config variant and writes a report.
-#   guide     - the inline rule from the v4.2 IIS guide, at the site root
+#   guide     - the inline rule from the v4.2 IIS guide (read from the page), at the site root
 #   root      - tools/ci/iis/web.config.root, at the site root
 #   subfolder - tools/ci/iis/web.config.subfolder, for the app at /app1
 # A check marked 'required' fails the job when it doesn't hold. 'info' checks
@@ -57,9 +57,7 @@ function Test-Variant([string]$Variant, [string]$Base) {
 	Add-Check $Variant 'path info (index.cfm/...)' "$h$Base/index.cfm/probe/hello" { param($r) $r.Status -eq 200 -and $r.Body -match 'probe:hello' } '200 probe:hello'
 	Add-Check $Variant 'static asset' "$h$Base/stylesheets/iis-probe.css" { param($r) $r.Status -eq 200 -and $r.Body -match 'iis-probe-static' } '200 file content'
 	Add-Check $Variant 'unknown route is 404' "$h$Base/no-such-route-xyz" { param($r) $r.Status -eq 404 } '404'
-	# The guide's {REQUEST_URI} prefix list also matches /files-gallery, so IIS serves its own 404 there.
-	$kind = if ($Variant -eq 'guide') { 'info' } else { 'required' }
-	Add-Check $Variant 'route named like a static folder' "$h$Base/files-gallery" { param($r) $r.Status -eq 200 -and $r.Body -match 'probe:hello' } '200 probe:hello (routed)' $kind
+	Add-Check $Variant 'route named like a static folder' "$h$Base/files-gallery" { param($r) $r.Status -eq 200 -and $r.Body -match 'probe:hello' } '200 probe:hello (routed)'
 	Add-Check $Variant 'dev tools from loopback' "$h$Base/wheels/info" { param($r) $r.Status -eq 200 } '200'
 	Add-Check $Variant 'dev tools from a non-loopback peer' "http://$nicIp$Base/wheels/info" { param($r) $r.Status -eq 403 } '403'
 	Add-Check $Variant 'reload redirect back to the page' "$h$Base/probe/hello?reload=true&password=wheels-dev" `
@@ -68,8 +66,20 @@ function Test-Variant([string]$Variant, [string]$Base) {
 		{ param($r) $r.Status -in 301, 302, 303, 307 -and $r.Location -eq "$Base/example.com/x" } "redirect to $Base/example.com/x"
 }
 
+# The guide variant is read from the guide page itself on every run, so the job tests
+# exactly what the v4.2 IIS guide tells readers to use.
+$guidePage = Join-Path $repo 'web\sites\guides\src\content\docs\v4-2-0\deployment\iis-and-windows.mdx'
+$page = Get-Content $guidePage -Raw
+$m = [regex]::Match($page, '(?s)```xml title="public\\web\.config"\r?\n(.*?)\r?\n[ ]*```')
+if (-not $m.Success) { throw "No public\web.config block found in $guidePage" }
+$guideXml = ($m.Groups[1].Value -split "\r?\n" | ForEach-Object { $_ -replace '^   ', '' }) -join "`r`n"
+$null = [xml]$guideXml  # fails the step if the block is not well-formed XML
+$guideWebConfig = Join-Path $env:RUNNER_TEMP 'web.config.guide'
+Set-Content -Path $guideWebConfig -Value $guideXml
+Write-Host "guide rule taken from $guidePage"
+
 $rootWebConfig = 'C:\wheels-iis\root\public\web.config'
-Use-WebConfig (Join-Path $iisDir 'web.config.guide') $rootWebConfig
+Use-WebConfig $guideWebConfig $rootWebConfig
 Test-Variant 'guide' ''
 Use-WebConfig (Join-Path $iisDir 'web.config.root') $rootWebConfig
 Test-Variant 'root' ''

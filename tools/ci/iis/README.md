@@ -18,7 +18,7 @@
 
 | Variant | web.config | Served at |
 |---|---|---|
-| `guide` | the inline rule from the v4.2 IIS guide (`web.config.guide`, extracted from the page) | `/` |
+| `guide` | the inline rule from the v4.2 IIS guide, read from the page on every run | `/` |
 | `root` | `web.config.root` | `/` |
 | `subfolder` | `web.config.subfolder` | `/app1` |
 
@@ -39,8 +39,6 @@
 A check marked INFO records a known gap without failing the job. Results go to the job summary and the `iis-report` artifact.
 
 ## Findings
-- **Root and subfolder `web.config`:** every check holds.
-- **The guide's inline rule:**
-  - **Holds:** the core routing, static files, 404s, the dev-tools gate and the reload redirect.
-  - **Gap (INFO):** its `{REQUEST_URI}` prefix list has no folder boundary, so a route such as `/files-gallery` (starting like the `files` folder) isn't rewritten, and IIS answers 404. `web.config.root` ends the match at a folder boundary instead: `(/.*)?$`.
+- **All three variants:** every check holds.
+- **Guide prefix list:** the rule in the IIS guide (v4.0, v4.1 and v4.2) used to end its `{REQUEST_URI}` prefix list without a folder boundary, so a route such as `/files-gallery` wasn't rewritten and IIS answered 404. The list now ends with `(/|\?|$)`, which routes `/files-gallery`-style paths to the app.
 - **Reload redirect under `/app1`:** it dropped the subfolder for a running app. That was found by this job and fixed in #4140.
