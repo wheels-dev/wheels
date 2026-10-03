@@ -9119,6 +9119,24 @@ component extends="modules.BaseModule" {
 		return 0;
 	}
 
+	/**
+	 * What to tell someone whose `wheels test` found no running server for
+	 * this project (issue 3972). tools/test-local.sh exists only in the Wheels
+	 * framework repository, so it is suggested only there: an app vendors
+	 * vendor/wheels/tests/specs but never has tools/test-local.sh. Public for
+	 * specs; hidden from MCP via the $-prefix sweep.
+	 */
+	public array function $testServerHints() {
+		var hints = ["wheels test runs the specs on this project's own running server. Start it with: wheels start"];
+		if (
+			fileExists(variables.projectRoot & "/tools/test-local.sh")
+			&& directoryExists(variables.projectRoot & "/vendor/wheels/tests/specs")
+		) {
+			arrayAppend(hints, "Or, in the Wheels framework repository: bash tools/test-local.sh (starts and stops its own server)");
+		}
+		return hints;
+	}
+
 	private string function runTests(
 		string filter = "",
 		string reporter = "simple",
@@ -9132,10 +9150,7 @@ component extends="modules.BaseModule" {
 		string basePath = "",
 		numeric timeoutSeconds = 900
 	) {
-		var serverPort = $requireOwnRunningServer([
-			"Start one with: wheels start",
-			"Or use: bash tools/test-local.sh (auto-manages server)"
-		]);
+		var serverPort = $requireOwnRunningServer($testServerHints());
 
 		// Subfolder-mounted apps (`set(subpath="/myapp")`, #2985/#3026) serve the
 		// test runner under a URL prefix the rewrite layer expects — without it
