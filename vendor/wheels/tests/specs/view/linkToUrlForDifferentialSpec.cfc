@@ -91,24 +91,36 @@ component extends="wheels.WheelsTest" {
 				var c = g.controller(name = "dummy");
 				variables.ref = c;
 
-				// Each probe: {rv, args, foundVariables, route}. Keys cover plain, encoded, and the
-				// per-engine backref values (\1 / $1) in a pattern variable.
+				// Each probe: {name, rv, fv, args}. Covers plain [prop], per-engine backref values
+				// (\1 / $1), wildcard [*prop] with a slash value (encode on/off), BOTH [prop] and
+				// [*prop] in each order (W2's earliest-placeholder branch), and a wildcard value
+				// carrying a backslash (the ReReplace fallback).
+				var base = {route = "", controller = "", action = "", key = "", path = "", format = "", params = "", encode = false, "$encodeForHtmlAttribute" = false, "$URLRewriting" = "On"};
+				var mk = (overrides) => {
+					var a = StructCopy(base);
+					StructAppend(a, overrides, true);
+					return a;
+				};
 				var probes = [
-					{rv = "/posts/[controller]/[action]/[key]", args = {route = "", controller = "posts", action = "edit", key = "7", format = "", params = "", encode = false, "$encodeForHtmlAttribute" = false, "$URLRewriting" = "On"}},
-					{rv = "/p/[key]", args = {route = "", controller = "", action = "", key = "a\1b", format = "", params = "", encode = false, "$encodeForHtmlAttribute" = false, "$URLRewriting" = "On"}},
-					{rv = "/p/[key]", args = {route = "", controller = "", action = "", key = "a$1b", format = "", params = "", encode = false, "$encodeForHtmlAttribute" = false, "$URLRewriting" = "On"}},
-					{rv = "/p/[key]", args = {route = "", controller = "", action = "", key = "a b", format = "", params = "", encode = true, "$encodeForHtmlAttribute" = false, "$URLRewriting" = "On"}},
-					{rv = "?controller=[controller]&action=[action]&key=[key]&format=[format]", args = {route = "", controller = "posts", action = "edit", key = "7", format = "", params = "", encode = false, "$encodeForHtmlAttribute" = false, "$URLRewriting" = "Off"}}
+					{name = "plain multi", rv = "/posts/[controller]/[action]/[key]", fv = "controller,action,key,format", args = mk({controller = "posts", action = "edit", key = "7"})},
+					{name = "backref slash", rv = "/p/[key]", fv = "controller,action,key,format", args = mk({key = "a\1b"})},
+					{name = "backref dollar", rv = "/p/[key]", fv = "controller,action,key,format", args = mk({key = "a$1b"})},
+					{name = "encoded space", rv = "/p/[key]", fv = "controller,action,key,format", args = mk({key = "a b", encode = true})},
+					{name = "rewriting off", rv = "?controller=[controller]&action=[action]&key=[key]&format=[format]", fv = "controller,action,key,format", args = mk({controller = "posts", action = "edit", key = "7", "$URLRewriting" = "Off"})},
+					{name = "wildcard slash encode off", rv = "/files/[*path]", fv = "path", args = mk({path = "a/b/c"})},
+					{name = "wildcard slash encode on", rv = "/files/[*path]", fv = "path", args = mk({path = "a b/c", encode = true})},
+					{name = "both star-first", rv = "/a/[*key]/b/[key]", fv = "key", args = mk({key = "7"})},
+					{name = "both lit-first", rv = "/a/[key]/b/[*key]", fv = "key", args = mk({key = "7"})},
+					{name = "wildcard backref", rv = "/files/[*path]", fv = "path", args = mk({path = "a\1b"})},
+					{name = "wildcard dollar", rv = "/files/[*path]", fv = "path", args = mk({path = "a$1b"})}
 				];
-				var fv = "controller,action,key,format";
 				for (var p in probes) {
 					var liveArgs = StructCopy(p.args);
 					var refArgs = StructCopy(p.args);
-					var live = c.$urlForSubstituteVariables(rv = p.rv, args = liveArgs, foundVariables = fv, coreVariables = fv, route = {});
-					var reference = $refSubstituteVariables(rv = p.rv, args = refArgs, foundVariables = fv, coreVariables = fv, route = {});
-					expect(live).toBe(reference, "substituteVariables diverged for key=[" & p.args.key & "]");
-					// the params side-effect must match too
-					expect(liveArgs.params).toBe(refArgs.params, "substituteVariables params side-effect diverged for key=[" & p.args.key & "]");
+					var live = c.$urlForSubstituteVariables(rv = p.rv, args = liveArgs, foundVariables = p.fv, coreVariables = p.fv, route = {});
+					var reference = $refSubstituteVariables(rv = p.rv, args = refArgs, foundVariables = p.fv, coreVariables = p.fv, route = {});
+					expect(live).toBe(reference, "substituteVariables diverged: " & p.name);
+					expect(liveArgs.params).toBe(refArgs.params, "substituteVariables params side-effect diverged: " & p.name);
 				}
 			});
 
