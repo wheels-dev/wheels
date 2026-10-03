@@ -101,8 +101,16 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * Throws if the lock could not be acquired within the timeout.
 	 */
 	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
+		$acquireAdvisoryLockSession(name = arguments.name, timeout = arguments.timeout);
+	}
+
+	/**
+	 * Internal function. Acquires the lock and returns the holding connection's id, read in the same
+	 * statement so it is the session that took the lock (#4197).
+	 */
+	public string function $acquireAdvisoryLockSession(required string name, numeric timeout = 10) {
 		local.result = queryExecute(
-			"SELECT GET_LOCK(?, ?) AS lockResult",
+			"SELECT GET_LOCK(?, ?) AS lockResult, CONNECTION_ID() AS sessionId",
 			[arguments.name, arguments.timeout],
 			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);
@@ -113,6 +121,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				extendedInfo = "The MySQL GET_LOCK function returned a non-1 result, indicating the lock could not be acquired."
 			);
 		}
+		return local.result.sessionId;
 	}
 
 	/**
@@ -139,15 +148,19 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Internal function. IS_USED_LOCK returns the holding connection's id, or NULL when free (#4197).
+	 * Internal function. IS_USED_LOCK returns the holding connection's id, or NULL when free; with
+	 * `holder`, only that connection holding it counts (#4197).
 	 */
-	public boolean function $isAdvisoryLockHeld(required string name) {
+	public boolean function $isAdvisoryLockHeld(required string name, string holder = "") {
 		local.result = queryExecute(
 			"SELECT IS_USED_LOCK(?) AS holder",
 			[arguments.name],
 			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);
-		return IsQuery(local.result) && IsNumeric(local.result.holder);
+		if (!IsQuery(local.result) || !IsNumeric(local.result.holder)) {
+			return false;
+		}
+		return !Len(arguments.holder) || local.result.holder == arguments.holder;
 	}
 
 	/**

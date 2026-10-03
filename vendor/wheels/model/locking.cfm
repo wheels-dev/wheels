@@ -25,7 +25,7 @@
 	 * [category: Locking Functions]
 	 *
 	 * @name A unique name for the lock. Different callers using the same name will contend for the same lock.
-	 * @timeout Maximum number of seconds to wait when acquiring the lock (supported by MySQL and SQL Server).
+	 * @timeout Maximum number of seconds to wait for the lock in all: first for another caller in this application, then for the database lock with the time that is left (at least one second), so the wait is about `timeout` at most.
 	 * @callback A function or closure to execute while holding the lock. Its return value is returned by this method.
 	 */
 	public any function withAdvisoryLock(
@@ -37,10 +37,15 @@
 		// take its own lock again. Without this named lock a second caller in this application could
 		// borrow that idle session, get the lock too, and leave it held (#4197).
 		local.state = {entered = false};
+		local.startedAt = GetTickCount();
 		try {
 			lock name="#$advisoryLockLocalName(arguments.name)#" type="exclusive" timeout="#arguments.timeout#" {
 				local.state.entered = true;
-				local.result = $runWithAdvisoryLock(name = arguments.name, timeout = arguments.timeout, callback = arguments.callback);
+				local.result = $runWithAdvisoryLock(
+					name = arguments.name,
+					timeout = $advisoryLockSecondsLeft(timeout = arguments.timeout, startedAt = local.startedAt),
+					callback = arguments.callback
+				);
 			}
 		} catch (any e) {
 			if (!local.state.entered) {
@@ -66,19 +71,33 @@
 	}
 
 	/**
+	 * Internal function. The whole seconds of `timeout` left since `startedAt` (a GetTickCount()
+	 * value), at least 1, for the database wait after the wait for a caller in this application.
+	 */
+	public numeric function $advisoryLockSecondsLeft(required numeric timeout, required numeric startedAt) {
+		return Max(1, Ceiling(arguments.timeout - (GetTickCount() - arguments.startedAt) / 1000));
+	}
+
+	/**
 	 * Internal function. Acquires the database lock, runs the callback and releases the lock,
 	 * verified free (#4197). A release that fails after the callback threw is logged, so it never
 	 * replaces the callback's own error.
 	 */
 	public any function $runWithAdvisoryLock(required string name, required numeric timeout, required any callback) {
 		local.adapter = variables.wheels.class.adapter;
-		local.adapter.$acquireAdvisoryLock(name = arguments.name, timeout = arguments.timeout);
+		// The session recorded at acquire, so the release check looks at our holder only (#4197).
+		local.holder = local.adapter.$acquireAdvisoryLockSession(name = arguments.name, timeout = arguments.timeout);
 		local.state = {callbackFailed = true};
 		try {
 			local.result = arguments.callback();
 			local.state.callbackFailed = false;
 		} finally {
-			$releaseAdvisoryLockAfterCallback(adapter = local.adapter, name = arguments.name, callbackFailed = local.state.callbackFailed);
+			$releaseAdvisoryLockAfterCallback(
+				adapter = local.adapter,
+				name = arguments.name,
+				holder = local.holder,
+				callbackFailed = local.state.callbackFailed
+			);
 		}
 		if (StructKeyExists(local, "result")) {
 			return local.result;
@@ -89,9 +108,14 @@
 	 * Internal function. Releases the lock; a failure is thrown, unless the callback already failed,
 	 * in which case it is logged and the callback's error propagates (#4197).
 	 */
-	public void function $releaseAdvisoryLockAfterCallback(required any adapter, required string name, required boolean callbackFailed) {
+	public void function $releaseAdvisoryLockAfterCallback(
+		required any adapter,
+		required string name,
+		required boolean callbackFailed,
+		string holder = ""
+	) {
 		try {
-			arguments.adapter.$releaseAdvisoryLockVerified(name = arguments.name);
+			arguments.adapter.$releaseAdvisoryLockVerified(name = arguments.name, holder = arguments.holder);
 		} catch (any e) {
 			if (!arguments.callbackFailed) {
 				rethrow;

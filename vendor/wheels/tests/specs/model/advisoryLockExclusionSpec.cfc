@@ -14,6 +14,17 @@ component extends="wheels.WheelsTest" {
 		variables.applies = ListFindNoCase("PostgreSQLModel,MySQLModel", variables.adapterName) > 0;
 	}
 
+	// A separate adapter instance on the test datasource, so a mock never touches the model's own.
+	function freshAdapter() {
+		var classData = variables.g.model("author").$classData();
+		var folder = Left(variables.adapterName, Len(variables.adapterName) - 5);
+		return CreateObject("component", "wheels.databaseAdapters.#folder#.#variables.adapterName#").$init(
+			dataSource = classData.dataSource,
+			username = classData.username,
+			password = classData.password
+		);
+	}
+
 	function lockName() {
 		return "wheels_spec_" & Replace(CreateUUID(), "-", "", "all");
 	}
@@ -142,6 +153,63 @@ component extends="wheels.WheelsTest" {
 				}
 				expect(state.type).toBe("Wheels.AdvisoryLockReleaseFailed");
 				expect(state.message).toInclude("spec-lock");
+			});
+
+			// The holder is recorded at acquire. Another server taking the lock once our session was
+			// gone is not our failure, so only our holder still holding it counts.
+			it("does not report a lock that another session holds once ours is gone", () => {
+				if (!variables.applies) {
+					skip("Session advisory locks: MySQL and PostgreSQL.");
+				}
+				var name = lockName();
+				var other = startHolder(name, 3000);
+				var adapter = freshAdapter();
+				prepareMock(adapter);
+				adapter.$("$tryReleaseAdvisoryLock", false);
+				var state = {heldByAnyone = adapter.$isAdvisoryLockHeld(name = name), type = ""};
+				try {
+					adapter.$releaseAdvisoryLockVerified(name = name, retrySeconds = 0.5, holder = "0");
+				} catch (any e) {
+					state.type = e.type;
+				}
+				thread action="join" name="#other#" timeout="15000";
+				expect(state.heldByAnyone).toBeTrue();
+				expect(state.type).toBe("");
+			});
+
+			it("records the session that took the lock", () => {
+				if (!variables.applies) {
+					skip("Session advisory locks: MySQL and PostgreSQL.");
+				}
+				var name = lockName();
+				var adapter = freshAdapter();
+				var holder = adapter.$acquireAdvisoryLockSession(name = name, timeout = 2);
+				expect(Len(holder)).toBeGT(0);
+				expect(adapter.$isAdvisoryLockHeld(name = name, holder = holder)).toBeTrue();
+				expect(adapter.$isAdvisoryLockHeld(name = name, holder = "0")).toBeFalse();
+				adapter.$releaseAdvisoryLockVerified(name = name, holder = holder);
+				expect(isHeld(name)).toBeFalse();
+			});
+
+			it("keeps the callback's error when the release fails too", () => {
+				var adapter = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLModel");
+				prepareMock(adapter);
+				adapter.$(method = "$releaseAdvisoryLockVerified", throwException = true, throwType = "Wheels.AdvisoryLockReleaseFailed", throwMessage = "still held");
+				var author = variables.g.model("author");
+				author.$releaseAdvisoryLockAfterCallback(adapter = adapter, name = "spec-lock", callbackFailed = true, holder = "1");
+				var state = {type = ""};
+				try {
+					author.$releaseAdvisoryLockAfterCallback(adapter = adapter, name = "spec-lock", callbackFailed = false, holder = "1");
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Wheels.AdvisoryLockReleaseFailed");
+			});
+
+			it("gives the database wait only the time that is left", () => {
+				var author = variables.g.model("author");
+				expect(author.$advisoryLockSecondsLeft(timeout = 10, startedAt = GetTickCount() - 3500)).toBe(7);
+				expect(author.$advisoryLockSecondsLeft(timeout = 2, startedAt = GetTickCount() - 5000)).toBe(1);
 			});
 
 			it("treats a release as done when no session holds the lock any more", () => {

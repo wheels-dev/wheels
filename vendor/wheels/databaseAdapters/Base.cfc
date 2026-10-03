@@ -925,6 +925,15 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. Acquires an advisory lock and returns the id of the database session that
+	 * holds it, or "" when the adapter can't tell (#4197). Session-scoped adapters override this.
+	 */
+	public string function $acquireAdvisoryLockSession(required string name, numeric timeout = 10) {
+		$acquireAdvisoryLock(name = arguments.name, timeout = arguments.timeout);
+		return "";
+	}
+
+	/**
 	 * Internal function. Releases an advisory lock and reports whether this release freed it.
 	 * Adapters whose locks belong to a pooled database session override this (#4197).
 	 */
@@ -934,9 +943,10 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
-	 * Internal function. True while any database session holds the named advisory lock (#4197).
+	 * Internal function. True while the named advisory lock is held: by the database session
+	 * `holder` when given, by any session otherwise (#4197).
 	 */
-	public boolean function $isAdvisoryLockHeld(required string name) {
+	public boolean function $isAdvisoryLockHeld(required string name, string holder = "") {
 		return false;
 	}
 
@@ -945,11 +955,16 @@ component output=false extends="wheels.Global"{
 	 * PostgreSQL locks belong to the database session that took them, and the release is a separate
 	 * pooled query, so it can run on another session and free nothing. The release is then retried
 	 * for up to `retrySeconds`; a lock that stays held throws Wheels.AdvisoryLockReleaseFailed.
+	 * `holder` is the session recorded at acquire: only that session still holding the lock counts,
+	 * so another server that took the lock once ours was gone is not reported as a failure.
 	 */
-	public void function $releaseAdvisoryLockVerified(required string name, numeric retrySeconds = 5) {
+	public void function $releaseAdvisoryLockVerified(required string name, numeric retrySeconds = 5, string holder = "") {
 		local.deadline = GetTickCount() + arguments.retrySeconds * 1000;
 		while (true) {
-			if ($tryReleaseAdvisoryLock(name = arguments.name) || !$isAdvisoryLockHeld(name = arguments.name)) {
+			if (
+				$tryReleaseAdvisoryLock(name = arguments.name)
+				|| !$isAdvisoryLockHeld(name = arguments.name, holder = arguments.holder)
+			) {
 				return;
 			}
 			if (GetTickCount() >= local.deadline) {
