@@ -250,10 +250,12 @@
 			transaction action="commit";
 			local.committed.flag = true;
 		} catch (any e) {
-			// Mark a caught throw (callback or commit) so the finally does NOT roll back — on a throw,
-			// invokeWithTransaction's own catch rolls back, and a SECOND rollback here corrupts the
-			// write on Adobe (it survives). Unscoped struct write so it persists out of the catch on
-			// BoxLang (invariant 11). The exception still propagates to invokeWithTransaction.
+			// Mark a caught throw (callback or commit) so the finally does NOT roll back here: on a
+			// throw, invokeWithTransaction's own catch rolls the transaction back after this method
+			// returns, so a rollback in the finally would be a redundant second one. Only the ABORT
+			// path needs the finally to roll back, because an abort is never caught and the wrapper's
+			// catch never runs (see the finally). Unscoped struct write so it persists out of the catch
+			// on BoxLang (invariant 11). The exception still propagates to invokeWithTransaction.
 			threw.flag = true;
 			rethrow;
 		} finally {
