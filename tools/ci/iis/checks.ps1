@@ -55,11 +55,15 @@ function Test-Variant([string]$Variant, [string]$Base) {
 	Add-Check $Variant 'path info (index.cfm/...)' "$h$Base/index.cfm/probe/hello" { param($r) $r.Status -eq 200 -and $r.Body -match 'probe:hello' } '200 probe:hello'
 	Add-Check $Variant 'static asset' "$h$Base/stylesheets/iis-probe.css" { param($r) $r.Status -eq 200 -and $r.Body -match 'iis-probe-static' } '200 file content'
 	Add-Check $Variant 'unknown route is 404' "$h$Base/no-such-route-xyz" { param($r) $r.Status -eq 404 } '404'
-	Add-Check $Variant 'route named like a static folder' "$h$Base/files-gallery" { param($r) $r.Status -eq 404 -and $r.Body -match 'Wheels|wheels' } '404 from Wheels (routed)' 'info'
+	# The guide's {REQUEST_URI} prefix list also matches /files-gallery, so IIS serves its own 404 there.
+	$kind = if ($Variant -eq 'guide') { 'info' } else { 'required' }
+	Add-Check $Variant 'route named like a static folder' "$h$Base/files-gallery" { param($r) $r.Status -eq 200 -and $r.Body -match 'probe:hello' } '200 probe:hello (routed)' $kind
 	Add-Check $Variant 'dev tools from loopback' "$h$Base/wheels/info" { param($r) $r.Status -eq 200 } '200'
 	Add-Check $Variant 'dev tools from a non-loopback peer' "http://$nicIp$Base/wheels/info" { param($r) $r.Status -eq 403 } '403'
+	Add-Check $Variant 'reload redirect back to the page' "$h$Base/probe/hello?reload=true&password=wheels-dev" `
+		{ param($r) $r.Status -in 301, 302, 303, 307 -and $r.Location -eq "$Base/probe/hello" } "redirect to $Base/probe/hello"
 	Add-Check $Variant 'reload redirect, "//"-leading path' "$h$Base//example.com/x?reload=true&password=wheels-dev" `
-		{ param($r) $r.Status -in 301, 302, 303, 307 -and $r.Location -notmatch '^(https?:)?//' } 'redirect to a path on this site'
+		{ param($r) $r.Status -in 301, 302, 303, 307 -and $r.Location -eq "$Base/example.com/x" } "redirect to $Base/example.com/x"
 }
 
 $rootWebConfig = 'C:\wheels-iis\root\public\web.config'
