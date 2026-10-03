@@ -1,7 +1,7 @@
 component extends="Base" {
 
 	public ColumnDefinition function init(required any adapter, required string name, required string type) {
-		local.args = "adapter,name,type,limit,precision,scale,default,allowNull,autoIncrement,afterColumn";
+		local.args = "adapter,name,type,limit,precision,scale,default,allowNull,autoIncrement,afterColumn,unsigned";
 		local.argsArray = ListToArray(local.args);
 		local.iEnd = ArrayLen(local.argsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
@@ -32,7 +32,7 @@ component extends="Base" {
 
 	public string function sqlType() {
 		local.options = {};
-		local.optionalArguments = "limit,precision,scale";
+		local.optionalArguments = "limit,precision,scale,unsigned";
 		local.optionalArgumentsArray = ListToArray(local.optionalArguments);
 		local.iEnd = ArrayLen(local.optionalArgumentsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
