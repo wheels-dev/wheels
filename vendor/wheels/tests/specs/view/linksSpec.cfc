@@ -9,9 +9,7 @@ component extends="wheels.WheelsTest" {
 			beforeEach(() => {
 				_params = {controller = "dummy", action = "dummy"}
 				_controller = g.controller("dummy", _params)
-				_originalRoutes = Duplicate(application.wheels.routes)
-				_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
-				_originalNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
+				_routeSnapshot = $snapshotRoutes()
 				_originalRewrite = application.wheels.URLRewriting
 				_originalRequestParams = StructKeyExists(request.wheels, "params") ? Duplicate(request.wheels.params) : {}
 				_originalRequestParamsExisted = StructKeyExists(request.wheels, "params")
@@ -24,9 +22,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			afterEach(() => {
-				application.wheels.routes = _originalRoutes
-				application.wheels.staticRoutes = _originalStaticRoutes
-				application.wheels.namedRoutePositions = _originalNamedRoutePositions
+				$restoreRoutes(_routeSnapshot)
 				application.wheels.URLRewriting = _originalRewrite
 				if (StructKeyExists(request.wheels, "params")) {
 					StructDelete(request.wheels, "params")
@@ -313,9 +309,4 @@ component extends="wheels.WheelsTest" {
 		})
 	}
 
-	public void function $clearRoutes() {
-		application.wheels.routes = []
-		application.wheels.staticRoutes = {}
-		application.wheels.namedRoutePositions = {}
-	}
 }

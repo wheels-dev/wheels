@@ -864,8 +864,7 @@ component extends="wheels.WheelsTest" {
 				g.set(functionName = "startFormTag", encode = false)
 				request.$wheelsProtectedFromForgery = true
 				// Save and configure routes so "root" route is available
-				_savedRoutes = Duplicate(application.wheels.routes)
-				_savedNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
+				_routeSnapshot = $snapshotRoutes()
 				_savedRewrite = application.wheels.URLRewriting
 				application.wheels.URLRewriting = "On"
 				$clearRoutes()
@@ -880,8 +879,7 @@ component extends="wheels.WheelsTest" {
 			afterEach(() => {
 				g.set(functionName = "startFormTag", encode = true)
 				request.$wheelsProtectedFromForgery = false
-				application.wheels.routes = _savedRoutes
-				application.wheels.namedRoutePositions = _savedNamedRoutePositions
+				$restoreRoutes(_routeSnapshot)
 				application.wheels.URLRewriting = _savedRewrite
 			})
 
@@ -1367,9 +1365,4 @@ component extends="wheels.WheelsTest" {
 		user.birthday = arguments.value;
 	}
 
-	public void function $clearRoutes() {
-		application.wheels.routes = [];
-		application.wheels.staticRoutes = {};
-		application.wheels.namedRoutePositions = {};
-	}
 }
