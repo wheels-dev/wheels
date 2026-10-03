@@ -27,7 +27,12 @@ component extends="wheels.WheelsTest" {
 			// Also reset the application-scoped urlForCache around each test so a stale
 			// controller##action -> route-name memo can't point at a now-absent route.
 			beforeEach(() => {
-				variables._origRoutes = application.wheels.routes;
+				// Snapshot EVERY route-derived structure, then rebuild a clean table. Restoring
+				// only `routes` (as an earlier revision did) leaks staticRoutes + namedRoutePositions
+				// into later specs -- the same stale-index class this spec guards against.
+				variables._origRoutes = Duplicate(application.wheels.routes);
+				variables._origStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {};
+				variables._origNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {};
 				$clearRoutes();
 				g.mapper().wildcard(methods = "get,post", mapKey = true).root(to = "home##index", method = "get").end();
 				g.$setNamedRoutePositions();
@@ -35,6 +40,8 @@ component extends="wheels.WheelsTest" {
 			});
 			afterEach(() => {
 				application.wheels.routes = variables._origRoutes;
+				application.wheels.staticRoutes = variables._origStaticRoutes;
+				application.wheels.namedRoutePositions = variables._origNamedRoutePositions;
 				$clearUrlForCache();
 			});
 
@@ -52,6 +59,7 @@ component extends="wheels.WheelsTest" {
 				cases["link_basic"]          = () => c.linkTo(text = "Edit", controller = "posts", action = "edit", key = 1);
 				cases["link_class_anchor"]   = () => c.linkTo(text = "Go", controller = "posts", action = "show", key = 1, anchor = "c", class = "btn", rel = "x");
 				cases["link_href"]           = () => c.linkTo(text = "Ext", href = "/raw/path?x=1");
+				cases["url_route_root"]      = () => c.URLFor(route = "root");
 				var attrs5 = {id = "n1", class = "btn", "data-x" = "1", "data-y" = "2", title = "t", href = "/p/1"};
 				cases["element_5attrs"]      = () => c.$element(name = "a", skip = "", content = "X", attributes = attrs5, encode = true, encodeExcept = "href");
 				var attrsSkip = {id = "n2", class = "c", wheelsInternal = "hide", wheelsFoo = "hide2", href = "/p/2"};
@@ -63,20 +71,14 @@ component extends="wheels.WheelsTest" {
 					if (StructKeyExists(application[appKey], "urlForCache")) { StructClear(application[appKey].urlForCache); }
 				};
 
-				var capture = StructKeyExists(url, "capture") && url.capture;
 				for (var name in cases) {
 					clearCache();
 					var uncached = cases[name]();
 					var cached = cases[name]();
-					if (capture) {
-						debug(var = "GOLD|#name#|" & uncached, label = "capture");
-						expect(Compare(uncached, cached)).toBe(0, "#name#: cached != uncached");
-					} else {
-						expect(uncached).toBe(golden[name], "#name# uncached diverged");
-						expect(cached).toBe(golden[name], "#name# cached diverged");
-						// W1 guard: the internal $argsResolved sentinel must never leak into output.
-						expect(uncached).notToInclude("$argsResolved", "#name#: $argsResolved leaked into output");
-					}
+					expect(uncached).toBe(golden[name], "#name# uncached diverged");
+					expect(cached).toBe(golden[name], "#name# cached diverged");
+					// W1 guard: the internal $argsResolved sentinel must never leak into output.
+					expect(uncached).notToInclude("$argsResolved", "#name#: $argsResolved leaked into output");
 				}
 			});
 
@@ -145,8 +147,13 @@ component extends="wheels.WheelsTest" {
 	}
 
 	// Not inherited from wheels.WheelsTest (see CLAUDE.md); mirrors linksSpec.cfc.
+	// Clears EVERY route-derived structure, not just routes: $setNamedRoutePositions()
+	// appends into namedRoutePositions and mapper().end() rebuilds staticRoutes, so a
+	// partial clear would let this spec leave stale indices for whatever runs after it.
 	public void function $clearRoutes() {
 		application.wheels.routes = [];
+		application.wheels.staticRoutes = {};
+		application.wheels.namedRoutePositions = {};
 	}
 
 	private void function $clearUrlForCache() {
@@ -159,11 +166,11 @@ component extends="wheels.WheelsTest" {
 	// Engine-independent goldens captured from develop (the backref cases are covered by the
 	// reference-copy test above, not here, because their output is engine-specific).
 	private struct function goldenMap() {
-		// url_route_root (URLFor(route="root")) is intentionally omitted: the named-route lookup
-		// is sensitive to route-cache state that a redefined route table doesn't fully rebuild in
-		// this harness, and the pattern-substitution it would exercise is already covered by the
-		// $urlForSubstituteVariables reference-copy test.
+		// url_route_root (URLFor(route="root")) exercises the named-route lookup. It is stable here
+		// because beforeEach now clears namedRoutePositions before $setNamedRoutePositions() rebuilds
+		// it (the method appends, so a stale entry would otherwise shadow the test route's position).
 		return {
+			url_route_root = "/",
 			url_ctrl_action_key = "/posts/edit/1",
 			url_params = "/posts/index?a=1&b=two",
 			url_format = "/posts/show/1?format=json",
