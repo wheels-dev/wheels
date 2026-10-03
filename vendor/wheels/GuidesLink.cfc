@@ -5,14 +5,16 @@
  * derived from the framework version and clamped to the guide trees that exist:
  * never older than 4.0, never newer than `variables.latest` (a version whose
  * guides aren't cut yet would 404). A version that can't be parsed, such as an
- * unstamped dev checkout, gets the latest tree. GuidesLinkSpec fails when a
- * newer tree exists under web/sites/guides/src/content/docs/ than `latest`, so
- * bump it when a version's guides are cut. cli/lucli/services/GuidesLink.cfc
- * carries the same logic for the CLI.
+ * unstamped dev checkout, gets the latest tree. GuidesLinkSpec fails when any
+ * tree under web/sites/guides/src/content/docs/ is newer than `latest`, including
+ * one still marked 'snapshot' (in development): code built from that branch ships
+ * as that minor, so its links, such as an upgrade check's "upgrading/" page, must
+ * reach that minor's guides. Bump `latest` when a version's guides tree is cut.
+ * cli/lucli/services/GuidesLink.cfc carries the same logic for the CLI.
  */
 component {
 
-	variables.latest = "4.1";
+	variables.latest = "4.2";
 	variables.oldest = "4.0";
 
 	/**
