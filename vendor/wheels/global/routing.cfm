@@ -677,9 +677,19 @@
 		numeric port,
 		boolean encode,
 		boolean $encodeForHtmlAttribute = false,
-		string $URLRewriting = application.wheels.URLRewriting
+		string $URLRewriting = application.wheels.URLRewriting,
+		boolean $argsResolved = false
 	) {
-		$args(name = "URLFor", args = arguments);
+		// An internal caller (e.g. linkTo) that has already run its own $args passes
+		// $argsResolved=true so we skip the redundant generic normalisation. We still apply any
+		// app-level `set(functionName="URLFor", …)` defaults here, since those belong to URLFor's
+		// default set (not the caller's) and would otherwise not reach the URL (#4151). Declaring
+		// $argsResolved as a real argument keeps the sentinel out of the generated query string.
+		if (!arguments.$argsResolved) {
+			$args(name = "URLFor", args = arguments);
+		} else if (StructKeyExists(application.wheels.functions, "URLFor")) {
+			$engineAdapter().structAppendDefaults(arguments, application.wheels.functions.URLFor);
+		}
 		local.coreVariables = "controller,action,key,format";
 		local.params = {};
 		if (StructKeyExists(variables, "params")) {

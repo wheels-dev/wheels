@@ -63,6 +63,30 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
+			it("the de-dup ($argsResolved) is output-neutral, including app-level URLFor overrides (W1)", () => {
+				var c = g.controller(name = "dummy");
+				// URLFor called with $argsResolved=true (linkTo's path, skipping the generic $args)
+				// must produce byte-identical output to $argsResolved=false (the full $args path),
+				// because the else-branch still applies application.wheels.functions.URLFor.
+				var probe = (resolved) => c.URLFor(controller = "posts", action = "index", params = "q=a b&x=y", encode = true, "$argsResolved" = resolved);
+				expect(probe(true)).toBe(probe(false), "de-dup changed URLFor output");
+
+				// Same equivalence with an app-level override on a framework default (no signature
+				// default, so it is actually applied via structAppendDefaults) — proving the override
+				// reaches both paths identically after the de-dup.
+				var prev = StructCopy(application.wheels.functions.URLFor);
+				try {
+					application.wheels.functions.URLFor.encode = false;
+					expect(probe(true)).toBe(probe(false), "URLFor override not applied identically with de-dup");
+				} finally {
+					application.wheels.functions.URLFor = prev;
+				}
+
+				// The internal sentinel must never surface in linkTo output.
+				var link = c.linkTo(text = "x", controller = "posts", action = "edit", key = 1);
+				expect(link).notToInclude("argsResolved", "sentinel leaked into linkTo output");
+			});
+
 			it("$urlForSubstituteVariables stays identical to its pre-optimization reference (incl regex backrefs)", () => {
 				var c = g.controller(name = "dummy");
 				variables.ref = c;
