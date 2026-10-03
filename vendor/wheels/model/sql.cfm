@@ -999,84 +999,70 @@
 			return arguments.where;
 		}
 		local.sentinel = $whereLiteralSentinel();
-		local.out = CreateObject("java", "java.lang.StringBuilder").init();
-		local.n = Len(arguments.where);
+		// Accumulate output pieces in a CFML array and join once at the end. Read the
+		// string into a one-indexed array of single characters in ONE pass, then walk it
+		// with a forward-only pointer. Array indexing AND ArrayAppend are O(1) on every
+		// engine, so the scan is O(n). The previous Mid()/Find()-by-index scan was O(n^2)
+		// on an engine where those cost O(index) to reach a position — RustCFML — for a
+		// value with a boundary every few characters, e.g. a long run of doubled quotes
+		// (#3903). Two further traps were measured on RustCFML and avoided: its
+		// java.lang.StringBuilder.append is O(length) (so char-by-char into a StringBuilder
+		// is O(n^2) — a CFML array is used instead), and ArraySlice is O(start) (so copying
+		// spans is O(n^2) for many short runs — single characters are appended instead).
+		// REMatch is a single linear pass and avoids the JVM-only toCharArray on the
+		// JVM-free RustCFML runtime.
+		local.out = [];
+		local.chars = REMatch("[\s\S]", arguments.where);
+		local.n = ArrayLen(local.chars);
 		local.i = 1;
-		// Only a quote or a brace can start something to mask. The scan jumps from one
-		// to the next with Find() and copies the text between them in one piece, rather
-		// than reading the string a character at a time: on an engine where Mid() has
-		// to walk the string to reach an index, a per-character loop is quadratic
-		// (#3903). The next quote and the next brace are each remembered and only
-		// searched again once the scan has passed them (0 means there is none left), so
-		// a long run of one never makes the scan search the rest of the string for the
-		// other again.
-		local.nextQuote = Find("'", arguments.where, 1);
-		local.nextBrace = Find("{", arguments.where, 1);
 		while (local.i <= local.n) {
-			if (local.nextQuote > 0 && local.nextQuote < local.i) {
-				local.nextQuote = Find("'", arguments.where, local.i);
-			}
-			if (local.nextBrace > 0 && local.nextBrace < local.i) {
-				local.nextBrace = Find("{", arguments.where, local.i);
-			}
-			local.next = local.nextQuote;
-			if (local.nextBrace > 0 && (local.next == 0 || local.nextBrace < local.next)) {
-				local.next = local.nextBrace;
-			}
-			if (local.next == 0) {
-				local.out.append(Mid(arguments.where, local.i, local.n - local.i + 1));
-				break;
-			}
-			if (local.next > local.i) {
-				local.out.append(Mid(arguments.where, local.i, local.next - local.i));
-				local.i = local.next;
-			}
-			local.ch = Mid(arguments.where, local.i, 1);
+			local.ch = local.chars[local.i];
 			// A CFML date interpolated into the string renders as an ODBC escape,
 			// {ts '2020-01-01 00:00:00'} (or {d '...'} / {t '...'}), either bare or
 			// inside a quoted literal. Its inner quotes would otherwise end the
 			// surrounding literal early. Only the exact form with a date/time value
 			// (digits, - : . and spaces) is recognised; it is masked as one literal
-			// holding the inner value. Anything else falls through to the ordinary
-			// handling below.
-			local.odbc = $matchOdbcDateLiteral(arguments.where, local.i, local.ch == "'");
-			if (local.odbc.matched) {
-				local.out.append("'");
-				local.out.append(local.sentinel);
-				// The escape kind rides in front of the hex ("ts:", "d:", "t:"), so a
-				// position that isn't bound can write the escape back (see
-				// $restoreMaskedLiterals); a bound position takes the plain value.
-				local.out.append(local.odbc.kind & ":");
-				local.out.append(LCase(BinaryEncode(CharsetDecode(local.odbc.value, "utf-8"), "hex")));
-				local.out.append("'");
-				local.i += local.odbc.length;
-				continue;
+			// holding the inner value. The escape always opens with a brace ("{" bare,
+			// or "'{" quoted), so the matcher is only consulted at a brace — a plain
+			// quote never pays for it, which keeps a long run of quotes linear.
+			if (local.ch == "{" || (local.ch == "'" && local.i < local.n && local.chars[local.i + 1] == "{")) {
+				local.window = $joinChars(local.chars, local.i, 60);
+				// The matcher reads a <=60-char window (start 1), so matching is O(1)
+				// in the string length, not O(index).
+				local.odbc = $matchOdbcDateLiteral(local.window, 1, local.ch == "'");
+				if (local.odbc.matched) {
+					ArrayAppend(local.out, "'");
+					ArrayAppend(local.out, local.sentinel);
+					// The escape kind rides in front of the hex ("ts:", "d:", "t:"), so a
+					// position that isn't bound can write the escape back (see
+					// $restoreMaskedLiterals); a bound position takes the plain value.
+					ArrayAppend(local.out, local.odbc.kind & ":");
+					ArrayAppend(local.out, LCase(BinaryEncode(CharsetDecode(local.odbc.value, "utf-8"), "hex")));
+					ArrayAppend(local.out, "'");
+					local.i += local.odbc.length;
+					continue;
+				}
 			}
 			if (local.ch != "'") {
-				// A brace that doesn't start an ODBC date is ordinary text.
-				local.out.append(local.ch);
+				// Ordinary text (including a brace that doesn't start an ODBC date).
+				ArrayAppend(local.out, local.ch);
 				local.i += 1;
 				continue;
 			}
 			// A string literal: consume to its closing quote, treating a doubled
-			// quote ('') as one escaped quote that stays in the value. The text up to
-			// each quote is copied in one piece.
-			local.value = CreateObject("java", "java.lang.StringBuilder").init();
+			// quote ('') as one escaped quote that stays in the value.
+			local.value = [];
 			local.i += 1;
 			local.closed = false;
 			while (local.i <= local.n) {
-				local.q = Find("'", arguments.where, local.i);
-				if (local.q == 0) {
-					break;
-				}
-				if (local.q > local.i) {
-					local.value.append(Mid(arguments.where, local.i, local.q - local.i));
-				}
-				if (local.q < local.n && Mid(arguments.where, local.q + 1, 1) == "'") {
-					local.value.append("'");
-					local.i = local.q + 2;
+				if (local.chars[local.i] != "'") {
+					ArrayAppend(local.value, local.chars[local.i]);
+					local.i += 1;
+				} else if (local.i < local.n && local.chars[local.i + 1] == "'") {
+					ArrayAppend(local.value, "'");
+					local.i += 2;
 				} else {
-					local.i = local.q + 1;
+					local.i += 1;
 					local.closed = true;
 					break;
 				}
@@ -1088,7 +1074,7 @@
 					extendedInfo = "A string literal in the `where` argument was opened with a single quote that is never closed. Escape a literal quote by doubling it ('')."
 				);
 			}
-			local.literalValue = local.value.toString();
+			local.literalValue = ArrayToList(local.value, "");
 			// The IN-list binder joins decoded elements with Chr(7); a value
 			// carrying Chr(7) (or the Chr(2) sentinel) would re-split or be
 			// mis-decoded, so reject those control characters outright — they
@@ -1103,15 +1089,35 @@
 			if (!Len(local.literalValue)) {
 				// An empty string literal carries nothing to mask; leaving it as
 				// `''` keeps the runner's existing empty-string / NULL handling.
-				local.out.append("''");
+				ArrayAppend(local.out, "''");
 			} else {
-				local.out.append("'");
-				local.out.append(local.sentinel);
-				local.out.append(LCase(BinaryEncode(CharsetDecode(local.literalValue, "utf-8"), "hex")));
-				local.out.append("'");
+				ArrayAppend(local.out, "'");
+				ArrayAppend(local.out, local.sentinel);
+				ArrayAppend(local.out, LCase(BinaryEncode(CharsetDecode(local.literalValue, "utf-8"), "hex")));
+				ArrayAppend(local.out, "'");
 			}
 		}
-		return local.out.toString();
+		return ArrayToList(local.out, "");
+	}
+
+	/**
+	 * Join up to `count` characters of the one-indexed char array `chars`, starting at
+	 * `start`, back into a string. Used to hand $matchOdbcDateLiteral a short fixed-size
+	 * lookahead window without a Mid() that would cost O(start) on RustCFML.
+	 */
+	public string function $joinChars(required array chars, required numeric start, required numeric count) {
+		local.piece = [];
+		local.stop = Min(arguments.start + arguments.count - 1, ArrayLen(arguments.chars));
+		local.j = arguments.start;
+		// Per-element loop into a CFML array, joined once. ArrayAppend/ArrayToList are
+		// O(1)/O(len) on every engine; NOT a java StringBuilder (its append is O(length)
+		// on RustCFML) and NOT ArraySlice (O(start) on RustCFML). Only used for a short
+		// bounded window, but kept consistent with $maskWhereLiterals (#3903).
+		while (local.j <= local.stop) {
+			ArrayAppend(local.piece, arguments.chars[local.j]);
+			local.j += 1;
+		}
+		return ArrayToList(local.piece, "");
 	}
 
 	/**
