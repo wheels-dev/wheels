@@ -2,7 +2,7 @@
 
 	// Use this file to add routes to your application and point the root route to a controller action.
 	// Don't forget to issue a reload request (e.g. reload=true) after making changes.
-	// See https://guides.wheels.dev/v4-1-0/basics/routing/ for more info.
+	// See https://guides.wheels.dev/v4-2-0/basics/routing/ for more info.
 
 	mapper()
 		// CLI-Appends-Here
