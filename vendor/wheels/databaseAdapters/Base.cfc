@@ -642,9 +642,11 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
-	 * The integer values a key column of this cf_sql type can hold and bind, as
-	 * {min, max} integer strings, or an empty struct when the type has no range here.
-	 * The signed ranges; adapters override a type whose range differs (#4087).
+	 * The integer values a key column of this cf_sql type can store, as {min, max}
+	 * integer strings, or an empty struct when the type has no range here. The signed
+	 * ranges; adapters override a type whose range differs (#4087). A key outside the
+	 * range can't be an existing row. Inside it, binding can still fail: Adobe ColdFusion
+	 * binds CF_SQL_TINYINT only from 0 to 255.
 	 */
 	public struct function $integerKeyRange(required string sqlType) {
 		switch (arguments.sqlType) {

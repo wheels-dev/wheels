@@ -44,7 +44,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	/**
 	 * A MySQL TINYINT or SMALLINT column may be signed or UNSIGNED, and both map to
 	 * the same cf_sql type, so the range covers both: TINYINT -128 to 255, SMALLINT
-	 * -32768 to 65535 (#4087).
+	 * -32768 to 65535 (#4087). On Adobe ColdFusion a negative key in a signed TINYINT
+	 * column still fails to bind, since Adobe accepts CF_SQL_TINYINT only from 0 to 255.
 	 */
 	public struct function $integerKeyRange(required string sqlType) {
 		if (arguments.sqlType == "cf_sql_tinyint") {
