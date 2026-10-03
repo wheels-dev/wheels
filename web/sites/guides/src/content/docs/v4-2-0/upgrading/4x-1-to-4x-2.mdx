@@ -175,7 +175,7 @@ On Oracle, new `t.integer()`, `t.references()` and `id` columns are `NUMBER(10)`
 
 ### SQLite date columns are validated as dates
 
-On SQLite, new `t.date()`, `t.datetime()`, `t.time()` and `t.timestamp()` columns are declared `DATE`, `DATETIME` and `TIME` instead of `TEXT` ([#4093](https://github.com/wheels-dev/wheels/issues/4093)). The model validates them as dates, so automatic validations now reject a value such as `"not a date"` that earlier releases stored. Values are still stored as ISO-8601 text, exactly as before. Existing `TEXT` date columns are unchanged: they keep the old check, which treats a `TEXT` column as a date only when its name is a word such as `created`, `updated` or `date`, so a column like `publishedAt` gets no date check. To give an existing column the new behaviour, convert it in a migration with `changeColumn(columnType="datetime")` (or `"date"`). The stored text is kept.
+On SQLite, new `t.date()`, `t.datetime()`, `t.time()` and `t.timestamp()` columns are declared `DATE`, `DATETIME` and `TIME` instead of `TEXT` ([#4093](https://github.com/wheels-dev/wheels/issues/4093)). The model validates them as dates, so automatic validations now reject a value such as `"not a date"` that earlier releases stored. Values are still stored as ISO-8601 text, exactly as before. Existing `TEXT` date columns are unchanged: they keep the old check, which treats a `TEXT` column as a date only when its name is a word such as `created`, `updated` or `date`, so a column like `publishedAt` gets no date check. To give an existing column the new behaviour, convert it in a migration with `changeColumn(columnType="datetime")` (or `"date"`). ISO-8601 text is kept as it is. Converting to any date type also rewrites older values in that column: the CFML date literals `{ts 'X'}`, `{d 'D'}` and `{t 'T'}` become `X`, `D 00:00:00` and `1899-12-30 T`, and bare text that is exactly `YYYY-MM-DD` or `HH:MM:SS` becomes `YYYY-MM-DD 00:00:00` or `1899-12-30 HH:MM:SS`. Any other value is copied unchanged.
 
 **Columns declared `DATE` or `TIME` by raw SQL or another tool.** Before 4.2, Wheels bound a SQLite column *declared* `DATE` as `cf_sql_date` and one declared `TIME` as `cf_sql_time`, and the driver stored those values as epoch-millisecond integers. Wheels now writes ISO-8601 text to them, so a column with old rows would mix integers and text, which breaks comparisons and sorting. Migrator-created columns aren't affected: they were `TEXT` before 4.2. To check a table, run `SELECT typeof(col), count(*) FROM tbl GROUP BY 1;`. If any rows are `integer`, convert them before writing with 4.2:
 
@@ -187,6 +187,20 @@ UPDATE tbl SET timeCol = strftime('%H:%M:%S', timeCol / 1000, 'unixepoch', 'loca
 Keep `'localtime'`: the old values are midnight (or the time of day) in the server's timezone, and without it a server east of UTC converts each date to the previous day. Run the conversion with the same timezone as the app server.
 
 **Convert before you upgrade.** If you don't, what happens depends on the engine. On BoxLang, a record holding an unconverted value fails validation on that column ("is invalid") even when the save doesn't touch it, so the record can't be saved. On Lucee and Adobe ColdFusion the record saves and keeps its integers, because Wheels updates only the columns that changed, but the first new value the app writes to such a column is stored as text, and the column mixes formats until you convert. The recipe changes only `integer` rows, so it's safe to run more than once. Run it again after every app process is on 4.2: processes still on 4.1 keep writing integers.
+
+**Date literals written by `updateAll()`.** Before 4.2, `updateAll()` on SQLite wrote CFML date literals such as `{ts '2026-10-03 04:31:00'}` into date columns instead of ISO-8601 text ([#4147](https://github.com/wheels-dev/wheels/issues/4147)); `save()` wasn't affected. In a `TEXT` column these values read back as plain strings, but once the column is declared `DATETIME` they fail to read. `changeColumn()` to a date type repairs them for you (see above). If you convert a column with your own SQL, or keep it `TEXT`, check for these rows and repair them first:
+
+```sql
+-- Check: rows holding a CFML ODBC date literal ({ts '...'}, {d '...'}, {t '...'}).
+-- char(123) and char(125) are { and }: written as literal braces, a JDBC driver (and so
+-- Wheels' execute()) reads them as an escape sequence and rewrites the SQL.
+SELECT COUNT(*) AS n FROM <table> WHERE <column> LIKE char(123) || 'ts ''%''' || char(125) OR <column> LIKE char(123) || 'd ''%''' || char(125) OR <column> LIKE char(123) || 't ''%''' || char(125);
+
+-- Repair: {ts 'X'} -> X, {d 'D'} -> 'D 00:00:00', {t 'T'} -> '1899-12-30 T' (what save() writes).
+UPDATE <table> SET <column> = CASE WHEN <column> LIKE char(123) || 'ts ''%''' || char(125) THEN substr(<column>, instr(<column>, '''') + 1, length(<column>) - instr(<column>, '''') - 2) WHEN <column> LIKE char(123) || 'd ''%''' || char(125) THEN substr(<column>, instr(<column>, '''') + 1, length(<column>) - instr(<column>, '''') - 2) || ' 00:00:00' WHEN <column> LIKE char(123) || 't ''%''' || char(125) THEN '1899-12-30 ' || substr(<column>, instr(<column>, '''') + 1, length(<column>) - instr(<column>, '''') - 2) ELSE <column> END WHERE <column> LIKE char(123) || 'ts ''%''' || char(125) OR <column> LIKE char(123) || 'd ''%''' || char(125) OR <column> LIKE char(123) || 't ''%''' || char(125);
+```
+
+The repair writes what `save()` writes: `{ts 'X'}` becomes `X`, `{d 'D'}` becomes `D 00:00:00` and `{t 'T'}` becomes `1899-12-30 T`. It changes only rows holding a literal, so it's safe to run more than once.
 
 ### `LocalDisk` storage keys are checked per segment
 
