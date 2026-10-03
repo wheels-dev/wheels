@@ -163,7 +163,7 @@ Some clients send their requests to the live application:
 - a client created outside a test run, such as in a scheduled task or a script;
 - a client pointed at another host.
 
-For a test server on another host name, set `testClientBaseUrl` or use `$testClient()`. To address the live application from a spec on purpose, pass `testContext=false` to `$testClient()` or to `new wheels.wheelstest.TestClient()`.
+For a test server on another host name, set `testClientBaseUrl` or use `$testClient()`. If your suite runs in a Docker container that publishes the server on a different port (`-p 8080:60007`), set `testClientBaseUrl` to the address inside the container; see [Setting the test client's base URL](/v4-2-0/testing/controller-tests/#setting-the-test-clients-base-url). To address the live application from a spec on purpose, pass `testContext=false` to `$testClient()` or to `new wheels.wheelstest.TestClient()`.
 
 If a `TestClient` subclass or a test helper in your app sets the `X-Wheels-Test-Context` header or the `WHEELS_TEST_CONTEXT` cookie itself (a pattern from 4.1), delete those lines. `TestClient` and `$testClient()` now send the test context for you, and a value set by hand replaces theirs, so the requests reach the live application and its primary datasource (errors such as a missing table).
 

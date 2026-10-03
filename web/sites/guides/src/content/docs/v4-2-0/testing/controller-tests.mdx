@@ -44,9 +44,22 @@ component extends="wheels.WheelsTest" {
 
 Three things worth knowing:
 
-- `$testClient()` returns a fresh client per call. The base URL is auto-detected from `CGI.SERVER_PORT` — no setup is needed when you run the suite against the built-in test server.
+- `$testClient()` returns a fresh client per call. The base URL is auto-detected from the request that runs the suite (its scheme, host and port), so no setup is needed when you run the suite against the built-in test server. See [Setting the test client's base URL](#setting-the-test-clients-base-url) for when detection gets it wrong.
 - `visit("/posts")` is shorthand for `$testClient().get("/posts")` — useful for one-liner assertions. Construct a client directly when you need to reuse cookies, set headers, or chain multiple requests.
 - `TestClient` assertions (`assertSee`, `assertRedirect`, `assertJson`, ...) throw `TestBox.AssertionFailed` on failure. They return `this`, so they chain: `client.assertOk().assertSee("Welcome")`.
+
+## Setting the test client's base URL
+
+Auto-detection uses the port the test-runner request arrived on. That's wrong when the suite runs inside a Docker container whose published port differs from the server's port, such as `-p 8080:60007`. The runner request arrives on 8080, but nothing listens on 8080 inside the container, so every `$testClient()` call fails with status `0`.
+
+Set the base URL to the server's address inside the container. Any one of these works; they're listed highest precedence first:
+
+- `this.testClientBaseUrl = "http://localhost:60007";` in a spec's pseudo-constructor, for one spec;
+- `set(testClientBaseUrl="http://localhost:60007")` in `config/settings.cfm`;
+- the JVM property `-Dwheels.testClient.baseUrl=http://localhost:60007`;
+- the environment variable `WHEELS_TEST_CLIENT_BASE_URL=http://localhost:60007`, which is usually the easiest in a container.
+
+The same setting covers a test server on another host name or behind HTTPS.
 
 ## The response accessors
 
