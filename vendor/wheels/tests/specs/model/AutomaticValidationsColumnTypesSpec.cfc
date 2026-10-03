@@ -99,9 +99,6 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("rejects a fraction in an integer column", () => {
-				if (variables.adapterName == "Oracle") {
-					skip("Oracle migrator integer columns are a bare NUMBER, which the model treats as a float (##4097).");
-				}
 				var props = $validProperties();
 				props.quantity = "1.5";
 				$expectRejectedOn(props, "quantity");
