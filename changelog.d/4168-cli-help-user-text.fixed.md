@@ -1,0 +1,1 @@
+- `wheels <command> --help` prints only the command's summary line and its `Usage:` / `Examples:` sections. Internal notes no longer appear in the help for `reload`, `map`, `upgrade` and `packages`, `wheels coverage --help` and `wheels engines --help` print a one-line summary, and Usage/Examples lines are indented.
