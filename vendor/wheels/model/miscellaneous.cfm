@@ -324,23 +324,47 @@
 	/**
 	 * Internal function. SQLite stores dates as TEXT and Wheels binds them as varchar. CFML's
 	 * default string for a date object is "{ts '...'}", which would be stored verbatim and then
-	 * fail to read from a DATETIME column, so a date-shaped value is written as ISO-8601 text.
-	 * Shared by every path that binds a property value: save() ($buildQueryParamValues),
-	 * updateAll() and key WHERE clauses (#4147). Idempotent for already-clean strings.
+	 * fail to read from a DATETIME column, so a date is written as ISO-8601 text. Shared by every
+	 * path that binds a property value: save() ($buildQueryParamValues), updateAll() and key
+	 * WHERE clauses (#4147).
+	 *
+	 * Scoped by the property, because every SQLite text column binds as varchar: a date column
+	 * (validation type "datetime": a declared date type, or a TEXT column the name heuristic
+	 * treats as a date) formats any date value; any other column is rewritten only when the value
+	 * would otherwise be stored as a CFML ODBC literal ({ts '...'}, {d '...'}, {t '...'}), so
+	 * date-like text such as "1-2-3" or "12:30" is kept as written.
 	 */
-	public any function $sqliteDateParamValue(required any value, required string type, required boolean isNull) {
+	public any function $sqliteDateParamValue(
+		required any value,
+		required string type,
+		required boolean isNull,
+		string property = ""
+	) {
 		if (
-			$get("adapterName") eq "SQLiteModel"
-			&& arguments.type eq "cf_sql_varchar"
-			&& !arguments.isNull
-			&& IsSimpleValue(arguments.value)
-			&& Len(arguments.value)
-			&& IsDate(arguments.value)
-			&& !IsNumeric(arguments.value)
+			$get("adapterName") neq "SQLiteModel"
+			|| arguments.type neq "cf_sql_varchar"
+			|| arguments.isNull
+			|| !IsSimpleValue(arguments.value)
+			|| !Len(arguments.value)
+			|| !IsDate(arguments.value)
+			|| IsNumeric(arguments.value)
 		) {
-			return DateFormat(arguments.value, "yyyy-mm-dd") & " " & TimeFormat(arguments.value, "HH:mm:ss");
+			return arguments.value;
 		}
-		return arguments.value;
+		if (!$isDateProperty(arguments.property) && !ReFind("^\{(ts|d|t) '", ToString(arguments.value))) {
+			return arguments.value;
+		}
+		return DateFormat(arguments.value, "yyyy-mm-dd") & " " & TimeFormat(arguments.value, "HH:mm:ss");
+	}
+
+	/**
+	 * Internal function. True when Wheels validates the property as a date.
+	 */
+	public boolean function $isDateProperty(required string property) {
+		return Len(arguments.property)
+			&& StructKeyExists(variables.wheels.class.properties, arguments.property)
+			&& StructKeyExists(variables.wheels.class.properties[arguments.property], "validationtype")
+			&& variables.wheels.class.properties[arguments.property].validationtype == "datetime";
 	}
 
 	public struct function $buildQueryParamValues(required string property) {
@@ -351,7 +375,7 @@
 		local.rv.scale = variables.wheels.class.properties[arguments.property].scale;
 		local.rv.null = (!Len(this[arguments.property]) && variables.wheels.class.properties[arguments.property].nullable);
 
-		local.rv.value = $sqliteDateParamValue(value = local.rv.value, type = local.rv.type, isNull = local.rv.null);
+		local.rv.value = $sqliteDateParamValue(value = local.rv.value, type = local.rv.type, isNull = local.rv.null, property = arguments.property);
 
 		// Convert date strings to proper date for datetime types (engine-specific parsing)
 		if ($engineAdapter().isBoxLang() && (Len(local.rv.value) && !local.rv.null && 

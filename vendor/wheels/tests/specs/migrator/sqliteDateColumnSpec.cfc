@@ -192,6 +192,66 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		// On SQLite every text column binds as varchar, so the ISO rewrite is scoped by the property:
+		// date-like text in a plain text column, including a text primary key, is kept as written (##4147).
+		describe("Date-like text in plain SQLite text columns", () => {
+
+			beforeEach(() => {
+				if (!variables.applies) {
+					return;
+				}
+				var t = variables.migration.createTable(name = "c_o_r_e_sqlitetextkeys", id = false, force = true);
+				t.primaryKey(columnNames = "code", type = "string", autoIncrement = false);
+				t.string(columnNames = "note");
+				t.create();
+				StructDelete(application.wheels.models, "SqliteTextKey");
+			});
+
+			afterEach(() => {
+				if (variables.applies) {
+					variables.migration.dropTable("c_o_r_e_sqlitetextkeys");
+					StructDelete(application.wheels.models, "SqliteTextKey");
+				}
+			});
+
+			it("round-trips unchanged through save, updateAll and findByKey", () => {
+				if (!variables.applies) {
+					skip("SQLite only.");
+				}
+				model("SqliteTextKey").create(code = "a", note = "1-2-3");
+				model("SqliteTextKey").create(code = "b", note = "x");
+				model("SqliteTextKey").updateAll(where = "code = 'b'", note = "12:30", callbacks = false);
+				var raw = QueryExecute("SELECT code, note FROM c_o_r_e_sqlitetextkeys ORDER BY code", [], {datasource = variables.ds});
+				expect(ValueList(raw.note, "|")).toBe("1-2-3|12:30");
+				expect(model("SqliteTextKey").findByKey("a").note).toBe("1-2-3");
+				expect(model("SqliteTextKey").findByKey("b").note).toBe("12:30");
+			});
+
+			it("works as a primary key for reload, update and delete", () => {
+				if (!variables.applies) {
+					skip("SQLite only.");
+				}
+				var row = model("SqliteTextKey").create(code = "12:30", note = "first");
+				row.reload();
+				expect(row.note).toBe("first");
+				expect(row.update(note = "second")).toBeTrue();
+				expect(model("SqliteTextKey").findByKey("12:30").note).toBe("second");
+				expect(row.delete()).toBeTrue();
+				expect(model("SqliteTextKey").count()).toBe(0);
+			});
+
+			it("still stores a date object as ISO-8601 text", () => {
+				if (!variables.applies) {
+					skip("SQLite only.");
+				}
+				model("SqliteTextKey").create(code = "d", note = CreateDateTime(2026, 10, 3, 4, 29, 57));
+				model("SqliteTextKey").updateAll(where = "code = 'd'", note = CreateDateTime(2026, 10, 4, 5, 6, 7), callbacks = false);
+				var raw = QueryExecute("SELECT note FROM c_o_r_e_sqlitetextkeys WHERE code = 'd'", [], {datasource = variables.ds});
+				expect(raw.note).toBe("2026-10-04 05:06:07");
+			});
+
+		});
+
 		describe("SQLite DATE / TIME columns written before ##4093", () => {
 
 			// Before #4093, SQLiteModel bound a declared DATE as cf_sql_date and TIME as cf_sql_time,
