@@ -1023,7 +1023,7 @@
 	 * make this O(n^2): Mid()/Find() by index, java StringBuilder.append (O(length) there),
 	 * and ArraySlice (O(start) there). Must stay byte-identical to $maskWhereLiteralsByScan.
 	 */
-	private string function $maskWhereLiteralsFromChars(required array chars) {
+	public string function $maskWhereLiteralsFromChars(required array chars) {
 		local.sentinel = $whereLiteralSentinel();
 		local.out = [];
 		local.chars = arguments.chars;
@@ -1136,7 +1136,7 @@
 	 * this path (Mid()/Find() are O(1) there). Must stay byte-identical to
 	 * $maskWhereLiteralsFromChars.
 	 */
-	private string function $maskWhereLiteralsByScan(required string where) {
+	public string function $maskWhereLiteralsByScan(required string where) {
 		if (Find("'", arguments.where) == 0) {
 			return arguments.where;
 		}
