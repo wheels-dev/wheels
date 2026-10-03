@@ -26,6 +26,42 @@ component extends="wheels.WheelsTest" {
 		return "wheels_txlock_" & Replace(CreateUUID(), "-", "", "all");
 	}
 
+	// A separate adapter instance on the test datasource, so a second-session acquire never touches
+	// the model's own adapter (mirrors advisoryLockExclusionSpec).
+	function freshAdapter() {
+		var classData = variables.g.model("author").$classData();
+		var folder = Left(variables.adapterName, Len(variables.adapterName) - 5);
+		return CreateObject("component", "wheels.databaseAdapters.#folder#.#variables.adapterName#").$init(
+			dataSource = classData.dataSource,
+			username = classData.username,
+			password = classData.password
+		);
+	}
+
+	// Attempts the transaction-scoped acquire on a FRESH adapter/connection, bypassing the app-server
+	// cflock, so this is a genuine second-DB-session attempt. Returns {ok, type}: ok=true if the lock
+	// was taken (and then released + rolled back so nothing leaks), false (with the error type) if it
+	// timed out while another session held it.
+	function tryAcquireFresh(required string name, required numeric timeoutSecs) {
+		var a = freshAdapter();
+		var r = {ok = false, type = ""};
+		transaction {
+			try {
+				a.$acquireAdvisoryLockTransactional(name = arguments.name, timeout = arguments.timeoutSecs);
+				r.ok = true;
+			} catch (any e) {
+				r.type = e.type;
+			}
+			// Clean up a session-scoped lock we took; a transaction-scoped one (PG) auto-releases on
+			// the rollback below.
+			if (r.ok && a.$transactionalAdvisoryLockIsSessionScoped()) {
+				a.$releaseAdvisoryLockTransactional(name = arguments.name);
+			}
+			transaction action="rollback";
+		}
+		return r;
+	}
+
 	// True when any session holds the named lock, read straight from the database on a pooled
 	// connection separate from the holder's pinned one (PostgreSQL / MySQL only).
 	function isHeld(required string name) {
@@ -209,6 +245,100 @@ component extends="wheels.WheelsTest" {
 				// Outer transaction has ended: the lock must now be free.
 				expect(ctx.heldDuringCall).toBeTrue("the lock must be held until the outer transaction ends, not when the call returns");
 				expect(isHeld(name)).toBeFalse("the lock must be released once the outer transaction ends");
+			});
+
+			// The session-scoped contrast: MySQL releases its lock at CALL end, so inside the outer
+			// transaction the lock is already free after the call returns (SQL Server shares this
+			// session-scoped code path; it is not introspectable here, so it is asserted on MySQL).
+			it("releases a session-scoped lock at call end, before the outer transaction ends", () => {
+				if (variables.adapterName != "MySQLModel") {
+					skip("Session-scoped call-end release is introspectable on MySQL; PostgreSQL is tx-scoped.");
+				}
+				var name = lockName();
+				var author = variables.g.model("author");
+				var ctx = {heldAfterCall = true};
+				transaction {
+					author.withAdvisoryLock(name = name, transaction = true, callback = function() {
+						return true;
+					});
+					// Still inside the OUTER transaction, but the session lock is released at call end.
+					ctx.heldAfterCall = isHeld(name);
+				}
+				expect(ctx.heldAfterCall).toBeFalse("a session-scoped lock must be released at call end, not held to the outer transaction");
+			});
+
+		});
+
+		describe("two-session exclusion at the database (4195-style, cflock-bypassing)", () => {
+
+			beforeEach(() => {
+				if (!variables.applies) {
+					skip("Transaction-scoped advisory locks: PostgreSQL, MySQL, SQL Server.");
+				}
+			});
+
+			// A genuine second DB session (freshAdapter, no app-server cflock) is blocked while the
+			// first holds the lock and can acquire once it is released. Uniform across PG/MySQL/MSSQL.
+			it("blocks a second session while held and lets it acquire after release", () => {
+				var name = lockName();
+				var holder = startTxHolder(name, 3000);
+				expect(application.advisoryLockTxSpec.started).toBeTrue();
+				var blocked = tryAcquireFresh(name, 1);
+				thread action="join" name="#holder#" timeout="15000";
+				expect(application.advisoryLockTxSpec.error).toBe("");
+				expect(blocked.ok).toBeFalse("a second DB session must be blocked while the lock is held");
+				expect(blocked.type).toBe("Wheels.AdvisoryLockTimeout");
+				var acquired = tryAcquireFresh(name, 2);
+				expect(acquired.ok).toBeTrue("a second DB session must acquire once the first has released");
+			});
+
+		});
+
+		describe("re-entrancy: a nested same-name lock on the same session", () => {
+
+			// Session locks (MySQL GET_LOCK, SQL Server sp_getapplock) and the PG xact lock all count
+			// up/down on one session, and the app-server cflock is re-entrant for the same thread, so a
+			// nested same-name call runs its inner callback and leaves the lock fully released.
+			it("runs the nested callback and fully releases on the transaction path", () => {
+				if (!variables.applies) {
+					skip("Transaction-scoped advisory locks: PostgreSQL, MySQL, SQL Server.");
+				}
+				var name = lockName();
+				var author = variables.g.model("author");
+				var ctx = {inner = false};
+				author.withAdvisoryLock(name = name, timeout = 5, transaction = true, callback = function() {
+					author.withAdvisoryLock(name = name, timeout = 5, transaction = true, callback = function() {
+						ctx.inner = true;
+						return true;
+					});
+					return true;
+				});
+				expect(ctx.inner).toBeTrue("the nested same-name callback must run");
+				if (variables.introspectable) {
+					expect(isHeld(name)).toBeFalse("both levels must release, leaving the lock free");
+				}
+			});
+
+			// The default (#4200) path uses the same app-server lock, so nesting must work there too;
+			// if an engine's cflock is not re-entrant, this is a #4200 behaviour, not #4198.
+			it("runs the nested callback and fully releases on the default path", () => {
+				if (!variables.g.model("author").$classData().adapter.$supportsAdvisoryLocks()) {
+					skip("Default-path advisory locks need standalone support: PostgreSQL, MySQL.");
+				}
+				var name = lockName();
+				var author = variables.g.model("author");
+				var ctx = {inner = false};
+				author.withAdvisoryLock(name = name, timeout = 5, callback = function() {
+					author.withAdvisoryLock(name = name, timeout = 5, callback = function() {
+						ctx.inner = true;
+						return true;
+					});
+					return true;
+				});
+				expect(ctx.inner).toBeTrue("the nested same-name callback must run on the default path");
+				if (variables.introspectable) {
+					expect(isHeld(name)).toBeFalse("both levels must release on the default path");
+				}
 			});
 
 		});
