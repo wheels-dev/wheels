@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UNVERIFIED ON IIS: drafted from docs and the Tuckey/rewrite.config rules; needs review on a real IIS box.
+
+  Wheels 4.1.x, app served at /app1 inside an existing IIS site.
+  Layout this assumes:
+    - In IIS Manager, add an Application (or Virtual Directory) with alias "app1" whose physical
+      path is the app's public\ folder, for example C:\inetpub\wheels-apps\app1\public.
+      app\, config\, vendor\ and .env stay one level up, outside the web root. That is the same
+      rule as a root install.
+    - Save this file as app1\public\web.config. URL Rewrite matches the URL relative to this
+      folder: "widgets" here means /app1/widgets in the browser, and "index.cfm/..." rewrites
+      to /app1/index.cfm/... The static folders (/app1/files, /app1/stylesheets, ...) are
+      therefore listed without the app1/ prefix.
+  For each app on the same ColdFusion/Lucee instance:
+    - config/settings.cfm:  set(subpath="/app1");  and keep set(URLRewriting="On").
+    - config/app.cfm: give this.name a value no other app uses, e.g. this.name = "myco-app1";
+      The template ships this.name = "Wheels". Two apps with that name share ONE application
+      scope: app2 then used app1's datasource, routes and /app1/ links (seen on ACF 2025).
+    - Do not use WHEELS_SUBPATH for more than one app. It is read from the engine's process
+      environment, so every app on the instance gets the same value. An IIS web.config
+      <environmentVariables> block is not passed to ColdFusion or Lucee behind the IIS connector.
+-->
+<configuration>
+  <system.webServer>
+
+    <defaultDocument enabled="true">
+      <files>
+        <remove value="index.cfm" />
+        <add value="index.cfm" />
+      </files>
+    </defaultDocument>
+
+    <rewrite>
+      <rules>
+        <!-- Drop rules inherited from the parent site's web.config. If another Wheels app runs
+             at the site root, its catch-all would otherwise rewrite /app1/widgets to
+             /index.cfm/app1/widgets before these rules run. -->
+        <clear />
+
+        <!-- 0. The app root (/app1 or /app1/) goes to the front controller with an explicit "/"
+                path. Without this, /app1/ is served by the default document with an empty
+                PATH_INFO. Wheels 4.1.2 then falls back to REQUEST_URI ("/app1/"), does not strip
+                the subpath, and routes to a controller named "App1": a 404 or ViewNotFound
+                instead of your home page (seen on ACF 2025 for /app1/index.cfm).
+                /app1/index.cfm/ (with the trailing slash) works. -->
+        <rule name="Wheels app1: app root" stopProcessing="true">
+          <match url="^$" />
+          <action type="Rewrite" url="index.cfm/" appendQueryString="true" />
+        </rule>
+
+        <!-- 1. Real files and folders under app1\public\ are served as they are. -->
+        <rule name="Wheels app1: existing files and folders" stopProcessing="true">
+          <match url=".*" />
+          <conditions logicalGrouping="MatchAny">
+            <add input="{REQUEST_FILENAME}" matchType="IsFile" />
+            <add input="{REQUEST_FILENAME}" matchType="IsDirectory" />
+          </conditions>
+          <action type="None" />
+        </rule>
+
+        <!-- 2. Static folders and the front controller under /app1/ never go to the router.
+                Use match url (relative to this folder) rather than the guide's {REQUEST_URI}
+                condition. {REQUEST_URI} holds the full path (/app1/files/...), so the guide's
+                ^/(files|...) never matches in a subfolder. -->
+        <rule name="Wheels app1: reserved paths" stopProcessing="true">
+          <match url="^(files|images|javascripts|miscellaneous|stylesheets|index\.cfm|robots\.txt|favicon\.ico|sitemap\.xml)(/.*)?$" ignoreCase="true" />
+          <action type="None" />
+        </rule>
+
+        <!-- 3. Format suffix. DISABLED on purpose, for the same reason as in web.config.root:
+                the router reads .json from PATH_INFO itself. /app1/widgets.json returned JSON
+                on ACF 2025 without this rule. -->
+        <rule name="Wheels app1: format suffix to ?format=" enabled="false" stopProcessing="true">
+          <match url="^(.*)\.(\w+)$" />
+          <action type="Rewrite" url="index.cfm/{R:1}?format={R:2}" appendQueryString="true" />
+        </rule>
+
+        <!-- 4. Everything else goes to this app's front controller:
+                /app1/posts/1 is rewritten to /app1/index.cfm/posts/1. -->
+        <rule name="Wheels app1: front controller" stopProcessing="true">
+          <match url="^(.*)$" />
+          <action type="Rewrite" url="index.cfm/{R:1}" appendQueryString="true" />
+        </rule>
+      </rules>
+    </rewrite>
+
+  </system.webServer>
+</configuration>

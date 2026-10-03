@@ -1,0 +1,72 @@
+# Windows/IIS check (test only, not a required check).
+# Serves the repository's app through IIS + URL Rewrite + the BonCode connector to
+# Lucee 7 (Tomcat), with the IIS rewrite rules from the v4.2 guide and the
+# web.config files in tools/ci/iis/, and reports which rules hold.
+# Adobe ColdFusion is out of scope (it needs a licensed installer).
+name: IIS (Windows)
+
+on:
+  workflow_dispatch:
+  # TEMP (remove before the PR): iterate on the branch, since workflow_dispatch needs the
+  # workflow on the default branch first.
+  push:
+    branches: ['peter/iis-windows-actions-job']
+  pull_request:
+    paths:
+      - '.github/workflows/iis-windows.yml'
+      - 'tools/ci/iis/**'
+      - 'public/urlrewrite.xml'
+      - 'web/sites/guides/src/content/docs/v4-2-0/deployment/iis-and-windows.mdx'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  iis:
+    name: IIS + Lucee 7 (BonCode)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Deploy the test apps
+        run: ./tools/ci/iis/deploy.ps1
+
+      - name: Install IIS, URL Rewrite, Lucee Express and BonCode
+        run: ./tools/ci/iis/install.ps1
+
+      - name: Run the IIS checks
+        run: ./tools/ci/iis/checks.ps1
+
+      - name: Server logs
+        if: failure()
+        run: |
+          foreach ($dir in 'C:\lucee\logs', 'C:\inetpub\logs\LogFiles\W3SVC1') {
+            if (Test-Path $dir) {
+              Get-ChildItem $dir -File | Sort-Object LastWriteTime -Descending | Select-Object -First 4 | ForEach-Object {
+                Write-Host "===== $($_.FullName)"
+                Get-Content $_.FullName -Tail 60
+              }
+            }
+          }
+          Get-ChildItem $env:TEMP -Filter 'Setup Log*.txt' -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "===== $($_.FullName)"; Get-Content $_.FullName -Tail 40 }
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iis-report
+          path: ${{ runner.temp }}/iis-report.md
+          if-no-files-found: ignore
