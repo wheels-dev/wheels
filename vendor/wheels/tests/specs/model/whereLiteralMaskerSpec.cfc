@@ -17,6 +17,14 @@ component extends="wheels.WheelsTest" {
 		describe("The WHERE literal masker", () => {
 
 			it("matches the previous implementation on edge cases", () => {
+				// Build the supplementary-plane fixture (U+1F600) from its UTF-8 bytes, not
+				// from Chr() surrogate halves: on a scalar-Unicode runtime (RustCFML) lone
+				// surrogates may not combine into the code point, which would make the
+				// differential comparison below pass on replacement chars rather than real
+				// supplementary input (rev1-r2). Assert the real bytes before using it, so a
+				// runtime that degrades it fails here loudly instead of silently.
+				var emoji = CharsetEncode(BinaryDecode("F09F9880", "hex"), "utf-8");
+				expect(LCase(BinaryEncode(CharsetDecode(emoji, "utf-8"), "hex"))).toBe("f09f9880");
 				var cases = [
 					"",
 					"id = 1",
@@ -46,11 +54,11 @@ component extends="wheels.WheelsTest" {
 					// before/inside a literal and before an ODBC escape. The char-array
 					// scan must round-trip the surrogate pair byte-for-byte like the old
 					// Mid() scan (#3903 / rev1-r2 equivalence review).
-					"x = " & Chr(55357) & Chr(56832) & " AND name = 'y'",
-					"name = '" & Chr(55357) & Chr(56832) & "smith'",
-					"name = 'sm" & Chr(55357) & Chr(56832) & "ith'",
-					"d = " & Chr(55357) & Chr(56832) & "{ts '2020-01-02 03:04:05'}",
-					"name = '" & Chr(55357) & Chr(56832) & "{ts ''2020-01-02''}'",
+					"x = " & emoji & " AND name = 'y'",
+					"name = '" & emoji & "smith'",
+					"name = 'sm" & emoji & "ith'",
+					"d = " & emoji & "{ts '2020-01-02 03:04:05'}",
+					"name = '" & emoji & "{ts ''2020-01-02''}'",
 					// A combining mark (U+0301) after a base letter, inside a literal.
 					"name = 'e" & Chr(769) & "clair'",
 					// CR / LF / NUL as ordinary literal data (not the rejected Chr(2)/Chr(7)).
