@@ -29,7 +29,7 @@ Three keys are required. Omitting any of them stops the loader with `<path to de
 The loader rejects any top-level key not on this list. Case-insensitive. The allowlist contains only keys the runtime actually reads — Kamal keys that `wheels deploy` has not implemented yet are **rejected** rather than accepted-and-ignored (see [Rejected Kamal keys](#rejected-kamal-keys) below).
 
 ```text title="Allowed top-level keys (illustrative — do not type)"
-service, image, servers, registry, builder, env, ssh, proxy, boot, accessories
+service, image, servers, registry, builder, env, ssh, proxy, boot, accessories, volumes
 ```
 
 <Aside type="caution" title="Some sub-keys are still parsed but ignored">
