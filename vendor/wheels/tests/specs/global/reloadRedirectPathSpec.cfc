@@ -29,6 +29,23 @@ component extends="wheels.WheelsTest" {
 				expect(g.$reloadRedirectPath(path = "/\/example.com/x", webPath = "/")).toBe("/example.com/x")
 			})
 
+			it("also ignores spaces and control characters in the leading run", () => {
+				var tab = Chr(9)
+				var lf = Chr(10)
+				var cr = Chr(13)
+				expect(g.$reloadRedirectPath(path = "/" & tab & "/example.com", webPath = "/")).toBe("/example.com")
+				expect(g.$reloadRedirectPath(path = "/" & lf & "//example.com", webPath = "/")).toBe("/example.com")
+				expect(g.$reloadRedirectPath(path = "/" & cr & "/x", webPath = "/")).toBe("/x")
+				expect(g.$reloadRedirectPath(path = "/ /example.com", webPath = "/")).toBe("/example.com")
+				expect(g.$reloadRedirectPath(path = "/\" & tab & "/x", webPath = "/")).toBe("/x")
+				expect(g.$reloadRedirectPath(path = "/" & Chr(127) & "/x", webPath = "/")).toBe("/x")
+				expect(g.$reloadRedirectPath(path = "/" & tab & cr & lf & " ", webPath = "/")).toBe("/")
+			})
+
+			it("keeps spaces and control characters that come after the leading run", () => {
+				expect(g.$reloadRedirectPath(path = "/a" & Chr(9) & "b", webPath = "/")).toBe("/a" & Chr(9) & "b")
+			})
+
 			it("only touches the leading run, not slashes later in the path", () => {
 				expect(g.$reloadRedirectPath(path = "/a//b", webPath = "/")).toBe("/a//b")
 			})

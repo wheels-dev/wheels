@@ -526,11 +526,29 @@
 
 	/**
 	 * Internal function. Where the redirect after a reload goes: the request's app-relative
-	 * path with any leading run of slashes or backslashes collapsed to a single `/`, so the
-	 * location is always a path on this site, then prefixed with the app's `webPath`.
+	 * path with any leading run of slashes, backslashes, spaces and control characters
+	 * collapsed to a single `/` (browsers drop tab, CR and LF from a URL), so the location is
+	 * always a path on this site, then prefixed with the app's `webPath`.
 	 */
 	public string function $reloadRedirectPath(required string path, string webPath) {
-		local.args = {path = ReReplace(arguments.path, "^[/\\]+", "/")};
+		local.len = Len(arguments.path);
+		local.i = 1;
+		while (local.i <= local.len) {
+			local.code = Asc(Mid(arguments.path, local.i, 1));
+			if (local.code == 47 || local.code == 92 || local.code <= 32 || local.code == 127) {
+				local.i++;
+			} else {
+				break;
+			}
+		}
+		if (local.i == 1) {
+			local.cleanPath = arguments.path;
+		} else if (local.i > local.len) {
+			local.cleanPath = "/";
+		} else {
+			local.cleanPath = "/" & Mid(arguments.path, local.i, local.len - local.i + 1);
+		}
+		local.args = {path = local.cleanPath};
 		if (StructKeyExists(arguments, "webPath")) {
 			local.args.webPath = arguments.webPath;
 		}
