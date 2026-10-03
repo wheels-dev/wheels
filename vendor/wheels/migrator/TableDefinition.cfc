@@ -149,7 +149,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function bigInteger(string columnNames, numeric limit, default, boolean allowNull) {
+	public any function bigInteger(string columnNames, numeric limit, default, boolean allowNull, boolean unsigned) {
 		return $addTypedColumns(columnType = "biginteger", args = arguments);
 	}
 
@@ -223,7 +223,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function integer(string columnNames, numeric limit, default, boolean allowNull) {
+	public any function integer(string columnNames, numeric limit, default, boolean allowNull, boolean unsigned) {
 		return $addTypedColumns(columnType = "integer", args = arguments);
 	}
 

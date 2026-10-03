@@ -50,6 +50,52 @@ The `onError` minimal fallback now tells an error raised once the application is
 
 **Fails safe:** without it, `wheels reload` against a RustCFML server fails every other run; Lucee, Adobe CF and BoxLang are unaffected. Copy the header-mapping block from the template.
 
+### Reload redirect keeps the subfolder (4.2.0)
+
+When an app runs under a subfolder (`set(subpath="/app1")`, or an IIS application at `/app1`), `?reload=true` on a running app restarts it and redirects from `public/Application.cfc`'s `$buildRedirectUrl()`. That function built the target from `cgi.path_info` alone, so `/app1/widgets?reload=true` came back to `/widgets`, outside the app ([#3948](https://github.com/wheels-dev/wheels/issues/3948)). The 4.2 template passes the path through the framework's `$reloadRedirectPath()`, which puts the subfolder back. The same function is used by the framework's own reload redirect.
+
+Replace the `return local.redirectPath;` at the end of `$buildRedirectUrl()` with the block below, and add `$normaliseRedirectPath()` after it. The fallback keeps the function working with a `vendor/wheels/` that doesn't have the helper yet.
+
+```cfm title="public/Application.cfc"
+		local.redirectPathResolved = false;
+		try {
+			if (StructKeyExists(application, "wo")) {
+				local.redirectPath = application.wo.$reloadRedirectPath(path = local.redirectPath);
+				local.redirectPathResolved = true;
+			}
+		} catch (any e) {
+			// No such helper (an older vendor/wheels): use the fallback below.
+		}
+		if (!local.redirectPathResolved) {
+			local.redirectPath = this.$normaliseRedirectPath(local.redirectPath);
+		}
+
+		return local.redirectPath;
+	}
+
+	public string function $normaliseRedirectPath(required string path) {
+		local.len = Len(arguments.path);
+		local.i = 1;
+		while (local.i <= local.len) {
+			local.code = Asc(Mid(arguments.path, local.i, 1));
+			if (local.code == 47 || local.code == 92 || local.code <= 32 || local.code == 127) {
+				local.i++;
+			} else {
+				break;
+			}
+		}
+		if (local.i == 1) {
+			return arguments.path;
+		}
+		if (local.i > local.len) {
+			return "/";
+		}
+		return "/" & Mid(arguments.path, local.i, local.len - local.i + 1);
+	}
+```
+
+**Fails safe at the site root:** nothing changes for an app served at `/`. **Does not fail safe under a subfolder:** the app restarts, but the browser is redirected to a path outside it.
+
 ### Event templates without leading whitespace (4.2.0)
 
 The `app/events/*.cfm` templates (`onrequeststart.cfm`, `onrequestend.cfm`, `onsessionstart.cfm` and their siblings) are included straight into the response buffer, where a bare `cfscript` block and a trailing newline put blank lines before every response ([#3882](https://github.com/wheels-dev/wheels/issues/3882)). New apps wrap them in `cfsilent` with no trailing newline.
@@ -110,6 +156,18 @@ A bare property or method name in a `condition` or `unless` expression now means
 ### MySQL boolean columns are `BIT(1)`
 
 On MySQL, `t.boolean()` and `addColumn(columnType="boolean")` now create `BIT(1)` instead of `TINYINT(1)` ([#3897](https://github.com/wheels-dev/wheels/issues/3897)). Existing columns are unchanged. If your DSN sets `tinyInt1isBit=false`, existing `TINYINT(1)` booleans read as plain integers and fail validation as "is not a number": drop that DSN option, or convert the column with `changeColumn(columnType="boolean")`. `BIT(1)` values read back as `1` on Lucee and Adobe CF and as `true` on BoxLang; both are truthy and compare equal in CFML.
+
+### MySQL `t.bigInteger()` columns are signed
+
+On MySQL, `t.bigInteger()` now creates a signed `BIGINT` instead of `BIGINT UNSIGNED` ([#4121](https://github.com/wheels-dev/wheels/issues/4121)). The new columns accept negative values and validate as integers. Existing `BIGINT UNSIGNED` columns are unchanged, and `changeColumn()` keeps a column's current signedness unless you pass `unsigned`.
+
+MySQL requires both sides of a foreign key to have the same signedness. A new `t.bigInteger()` or `t.integer()` column that references an id created by an earlier version (`BIGINT UNSIGNED`) therefore fails with "Referencing column … and referenced column … are incompatible". Declare it unsigned:
+
+```cfm
+t.bigInteger(columnNames = "accountId", unsigned = true);
+```
+
+`unsigned` is ignored on databases without unsigned types.
 
 ### Oracle integer columns carry a precision
 

@@ -1860,6 +1860,9 @@ component extends="modules.BaseModule" {
 	 * already be canonical. The comparison is exact (Compare) and qualified by
 	 * a separator boundary, so `/srv/App-extra` is not inside `/srv/App`.
 	 * Mirrors wheels.PathGuard.pathWithinExact(), which the CLI does not load.
+	 * Keep the two in sync: a change to either belongs in both. The only
+	 * intended differences are the optional `separator` argument here and
+	 * $nativeSeparator() being public.
 	 * Public for specs; $-prefixed, so hidden from MCP.
 	 *
 	 * @separator The platform separator; empty means $nativeSeparator(). Specs
@@ -1887,8 +1890,8 @@ component extends="modules.BaseModule" {
 	/**
 	 * The platform's native path separator. Prefers java.io.File.separator; falls
 	 * back to the OS name; defaults to the POSIX "/". It is never inferred from
-	 * seeing a backslash in a path. Mirrors wheels.PathGuard.$nativeSeparator().
-	 * Public for specs.
+	 * seeing a backslash in a path. Mirrors wheels.PathGuard.$nativeSeparator();
+	 * keep the two in sync. Public for specs.
 	 */
 	public string function $nativeSeparator() {
 		try {

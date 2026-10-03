@@ -23,7 +23,7 @@ A Wheels app in production is a Java webapp running on a CFML engine. That one f
 
 The port is byte-compatible with Ruby Kamal on the server side. Container names, labels, Docker network, lock-file paths, and the `.kamal/` directory layout all match exactly — a host managed by Ruby Kamal can be taken over by `wheels deploy` during evaluation, and vice versa. You don't need Ruby, a gem install, or a second CLI. The mirrored Kamal version is 2.4.0; the `kamal-proxy` image is pinned at v0.8.6.
 
-There are two deliberate schema divergences. `deploy.yml` does not support ERB — where Ruby Kamal writes `<%= ENV["APP_NAME"] %>`, Wheels writes `${APP_NAME}`, the same `${VAR}` env-var interpolation Kamal supports natively. And Kamal top-level keys the port hasn't implemented (`boot`, `logging`, `retain_containers`, …) are [rejected by the validator](/v4-2-0/deployment/config-reference/#rejected-kamal-keys) rather than silently ignored. See [Migrating from Kamal](/v4-2-0/deployment/migrating-from-kamal/) for the full story.
+There are two deliberate schema divergences. `deploy.yml` does not support ERB — where Ruby Kamal writes `<%= ENV["APP_NAME"] %>`, Wheels writes `${APP_NAME}`, the same `${VAR}` env-var interpolation Kamal supports natively. And Kamal top-level keys the port hasn't implemented (`logging`, `labels`, `retain_containers`, …) are [rejected by the validator](/v4-2-0/deployment/config-reference/#rejected-kamal-keys) rather than silently ignored. See [Migrating from Kamal](/v4-2-0/deployment/migrating-from-kamal/) for the full story.
 
 ## When to reach for `wheels deploy`
 
@@ -64,7 +64,7 @@ The framework is narrow about production. Wheels gives you a CFML app that boots
 - A CFML application that runs on Lucee 6/7 or Adobe ColdFusion 2023/2025. The 4.0 reference engine for core tests is Lucee 7 on Java 21.
 - `wheels deploy` — orchestration, dry-run, rollback, accessories, secrets adapters, hooks. See [Your First Deploy](/v4-2-0/deployment/first-deploy/).
 - Environment-aware configuration (`config/environment.cfm`, `config/environments/*.cfm`) that selects behavior by `WHEELS_ENV`.
-- A migrator (`wheels dbmigrate`) and seeder (`wheels seed`) that run inside the deployed container against your production database.
+- A migrator and seeder. In development, `wheels migrate` and `wheels seed` drive them through the running dev server. The deployed image doesn't include the CLI, and the CLI bridge is refused in production, so a production app runs migrations at start with `set(autoMigrateDatabase=true)` (one app host only, see [Accessories](/v4-2-0/deployment/accessories/#connecting-your-wheels-app-to-a-database-accessory)) or through one of the [no-CLI paths](/v4-2-0/basics/migrations/#running-migrations-without-the-wheels-cli).
 - Built-in middleware for request IDs, security headers, CORS, and rate limiting — wired in `config/settings.cfm`.
 - A reload endpoint (`?reload=true&password=...`) and a health-check surface `kamal-proxy` polls.
 

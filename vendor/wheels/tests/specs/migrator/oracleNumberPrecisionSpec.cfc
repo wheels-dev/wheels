@@ -78,10 +78,9 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("validates as an integer and rejects a fraction", () => {
-				// Only `qty` here: MySQL's t.bigInteger() is BIGINT UNSIGNED, which binds as a
-				// decimal and validates as a float on MySQL (#4121); `total` is checked
-				// on Oracle below.
-				expect(model("OraNumber").$classData().properties.qty.validationtype).toBe("integer");
+				var props = model("OraNumber").$classData().properties;
+				expect(props.qty.validationtype).toBe("integer");
+				expect(props.total.validationtype).toBe("integer");
 				expect(model("OraNumber").new(qty = 3, total = 4).valid()).toBeTrue();
 				expect(model("OraNumber").new(qty = 1.5, total = 4).valid()).toBeFalse();
 			});
@@ -96,7 +95,6 @@ component extends="wheels.WheelsTest" {
 				var props = model("OraNumber").$classData().properties;
 				expect(props.qty.type).toBe("cf_sql_integer");
 				expect(props.total.type).toBe("cf_sql_bigint");
-				expect(props.total.validationtype).toBe("integer");
 			});
 
 			// changeColumn() is how a migration changes a default; it must not re-type the column.

@@ -225,6 +225,42 @@ component extends="wheels.WheelsTest" {
 					expect(m.$isNewNestedCollectionKey(collectionKey = "1696262400000", value = {})).toBeTrue()
 				})
 
+				it("reads SMALLINT and TINYINT keys against the adapter's range for them (##4087)", () => {
+					var m = g.model("postWithTagCheckboxes")
+					var adapterName = g.get("adapterName")
+					// The range a key can be stored in and bound with. SQL Server's SMALLINT is
+					// signed and its TINYINT unsigned; MySQL columns may be either, so MySQL takes
+					// both ranges; the other adapters use the signed ranges. Outside the range a
+					// key cannot be an existing row, and binding it throws on Adobe.
+					var small = {type = "cf_sql_smallint", min = "-32768", below = "-32769", max = "32767", above = "32768"}
+					var tiny = {type = "cf_sql_tinyint", min = "-128", below = "-129", max = "127", above = "128"}
+					if (adapterName == "MicrosoftSQLServerModel") {
+						tiny.min = "0"
+						tiny.below = "-1"
+						tiny.max = "255"
+						tiny.above = "256"
+					} else if (FindNoCase("MySQL", adapterName)) {
+						small.max = "65535"
+						small.above = "65536"
+						tiny.max = "255"
+						tiny.above = "256"
+					}
+					var checks = [small, tiny]
+					for (var c in checks) {
+						expect(m.$integerStringExceedsSqlType(value = c.max, sqlType = c.type)).toBeFalse("#c.type# max #c.max#")
+						expect(m.$integerStringExceedsSqlType(value = c.min, sqlType = c.type)).toBeFalse("#c.type# min #c.min#")
+						expect(m.$integerStringExceedsSqlType(value = c.above, sqlType = c.type)).toBeTrue("#c.type# above #c.above#")
+						expect(m.$integerStringExceedsSqlType(value = c.below, sqlType = c.type)).toBeTrue("#c.type# below #c.below#")
+						expect(m.$integerStringExceedsSqlType(value = "1696262400000", sqlType = c.type)).toBeTrue("#c.type# tick count")
+						expect(m.$integerStringExceedsSqlType(value = "0", sqlType = c.type)).toBeFalse("#c.type# 0")
+					}
+					// The issue's case: 40000 is out of range for a signed SMALLINT key.
+					expect(m.$integerStringExceedsSqlType(value = "40000", sqlType = "cf_sql_smallint")).toBe(small.max == "32767")
+					// INTEGER and BIGINT keep their ranges.
+					expect(m.$integerStringExceedsSqlType(value = "2147483647", sqlType = "cf_sql_integer")).toBeFalse()
+					expect(m.$integerStringExceedsSqlType(value = "2147483648", sqlType = "cf_sql_integer")).toBeTrue()
+				})
+
 			})
 
 			describe("key comparison", () => {

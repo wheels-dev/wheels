@@ -68,7 +68,7 @@
 			case "H2":
 				return "BIGINT"
 			case "MySQL":
-				return "BIGINT UNSIGNED"
+				return "BIGINT"
 			default:
 				return "`addbiginteger()` not supported for " & migration.adapter.adapterName()
 		}

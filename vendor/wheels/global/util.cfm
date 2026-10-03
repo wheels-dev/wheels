@@ -227,27 +227,15 @@
 	// ======================================================================
 
 	/**
-	 * The platform's native path separator. Prefers java.io.File.separator (JVM); falls
-	 * back to the OS name when no JVM is present (the JVM-free RustCFML); defaults to the
-	 * POSIX "/". NEVER inferred from seeing a backslash in a path — a backslash is a legal
-	 * filename byte on POSIX, not evidence of a Windows separator. Used by path-containment
-	 * normalisation so it folds only real native separators.
+	 * The platform's native path separator, for path-containment normalisation (folds only
+	 * real native separators, never a backslash seen in a POSIX filename). This Global mixin
+	 * is reachable from mixed-in code (tags.cfm, Public.cfc); it delegates to
+	 * wheels.PathGuard.$nativeSeparator() so the detection lives in exactly one place rather
+	 * than being duplicated here. (PathGuard is a standalone component with no Global mixins,
+	 * so the dependency only goes this direction.)
 	 */
 	public string function $nativePathSeparator() {
-		try {
-			local.sep = CreateObject("java", "java.io.File").separator;
-			if (local.sep == "\" || local.sep == "/") {
-				return local.sep;
-			}
-		} catch (any e) {
-		}
-		try {
-			if (StructKeyExists(server, "os") && StructKeyExists(server.os, "name") && FindNoCase("windows", server.os.name)) {
-				return "\";
-			}
-		} catch (any e) {
-		}
-		return "/";
+		return new wheels.PathGuard().$nativeSeparator();
 	}
 
 	/**
