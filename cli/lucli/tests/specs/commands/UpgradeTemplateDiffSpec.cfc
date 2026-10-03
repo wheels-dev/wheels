@@ -38,8 +38,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(variables.moduleSource).toInclude("compare(fileRead(userPath), fileRead(templatePath))");
 			});
 
-			it("names the Adobe teardown hardening in the fix message", () => {
-				expect(variables.moduleSource).toInclude("Adobe teardown crashes");
+			it("points the fix message at the upgrade guide for the target version (##4154)", () => {
+				expect(variables.moduleSource).toInclude("The upgrade guide for your target version lists what changed in these files");
+				expect(variables.moduleSource).toInclude("new services.GuidesLink().link(""upgrading/"", arguments.target)");
+				expect(variables.moduleSource).notToInclude("Adobe teardown crashes");
 			});
 
 		});

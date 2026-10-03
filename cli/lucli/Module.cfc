@@ -7983,10 +7983,24 @@ component extends="modules.BaseModule" {
 		// gate never passes without having scanned anything.
 		var target = $upgradeResolveTargetVersion(arguments.targetVersion, jsonMode, arguments.strict);
 
+		// The checks below come from this CLI: its bundled app template and the
+		// rules it ships with. A CLI older than --to can't know what a newer
+		// release changed, so say so instead of a clean report (#4154). A
+		// warning only: it never changes the exit code.
+		var cliVersion = $displayVersion();
+		var cliBehind = $upgradeCliBehindTarget(cliVersion, target);
+		var cliWarning = cliBehind
+			? "This CLI is #cliVersion#; its checks and app template only know releases up to #cliVersion#, so this report can miss what #target# changed. Upgrade the CLI first (brew upgrade wheels, scoop update wheels, or your apt/yum package) and run the check again."
+			: "";
+
 		if (!jsonMode) {
 			out("Current version: #currentVersion#", "bold");
 			out("Target version:  #target#", "bold");
 			out("");
+			if (cliBehind) {
+				out(cliWarning, "yellow");
+				out("");
+			}
 		}
 
 		// Compare major versions
@@ -8002,7 +8016,7 @@ component extends="modules.BaseModule" {
 			out("");
 		}
 
-		var checks = $upgradeBuildChecks(currentMajor, targetMajor);
+		var checks = $upgradeBuildChecks(currentMajor, targetMajor, target);
 
 		// Run checks. Matched checks land in `issues` (severity=breaking) or
 		// `advisories` (severity=advisory); unmatched land in `passed`.
@@ -8035,7 +8049,10 @@ component extends="modules.BaseModule" {
 				"breaking": issues,
 				"advisories": advisories,
 				"passed": passed,
-				"guide": guideUrl
+				"guide": guideUrl,
+				"cliVersion": cliVersion,
+				"cliBehindTarget": cliBehind,
+				"warnings": cliBehind ? [cliWarning] : []
 			}));
 		} else {
 			$upgradePrintReport(issues, advisories, passed, guideUrl, targetMajor);
@@ -8194,7 +8211,27 @@ component extends="modules.BaseModule" {
 	 * version pair. Each entry may set `severity` to "breaking" (default,
 	 * gated by major-version-bump scenarios) or "advisory" (runs regardless).
 	 */
-	private array function $upgradeBuildChecks(required numeric currentMajor, required numeric targetMajor) {
+	/**
+	 * True when this CLI's own version is older than the target (#4154), so its
+	 * checks and bundled template can't know what the target release changed.
+	 * Compares MAJOR.MINOR.PATCH only (a `-dev` or snapshot suffix doesn't
+	 * matter). An unstamped development build (major 0) or an unparseable
+	 * version is treated as unknown: no warning. Public for specs.
+	 */
+	public boolean function $upgradeCliBehindTarget(required string cliVersion, required string target) {
+		var semver = new services.SemVer();
+		try {
+			var cliBase = semver.format(semver.parse(arguments.cliVersion));
+			if (val(listFirst(cliBase, ".")) == 0) {
+				return false;
+			}
+			return semver.compare(cliBase, semver.format(semver.parse(arguments.target))) < 0;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	private array function $upgradeBuildChecks(required numeric currentMajor, required numeric targetMajor, string target = "") {
 		var checks = [];
 
 		// 2.x -> 3.x
@@ -8513,15 +8550,16 @@ component extends="modules.BaseModule" {
 		// public/index.cfm against the CLI's bundled app template. Always-on
 		// (not major-gated): the current release's template changes must be
 		// visible to patch/minor upgraders too, not just 3.x → 4.x jumpers.
-		// Most recently the Adobe teardown guards (##3379). Advisory because
-		// customized apps legitimately drift — the point is to surface the
-		// diff, not to demand a byte-for-byte match.
+		// What changed is release-specific, so the fix points at the upgrade
+		// guides for the target version (#4154). Advisory because customized
+		// apps legitimately drift — the point is to surface the diff, not to
+		// demand a byte-for-byte match.
 		arrayAppend(checks, {
 			description: "App template drift — public/Application.cfc or public/index.cfm differs from the bundled template",
 			checkType: "templateDiff",
 			severity: "advisory",
 			files: ["public/Application.cfc", "public/index.cfm"],
-			fix: "Diff these files against the CLI's bundled template and reconcile. The current release hardens public/Application.cfc's onError/onSessionEnd/onApplicationEnd against Adobe teardown crashes (##3379) — keep your local customizations (this.name, mappings, env loading) while adopting the framework changes."
+			fix: "Diff these files against the CLI's bundled template and reconcile: keep your local customizations (this.name, mappings, env loading) while adopting the framework changes. The upgrade guide for your target version lists what changed in these files: " & new services.GuidesLink().link("upgrading/", arguments.target)
 		});
 
 		return checks;
@@ -8648,10 +8686,10 @@ component extends="modules.BaseModule" {
 		} else if (arguments.check.checkType == "templateDiff") {
 			// Compare app-owned template files against the CLI's bundled app
 			// template (the same source `wheels new` scaffolds from). Drift
-			// means the app may be missing framework-side hardening that
-			// shipped in the target release — most recently the Adobe
-			// teardown guards in public/Application.cfc (##3379). Advisory:
-			// customized apps legitimately drift; reconcile, never overwrite.
+			// means the app may be missing framework-side changes that
+			// shipped in the target release (the check's fix names the upgrade
+			// guide that lists them). Advisory: customized apps legitimately
+			// drift; reconcile, never overwrite.
 			var driftFiles = [];
 			for (var relFile in arguments.check.files) {
 				var templatePath = variables.moduleRoot & "templates/app/" & relFile;
