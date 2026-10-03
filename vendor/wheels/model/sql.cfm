@@ -979,9 +979,6 @@
 	}
 
 	/**
-	 * Internal function.
-	 */
-	/**
 	 * Replace every single-quoted string literal in a WHERE string with a
 	 * masked placeholder whose content is a sentinel prefix plus the literal's
 	 * hex-encoded, un-escaped value. Masked literals contain no quote, comma
@@ -1382,6 +1379,9 @@
 		return arguments.idx == 2 || !ReFind("[A-Za-z0-9_$]", Mid(arguments.sql, arguments.idx - 2, 1));
 	}
 
+	/**
+	 * Internal function.
+	 */
 	public array function $whereClause(required string where, string include = "", boolean includeSoftDeletes = "false", sql = "", boolean softDelete = "true", useIndex = {}) {
 		arguments.where = $maskWhereLiterals(arguments.where);
 		local.rv = [];
@@ -1967,9 +1967,6 @@
 
 	/**
 	 * Internal function.
-	 */
-	/**
-	 * Internal function.
 	 * Whether an association contributes an INNER JOIN.
 	 *
 	 * Reads the association's declared `joinType` — the same value `$expandedAssociations`
@@ -1988,6 +1985,9 @@
 		return FindNoCase("INNER", arguments.join) > 0;
 	}
 
+	/**
+	 * Internal function.
+	 */
 	public array function $expandedAssociations(required string include, boolean includeSoftDeletes = "false") {
 		local.rv = [];
 
