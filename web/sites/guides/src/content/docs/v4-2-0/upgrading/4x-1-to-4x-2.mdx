@@ -24,7 +24,7 @@ Upgrade the CLI first (step 1 below), then run `wheels upgrade check --to=4.2.0`
 
 3. **Install 4.2.x.** Extract the 4.2 `vendor/wheels/` in its place (or `git checkout` the tag if you vendor the framework).
 
-4. **Restart the server and run your suite.** Use `wheels stop` then `wheels start`, and `/wheels/app/tests`. Then apply the edits below, and restart again after them: `?reload=true` rebuilds the application but doesn't recompile changed `app/events/*.cfm` or `public/Application.cfc` files on a running dev server.
+4. **Restart the server and run your suite.** Use `wheels stop` then `wheels start`, and `/wheels/app/tests`. The suite now runs against a separate `<datasource>_test` datasource and refuses to run without one; see [App tests use the test database](#app-tests-use-the-test-database-and-test-application). Then apply the edits below, and restart again after them: `?reload=true` rebuilds the application but doesn't recompile changed `app/events/*.cfm` or `public/Application.cfc` files on a running dev server.
 
 </Steps>
 
@@ -140,6 +140,19 @@ These need no file edits, but code that relied on the old behaviour changes.
 ### App tests use the test database and test application
 
 `/wheels/app/tests` and `wheels test` now default to the `<datasource>_test` datasource. If it doesn't exist, they refuse to run rather than using your primary datasource. Create it, or run against the primary datasource on purpose with `wheels test --no-test-db` (URL: `useTestDB=false`). Specs run in a separate test application (`<app name>_wheelsTest`), which needs `WHEELS_ENV` set to `development` or `testing`.
+
+For a SQLite app, `wheels new` already adds the test datasource to `config/app.cfm`, next to the main one:
+
+```cfm title="config/app.cfm"
+this.datasources["myapp_test"] = {
+	class: "org.sqlite.JDBC",
+	connectionString: "jdbc:sqlite:" & expandPath("../db/test.sqlite")
+};
+```
+
+For another database, add a `myapp_test` entry with the same settings as `myapp`, pointing at a separate, empty database. The `tests/populate.cfm` that `wheels new` creates runs your migrations against it before each run.
+
+A CLI too old to send `useTestDB=false` can still run the suite against the primary datasource with `set(allowTestsAgainstPrimaryDatasource=true)` in `config/settings.cfm`. Specs then write to that database, and each run logs a warning to `wheels.log`. The setting only applies when the request has no `useTestDB` parameter: `wheels test`, which sends `useTestDB=true`, still requires `<datasource>_test`.
 
 HTTP requests your specs make reach that same test application, so they see the same datasource as the spec code, when they come from:
 - `$testClient()`;
