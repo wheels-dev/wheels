@@ -103,6 +103,23 @@ component extends="wheels.WheelsTest" {
 				expect(result.other).toBeFalse();
 			});
 
+			it("parses hosts without java.net.URI the same way on every engine", () => {
+				var c = new wheels.wheelstest.TestClient(baseUrl = "http://127.0.0.1", testContext = false);
+				for (var row in $hostCorpus()) {
+					expect(c.$lexicalUrlHost(row.input)).toBe(row.host, "lexical host of [#row.input#]");
+				}
+			});
+
+			it("agrees with java.net.URI wherever the JVM provides it", () => {
+				var c = new wheels.wheelstest.TestClient(baseUrl = "http://127.0.0.1", testContext = false);
+				if (!c.$uriAvailable()) {
+					skip("java.net.URI is not available on this engine; the lexical parser is the only path");
+				}
+				for (var row in $hostCorpus()) {
+					expect(c.$urlHost(row.input)).toBe(row.host, "URI host of [#row.input#]");
+				}
+			});
+
 			it("currentRequestIsIsolated() reflects the current application and environment", () => {
 				var ctx = new wheels.events.TestContext();
 				var expected = $isolated() && ListFindNoCase("development,testing", application.wheels.environment) > 0;
@@ -111,6 +128,38 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+	}
+
+	/** Host-rule corpus: each input with the host both parsers must return ("" = refused). */
+	private array function $hostCorpus() {
+		return [
+			{input = "http://localhost:8080/x", host = "localhost"},
+			{input = "http://LOCALHOST", host = "localhost"},
+			{input = "http://127.0.0.1", host = "127.0.0.1"},
+			{input = "https://127.1.2.3:60007", host = "127.1.2.3"},
+			{input = "http://[::1]:8080/", host = "[::1]"},
+			{input = "http://user:pw@localhost:8080/", host = "localhost"},
+			{input = "https://external-service.example", host = "external-service.example"},
+			{input = "http://localhost.example.com", host = "localhost.example.com"},
+			{input = "http://127.0.0.1.example.com", host = "127.0.0.1.example.com"},
+			{input = "http://example.com/localhost", host = "example.com"},
+			{input = "http://example.com/?host=127.0.0.1", host = "example.com"},
+			{input = "http://example.com##@localhost", host = "example.com"},
+			{input = "http://localhost@example.com", host = "example.com"},
+			{input = "http://127.0.0.256", host = ""},
+			{input = "http://1234", host = ""},
+			{input = "http://example.123", host = ""},
+			{input = "http://a..b", host = ""},
+			{input = "http://localhost\@example.com", host = ""},
+			{input = "http://127.0.0.1%2e.example.com", host = ""},
+			{input = "http://local" & Chr(9) & "host", host = ""},
+			{input = "ftp://localhost", host = ""},
+			{input = "http://localhost:80a/", host = ""},
+			{input = "http://[::1", host = ""},
+			{input = "http://", host = ""},
+			{input = "not a url", host = ""},
+			{input = "", host = ""}
+		];
 	}
 
 	private boolean function $isolated() {

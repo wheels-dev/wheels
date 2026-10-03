@@ -93,8 +93,19 @@ component {
 		return false;
 	}
 
-	/** The lower-cased host of an absolute URL, or "" when it has none or does not parse. */
-	private string function $urlHost(required string target) {
+	/**
+	 * The lower-cased host of an absolute http(s) URL, or "" when it has none or
+	 * is not one. Parsed with java.net.URI where the engine provides it, and
+	 * with $lexicalUrlHost() otherwise (an engine without a JVM). Both paths
+	 * first refuse anything $lexicalUrlHost() refuses: another scheme, or an
+	 * authority holding a backslash, whitespace, '%' or a control character.
+	 * Public for specs.
+	 */
+	public string function $urlHost(required string target) {
+		var lexical = $lexicalUrlHost(arguments.target);
+		if (!Len(lexical) || !$uriAvailable()) {
+			return lexical;
+		}
 		var state = {host = ""};
 		try {
 			state.parsed = CreateObject("java", "java.net.URI").init(Trim(arguments.target)).getHost();
@@ -105,6 +116,127 @@ component {
 			// Not a parseable absolute URL: no host.
 		}
 		return state.host;
+	}
+
+	/** True when java.net.URI can be created and parses a known URL. Public for specs. */
+	public boolean function $uriAvailable() {
+		var state = {ok = false};
+		try {
+			state.probe = CreateObject("java", "java.net.URI").init("http://localhost:1/").getHost();
+			state.ok = !IsNull(state.probe) && Compare(state.probe, "localhost") == 0;
+		} catch (any e) {
+			// No JVM: java.net.URI is not available.
+		}
+		return state.ok;
+	}
+
+	/**
+	 * The lower-cased host of an absolute http(s) URL, parsed without
+	 * java.net.URI, or "" when it has none or is not one. The authority runs from
+	 * '://' to the first '/', '?' or '#'; anything up to its LAST '@' is user
+	 * information; a port must be digits; an IPv6 host keeps its brackets. An
+	 * authority holding a backslash, whitespace, '%' or a control character is
+	 * refused outright. Public for specs.
+	 */
+	public string function $lexicalUrlHost(required string target) {
+		var raw = Trim(arguments.target);
+		if (REFindNoCase("^https?://", raw) != 1) {
+			return "";
+		}
+		var rest = Mid(raw, Find("://", raw) + 3, Len(raw));
+		var cutAt = REFind("[/?##]", rest);
+		var authority = rest;
+		if (cutAt == 1) {
+			return "";
+		} else if (cutAt > 1) {
+			authority = Left(rest, cutAt - 1);
+		}
+		if (!Len(authority) || !$isPlainAuthority(authority)) {
+			return "";
+		}
+		var hostPort = authority;
+		var atFromEnd = Find("@", Reverse(authority));
+		if (atFromEnd > 0) {
+			hostPort = Mid(authority, Len(authority) - atFromEnd + 2, Len(authority));
+		}
+		var host = "";
+		var port = "";
+		if (Left(hostPort, 1) == "[") {
+			var closeAt = Find("]", hostPort);
+			if (closeAt < 3) {
+				return "";
+			}
+			host = Left(hostPort, closeAt);
+			var afterHost = Mid(hostPort, closeAt + 1, Len(hostPort));
+			if (Len(afterHost) && (Left(afterHost, 1) != ":")) {
+				return "";
+			}
+			port = Len(afterHost) ? Mid(afterHost, 2, Len(afterHost)) : "";
+			if (!REFind("^\[[0-9A-Fa-f:.]+\]$", host)) {
+				return "";
+			}
+		} else {
+			var colonAt = Find(":", hostPort);
+			if (colonAt == 0) {
+				host = hostPort;
+			} else {
+				host = colonAt > 1 ? Left(hostPort, colonAt - 1) : "";
+				port = Mid(hostPort, colonAt + 1, Len(hostPort));
+			}
+			if (!$isHostName(host)) {
+				return "";
+			}
+		}
+		if (Len(port) && !REFind("^[0-9]{1,5}$", port)) {
+			return "";
+		}
+		return LCase(host);
+	}
+
+	/**
+	 * A host name or IPv4 address in the RFC 2396 sense java.net.URI applies:
+	 * either four dot-separated numbers of 0-255, or dot-separated labels of
+	 * letters, digits and inner hyphens whose last label starts with a letter.
+	 */
+	private boolean function $isHostName(required string host) {
+		var labels = ListToArray(arguments.host, ".", true);
+		if (!ArrayLen(labels)) {
+			return false;
+		}
+		var allNumeric = true;
+		for (var label in labels) {
+			if (!REFind("^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$", label)) {
+				return false;
+			}
+			if (!REFind("^[0-9]+$", label)) {
+				allNumeric = false;
+			}
+		}
+		if (allNumeric) {
+			if (ArrayLen(labels) != 4) {
+				return false;
+			}
+			for (var octet in labels) {
+				if (Len(octet) > 3 || Val(octet) > 255) {
+					return false;
+				}
+			}
+			return true;
+		}
+		return REFind("^[A-Za-z]", labels[ArrayLen(labels)]) == 1;
+	}
+
+	/** False when the authority holds a backslash, whitespace, '%' or a control character. */
+	private boolean function $isPlainAuthority(required string authority) {
+		var i = 0;
+		for (i = 1; i <= Len(arguments.authority); i++) {
+			var ch = Mid(arguments.authority, i, 1);
+			var code = Asc(ch);
+			if (code <= 32 || code == 127 || ch == "\" || ch == "%") {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private boolean function $isLoopbackIPv4(required string host) {
