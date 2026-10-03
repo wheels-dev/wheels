@@ -629,6 +629,11 @@ component extends="wheels.migrator.Base" {
 		) {
 			return arguments.expectedMigType;
 		}
+		// SQLite INTEGER is typed cf_sql_bigint by the model (64-bit storage, #4142), so the
+		// model side reads "biginteger" for a column the probe reports as "integer".
+		if ($getDBType() == "sqlite" && arguments.actualMigType == "integer" && arguments.expectedMigType == "biginteger") {
+			return arguments.expectedMigType;
+		}
 		return arguments.actualMigType;
 	}
 
