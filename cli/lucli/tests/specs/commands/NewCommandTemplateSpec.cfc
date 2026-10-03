@@ -153,10 +153,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(block).notToInclude("{project}");
 			});
 
-			it("links the template's comments to the current (v4-1-0) guides", () => {
+			it("links the template's comments to the current (v4-2-0) guides", () => {
 				var stale = [];
 				for (var path in directoryList(templateRoot, true, "path", "*.cfm|*.md|*.cfc")) {
-					if (findNoCase("guides.wheels.dev/v4-0-0/", fileRead(path))) {
+					var content = fileRead(path);
+					if (findNoCase("guides.wheels.dev/v4-0-0/", content) || findNoCase("guides.wheels.dev/v4-1-0/", content)) {
 						arrayAppend(stale, replace(path, templateRoot, ""));
 					}
 				}

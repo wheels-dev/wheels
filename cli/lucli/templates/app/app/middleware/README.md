@@ -21,4 +21,4 @@ component implements="wheels.middleware.MiddlewareInterface" {
 
 Register it in `config/settings.cfm` (all requests) or on a route scope (one subtree). A component registered by CFC path, such as `"app.middleware.RequestTimer"`, needs an `init()` that returns `this`.
 
-See [Middleware Pipeline](https://guides.wheels.dev/v4-1-0/core-concepts/middleware-pipeline/) in the guides for registration, ordering and the built-in components.
+See [Middleware Pipeline](https://guides.wheels.dev/v4-2-0/core-concepts/middleware-pipeline/) in the guides for registration, ordering and the built-in components.
