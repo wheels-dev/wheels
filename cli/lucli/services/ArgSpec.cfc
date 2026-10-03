@@ -424,34 +424,6 @@ component {
 	}
 
 	/**
-	 * Emit a JSON-Schema-compatible input schema describing this spec.
-	 *
-	 * The auto-discovered MCP tools in Module.cfc currently advertise empty
-	 * `properties` so clients can't discover parameters (#2963). Per the
-	 * cross-framework research (FastMCP, MCP TypeScript SDK, Symfony
-	 * JsonDescriptor): derive the schema from the same typed declaration
-	 * the command already uses. One source of truth, no hand-written drift.
-	 *
-	 * Result shape (matches MCP `tools/list[].inputSchema`):
-	 *
-	 *     {
-	 *       "type": "object",
-	 *       "properties": {
-	 *         "appName":    {"type": "string",  "description": "...", "default": ""},
-	 *         "sqlite":     {"type": "boolean", "description": "...", "default": true},
-	 *         "datasource": {"type": "string",  "description": "...", "default": ""}
-	 *       },
-	 *       "required": ["appName"],
-	 *       "additionalProperties": false
-	 *     }
-	 *
-	 * Type mapping follows CFML/ArgSpec coercion: positional/option strings
-	 * become JSON Schema "string"; numeric-typed options become "number";
-	 * flags become "boolean". `additionalProperties: false` matches the
-	 * mcpHiddenTools surface convention — unknown keys are rejected at the
-	 * MCP client.
-	 */
-	/**
 	 * The options section of `wheels <cmd> --help` (issue 3962): one entry per
 	 * positional and named option, in declaration order, with its description,
 	 * accepted values and default, wrapped to `width` columns. Keys added with
@@ -527,6 +499,34 @@ component {
 		}
 	}
 
+	/**
+	 * Emit a JSON-Schema-compatible input schema describing this spec.
+	 *
+	 * The auto-discovered MCP tools in Module.cfc currently advertise empty
+	 * `properties` so clients can't discover parameters (#2963). Per the
+	 * cross-framework research (FastMCP, MCP TypeScript SDK, Symfony
+	 * JsonDescriptor): derive the schema from the same typed declaration
+	 * the command already uses. One source of truth, no hand-written drift.
+	 *
+	 * Result shape (matches MCP `tools/list[].inputSchema`):
+	 *
+	 *     {
+	 *       "type": "object",
+	 *       "properties": {
+	 *         "appName":    {"type": "string",  "description": "...", "default": ""},
+	 *         "sqlite":     {"type": "boolean", "description": "...", "default": true},
+	 *         "datasource": {"type": "string",  "description": "...", "default": ""}
+	 *       },
+	 *       "required": ["appName"],
+	 *       "additionalProperties": false
+	 *     }
+	 *
+	 * Type mapping follows CFML/ArgSpec coercion: positional/option strings
+	 * become JSON Schema "string"; numeric-typed options become "number";
+	 * flags become "boolean". `additionalProperties: false` matches the
+	 * mcpHiddenTools surface convention — unknown keys are rejected at the
+	 * MCP client.
+	 */
 	public struct function toInputSchema() {
 		var properties = {};
 		var required = [];
