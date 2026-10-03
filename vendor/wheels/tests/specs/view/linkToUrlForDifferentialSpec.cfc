@@ -87,7 +87,14 @@ component extends="wheels.WheelsTest" {
 				// URLFor called with $argsResolved=true (linkTo's path, skipping the generic $args)
 				// must produce byte-identical output to $argsResolved=false (the full $args path),
 				// because the else-branch still applies application.wheels.functions.URLFor.
-				var probe = (resolved) => c.URLFor(controller = "posts", action = "index", params = "q=a b&x=y", encode = true, "$argsResolved" = resolved);
+				// Pass the $-prefixed sentinel via argumentCollection: a quoted named argument
+				// ("$argsResolved" = x) in a direct call is a compile error on Adobe 2023
+				// (MissingNameException), though Lucee/BoxLang/Adobe 2025 accept it.
+				var probe = (resolved) => {
+					var pArgs = {controller = "posts", action = "index", params = "q=a b&x=y", encode = true};
+					pArgs["$argsResolved"] = resolved;
+					return c.URLFor(argumentCollection = pArgs);
+				};
 				expect(probe(true)).toBe(probe(false), "de-dup changed URLFor output");
 
 				// Same equivalence with an app-level override on a framework default (no signature
