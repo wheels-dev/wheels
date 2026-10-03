@@ -998,6 +998,155 @@
 		if (Find("'", arguments.where) == 0) {
 			return arguments.where;
 		}
+		// Path selection is by CAPABILITY, not engine name. On a JVM-backed engine Mid()/Find()
+		// index in O(1), so the single-pass index scan ($maskWhereLiteralsByScan) is linear AND
+		// carries a much lower constant factor than building a per-character array — measured
+		// ~3x faster on finderValueBindingSpec. The char-array path only helps a JVM-free runtime
+		// (RustCFML), where Mid()/Find() are O(index) and a per-index scan is O(n^2) (#3903). The
+		// engine adapter probes the capability (stringIndexIsLinear) once per application.
+		if ($engineAdapter().stringIndexIsLinear()) {
+			return $maskWhereLiteralsByScan(arguments.where);
+		}
+		// JVM-free runtime: read the string into a one-pass char array (REMatch) and walk it with
+		// O(1) indexing. REMatch("[\s\S]") is NOT lossless on every engine (BoxLang drops
+		// whitespace matches), so take the char-array path ONLY when the array rejoins to the
+		// exact input. The test is CONTENT, not length: a JVM engine returns a supplementary
+		// character as ONE code-point match while Len() counts two UTF-16 units, so a length
+		// check would needlessly reject a faithful array. If the array is not faithful, fall back
+		// to the scan — correct on every engine (any future JVM-free engine with an unfaithful
+		// REMatch still degrades safely, just not linearly).
+		local.chars = REMatch("[\s\S]", arguments.where);
+		if (Compare(ArrayToList(local.chars, ""), arguments.where) == 0) {
+			return $maskWhereLiteralsFromChars(local.chars);
+		}
+		return $maskWhereLiteralsByScan(arguments.where);
+	}
+
+	/**
+	 * Fast path for $maskWhereLiterals: a forward single pass over `chars`, a one-indexed
+	 * array of the input's characters that the caller has verified rejoins to the input.
+	 * Output and each literal value accumulate in CFML arrays (ArrayAppend O(1) on every
+	 * engine), joined once. Avoids three primitives that are O(n) on RustCFML and would
+	 * make this O(n^2): Mid()/Find() by index, java StringBuilder.append (O(length) there),
+	 * and ArraySlice (O(start) there). Must stay byte-identical to $maskWhereLiteralsByScan.
+	 */
+	public string function $maskWhereLiteralsFromChars(required array chars) {
+		local.sentinel = $whereLiteralSentinel();
+		local.out = [];
+		local.chars = arguments.chars;
+		local.n = ArrayLen(local.chars);
+		local.i = 1;
+		while (local.i <= local.n) {
+			local.ch = local.chars[local.i];
+			// A CFML date interpolated into the string renders as an ODBC escape,
+			// {ts '2020-01-01 00:00:00'} (or {d '...'} / {t '...'}), either bare or
+			// inside a quoted literal. Its inner quotes would otherwise end the
+			// surrounding literal early. Only the exact form with a date/time value
+			// (digits, - : . and spaces) is recognised; it is masked as one literal
+			// holding the inner value. The escape always opens with a brace ("{" bare,
+			// or "'{" quoted), so the matcher is only consulted at a brace — a plain
+			// quote never pays for it, which keeps a long run of quotes linear.
+			if (local.ch == "{" || (local.ch == "'" && local.i < local.n && local.chars[local.i + 1] == "{")) {
+				// Build the <=60-char lookahead window inline. Passing the (potentially
+				// very large) char array to a helper copies it by value on every call on
+				// Adobe CF — ArgumentCollection deep-copies array arguments (cross-engine
+				// invariant #6) — so a call at every brace turns the whole scan O(n^2)
+				// (measured: a maskGrowth probe burned >400s of CPU and never returned on
+				// Adobe 2023, while staying linear on Lucee/BoxLang/RustCFML). Reading
+				// local.chars[k] directly is O(1) per element on every engine, so the
+				// window stays O(60) regardless of how many braces the value holds.
+				local.windowChars = [];
+				local.windowStop = Min(local.i + 59, local.n);
+				local.w = local.i;
+				while (local.w <= local.windowStop) {
+					ArrayAppend(local.windowChars, local.chars[local.w]);
+					local.w += 1;
+				}
+				local.window = ArrayToList(local.windowChars, "");
+				// The matcher reads a <=60-char window (start 1), so matching is O(1)
+				// in the string length, not O(index).
+				local.odbc = $matchOdbcDateLiteral(local.window, 1, local.ch == "'");
+				if (local.odbc.matched) {
+					ArrayAppend(local.out, "'");
+					ArrayAppend(local.out, local.sentinel);
+					// The escape kind rides in front of the hex ("ts:", "d:", "t:"), so a
+					// position that isn't bound can write the escape back (see
+					// $restoreMaskedLiterals); a bound position takes the plain value.
+					ArrayAppend(local.out, local.odbc.kind & ":");
+					ArrayAppend(local.out, LCase(BinaryEncode(CharsetDecode(local.odbc.value, "utf-8"), "hex")));
+					ArrayAppend(local.out, "'");
+					local.i += local.odbc.length;
+					continue;
+				}
+			}
+			if (local.ch != "'") {
+				// Ordinary text (including a brace that doesn't start an ODBC date).
+				ArrayAppend(local.out, local.ch);
+				local.i += 1;
+				continue;
+			}
+			// A string literal: consume to its closing quote, treating a doubled
+			// quote ('') as one escaped quote that stays in the value.
+			local.value = [];
+			local.i += 1;
+			local.closed = false;
+			while (local.i <= local.n) {
+				if (local.chars[local.i] != "'") {
+					ArrayAppend(local.value, local.chars[local.i]);
+					local.i += 1;
+				} else if (local.i < local.n && local.chars[local.i + 1] == "'") {
+					ArrayAppend(local.value, "'");
+					local.i += 2;
+				} else {
+					local.i += 1;
+					local.closed = true;
+					break;
+				}
+			}
+			if (!local.closed) {
+				Throw(
+					type = "Wheels.InvalidWhereClause",
+					message = "The where clause contains an unbalanced quote.",
+					extendedInfo = "A string literal in the `where` argument was opened with a single quote that is never closed. Escape a literal quote by doubling it ('')."
+				);
+			}
+			local.literalValue = ArrayToList(local.value, "");
+			// The IN-list binder joins decoded elements with Chr(7); a value
+			// carrying Chr(7) (or the Chr(2) sentinel) would re-split or be
+			// mis-decoded, so reject those control characters outright — they
+			// are never part of legitimate SQL string data (GHSA-96rm).
+			if (Find(Chr(7), local.literalValue) > 0 || Find(Chr(2), local.literalValue) > 0) {
+				Throw(
+					type = "Wheels.InvalidWhereClause",
+					message = "A where-clause value contains a control character that cannot be bound safely.",
+					extendedInfo = "Remove the Chr(2)/Chr(7) control character from the value, or bind it through a parameter."
+				);
+			}
+			if (!Len(local.literalValue)) {
+				// An empty string literal carries nothing to mask; leaving it as
+				// `''` keeps the runner's existing empty-string / NULL handling.
+				ArrayAppend(local.out, "''");
+			} else {
+				ArrayAppend(local.out, "'");
+				ArrayAppend(local.out, local.sentinel);
+				ArrayAppend(local.out, LCase(BinaryEncode(CharsetDecode(local.literalValue, "utf-8"), "hex")));
+				ArrayAppend(local.out, "'");
+			}
+		}
+		return ArrayToList(local.out, "");
+	}
+
+	/**
+	 * Fallback for $maskWhereLiterals when the char array is not faithful to the input
+	 * (e.g. BoxLang, whose REMatch("[\s\S]") drops whitespace matches). The develop
+	 * Find-jump scan: correct on every engine and linear on the JVM engines that take
+	 * this path (Mid()/Find() are O(1) there). Must stay byte-identical to
+	 * $maskWhereLiteralsFromChars.
+	 */
+	public string function $maskWhereLiteralsByScan(required string where) {
+		if (Find("'", arguments.where) == 0) {
+			return arguments.where;
+		}
 		local.sentinel = $whereLiteralSentinel();
 		local.out = CreateObject("java", "java.lang.StringBuilder").init();
 		local.n = Len(arguments.where);
