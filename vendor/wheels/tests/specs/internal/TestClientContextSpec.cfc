@@ -45,6 +45,64 @@ component extends="wheels.WheelsTest" {
 				);
 			});
 
+			it("sends neither the header nor the cookie to a host other than the test server", () => {
+				if (!$isolated()) {
+					skip("this run is not in the isolated test application (set WHEELS_ENV to development or testing)");
+				}
+				var ctx = new wheels.events.TestContext();
+				// No request is made: the defaults are inspected right after init().
+				var external = new wheels.tests._assets.wheelstest.InspectableTestClient(baseUrl = "https://external-service.example").capturedDefaults();
+				expect(StructKeyExists(external.headers, ctx.headerName())).toBeFalse("an external baseUrl must not get the test-context header");
+				expect(StructKeyExists(external.cookies, ctx.cookieName())).toBeFalse("an external baseUrl must not get the test-context cookie");
+				// Control: a loopback client in the same run does carry both.
+				var loopback = new wheels.tests._assets.wheelstest.InspectableTestClient(baseUrl = "http://127.0.0.1:8080").capturedDefaults();
+				expect(StructKeyExists(loopback.headers, ctx.headerName())).toBeTrue();
+				expect(StructKeyExists(loopback.cookies, ctx.cookieName())).toBeTrue();
+			});
+
+			it("treats only loopback hosts and the configured test base URL as the test server", () => {
+				var c = new wheels.wheelstest.TestClient(baseUrl = "https://external-service.example", testContext = false);
+				for (var candidate in ["http://localhost:8080/x", "http://LOCALHOST", "http://127.0.0.1", "https://127.1.2.3:60007", "http://[::1]:8080/"]) {
+					expect(c.$isTestHost(candidate)).toBeTrue(candidate);
+				}
+				for (var candidate in [
+					"https://external-service.example",
+					"http://localhost.example.com",
+					"http://127.0.0.1.example.com",
+					"http://example.com/localhost",
+					"http://example.com/?host=127.0.0.1",
+					"http://localhost@example.com",
+					"http://127.0.0.256",
+					"not a url",
+					""
+				]) {
+					expect(c.$isTestHost(candidate)).toBeFalse(candidate);
+				}
+			});
+
+			it("treats the configured testClientBaseUrl host as the test server", () => {
+				var c = new wheels.wheelstest.TestClient(baseUrl = "http://127.0.0.1", testContext = false);
+				var saved = {exists = StructKeyExists(application.wheels, "testClientBaseUrl"), value = ""};
+				if (saved.exists) {
+					saved.value = application.wheels.testClientBaseUrl;
+				}
+				var result = {configured = false, other = true};
+				application.wheels.testClientBaseUrl = "https://myapp.test:8443";
+				try {
+					result.configured = c.$isTestHost("https://myapp.test:8443/users");
+					result.other = c.$isTestHost("https://otherapp.test");
+				} finally {
+					// Restore the setting even if a check throws, so later specs see the original.
+					if (saved.exists) {
+						application.wheels.testClientBaseUrl = saved.value;
+					} else {
+						StructDelete(application.wheels, "testClientBaseUrl");
+					}
+				}
+				expect(result.configured).toBeTrue();
+				expect(result.other).toBeFalse();
+			});
+
 			it("currentRequestIsIsolated() reflects the current application and environment", () => {
 				var ctx = new wheels.events.TestContext();
 				var expected = $isolated() && ListFindNoCase("development,testing", application.wheels.environment) > 0;

@@ -124,10 +124,14 @@ These need no file edits, but code that relied on the old behaviour changes.
 
 HTTP requests your specs make reach that same test application, so they see the same datasource as the spec code, when they come from:
 - `$testClient()`;
-- a `wheels.wheelstest.TestClient` you create inside the spec run;
-- a subclass of `TestClient` whose `init()` calls `super.init()`.
+- a `wheels.wheelstest.TestClient` you create inside the spec run (including in a thread started during the run) whose `baseUrl` points at the test server: a loopback host (`localhost`, `127.x.x.x`, `[::1]`) or the host of a configured `testClientBaseUrl`;
+- a subclass of `TestClient` whose `init()` calls `super.init()`, under the same conditions.
 
-A client created outside a test run, such as in a thread or a script, sends requests to the live application. Create such clients inside the spec, or use `$testClient()`. To address the live application from a spec on purpose, pass `testContext=false` to `$testClient()` or to `new wheels.wheelstest.TestClient()`.
+Some clients send their requests to the live application:
+- a client created outside a test run, such as in a scheduled task or a script;
+- a client pointed at another host.
+
+For a test server on another host name, set `testClientBaseUrl` or use `$testClient()`. To address the live application from a spec on purpose, pass `testContext=false` to `$testClient()` or to `new wheels.wheelstest.TestClient()`.
 
 ### `findAll(returnAs="structs")` returns an array
 

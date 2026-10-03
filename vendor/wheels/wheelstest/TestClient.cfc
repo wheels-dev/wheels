@@ -33,9 +33,10 @@ component {
 	/**
 	 * @baseUrl     Origin the requests go to.
 	 * @testContext Send the test context (header and cookie) with every request
-	 *              when the client is created inside a test-runner request, so
-	 *              the requests reach the same isolated test application as the
-	 *              spec code. Pass false to address the live application.
+	 *              when the client is created inside a test-runner request and
+	 *              baseUrl points at the test server (see $isTestHost()), so the
+	 *              requests reach the same isolated test application as the spec
+	 *              code. Pass false to address the live application.
 	 */
 	public TestClient function init(string baseUrl = "http://localhost:8080", boolean testContext = true) {
 		variables.baseUrl = arguments.baseUrl;
@@ -53,17 +54,100 @@ component {
 	/**
 	 * Adds the test-context header and cookie when this client is created
 	 * inside a test-runner request (the isolated test application, in
-	 * development or testing). A client created anywhere else, such as a thread
-	 * or a script, sends nothing extra.
+	 * development or testing; a thread started during the run is in the same
+	 * application) and baseUrl points at the test server. A client created
+	 * outside a test run, such as in a scheduled task or a script, or one aimed
+	 * at any other host, sends nothing extra.
 	 */
 	private void function $attachTestContext() {
 		var ctx = new wheels.events.TestContext();
-		if (!ctx.currentRequestIsIsolated()) {
+		if (!ctx.currentRequestIsIsolated() || !$isTestHost(variables.baseUrl)) {
 			return;
 		}
 		var testSecret = ctx.testSecret();
 		withHeader(ctx.headerName(), testSecret);
 		withCookie(ctx.cookieName(), testSecret);
+	}
+
+	/**
+	 * True when `target` points at the test server: its host is a loopback address
+	 * (localhost, 127.x.x.x, [::1]) or the host of an explicitly configured test
+	 * base URL (the testClientBaseUrl setting, -Dwheels.testClient.baseUrl, or
+	 * WHEELS_TEST_CLIENT_BASE_URL). Hosts are compared exactly after the URL is
+	 * parsed, with no DNS lookup, so localhost.example.com or
+	 * 127.0.0.1.example.com do not match. Public for specs.
+	 */
+	public boolean function $isTestHost(required string target) {
+		var host = $urlHost(arguments.target);
+		if (!Len(host)) {
+			return false;
+		}
+		if (host == "localhost" || host == "[::1]" || host == "::1" || $isLoopbackIPv4(host)) {
+			return true;
+		}
+		for (var configured in $configuredTestBaseUrls()) {
+			if (Compare($urlHost(configured), host) == 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** The lower-cased host of an absolute URL, or "" when it has none or does not parse. */
+	private string function $urlHost(required string target) {
+		var state = {host = ""};
+		try {
+			state.parsed = CreateObject("java", "java.net.URI").init(Trim(arguments.target)).getHost();
+			if (!IsNull(state.parsed)) {
+				state.host = LCase(state.parsed);
+			}
+		} catch (any e) {
+			// Not a parseable absolute URL: no host.
+		}
+		return state.host;
+	}
+
+	private boolean function $isLoopbackIPv4(required string host) {
+		if (!ReFind("^127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$", arguments.host)) {
+			return false;
+		}
+		for (var octet in ListToArray(arguments.host, ".")) {
+			if (Val(octet) > 255) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** Test base URLs configured outside the request: the Wheels setting, the JVM property and the environment variable. */
+	private array function $configuredTestBaseUrls() {
+		var urls = [];
+		if (
+			StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "testClientBaseUrl")
+			&& IsSimpleValue(application.wheels.testClientBaseUrl)
+			&& Len(application.wheels.testClientBaseUrl)
+		) {
+			ArrayAppend(urls, application.wheels.testClientBaseUrl);
+		}
+		var state = {};
+		try {
+			state.property = CreateObject("java", "java.lang.System").getProperty("wheels.testClient.baseUrl");
+			if (!IsNull(state.property) && Len(state.property)) {
+				ArrayAppend(urls, state.property);
+			}
+		} catch (any e) {
+			// No JVM: no system property.
+		}
+		if (
+			StructKeyExists(server, "system")
+			&& StructKeyExists(server.system, "environment")
+			&& StructKeyExists(server.system.environment, "WHEELS_TEST_CLIENT_BASE_URL")
+			&& Len(server.system.environment.WHEELS_TEST_CLIENT_BASE_URL)
+		) {
+			ArrayAppend(urls, server.system.environment.WHEELS_TEST_CLIENT_BASE_URL);
+		}
+		return urls;
 	}
 
 	// ─── HTTP Methods ────────────────────────────────────────────────
