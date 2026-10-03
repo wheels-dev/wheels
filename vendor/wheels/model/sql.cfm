@@ -998,16 +998,23 @@
 		if (Find("'", arguments.where) == 0) {
 			return arguments.where;
 		}
-		// The fast path reads the string into a one-pass char array (REMatch) and walks
-		// it with O(1) indexing — needed on RustCFML, where Mid()/Find() are O(index) so
-		// the old per-index scan was O(n^2) for a value with a boundary every few
-		// characters (#3903). But REMatch("[\s\S]") is NOT lossless on every engine:
-		// BoxLang drops whitespace matches. So the char-array path is used ONLY when the
-		// array rejoins to the exact input. The test is CONTENT, not length: a JVM engine
-		// returns a supplementary character as ONE code-point match while Len() counts two
-		// UTF-16 units, so a length check would needlessly reject a faithful array. When
-		// the array is not faithful, fall back to the index scan — correct on every engine
-		// and linear on the JVM engines that take it (their Mid() is O(1)).
+		// Path selection is by CAPABILITY, not engine name. On a JVM-backed engine Mid()/Find()
+		// index in O(1), so the single-pass index scan ($maskWhereLiteralsByScan) is linear AND
+		// carries a much lower constant factor than building a per-character array — measured
+		// ~3x faster on finderValueBindingSpec. The char-array path only helps a JVM-free runtime
+		// (RustCFML), where Mid()/Find() are O(index) and a per-index scan is O(n^2) (#3903). The
+		// engine adapter probes the capability (stringIndexIsLinear) once per application.
+		if ($engineAdapter().stringIndexIsLinear()) {
+			return $maskWhereLiteralsByScan(arguments.where);
+		}
+		// JVM-free runtime: read the string into a one-pass char array (REMatch) and walk it with
+		// O(1) indexing. REMatch("[\s\S]") is NOT lossless on every engine (BoxLang drops
+		// whitespace matches), so take the char-array path ONLY when the array rejoins to the
+		// exact input. The test is CONTENT, not length: a JVM engine returns a supplementary
+		// character as ONE code-point match while Len() counts two UTF-16 units, so a length
+		// check would needlessly reject a faithful array. If the array is not faithful, fall back
+		// to the scan — correct on every engine (any future JVM-free engine with an unfaithful
+		// REMatch still degrades safely, just not linearly).
 		local.chars = REMatch("[\s\S]", arguments.where);
 		if (Compare(ArrayToList(local.chars, ""), arguments.where) == 0) {
 			return $maskWhereLiteralsFromChars(local.chars);

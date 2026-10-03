@@ -71,6 +71,28 @@ component output="false" {
 	}
 
 	/**
+	 * Returns true when String indexing — Mid()/Find() by position — is O(1), as it is on
+	 * any JVM-backed engine (java.lang.String.charAt is constant-time). On a JVM-free
+	 * runtime such as RustCFML those operations are O(index), so a per-index scan over a
+	 * long value is O(n^2); such a caller must use a single-pass char-array walk instead
+	 * (#3903). This is a CAPABILITY probe, not an engine-name check: it guards a lookup for
+	 * a core JVM class (the same signal $maskWhereLiterals needs — "is native O(1) string
+	 * indexing available") and caches the result for the adapter's lifetime. Engines without
+	 * a JVM throw on the CreateObject and are reported false; no subclass override is needed.
+	 */
+	public boolean function stringIndexIsLinear() {
+		if (!StructKeyExists(variables, "$stringIndexIsLinear")) {
+			try {
+				CreateObject("java", "java.lang.String");
+				variables.$stringIndexIsLinear = true;
+			} catch (any e) {
+				variables.$stringIndexIsLinear = false;
+			}
+		}
+		return variables.$stringIndexIsLinear;
+	}
+
+	/**
 	 * Aggregates the adapter's capability probes into a plain-data struct,
 	 * computed lazily on first call and cached in the variables scope for
 	 * the adapter's lifetime (adapters are application-scoped singletons).
@@ -82,7 +104,8 @@ component output="false" {
 		if (!StructKeyExists(variables, "capabilities")) {
 			variables.capabilities = {
 				cfcache: supportsCfcache(),
-				imageInfo: supportsImageInfo()
+				imageInfo: supportsImageInfo(),
+				stringIndexLinear: stringIndexIsLinear()
 			};
 		}
 		return variables.capabilities;

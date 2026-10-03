@@ -19,63 +19,26 @@ component extends="wheels.WheelsTest" {
 		describe("The WHERE literal masker", () => {
 
 			it("matches the previous implementation on edge cases", () => {
-				// Build the supplementary-plane fixture (U+1F600) from its UTF-8 bytes, not
-				// from Chr() surrogate halves: on a scalar-Unicode runtime (RustCFML) lone
-				// surrogates may not combine into the code point, which would make the
-				// differential comparison below pass on replacement chars rather than real
-				// supplementary input (rev1-r2). Assert the real bytes before using it, so a
-				// runtime that degrades it fails here loudly instead of silently.
-				var emoji = CharsetEncode(BinaryDecode("F09F9880", "hex"), "utf-8");
-				expect(LCase(BinaryEncode(CharsetDecode(emoji, "utf-8"), "hex"))).toBe("f09f9880");
-				var cases = [
-					"",
-					"id = 1",
-					"lastName = 'smith'",
-					"lastName = ''",
-					"lastName = 'O''Brien'",
-					"lastName = ''''",
-					"lastName = 'a''''b'",
-					"a = 'x' AND b = 'y,z' OR c IN ('p','q','r')",
-					"note = '(paren)' AND t = '{not odbc}'",
-					"createdAt > {ts '2020-01-02 03:04:05'}",
-					"createdAt > '{ts ''2020-01-02 03:04:05''}'",
-					"d = {d '2020-01-02'} AND t = {t '03:04:05'}",
-					"x = {ts 'not a date'}",
-					"x = '{' AND y = '}'",
-					"{brace} = 1",
-					"lastName = 'trailing",
-					"lastName = 'a' AND",
-					"a = 'b",
-					"title = 'back\slash' AND body LIKE '%50\%%' ESCAPE '\'",
-					"name = 'caf" & Chr(233) & "' AND city = '" & Chr(26085) & Chr(26412) & "'",
-					"bad = '" & Chr(7) & "'",
-					"bad = '" & Chr(2) & "x'",
-					"plain text with no quote {but a brace}",
-					// Supplementary (non-BMP) char U+1F600 as its UTF-16 surrogate pair
-					// (built from BMP code points so it is identical on every engine),
-					// before/inside a literal and before an ODBC escape. The char-array
-					// scan must round-trip the surrogate pair byte-for-byte like the old
-					// Mid() scan (#3903 / rev1-r2 equivalence review).
-					"x = " & emoji & " AND name = 'y'",
-					"name = '" & emoji & "smith'",
-					"name = 'sm" & emoji & "ith'",
-					"d = " & emoji & "{ts '2020-01-02 03:04:05'}",
-					"name = '" & emoji & "{ts ''2020-01-02''}'",
-					// A combining mark (U+0301) after a base letter, inside a literal.
-					"name = 'e" & Chr(769) & "clair'",
-					// CR / LF / NUL as ordinary literal data (not the rejected Chr(2)/Chr(7)).
-					"note = 'line1" & Chr(13) & Chr(10) & "line2'",
-					"note = 'a" & Chr(0) & "b'",
-					// ODBC escape lengths straddling the 60-char lookahead window: the
-					// value is [0-9:. -]+, so "{ts '" (5) + value + "'}" (2). value 52/53/54
-					// gives a 59/60/61-char escape — 60 is the last that fits the window,
-					// 61 must fall through to ordinary quote handling, identically to old.
-					"id = {ts '" & RepeatString("1", 52) & "'}",
-					"id = {ts '" & RepeatString("1", 53) & "'}",
-					"id = {ts '" & RepeatString("1", 54) & "'}"
-				];
-				for (var w in cases) {
+				// Assert the supplementary-plane fixture (U+1F600) is real before relying on
+				// it, so a scalar-Unicode runtime that degrades it fails here loudly rather
+				// than passing the comparison on replacement chars (rev1-r2).
+				expect(LCase(BinaryEncode(CharsetDecode(supplementaryEmoji(), "utf-8"), "hex"))).toBe("f09f9880");
+				for (var w in edgeCases()) {
 					var cmp = compareMaskers(w);
+					expect(cmp.same).toBeTrue(cmp.detail);
+				}
+			});
+
+			// $maskWhereLiterals routes by capability: a JVM engine takes the index scan
+			// ($maskWhereLiteralsByScan), a JVM-free runtime (RustCFML) takes the char-array
+			// path ($maskWhereLiteralsFromChars). Each engine's CI leg therefore exercises
+			// only one path through the dispatcher. Force BOTH helpers directly on the same
+			// corpus on every engine, so the RustCFML-only char-array path is still proven on
+			// the JVM legs and the scan is still proven on RustCFML. Both must match the
+			// reference byte-for-byte and agree on which inputs throw (orch1 / rev1-r3).
+			it("masks via both the scan and char-array paths identically on every engine", () => {
+				for (var w in edgeCases()) {
+					var cmp = compareBothPaths(w);
 					expect(cmp.same).toBeTrue(cmp.detail);
 				}
 			});
@@ -160,17 +123,18 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
-			// Pin which path the supplementary-character fixture takes on this engine, and
-			// prove it masks correctly either way. The fixture is built from UTF-8 bytes so
-			// it is a real U+1F600 (not Chr() surrogate halves that a scalar-Unicode runtime
-			// may not combine).
+			// Record which path the dispatcher actually routes to on this engine (by its
+			// stringIndexIsLinear capability: JVM -> index scan, JVM-free -> char array) and
+			// prove the supplementary-character fixture masks correctly on that path. The
+			// fixture is built from UTF-8 bytes so it is a real U+1F600 (not Chr() surrogate
+			// halves that a scalar-Unicode runtime may not combine).
 			it("pins the supplementary-char fixture's masker path and masks it correctly", () => {
 				var emoji = CharsetEncode(BinaryDecode("F09F9880", "hex"), "utf-8");
 				expect(LCase(BinaryEncode(CharsetDecode(emoji, "utf-8"), "hex"))).toBe("f09f9880");
 				var w = "name = '" & emoji & "x' AND y = 'z'";
-				var fastPath = (Compare(ArrayToList(REMatch("[\s\S]", w), ""), w) == 0);
+				var usesScan = application.wheels.engineAdapter.stringIndexIsLinear();
 				debug(
-					var = "supplementary fixture path on #application.wheels.engineAdapter.getName()#: " & (fastPath ? "fast char-array" : "index-scan fallback"),
+					var = "masker path on #application.wheels.engineAdapter.getName()#: " & (usesScan ? "index scan (JVM)" : "char array (JVM-free)"),
 					label = "masker path"
 				);
 				var cmp = compareMaskers(w);
@@ -233,6 +197,117 @@ component extends="wheels.WheelsTest" {
 			state.error = e.type;
 		}
 		return state;
+	}
+
+	// Supplementary-plane fixture U+1F600, built from its UTF-8 bytes (not Chr() surrogate
+	// halves, which a scalar-Unicode runtime may not combine) so every engine sees a real
+	// astral code point.
+	private string function supplementaryEmoji() {
+		return CharsetEncode(BinaryDecode("F09F9880", "hex"), "utf-8");
+	}
+
+	// The hand-picked edge-case corpus, shared by the auto-path comparison and the
+	// force-both-paths comparison so both exercise identical inputs.
+	private array function edgeCases() {
+		var emoji = supplementaryEmoji();
+		return [
+			"",
+			"id = 1",
+			"lastName = 'smith'",
+			"lastName = ''",
+			"lastName = 'O''Brien'",
+			"lastName = ''''",
+			"lastName = 'a''''b'",
+			"a = 'x' AND b = 'y,z' OR c IN ('p','q','r')",
+			"note = '(paren)' AND t = '{not odbc}'",
+			"createdAt > {ts '2020-01-02 03:04:05'}",
+			"createdAt > '{ts ''2020-01-02 03:04:05''}'",
+			"d = {d '2020-01-02'} AND t = {t '03:04:05'}",
+			"x = {ts 'not a date'}",
+			"x = '{' AND y = '}'",
+			"{brace} = 1",
+			"lastName = 'trailing",
+			"lastName = 'a' AND",
+			"a = 'b",
+			"title = 'back\slash' AND body LIKE '%50\%%' ESCAPE '\'",
+			"name = 'caf" & Chr(233) & "' AND city = '" & Chr(26085) & Chr(26412) & "'",
+			"bad = '" & Chr(7) & "'",
+			"bad = '" & Chr(2) & "x'",
+			"plain text with no quote {but a brace}",
+			// Supplementary (non-BMP) char U+1F600, before/inside a literal and before an
+			// ODBC escape. Both masker paths must round-trip it byte-for-byte like the old
+			// Mid() scan (#3903 / rev1-r2 equivalence review).
+			"x = " & emoji & " AND name = 'y'",
+			"name = '" & emoji & "smith'",
+			"name = 'sm" & emoji & "ith'",
+			"d = " & emoji & "{ts '2020-01-02 03:04:05'}",
+			"name = '" & emoji & "{ts ''2020-01-02''}'",
+			// A combining mark (U+0301) after a base letter, inside a literal.
+			"name = 'e" & Chr(769) & "clair'",
+			// CR / LF / NUL as ordinary literal data (not the rejected Chr(2)/Chr(7)).
+			"note = 'line1" & Chr(13) & Chr(10) & "line2'",
+			"note = 'a" & Chr(0) & "b'",
+			// ODBC escape lengths straddling the 60-char lookahead window: the value is
+			// [0-9:. -]+, so "{ts '" (5) + value + "'}" (2). value 52/53/54 gives a
+			// 59/60/61-char escape — 60 is the last that fits the window, 61 must fall
+			// through to ordinary quote handling, identically to old.
+			"id = {ts '" & RepeatString("1", 52) & "'}",
+			"id = {ts '" & RepeatString("1", 53) & "'}",
+			"id = {ts '" & RepeatString("1", 54) & "'}"
+		];
+	}
+
+	// Force both masker paths directly (not through the dispatcher) and require each to
+	// match the reference. $maskWhereLiteralsFromChars is fed a lossless per-character array
+	// so it can be exercised even on engines whose REMatch drops characters (BoxLang) or
+	// whose dispatcher would never route to it (every JVM engine). Both must agree with the
+	// reference on output and on which inputs throw.
+	private struct function compareBothPaths(required string where) {
+		var reference = runReference(arguments.where);
+		var scan = runForcedPath("scan", arguments.where);
+		var chars = runForcedPath("chars", arguments.where);
+		return {
+			same = (
+				Compare(scan.out, reference.out) == 0 && scan.error == reference.error
+				&& Compare(chars.out, reference.out) == 0 && chars.error == reference.error
+			),
+			detail = "where [" & arguments.where & "]: ref [" & reference.out & "|" & reference.error
+				& "] scan [" & scan.out & "|" & scan.error & "] chars [" & chars.out & "|" & chars.error & "]"
+		};
+	}
+
+	private struct function runReference(required string where) {
+		var state = {out = "", error = ""};
+		try {
+			state.out = referenceMask(arguments.where);
+		} catch (any e) {
+			state.error = e.type;
+		}
+		return state;
+	}
+
+	private struct function runForcedPath(required string path, required string where) {
+		var state = {out = "", error = ""};
+		try {
+			state.out = arguments.path == "scan"
+				? variables.ref.$maskWhereLiteralsByScan(arguments.where)
+				: variables.ref.$maskWhereLiteralsFromChars(faithfulChars(arguments.where));
+		} catch (any e) {
+			state.error = e.type;
+		}
+		return state;
+	}
+
+	// A one-character-per-element array built with Mid() rather than REMatch, so it is
+	// faithful to the input on every engine (BoxLang's REMatch("[\s\S]") drops whitespace).
+	// The corpus strings are short, so the O(index) Mid() on RustCFML is not a concern here.
+	private array function faithfulChars(required string where) {
+		var chars = [];
+		var n = Len(arguments.where);
+		for (var i = 1; i <= n; i++) {
+			ArrayAppend(chars, Mid(arguments.where, i, 1));
+		}
+		return chars;
 	}
 
 	// The per-character implementation before #3903, unchanged apart from calling
