@@ -1,5 +1,14 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
+	/**
+	 * SQL Server accepts at most 2100 parameters in one request, and the JDBC drivers use some of them
+	 * themselves: mssql-jdbc (Lucee, BoxLang) runs 2098 bound values and fails at 2099, Adobe's
+	 * driver runs 2097 and fails at 2098. 2097 is the highest count that runs on every engine (#3906).
+	 */
+	public numeric function $maxBoundParameters() {
+		return 2097;
+	}
+
 	variables.mssqlTypeMap = {
 		"bigint": "cf_sql_bigint",
 		"binary": "cf_sql_binary",
