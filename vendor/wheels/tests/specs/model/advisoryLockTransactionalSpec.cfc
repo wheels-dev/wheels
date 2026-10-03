@@ -353,6 +353,49 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("tenant datasource routing: the lock follows the model's effective datasource", () => {
+
+			// The lock connection must resolve its datasource through $effectiveDataSource() exactly as
+			// the model's query path ($performQuery) does. Otherwise, in a multi-tenant request, a
+			// non-shared model's lock is taken on the DEFAULT datasource while its writes go to the
+			// TENANT datasource — the same split-connection bug as the Adobe one, and lock names would
+			// also collide across tenants in the default database. Pure datasource-routing assertions,
+			// so they run on every adapter (no live lock needed).
+			it("a non-shared (tenant) model takes the lock on its tenant datasource", () => {
+				var a = freshAdapter();
+				var saved = IsDefined("request.wheels.tenant") ? Duplicate(request.wheels.tenant) : "";
+				request.wheels.tenant = {dataSource = "wheels_tenant_probe_ds"};
+				try {
+					expect(a.$effectiveDataSource()).toBe("wheels_tenant_probe_ds", "a non-shared model must route to the tenant datasource");
+					expect(a.$advisoryLockConnection().datasource).toBe(a.$effectiveDataSource(), "the lock datasource must equal the model's effective (tenant) datasource");
+				} finally {
+					if (IsStruct(saved)) {
+						request.wheels.tenant = saved;
+					} else {
+						StructDelete(request.wheels, "tenant");
+					}
+				}
+			});
+
+			it("a shared model takes the lock on the default datasource, ignoring the tenant", () => {
+				var a = freshAdapter();
+				a.$setSharedModel(true);
+				var saved = IsDefined("request.wheels.tenant") ? Duplicate(request.wheels.tenant) : "";
+				request.wheels.tenant = {dataSource = "wheels_tenant_probe_ds"};
+				try {
+					expect(a.$effectiveDataSource()).notToBe("wheels_tenant_probe_ds", "a shared model must ignore the tenant datasource");
+					expect(a.$advisoryLockConnection().datasource).toBe(a.$effectiveDataSource(), "the lock datasource must equal the default datasource for a shared model");
+				} finally {
+					if (IsStruct(saved)) {
+						request.wheels.tenant = saved;
+					} else {
+						StructDelete(request.wheels, "tenant");
+					}
+				}
+			});
+
+		});
+
 		describe("re-entrancy: a nested same-name lock on the same session", () => {
 
 			// A nested transaction = true runs inside the OUTER lock's Wheels-owned transaction, so it

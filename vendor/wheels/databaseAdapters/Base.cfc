@@ -1056,9 +1056,13 @@ component output=false extends="wheels.Global"{
 	 * run outside the lock's transaction and are not rolled back with it. Matching the model's form
 	 * pins the lock and the callback's queries to one connection on every engine. Lucee treats the two
 	 * forms as the same connection, which is why this only surfaced on Adobe.
+	 *
+	 * The datasource is resolved through `$effectiveDataSource()`, exactly as `$performQuery` does, so a
+	 * non-shared (tenant) model takes the lock on its tenant datasource — the same one its writes use —
+	 * rather than on the default datasource.
 	 */
 	public struct function $advisoryLockConnection() {
-		local.conn = {datasource = variables.dataSource};
+		local.conn = {datasource = $effectiveDataSource()};
 		if (Len(variables.username)) {
 			local.conn.username = variables.username;
 		}
