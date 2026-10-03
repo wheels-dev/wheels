@@ -281,7 +281,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			local.result = queryExecute(
 				"SELECT pg_try_advisory_xact_lock(hashtext(?)) AS lockresult",
 				[arguments.name],
-				{datasource: variables.dataSource, username: variables.username, password: variables.password}
+				$advisoryLockConnection()
 			);
 			if (IsQuery(local.result) && IsBoolean(local.result.lockresult) && local.result.lockresult) {
 				return;

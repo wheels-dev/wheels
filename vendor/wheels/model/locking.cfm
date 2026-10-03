@@ -235,6 +235,7 @@
 		local.adapter = variables.wheels.class.adapter;
 		local.committed = {flag = false};
 		var release = {error = ""};
+		var threw = {flag = false};
 		local.adapter.$acquireAdvisoryLockTransactional(name = arguments.name, timeout = arguments.timeout);
 		try {
 			local.cbResult = arguments.callback();
@@ -248,14 +249,28 @@
 			// only AFTER a clean commit, so a failing commit takes the failure path (rollback).
 			transaction action="commit";
 			local.committed.flag = true;
+		} catch (any e) {
+			// Mark a caught throw (callback or commit) so the finally does NOT roll back — on a throw,
+			// invokeWithTransaction's own catch rolls back, and a SECOND rollback here corrupts the
+			// write on Adobe (it survives). Unscoped struct write so it persists out of the catch on
+			// BoxLang (invariant 11). The exception still propagates to invokeWithTransaction.
+			threw.flag = true;
+			rethrow;
 		} finally {
-			// On a failure / abort, resolve the transaction to rolled-back BEFORE the release, so a
-			// callback that aborts never leaves an open transaction the engine could commit at block
-			// exit — which would reopen the pre-commit window after the lock has already been freed.
-			// Harmless on the throw path, where invokeWithTransaction also rolls back afterwards.
-			if (!local.committed.flag) {
-				transaction action="rollback";
+			// Roll back ONLY on the ABORT path — not committed, and not a caught throw. An aborting
+			// callback is never caught, so invokeWithTransaction's catch never runs and the engine would
+			// otherwise decide the open transaction's fate at block exit (a commit-at-exit would reopen
+			// the pre-commit window after the lock is freed). The rollback is in its own try/catch: a
+			// rollback that itself throws (a dead connection the server has already rolled back) must not
+			// skip the release below.
+			if (!local.committed.flag && !threw.flag) {
+				try {
+					transaction action="rollback";
+				} catch (any rollbackErr) {
+					WriteLog(type = "error", file = "wheels", text = "withAdvisoryLock(transaction=true): rollback on the abort path failed: " & rollbackErr.message);
+				}
 			}
+			// Always attempt the release, whatever the rollback did.
 			try {
 				$releaseTransactionalAdvisoryLock(adapter = local.adapter, name = arguments.name);
 			} catch (any releaseErr) {
@@ -309,8 +324,8 @@
 
 	/**
 	 * Internal function. Releases a transaction-scoped advisory lock only when the adapter's lock is
-	 * actually session-scoped (MySQL); transaction-scoped locks (PostgreSQL / SQL Server) auto-release
-	 * at transaction end, so this is a no-op for them (#4198).
+	 * actually session-scoped (MySQL / SQL Server); a transaction-scoped lock (PostgreSQL) auto-releases
+	 * at transaction end, so this is a no-op for it (#4198).
 	 */
 	public void function $releaseTransactionalAdvisoryLock(required any adapter, required string name) {
 		if (arguments.adapter.$transactionalAdvisoryLockIsSessionScoped()) {

@@ -298,6 +298,61 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("connection pinning: the lock holder is the model's own connection", () => {
+
+			beforeEach(() => {
+				if (!variables.applies) {
+					skip("Transaction-scoped advisory locks: PostgreSQL, MySQL, SQL Server.");
+				}
+			});
+
+			// The guarantee the whole feature rests on: inside the lock transaction, the session that
+			// HOLDS the lock is the SAME session the model's own queries run on. Read the model's
+			// session id through a real model query (findAll) and the lock owner's session id through a
+			// database view, and assert they are equal. This fails if the lock's connection args ever
+			// drift from the model's query path (the Adobe bug where the lock used explicit empty creds
+			// and the model omitted them, landing on different pooled connections).
+			it("holds the lock on the same session the model queries use", () => {
+				var author = variables.g.model("author");
+				var ds = variables.g.get("dataSourceName");
+				var name = lockName();
+				var ctx = {modelSid = "", ownerSid = ""};
+				author.withAdvisoryLock(name = name, transaction = true, callback = function() {
+					if (variables.adapterName == "MySQLModel") {
+						ctx.modelSid = author.findAll(select = "CONNECTION_ID() AS cid", maxRows = 1, reload = true).cid;
+						var o = queryExecute("SELECT IS_USED_LOCK(?) AS sid", [name], {datasource = ds});
+						ctx.ownerSid = IsNull(o.sid) ? "" : o.sid;
+					} else if (variables.adapterName == "PostgreSQLModel") {
+						ctx.modelSid = author.findAll(select = "pg_backend_pid() AS cid", maxRows = 1, reload = true).cid;
+						var o = queryExecute(
+							"SELECT pid AS sid FROM pg_locks WHERE locktype = 'advisory' AND granted AND objid = CAST((CAST(hashtext(?) AS bigint) & 4294967295) AS oid) LIMIT 1",
+							[name],
+							{datasource = ds}
+						);
+						ctx.ownerSid = o.recordCount ? o.sid : "";
+					} else {
+						ctx.modelSid = author.findAll(select = "@@SPID AS cid", maxRows = 1, reload = true).cid;
+						// Match the SQL Server application lock by its hashed resource name.
+						var o = queryExecute(
+							"SELECT request_session_id AS sid FROM sys.dm_tran_locks WHERE resource_type = 'APPLICATION' AND request_status = 'GRANT' AND resource_description LIKE ?",
+							[{value = "%" & LCase(Hash(name, "SHA")) & "%", cfsqltype = "cf_sql_varchar"}],
+							{datasource = ds}
+						);
+						// Fall back to the single granted application lock when the hash form differs.
+						if (!o.recordCount) {
+							o = queryExecute("SELECT request_session_id AS sid FROM sys.dm_tran_locks WHERE resource_type = 'APPLICATION' AND request_status = 'GRANT'", [], {datasource = ds});
+						}
+						ctx.ownerSid = o.recordCount ? o.sid : "";
+					}
+					return true;
+				});
+				expect(Len(ctx.modelSid)).toBeGT(0, "could not read the model's session id");
+				expect(Len(ctx.ownerSid)).toBeGT(0, "could not read the lock owner's session id");
+				expect(ToString(ctx.modelSid)).toBe(ToString(ctx.ownerSid), "the lock must be held on the model's own connection (pinned)");
+			});
+
+		});
+
 		describe("re-entrancy: a nested same-name lock on the same session", () => {
 
 			// A nested transaction = true runs inside the OUTER lock's Wheels-owned transaction, so it
@@ -436,26 +491,28 @@ component extends="wheels.WheelsTest" {
 			// stays committed, afterCommit fires once — not afterRollback) and still surface the release
 			// error, rather than letting invokeWithTransaction fire afterRollback on committed data.
 			// Session-scoped only: PostgreSQL's release step is a no-op (the xact lock auto-released).
+			//
+			// The failure is produced WITHOUT a mock and WITHOUT leaking the lock: the callback releases
+			// the lock itself on the pinned connection, so the body's own release then runs against an
+			// already-released lock and fails naturally (a non-success result), which is the real
+			// post-commit release-failure path. The lock is genuinely free afterwards.
 			it("surfaces a release failure after commit but keeps the committed outcome and afterCommit", () => {
 				if (!ListFindNoCase("MySQLModel,MicrosoftSQLServerModel", variables.adapterName)) {
 					skip("A release step that can fail is session-scoped: MySQL, SQL Server.");
 				}
 				var adapter = variables.g.model("author").$classData().adapter;
-				prepareMock(adapter);
-				adapter.$(method = "$releaseAdvisoryLockTransactional", throwException = true, throwType = "Wheels.AdvisoryLockReleaseFailed", throwMessage = "injected release failure");
 				var name = lockName();
 				var state = {type = ""};
 				try {
-					try {
-						variables.g.model("author").withAdvisoryLock(name = name, transaction = true, callback = function() {
-							variables.g.model("tag").new(name = "txncb-lock-relfail").save();
-							return true;
-						});
-					} catch (any e) {
-						state.type = e.type;
-					}
-				} finally {
-					adapter.$reset();
+					variables.g.model("author").withAdvisoryLock(name = name, transaction = true, callback = function() {
+						variables.g.model("tag").new(name = "txncb-lock-relfail").save();
+						// Release the lock early on the pinned connection, so the body's own release then
+						// fails naturally (RELEASE returns a non-success result) — no mock, no leak.
+						adapter.$releaseAdvisoryLockTransactional(name = name);
+						return true;
+					});
+				} catch (any e) {
+					state.type = e.type;
 				}
 				expect(state.type).toBe("Wheels.AdvisoryLockReleaseFailed", "the release failure must surface after the wrapper completes");
 				// The committed outcome is preserved despite the release failure.

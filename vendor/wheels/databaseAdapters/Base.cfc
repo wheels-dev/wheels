@@ -1048,6 +1048,27 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. The connection attributes for an advisory-lock query, built the SAME way the
+	 * model's own query path does (`$performQuery`): empty username/password are OMITTED (#4198). This
+	 * matters for the transaction-scoped path: on Adobe CF a query with `{datasource}` and one with
+	 * `{datasource, username:"", password:""}` resolve to DIFFERENT pooled connections, so a lock taken
+	 * with the always-on form lands on a different connection than the model's writes — the writes then
+	 * run outside the lock's transaction and are not rolled back with it. Matching the model's form
+	 * pins the lock and the callback's queries to one connection on every engine. Lucee treats the two
+	 * forms as the same connection, which is why this only surfaced on Adobe.
+	 */
+	public struct function $advisoryLockConnection() {
+		local.conn = {datasource = variables.dataSource};
+		if (Len(variables.username)) {
+			local.conn.username = variables.username;
+		}
+		if (Len(variables.password)) {
+			local.conn.password = variables.password;
+		}
+		return local.conn;
+	}
+
+	/**
 	 * Reports whether auto-derived property names should be lowercased.
 	 *
 	 * When a model declares no property() mappings, Wheels derives its

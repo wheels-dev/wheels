@@ -366,7 +366,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		local.result = queryExecute(
 			"SET NOCOUNT ON; DECLARE @r int; EXEC @r = sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = ?; SELECT @r AS lockResult",
 			[arguments.name, arguments.timeout * 1000],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 		local.status = (IsQuery(local.result) && local.result.recordCount) ? Val(local.result.lockResult) : -999;
 		if (local.status < 0) {
@@ -396,7 +396,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		local.result = queryExecute(
 			"SET NOCOUNT ON; DECLARE @r int; EXEC @r = sp_releaseapplock @Resource = ?, @LockOwner = 'Session'; SELECT @r AS releaseResult",
 			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 		local.status = (IsQuery(local.result) && local.result.recordCount) ? Val(local.result.releaseResult) : -999;
 		if (local.status < 0) {

@@ -198,7 +198,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		local.result = queryExecute(
 			"SELECT GET_LOCK(?, ?) AS lockResult",
 			[arguments.name, arguments.timeout],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 		if (!IsQuery(local.result) || local.result.lockResult != 1) {
 			Throw(
@@ -220,7 +220,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		local.result = queryExecute(
 			"SELECT RELEASE_LOCK(?) AS released",
 			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 		if (!IsQuery(local.result) || !IsNumeric(local.result.released) || local.result.released != 1) {
 			Throw(
