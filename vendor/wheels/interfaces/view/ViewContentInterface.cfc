@@ -36,7 +36,7 @@ interface {
 	 *
 	 * @partial Path to the partial (e.g., "comments/comment").
 	 * @group Column name to group query rows by (renders partial per group).
-	 * @cache Minutes to cache the rendered output.
+	 * @cache Minutes to cache the rendered output. The cache key hashes every argument, including the full rows of a `query` argument, so edited rows produce a new key automatically; pass viewer state (for example `editable=`) as an argument to partition the key. Only active when `cachePartials` is on (off in development and testing).
 	 * @layout Layout to wrap each partial rendering.
 	 * @spacer HTML inserted between each partial rendering.
 	 * @dataFunction Function name that provides data to the partial.
