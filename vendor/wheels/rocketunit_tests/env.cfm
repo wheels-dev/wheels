@@ -16,13 +16,29 @@ if(structKeyExists(url, "db") && url.db == "sqlserver"){
 		END", {}, {datasource = "msdb_sqlserver"});
 }
 
-if(structKeyExists(url, "db") && listFind("mysql,sqlserver,postgres,h2,cockroachdb", url.db)){
-	application.wheels.dataSourceName = "wheelstestdb_" & url.db;
-} else if (application.wheels.coreTestDataSourceName eq "|datasourceName|") {
-	application.wheels.dataSourceName = "wheelstestdb";
-} else {
-	application.wheels.dataSourceName = application.wheels.coreTestDataSourceName;
+// Same datasource rule as the core runner: never the app's primary datasource
+// unless the request asks for it (useTestDB=false).
+coreDataSource = $coreTestDataSource(
+	primary = application.wheels.dataSourceName,
+	coreName = StructKeyExists(application.wheels, "coreTestDataSourceName") ? application.wheels.coreTestDataSourceName : application.wheels.dataSourceName,
+	requestUrl = url,
+	testDbList = "mysql,sqlserver,postgres,h2,cockroachdb"
+);
+if (coreDataSource.action == "refuse") {
+	cfheader(statuscode = 409);
+	cfcontent(type = "application/json");
+	WriteOutput(SerializeJSON({
+		success = false,
+		error = "Test database not available",
+		message = "The framework test suite would run on this app's primary datasource '" & coreDataSource.decision.primary
+			& "'. Pass ?db= to use a wheelstestdb_<db> datasource, create '" & coreDataSource.decision.candidate
+			& "', or run against the primary datasource intentionally with useTestDB=false.",
+		datasource = coreDataSource.decision.primary,
+		candidate = coreDataSource.decision.candidate
+	}));
+	abort;
 }
+application.wheels.dataSourceName = coreDataSource.target;
 
 /* For JS Test Runner */
 $header(name="Access-Control-Allow-Origin", value="*");
