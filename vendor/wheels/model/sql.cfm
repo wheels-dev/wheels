@@ -1552,8 +1552,17 @@
 						local.param.list = true;
 					}
 					ArrayAppend(local.params, local.param);
-				} else if (ArrayLen(local.classes) > 1) {
-					local.where = $qualifyUnboundConditionColumn(where = local.where, element = local.element, classes = local.classes, useTableAlias = local.useTableAlias);
+				} else {
+					// A function call compared with a bound value (ABS(id) = 1) binds that value
+					// with the call as its column; otherwise, under include, a condition whose
+					// value is a function call gets its column qualified.
+					local.leftExpression = Find("?", local.element) ? $leftExpressionParam(where = arguments.where, element = local.element, index = ArrayLen(local.params) + 1) : {};
+					if (!StructIsEmpty(local.leftExpression)) {
+						local.where = Replace(local.where, local.element, Replace(local.element, local.leftExpression.dataPart, "?", "one"));
+						ArrayAppend(local.params, local.leftExpression.param);
+					} else if (ArrayLen(local.classes) > 1) {
+						local.where = $qualifyUnboundConditionColumn(where = local.where, element = local.element, classes = local.classes, useTableAlias = local.useTableAlias);
+					}
 				}
 			}
 			local.where = Replace(local.where, Chr(7), "", "all");
@@ -1681,6 +1690,133 @@
 			}
 		}
 		return "";
+	}
+
+	/**
+	 * Internal function. For a WHERE condition whose left side is a function call and
+	 * whose value the WHERE regex bound (`ABS(id) = ?`, `UPPER(title) IS ?`), returns the
+	 * text to replace (dataPart) and the parameter, with the call as its column. The
+	 * value's SQL type comes from the bound value's shape, since there is no column to
+	 * take it from. Empty when the condition is not that shape.
+	 */
+	public struct function $leftExpressionParam(required string where, required string element, required numeric index) {
+		local.qpos = Find("?", arguments.element);
+		local.before = Left(arguments.element, local.qpos - 1);
+		local.operator = $trailingWhereOperator(local.before);
+		if (!Len(local.operator)) {
+			return {};
+		}
+		local.expressionEnd = Len(RTrim(local.before)) - Len(local.operator);
+		local.expressionStart = $callExpressionStart(arguments.element, local.expressionEnd);
+		if (local.expressionStart == 0) {
+			return {};
+		}
+		local.lead = local.expressionStart > 1 ? Left(arguments.element, local.expressionStart - 1) : "";
+		// ReFind never matches an empty string, so only check a lead that is there
+		if (Len(local.lead) && !ReFindNoCase("^\s*((AND|OR)\s+)?[\s(]*$", local.lead)) {
+			return {};
+		}
+		local.expression = Trim(Mid(arguments.element, local.expressionStart, local.expressionEnd - local.expressionStart + 1));
+		local.param = $boundValueType($boundWhereValue(where = arguments.where, index = arguments.index));
+		local.param.property = local.expression;
+		local.param.column = local.expression;
+		local.param.operator = Trim(local.operator);
+		return {dataPart: Mid(arguments.element, local.expressionStart, local.qpos - local.expressionStart + 1), param: local.param};
+	}
+
+	/**
+	 * Internal function. The comparison operator that ends `text` (ignoring trailing
+	 * whitespace), as written, or "" when it doesn't end in one. Longest operators first.
+	 */
+	public string function $trailingWhereOperator(required string text) {
+		local.text = RTrim(arguments.text);
+		local.match = ReFindNoCase("(\s(NOT\s+LIKE|LIKE|NOT\s+IN|IN|IS\s+NOT|IS)|<>|<=|>=|!=|!<|!>|=|<|>)$", local.text, 1, true);
+		if (ArrayLen(local.match.len) < 2 || local.match.len[1] == 0) {
+			return "";
+		}
+		return Mid(local.text, local.match.pos[1], local.match.len[1]);
+	}
+
+	/**
+	 * Internal function. When the text of `element` up to position `endPos` (ignoring
+	 * trailing whitespace) is a function call (a name, then balanced parentheses),
+	 * returns the position the call starts at; otherwise 0.
+	 */
+	public numeric function $callExpressionStart(required string element, required numeric endPos) {
+		local.i = arguments.endPos;
+		while (local.i >= 1 && ReFind("\s", Mid(arguments.element, local.i, 1))) {
+			local.i--;
+		}
+		if (local.i < 1 || Mid(arguments.element, local.i, 1) != ")") {
+			return 0;
+		}
+		local.depth = 0;
+		while (local.i >= 1) {
+			local.char = Mid(arguments.element, local.i, 1);
+			if (local.char == ")") {
+				local.depth++;
+			} else if (local.char == "(") {
+				local.depth--;
+				if (local.depth == 0) {
+					break;
+				}
+			}
+			local.i--;
+		}
+		if (local.i < 1) {
+			return 0;
+		}
+		local.nameEnd = local.i - 1;
+		local.i = local.nameEnd;
+		while (local.i >= 1 && ReFind("[A-Za-z0-9_$.]", Mid(arguments.element, local.i, 1))) {
+			local.i--;
+		}
+		return local.i < local.nameEnd ? local.i + 1 : 0;
+	}
+
+	/**
+	 * Internal function. The text of the index-th value the WHERE regex binds in `where`
+	 * (already masked), or "" when there are fewer.
+	 */
+	public string function $boundWhereValue(required string where, required numeric index) {
+		local.start = 1;
+		for (local.n = 1; local.n <= arguments.index; local.n++) {
+			local.match = ReFind(variables.wheels.class.RESQLWhere, arguments.where, local.start, true);
+			if (ArrayLen(local.match.len) < 5) {
+				return "";
+			}
+			local.start = local.match.pos[4] + local.match.len[4];
+		}
+		return Mid(arguments.where, local.match.pos[4], local.match.len[4]);
+	}
+
+	/**
+	 * Internal function. Parameter type settings for a bound value with no column to take
+	 * them from: a 64-bit integer or a decimal for a number, 1/0 for TRUE/FALSE, string otherwise
+	 * (a quoted value, or NULL, which binds as a null).
+	 */
+	public struct function $boundValueType(required string value) {
+		local.value = Trim(arguments.value);
+		local.rv = {dataType: "string", type: "CF_SQL_VARCHAR", scale: 0, list: false};
+		if (ReFind("^[+-]?[0-9]+$", local.value)) {
+			// 64-bit: ids and other whole numbers can exceed 32 bits (CockroachDB SERIAL ids do)
+			local.rv.dataType = "integer";
+			local.rv.type = "CF_SQL_BIGINT";
+		} else if (ReFindNoCase("^(true|false)$", local.value)) {
+			local.rv.dataType = "integer";
+			local.rv.type = "CF_SQL_INTEGER";
+		} else if (ReFind("^[+-]?[0-9]*\.[0-9]+$", local.value)) {
+			local.rv.dataType = "float";
+			local.rv.type = "CF_SQL_DECIMAL";
+			local.rv.scale = Len(ListLast(local.value, "."));
+		} else if (Left(local.value, 1) == "(") {
+			local.rv.list = true;
+			if (!Find("'", local.value)) {
+				local.rv.dataType = "integer";
+				local.rv.type = "CF_SQL_BIGINT";
+			}
+		}
+		return local.rv;
 	}
 
 	/**
