@@ -6462,7 +6462,14 @@ component extends="modules.BaseModule" {
 		if (parts.pos[1] > 0) {
 			var column = parts.pos[2] > 0 ? mid(name, parts.pos[2], parts.len[2]) : mid(name, parts.pos[4], parts.len[4]);
 			var table = parts.pos[3] > 0 ? mid(name, parts.pos[3], parts.len[3]) : mid(name, parts.pos[5], parts.len[5]);
-			var modelName = capitalize(getService("helpers").singularize(lCase(table)));
+			// Keep the words' case: lCase() first turned BlogPosts into "Blogpost".
+			// A snake_case table (blog_posts) is PascalCased first; singularize()
+			// then changes only the last word.
+			var pascalTable = "";
+			for (var word in listToArray(table, "_")) {
+				pascalTable &= uCase(left(word, 1)) & mid(word, 2, len(word));
+			}
+			var modelName = getService("helpers").singularize(pascalTable);
 			var columnName = lCase(left(column, 1)) & mid(column, 2, len(column));
 			return "This migration is blank: `generate migration` doesn't read columns from its name." & nl
 				& "To add #columnName# to #lCase(table)# with the migration written for you, use instead:" & nl

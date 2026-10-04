@@ -30,6 +30,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect($module().$migrationNameHint("add_email_to_users")).toInclude("wheels generate property User email:string");
 			});
 
+			it("keeps each word of a multi-word table in the model name", () => {
+				var m = $module();
+				expect(m.$migrationNameHint("AddEmailToBlogPosts")).toInclude("wheels generate property BlogPost email:string");
+				expect(m.$migrationNameHint("add_email_to_blog_posts")).toInclude("wheels generate property BlogPost email:string");
+			});
+
 			it("shows the removeColumn() call for a RemoveXFromY name", () => {
 				var hint = $module().$migrationNameHint("RemoveLegacyFlagFromAccounts");
 				expect(hint).toInclude('removeColumn(table="accounts", columnName="legacyFlag");');
