@@ -162,13 +162,21 @@ box install
 # 2. Start the server (auto-installs the H2 extension, boots the app)
 box server start
 
-# 3. Create the schema and seed the default data
-wheels migrate latest
+# 3. Create the schema and seed the default data: open the migrator page
+#    http://localhost:8081/wheels/migrator
+#    and click "Migrate To Latest", then "Confirm & Execute".
 
-# 4. Reload the application so the seeded settings load
-#    (or just restart the server). Then open the site:
+# 4. Restart the server so the app loads the seeded settings,
+#    then open the site:
+box server restart
 box server open
 ```
+
+Until step 3 has run, the site returns an error such as `key [general_sitename] doesn't exist`:
+the app reads its `settings` table when it starts.
+
+The `wheels migrate latest` CLI command doesn't work here. It talks to a server started with
+`wheels start`, and this app runs on CommandBox (`box server start`).
 
 Default sign-in credentials are seeded by the migrations — see
 `app/migrator/migrations/20180519105944_Adds_Default_UserAccounts.cfc`.

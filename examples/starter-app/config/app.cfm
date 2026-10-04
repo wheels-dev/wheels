@@ -14,7 +14,8 @@
 	// database server. The H2 driver (org.h2.Driver) is bundled with Lucee, so
 	// it works on a plain `box install` / CommandBox install without any extra
 	// JDBC driver. MODE=MySQL gives MySQL-compatible SQL. Data files live under
-	// db/h2/. Run `wheels migrate latest` after install to create the schema.
+	// db/h2/. After install, create the schema from the migrator page
+	// (/wheels/migrator, "Migrate To Latest"); see the README's Quick Start.
 	//
 	// To use a server-based database (MySQL/PostgreSQL/etc.) instead, copy
 	// .env.example to .env, fill in your credentials, and swap the datasource
