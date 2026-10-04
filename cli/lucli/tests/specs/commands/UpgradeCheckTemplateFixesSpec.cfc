@@ -69,6 +69,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(arrayLen(flagged(report, "advisories"))).toBe(0);
 			});
 
+			it("names the file it checked in the finding", () => {
+				app(replace(variables.template, "resources/java", "resources/jar", "all"));
+				var entry = {};
+				for (var a in runCheck().advisories) {
+					if (findNoCase("jBCrypt", a.description)) entry = a;
+				}
+				expect(structIsEmpty(entry)).toBeFalse();
+				expect(entry.matches).toBe(["public/Application.cfc (no occurrences found)"]);
+			});
+
 			it("is an error when onSessionEnd doesn't go through arguments.applicationScope", () => {
 				app(replace(variables.template, "applicationScope.wo.$simpleLock", "application.wo.$simpleLock", "all"));
 				expect(arrayToList(flagged(runCheck(), "breaking"), "|")).toInclude("onSessionEnd()");
