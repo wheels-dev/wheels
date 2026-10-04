@@ -342,7 +342,11 @@ component {
 					}
 				}
 				if (!hasFK) {
-					arrayAppend(props, {name: fkName, type: "integer"});
+					// A belongsTo foreign key is required by default, so the migration
+					// makes it NOT NULL and the model validates its presence — the two
+					// halves agree (a user can still relax it by listing the column
+					// explicitly as `<fk>:integer:optional`).
+					arrayAppend(props, {name: fkName, type: "integer", required: true});
 				}
 			}
 		}
@@ -1292,11 +1296,19 @@ component {
 
 			var cfType = mapToWheelsType(prop.type);
 			var params = "columnNames='#prop.name#'";
-			// No `default=''` — the migrator hardener (S14) rejects empty-string
-			// defaults on string/text/char columns, and for numeric/temporal
-			// types `default=''` just rendered DEFAULT NULL anyway. Omitting the
-			// default yields NULL for nullable columns, which is the same thing.
-			params &= ", allowNull=" & (structKeyExists(prop, "required") && prop.required ? "false" : "true");
+			// Required by default (allowNull=false); only an explicit `:optional`
+			// column (required=false) is nullable. A prop with no `required` key is
+			// treated as required, the same default the model's validatesPresenceOf
+			// applies, so migration and model agree.
+			params &= ", allowNull=" & ((!structKeyExists(prop, "required") || prop.required) ? "false" : "true");
+			// A `name:type=value` property carries an explicit DEFAULT. Only emit it
+			// when non-empty: the migrator hardener (S14) rejects empty-string
+			// defaults on string/text/char columns, and for numeric/temporal types
+			// `default=''` just rendered DEFAULT NULL anyway, so an omitted default
+			// yields the same NULL for a nullable column.
+			if (structKeyExists(prop, "default") && len(prop.default)) {
+				params &= ", default='" & replace(prop.default, "'", "''", "all") & "'";
+			}
 			params &= $columnSizeParams(prop, cfType);
 
 			c &= t & t & t & t & "t.#cfType#(#params#);" & nl;

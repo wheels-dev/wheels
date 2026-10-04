@@ -540,7 +540,7 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.positional(name = "type", required = true, choices = "model,controller,view,scaffold,migration,api-resource,route,test,property,helper,policy,snippets,admin,auth", description = "What to generate: model, controller, view, scaffold, migration, api-resource, route, test, property, helper, policy, snippets, admin, or auth")
 			.positional(name = "name", description = "Artifact name (model, controller or resource name)")
-			.positional(name = "attributes", description = "Column definitions for model/scaffold (space- or comma-delimited name:type pairs, e.g. 'title:string body:text')")
+			.positional(name = "attributes", description = "Column definitions for model/scaffold (space- or comma-delimited name:type pairs, e.g. 'title:string body:text'). Columns are required by default; 'name:type:optional' makes one nullable and 'name:type=value' gives it a default (both omit it from validatesPresenceOf)")
 			.flag(name = "dry-run", default = false, description = "Print the would-be paths and write nothing");
 	}
 
@@ -1116,6 +1116,14 @@ component extends="modules.BaseModule" {
 		out("  wheels generate admin User");
 		out("  wheels generate auth");
 		out("  wheels generate auth --strategy=jwt");
+		out("");
+		out("Property syntax:", "bold");
+		out("  name:type            required column: NOT NULL + validatesPresenceOf (the default)");
+		out("  name:type:optional   nullable column, excluded from validatesPresenceOf");
+		out("  name:type=value      column DEFAULT (also excluded from presence; the default fills an absence)");
+		out("  name:type{N}         string length / column size, e.g. title:string{120}");
+		out("  name:enum:a,b,c      enum column with the given allowed values");
+		out("  Example: wheels generate model Post title:string body:text:optional status:string=draft");
 	}
 
 	/**
@@ -6584,10 +6592,11 @@ component extends="modules.BaseModule" {
 
 		var names = new services.GeneratorPaths();
 		var modelName = capitalize(names.identifier(args[1], "model"));
-		var propArg = args[2];
-		var parts = listToArray(propArg, ":");
-		var propName = names.identifier($underscoreHyphens(arrayLen(parts) ? parts[1] : "", "property"), "property");
-		var propType = names.identifier(arrayLen(parts) > 1 ? parts[2] : "string", "property type");
+		// Share the model generator's token parser so `:optional` and `=value`
+		// are understood here too (it validates the name and type as identifiers).
+		var prop = $parsePropertyArg(args[2]);
+		var propName = prop.name;
+		var propType = prop.type;
 
 		var tableName = getService("helpers").pluralize(lCase(modelName));
 		var timestamp = getService("helpers").generateMigrationTimestamp();
@@ -6604,7 +6613,14 @@ component extends="modules.BaseModule" {
 		content &= tab & 'function up() {' & nl;
 		content &= tab & tab & 'transaction {' & nl;
 		content &= tab & tab & tab & 't = changeTable(name="#tableName#");' & nl;
-		content &= tab & tab & tab & 't.#colType#(columnNames="#propName#");' & nl;
+		// Columns added to an EXISTING table stay nullable (no allowNull=false) so
+		// the ALTER succeeds on a populated table; a `=value` default is emitted
+		// when given (and is safe — it backfills existing rows).
+		var colParams = 'columnNames="#propName#"';
+		if (structKeyExists(prop, "default") && len(prop.default)) {
+			colParams &= ', default="' & replace(prop.default, '"', '""', "all") & '"';
+		}
+		content &= tab & tab & tab & 't.#colType#(#colParams#);' & nl;
 		content &= tab & tab & tab & 't.change();' & nl;
 		content &= tab & tab & '}' & nl;
 		content &= tab & '}' & nl & nl;
@@ -6620,8 +6636,16 @@ component extends="modules.BaseModule" {
 		$generateWrite(migrationDir & "/" & fileName, content);
 		printCreated("app/migrator/migrations/#fileName#");
 		out("");
-		out("Remember to add validation in app/models/#modelName#.cfc config():", "yellow");
-		out('  validatesPresenceOf("#propName#");');
+		// Suggest a presence validation only for a required column with no default —
+		// the same rule the model generator uses. The column is added nullable (so
+		// existing rows are safe); presence then enforces it for new records. An
+		// `:optional` or defaulted column gets no suggestion.
+		var suggestPresence = (structKeyExists(prop, "required") ? prop.required : false)
+			&& !(structKeyExists(prop, "default") && len(prop.default));
+		if (suggestPresence) {
+			out("Remember to add validation in app/models/#modelName#.cfc config():", "yellow");
+			out('  validatesPresenceOf("#propName#");');
+		}
 
 		return "";
 	}
@@ -12007,6 +12031,15 @@ component extends="modules.BaseModule" {
 			} else if (reFindNoCase("^--hasOne=", arg)) {
 				var rels = $validAssociationNames(listToArray(valueAfterEquals(arg)), "hasOne");
 				result.hasOne.append(rels, true);
+			} else if (arg.startsWith("--") && find(":", mid(arg, 3, len(arg) - 2))) {
+				// A `name:type=value` property (the `=value` default marker) is parsed
+				// by LuCLI as a `key=value` named option and handed back as
+				// "--name:type=value". Recover it as a property token instead of
+				// rejecting it as an unknown flag. A real flag typo has no ":" (the
+				// association flags are matched above, and --force/--dry-run are
+				// stripped before this runs), so this only catches the mangled
+				// property form.
+				arrayAppend(result.properties, $parsePropertyArg(mid(arg, 3, len(arg) - 2)));
 			} else if (arg.startsWith("--")) {
 				var flagName = listFirst(arg, "=");
 				var hint = $closestFlag(flagName, known);
@@ -12123,6 +12156,17 @@ component extends="modules.BaseModule" {
 	 *
 	 * Brace modifiers attach to the type token only, so they never steal
 	 * the value list from `name:enum:a,b`.
+	 *
+	 * Required-ness: a column is REQUIRED by default (`required=true` →
+	 * migration `allowNull=false` + a `validatesPresenceOf`). Two markers opt
+	 * out, so the generated migration and model always agree:
+	 *   - `name:type:optional` → nullable (`required=false`, no presence).
+	 *   - `name:type=value`    → a column DEFAULT (`prop.default`); a defaulted
+	 *                            column is never added to `validatesPresenceOf`
+	 *                            (an absent value is filled by the default).
+	 * The two combine: `name:type=value:optional` is nullable with a default.
+	 * `:optional` uses the word (not `?`) because zsh — the macOS default
+	 * shell — treats a bare `?` as a glob.
 	 */
 	private struct function $parsePropertyArg(required string arg) {
 		// Split on the FIRST two colons only — any additional colons
@@ -12133,13 +12177,45 @@ component extends="modules.BaseModule" {
 		// Property names and types are written into generated CFML (models,
 		// migrations, forms), so only plain identifiers are accepted.
 		var propName = names.identifier($underscoreHyphens(arrayLen(parts) ? parts[1] : "", "property"), "property");
+
+		// A trailing ":optional" marks the column nullable. Recognized only in
+		// the MODIFIER position (after both name and type), so a bare
+		// "name:optional" still reads "optional" as the type. Strip it before
+		// type/enum parsing so it never leaks into the enum value list.
+		var optional = false;
+		if (arrayLen(parts) >= 3 && compareNoCase(trim(parts[arrayLen(parts)]), "optional") == 0) {
+			optional = true;
+			arrayDeleteAt(parts, arrayLen(parts));
+		}
+
 		var typeToken = arrayLen(parts) > 1 ? parts[2] : "string";
+
+		// A "=value" suffix on the type token sets a column DEFAULT. Split it off
+		// (on the first "=") before brace-modifier/type parsing. An empty value
+		// ("name:string=") is treated as no default.
+		var columnDefault = "";
+		var hasDefault = false;
+		var eqPos = find("=", typeToken);
+		if (eqPos > 0) {
+			columnDefault = trim(mid(typeToken, eqPos + 1, len(typeToken) - eqPos));
+			typeToken = left(typeToken, eqPos - 1);
+			hasDefault = len(columnDefault) > 0;
+		}
+		if (!len(typeToken)) {
+			typeToken = "string";
+		}
+
 		var modifiers = $parseTypeModifiers(typeToken);
 		names.identifier(modifiers.type, "property type");
 		var prop = {
 			name: propName,
-			type: modifiers.type
+			type: modifiers.type,
+			// Required by default; ":optional" makes it nullable.
+			required: !optional
 		};
+		if (hasDefault) {
+			prop.default = columnDefault;
+		}
 		if (structKeyExists(modifiers, "limit")) {
 			prop.limit = modifiers.limit;
 		}
