@@ -6985,8 +6985,10 @@ component extends="modules.BaseModule" {
 				out("  3. Restart, then POST credentials to /api/session to receive a JWT.");
 				out("  4. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a bcrypt derivation.");
 			} else {
-				out("  2. Restart, then POST credentials to /api/session to receive a bearer token.");
-				out("  3. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a bcrypt derivation.");
+				out("  2. Create a first account (there is no sign-up endpoint): a seedOnce() in app/db/seeds.cfm, then wheels seed.");
+				out("  3. Restart, then POST credentials to /api/session to receive a bearer token.");
+				out("  4. Protect actions with a filter that authenticates the Authorization header (see .ai/auth.md).");
+				out("  5. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a bcrypt derivation.");
 			}
 			out("  Generated code is yours to edit — re-run with --force and review `git diff` to upgrade.");
 		} else {

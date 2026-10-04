@@ -124,6 +124,29 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(content).notToInclude("apiTokenDigest");
 			});
 
+			it("indexes the api token digest for the token strategy (looked up on every request)", () => {
+				var files = directoryList(fixtures.token.root & "/app/migrator/migrations", false, "name", "*_create_users_table.cfc");
+				expect(arrayLen(files)).toBe(1);
+				var content = fileRead(fixtures.token.root & "/app/migrator/migrations/" & files[1]);
+				expect(content).toInclude('t.string(columnNames="apiTokenDigest", allowNull=true, limit=64);');
+				expect(content).toInclude('addIndex(table="users", columnNames="apiTokenDigest");');
+				expect(content).notToInclude('columnNames="apiTokenDigest", unique=true');
+			});
+
+			it("the auth guide new apps get shows how to require a token and create the first account", () => {
+				// The app template's copy; ship-consumer-docs.sh check keeps it
+				// identical to docs/consumer-ai/.ai/auth.md.
+				var guide = fileRead(expandPath("/cli/lucli/templates/app/.ai/auth.md"));
+				expect(guide).toInclude("## Token APIs (`--strategy=token`)");
+				expect(guide).toInclude('service("authenticator").authenticate(');
+				expect(guide).toInclude("GetHttpRequestData(false).headers");
+				expect(guide).toInclude('seedOnce(modelName="User"');
+				// Shared with the action through variables. (a bare name would stay
+				// local to the filter under localMode="modern").
+				expect(guide).toInclude("variables.currentUser = ");
+				expect(guide).notToInclude("        currentUser = ");
+			});
+
 			it("injects the marked auth route block before the wildcard route", () => {
 				var content = fileRead(fixtures.session.root & "/config/routes.cfm");
 				expect(content).toInclude("wheels:generate-auth:routes:begin");
