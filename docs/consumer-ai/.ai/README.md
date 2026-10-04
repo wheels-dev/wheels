@@ -10,6 +10,7 @@ APPLICATION on Wheels — nothing about framework internals.
 - `../AGENTS.md` — cross-tool workflow guidance (MCP-first, conventions).
 - `models.md` — models: finders, associations, validations, callbacks, scopes.
 - `routing.md` — routing and route model binding.
+- `api.md` — JSON APIs: the api-resource generator, renderWith, status codes, pagination, UTC timestamps.
 - `views.md` — pagination helpers and the development error page.
 - `caching.md` — partial caching.
 - `middleware.md` — middleware and rate limiting.
