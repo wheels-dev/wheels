@@ -144,6 +144,21 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(arrayToList(directoryList(templateRoot & "app/snippets", false, "name", "*.txt"))).toBe("");
 			});
 
+			it("doesn't show an empty-string default in the dbmigrate templates", () => {
+				// Since 4.1.0 the migrator rejects default='' on string, text and
+				// char columns (Wheels.InvalidDefault), and every generated
+				// migration copies these headers, so they must not teach it.
+				var offenders = [];
+				for (var dir in [templateRoot & "app/snippets/dbmigrate/", expandPath("/cli/lucli/templates/codegen/dbmigrate/")]) {
+					for (var name in directoryList(dir, false, "name", "*.txt")) {
+						if (reFind("default\s*=\s*(''|"""")", fileRead(dir & name))) {
+							arrayAppend(offenders, name);
+						}
+					}
+				}
+				expect(arrayToList(offenders)).toBe("");
+			});
+
 			it("writes a lucee.json SQLite DSN with the ##project:path## placeholder LuCLI resolves", () => {
 				var m = new cli.lucli.Module(cwd = expandPath("/"));
 				makePublic(m, "buildSQLiteDatasourcesBlock");
