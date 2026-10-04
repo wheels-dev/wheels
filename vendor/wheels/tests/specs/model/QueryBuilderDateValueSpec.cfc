@@ -83,6 +83,39 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("$unwrapDateLiteral()", () => {
+
+			it("turns a CFML date literal into the text save() writes", () => {
+				var adapter = g.model("profile").$classData().adapter;
+				expect(adapter.$unwrapDateLiteral("{ts '2031-06-15 12:00:00'}")).toBe("2031-06-15 12:00:00");
+				expect(adapter.$unwrapDateLiteral("{ts '2031-06-15 12:00:00.250'}")).toBe("2031-06-15 12:00:00.250");
+				expect(adapter.$unwrapDateLiteral("{d '2031-06-15'}")).toBe("2031-06-15 00:00:00");
+				expect(adapter.$unwrapDateLiteral("{t '12:30:00'}")).toBe("1899-12-30 12:30:00");
+			});
+
+			it("leaves text that is not exactly a date literal unchanged", () => {
+				var adapter = g.model("profile").$classData().adapter;
+				for (var text in [
+					"{d 'abc'}",
+					"{ts 'not a date'}",
+					"{t 'noon'}",
+					"{ts '2031-06-15'}",
+					"x{d '2031-06-15'}",
+					"{d '2031-06-15'} and more",
+					"2031-06-15 12:00:00",
+					""
+				]) {
+					expect(adapter.$unwrapDateLiteral(text)).toBe(text, text);
+				}
+			});
+
+			it("keeps a date-literal-looking value verbatim when it quotes it for a text column", () => {
+				var adapter = g.model("profile").$classData().adapter;
+				expect(adapter.$quoteValue(str = "{d 'abc'}", type = "string")).toBe("'{d ''abc''}'");
+			});
+
+		});
+
 	}
 
 	private void function seedProfiles() {
