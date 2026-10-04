@@ -55,6 +55,32 @@ component extends="wheels.WheelsTest" {
 				expect(instance.wasInitialized()).toBeTrue();
 			});
 
+			it("calls an init() the component inherits", () => {
+				var d = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init");
+				var instance = d.$resolveMiddlewareInstance(middleware = "wheels.tests._assets.middleware.InheritedInitMiddleware");
+				expect(instance.wasInitialized()).toBeTrue();
+			});
+
+			it("caches the component itself when init() returns nothing", () => {
+				var d = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init");
+				var instance = d.$resolveMiddlewareInstance(middleware = "wheels.tests._assets.middleware.VoidInitMiddleware");
+				expect(IsObject(instance)).toBeTrue();
+				expect(instance.wasInitialized()).toBeTrue();
+			});
+
+			it("caches the component itself when init() returns a non-object", () => {
+				var d = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init");
+				var instance = d.$resolveMiddlewareInstance(middleware = "wheels.tests._assets.middleware.ScalarInitMiddleware");
+				expect(IsObject(instance)).toBeTrue();
+				expect(instance.wasInitialized()).toBeTrue();
+			});
+
+			it("caches what init() returns when it returns another object, as before", () => {
+				var d = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init");
+				var instance = d.$resolveMiddlewareInstance(middleware = "wheels.tests._assets.middleware.ReplacingInitMiddleware");
+				expect(ListLast(GetMetaData(instance).name, ".")).toBe("NoInitMiddleware");
+			});
+
 			it("runs an init-less component through the pipeline", () => {
 				var d = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init");
 				var instance = d.$resolveMiddlewareInstance(middleware = "wheels.tests._assets.middleware.NoInitMiddleware");

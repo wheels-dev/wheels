@@ -121,11 +121,16 @@ component output="false" extends="wheels.Global"{
 			}
 			if (!StructKeyExists(application[local.appKey].$middlewareInstanceCache, arguments.middleware)) {
 				// MiddlewareInterface requires only handle(), so init() is optional:
-				// call it when the component has one. The instance itself is cached
-				// (not init()'s return value, which a void init() doesn't have).
+				// call it when the component has one (its own or inherited). As
+				// before, an object init() returns is what gets cached; anything
+				// else (nothing from a void init(), or a boolean, string or struct)
+				// leaves the component itself as the cached middleware.
 				local.instance = CreateObject("component", arguments.middleware);
 				if (StructKeyExists(local.instance, "init")) {
-					local.instance.init();
+					local.initResult = local.instance.init();
+					if (!IsNull(local.initResult) && IsObject(local.initResult)) {
+						local.instance = local.initResult;
+					}
 				}
 				application[local.appKey].$middlewareInstanceCache[arguments.middleware] = local.instance;
 			}
