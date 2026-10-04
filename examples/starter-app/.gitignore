@@ -16,9 +16,14 @@ settings.json
 .vscode
 /plugins/**/
 .env
-/vendor
 
-# H2 embedded database data files (created at runtime; keep the directory)
+# vendor/ is committed on purpose: it holds the framework (vendor/wheels/),
+# so a clone, CI run or image build has everything it needs.
+
+# SQLite database files (created by the server under `wheels start`)
+/db/*.sqlite
+
+# H2 embedded database data files (created under `box server start`; keep the directory)
 /db/h2/*.db
 /db/h2/*.trace.db
 !/db/h2/.keep
