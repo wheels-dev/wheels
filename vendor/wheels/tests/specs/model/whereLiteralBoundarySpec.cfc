@@ -81,6 +81,38 @@ component extends="wheels.WheelsTest" {
 
 		})
 
+		describe("Where strings with BETWEEN ... AND in any case", () => {
+
+			it("returns the rows between two bounds whatever the keyword case", () => {
+				var ids = $postIds();
+				var lower = g.model("post").findAll(where = "id between #ids[1]# and #ids[3]#", returnAs = "query", reload = true);
+				var mixed = g.model("post").findAll(where = "id Between #ids[1]# And #ids[3]#", returnAs = "query", reload = true);
+				var upper = g.model("post").findAll(where = "id BETWEEN #ids[1]# AND #ids[3]#", returnAs = "query", reload = true);
+				expect(lower.recordCount).toBe(3);
+				expect(mixed.recordCount).toBe(3);
+				expect(upper.recordCount).toBe(3);
+			})
+
+			it("keeps a BETWEEN next to a lowercase and/or condition", () => {
+				var ids = $postIds();
+				var titles = $postTitles();
+				var withOr = g.model("post").findAll(where = "id between #ids[2]# and #ids[3]# or title = '#titles[5]#'", returnAs = "query", reload = true);
+				var withAnd = g.model("post").findAll(where = "id between #ids[1]# and #ids[3]# and title <> '#titles[2]#'", returnAs = "query", reload = true);
+				expect(withOr.recordCount).toBe(3);
+				expect(withAnd.recordCount).toBe(2);
+			})
+
+			it("keeps a BETWEEN next to a quoted literal", () => {
+				var ids = $postIds();
+				var titles = $postTitles();
+				var before = g.model("post").findAll(where = "title = '#titles[1]#' and id between #ids[1]# and #ids[3]#", returnAs = "query", reload = true);
+				var after = g.model("post").findAll(where = "id Between #ids[1]# And #ids[3]# And title = '#titles[4]#'", returnAs = "query", reload = true);
+				expect(before.recordCount).toBe(1);
+				expect(after.recordCount).toBe(0);
+			})
+
+		})
+
 	}
 
 	/**
@@ -99,6 +131,21 @@ component extends="wheels.WheelsTest" {
 			transaction action = "rollback";
 		}
 		return counts;
+	}
+
+	public array function $postIds() {
+		// hoisted: ValueList() over a call expression doesn't compile on Adobe
+		var posts = g.model("post").findAll(select = "id", order = "id", returnAs = "query", reload = true);
+		return ListToArray(ValueList(posts.id));
+	}
+
+	public array function $postTitles() {
+		var posts = g.model("post").findAll(select = "id,title", order = "id", returnAs = "query", reload = true);
+		var titles = [];
+		for (var row in posts) {
+			ArrayAppend(titles, row.title);
+		}
+		return titles;
 	}
 
 }
