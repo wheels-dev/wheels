@@ -239,6 +239,31 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(upgrader.readBoxJsonCorePin(dir & "/box.json").error).toInclude("not valid JSON");
 			});
 
+			it("lists each section's pin with its own value", () => {
+				var dir = newTempDir("pin");
+				fileWrite(dir & "/box.json", '{"dependencies":{"wheels-core":"^3.0.1"},"devDependencies":{"wheels-core":"~3.0.0"}}');
+				var pins = upgrader.readBoxJsonCorePin(dir & "/box.json").pins;
+				expect(arrayLen(pins)).toBe(2);
+				expect(pins[1].section).toBe("dependencies");
+				expect(pins[1].value).toBe("^3.0.1");
+				expect(pins[2].section).toBe("devDependencies");
+				expect(pins[2].value).toBe("~3.0.0");
+			});
+
+			it("doesn't rewrite a range, channel or forgebox spec", () => {
+				for (var spec in ["4.x", ">=4.0.0", "be", "stable", "forgebox:wheels-core@3.0.1", "*", ""]) {
+					expect(upgrader.boxJsonCorePinFor(spec, "4.2.0")).toBe("", "spec: " & spec);
+				}
+			});
+
+			it("rewrites only the named section", () => {
+				var dir = newTempDir("pin");
+				var before = '{"dependencies":{"wheels-core":"^3.0.1"},"devDependencies":{"wheels-core":"~3.0.0"}}';
+				fileWrite(dir & "/box.json", before);
+				expect(upgrader.writeBoxJsonCorePin(dir & "/box.json", "~4.2.0", "devDependencies")).toBe(1);
+				expect(fileRead(dir & "/box.json")).toBe(replace(before, '"~3.0.0"', '"~4.2.0"'));
+			});
+
 			it("keeps a ^ or ~ range for a release and pins a prerelease exactly", () => {
 				expect(upgrader.boxJsonCorePinFor("^3.0.1", "4.2.0")).toBe("^4.2.0");
 				expect(upgrader.boxJsonCorePinFor("~3.0.1", "4.2.0")).toBe("~4.2.0");

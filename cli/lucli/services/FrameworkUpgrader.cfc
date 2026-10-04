@@ -294,14 +294,16 @@ component {
 	}
 
 	/**
-	 * Read the wheels-core pin from a CommandBox box.json. Returns
-	 * {declared, value, error}: `declared` is true when `dependencies` or
-	 * `devDependencies` names wheels-core; `error` is non-empty when the file
-	 * exists but isn't a JSON object (a later `box install` couldn't read it
-	 * either, so apply refuses before touching anything).
+	 * Read the wheels-core pins from a CommandBox box.json. Returns
+	 * {declared, value, pins, error}: `pins` lists {section, value} for each of
+	 * `dependencies` and `devDependencies` that names wheels-core, `declared`
+	 * is true when there is at least one, and `value` is the first one's
+	 * value. `error` is non-empty when the file exists but isn't a JSON object
+	 * (a later `box install` couldn't read it either, so apply refuses before
+	 * touching anything).
 	 */
 	public struct function readBoxJsonCorePin(required string boxJsonPath) {
-		var rv = {declared: false, value: "", error: ""};
+		var rv = {declared: false, value: "", pins: [], error: ""};
 		if (!fileExists(arguments.boxJsonPath)) {
 			return rv;
 		}
@@ -313,21 +315,30 @@ component {
 		var box = deserializeJSON(raw);
 		for (var section in ["dependencies", "devDependencies"]) {
 			if (structKeyExists(box, section) && isStruct(box[section]) && structKeyExists(box[section], "wheels-core")) {
-				rv.declared = true;
-				rv.value = isSimpleValue(box[section]["wheels-core"]) ? box[section]["wheels-core"] : "";
-				return rv;
+				var value = isSimpleValue(box[section]["wheels-core"]) ? box[section]["wheels-core"] : "";
+				arrayAppend(rv.pins, {section: section, value: value});
+				if (!rv.declared) {
+					rv.declared = true;
+					rv.value = value;
+				}
 			}
 		}
 		return rv;
 	}
 
 	/**
-	 * The box.json value that pins wheels-core to `newVersion`. A release
-	 * version keeps a leading ^ or ~ from the old value; a prerelease such as
-	 * 4.2.0-snapshot.2867 is pinned exactly, because a range could let
-	 * `box install` resolve a different build.
+	 * The box.json value that pins wheels-core to `newVersion`, or "" when the
+	 * old value isn't one apply rewrites. Only an exact version or a ^ / ~
+	 * range is rewritten: anything else (4.x, >=4.0.0, a channel such as be,
+	 * a forgebox:...@ spec) says something about the user's intent that a bare
+	 * version would lose, so the caller warns instead. A release version keeps
+	 * the ^ or ~; a prerelease such as 4.2.0-snapshot.2867 is pinned exactly,
+	 * because a range could let `box install` resolve a different build.
 	 */
 	public string function boxJsonCorePinFor(required string oldValue, required string newVersion) {
+		if (!reFind("^\s*[\^~]?\d+(\.\d+){1,2}([-+][0-9A-Za-z.+-]+)?\s*$", arguments.oldValue)) {
+			return "";
+		}
 		if (find("-", arguments.newVersion)) {
 			return arguments.newVersion;
 		}
@@ -337,15 +348,17 @@ component {
 
 	/**
 	 * Rewrite the wheels-core value inside box.json's `dependencies` and
-	 * `devDependencies` objects to `newValue`. Everything else stays byte for
+	 * `devDependencies` objects (or only `section`, when given) to `newValue`.
+	 * Everything else stays byte for
 	 * byte, including an `installPaths` entry that also names wheels-core:
 	 * re-serializing would reorder and reformat the user's file. Returns the
 	 * number of values rewritten.
 	 */
-	public numeric function writeBoxJsonCorePin(required string boxJsonPath, required string newValue) {
+	public numeric function writeBoxJsonCorePin(required string boxJsonPath, required string newValue, string section = "") {
 		var raw = fileRead(arguments.boxJsonPath, "utf-8");
 		var state = {count: 0};
-		for (var section in ["dependencies", "devDependencies"]) {
+		var sections = len(arguments.section) ? [arguments.section] : ["dependencies", "devDependencies"];
+		for (var section in sections) {
 			var match = reFind('"' & section & '"\s*:\s*\{[^{}]*\}', raw, 1, true);
 			if (match.pos[1] > 0) {
 				var block = $repinBlock(mid(raw, match.pos[1], match.len[1]), arguments.newValue, state);

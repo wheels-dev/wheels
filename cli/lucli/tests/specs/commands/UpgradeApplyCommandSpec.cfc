@@ -420,6 +420,45 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(result).toInclude("box.json: wheels-core ^3.0.1 -> ^4.1.1 (so box install keeps this framework)");
 				});
 
+				it("keeps each section's own range when both sections pin wheels-core", () => {
+					seedVendorWheels(version = "4.1.0");
+					var box = '{"dependencies":{"wheels-core":"^3.0.1"},"devDependencies":{"wheels-core":"~3.0.0"}}';
+					fileWrite(variables.tempRoot & "/box.json", box);
+
+					var result = mod.upgrade(arg1 = "apply");
+
+					expect(fileRead(variables.tempRoot & "/box.json")).toBe('{"dependencies":{"wheels-core":"^4.1.1"},"devDependencies":{"wheels-core":"~4.1.1"}}');
+					expect(result).toInclude("box.json: wheels-core ^3.0.1 -> ^4.1.1");
+					expect(result).toInclude("box.json (devDependencies): wheels-core ~3.0.0 -> ~4.1.1");
+				});
+
+				it("leaves a channel spec alone and names the line to change", () => {
+					seedVendorWheels(version = "4.1.0");
+					var box = '{"dependencies":{"wheels-core":"be"}}';
+					fileWrite(variables.tempRoot & "/box.json", box);
+
+					var result = mod.upgrade(arg1 = "apply");
+
+					expect(fileRead(variables.tempRoot & "/box.json")).toBe(box);
+					expect(result).toInclude('box.json: wheels-core is "be", which apply doesn''t rewrite');
+					expect(result).toInclude('"wheels-core": "4.1.1"');
+					expect(result).notToInclude("be ->");
+				});
+
+				it("doesn't report an update it couldn't write", () => {
+					seedVendorWheels(version = "4.1.0");
+					// Valid JSON, but a nested object keeps the in-place rewrite
+					// from locating the dependencies block.
+					var box = '{"dependencies":{"wheels-core":"^3.0.1","x":{"y":"1"}}}';
+					fileWrite(variables.tempRoot & "/box.json", box);
+
+					var result = mod.upgrade(arg1 = "apply");
+
+					expect(fileRead(variables.tempRoot & "/box.json")).toBe(box);
+					expect(result).toInclude("box.json: wheels-core could not be located to rewrite");
+					expect(result).notToInclude("^3.0.1 -> ^4.1.1");
+				});
+
 				it("refuses before changing anything when box.json can't be read", () => {
 					seedVendorWheels(version = "4.1.0");
 					fileWrite(variables.tempRoot & "/box.json", '{"dependencies":{"wheels-core":"^3.0.1"');
