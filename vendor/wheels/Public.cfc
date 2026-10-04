@@ -844,10 +844,49 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		// because `wheels new` doesn't scaffold one.
 		var projectRunner = ExpandPath("/tests/runner.cfm");
 		if (FileExists(projectRunner)) {
-			include "/tests/runner.cfm";
+			$runProjectTestRunner();
 			return;
 		}
 		include "/wheels/tests/app-runner.cfm";
+	}
+
+	/**
+	 * Runs the project's own tests/runner.cfm under the same datasource rule as the
+	 * built-in runner: on `<datasource>_test`, or on the primary datasource only when
+	 * asked to (useTestDB=false, or the allowTestsAgainstPrimaryDatasource setting),
+	 * otherwise refused. Runners copied from older Wheels releases pick their
+	 * datasource from coreTestDataSourceName, which is pointed at the test datasource
+	 * for the run. Holds the app-runner's lock; a re-entrant request carrying the
+	 * in-progress run's token is included as-is (app-runner.cfm handles it).
+	 */
+	private void function $runProjectTestRunner() {
+		var activeRunToken = StructKeyExists(application, "$$$appTestRunToken") ? application["$$$appTestRunToken"] : "";
+		var requestRunToken = (StructKeyExists(url, "wheelsTestRun") && IsSimpleValue(url.wheelsTestRun)) ? url.wheelsTestRun : "";
+		if (Len(activeRunToken) && Compare(requestRunToken, activeRunToken) == 0) {
+			include "/tests/runner.cfm";
+			return;
+		}
+		lock name="wheelsTestRunner_#application.applicationName#" type="exclusive" timeout="1800" throwontimeout="true" {
+			// Holding the lock means no run is in progress: settings a killed run left
+			// switched are restored before this run reads them.
+			application.wo.$recoverStrandedTestRun(force = true);
+			var decision = application.wo.$testDataSourceDecision(primary = application.wheels.dataSourceName, requestUrl = url);
+			if (decision.action == "refuse") {
+				cfheader(statuscode = 409);
+				cfcontent(type = "application/json");
+				WriteOutput(SerializeJSON(application.wo.$testDataSourceRefusal(decision = decision)));
+				abort;
+			}
+			if (decision.warn) {
+				application.wo.$warnTestsOnPrimaryDataSource(decision = decision);
+			}
+			var saved = application.wo.$beginTestRunDataSource(decision = decision);
+			try {
+				include "/tests/runner.cfm";
+			} finally {
+				application.wo.$endTestRunDataSource(saved = saved);
+			}
+		}
 	}
 
 	public function tests_testbox() {
