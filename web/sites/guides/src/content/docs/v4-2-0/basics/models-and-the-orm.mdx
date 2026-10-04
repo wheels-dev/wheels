@@ -120,6 +120,24 @@ component extends="Controller" {
 
 Pagination is built into `findAll`: pass `page` and `perPage` and the framework runs a count query, a primary-key query, and a hydration query behind the scenes. Pair with the view pagination helpers (`paginationNav()`) to render navigation.
 
+In a JSON API there's no navigation to render. Call `pagination()` after the `findAll` instead: it returns `currentPage`, `totalPages` and `totalRecords` for that query (pass `handle=` if the query has one). Copy the values into a struct with quoted keys, because rendered as is the key case varies:
+
+```cfm {test:compile} title="app/controllers/api/Widgets.cfc (fragment)"
+component extends="wheels.Controller" {
+    function config() {
+        provides("json");
+    }
+    function index() {
+        local.widgets = model("widget").findAll(page = params.page ?: 1, perPage = 25, returnAs = "objects");
+        local.p = pagination();
+        renderWith(data = {
+            "widgets" = local.widgets,
+            "pagination" = {"page" = local.p.currentPage, "totalPages" = local.p.totalPages, "totalRecords" = local.p.totalRecords}
+        });
+    }
+}
+```
+
 ## Creating records
 
 Two patterns, chosen by whether you need to inspect or mutate the record before it's saved.
