@@ -9,8 +9,8 @@
  * FrameworkUpgrader.applyUpgrade path (covered in depth by FrameworkUpgraderSpec);
  * this spec covers the thin dispatch layer in Module.cfc.
  *
- * Mirrors UpgradeApplyCommandSpec: a fresh scaffolded temp project per spec and
- * an output-capturing Module driven through the structured callerArgs path.
+ * Uses the output-capturing Module so help/refusal specs can assert what was
+ * PRINTED (the command returns "" to avoid the double-print — U4/#4265).
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
@@ -44,7 +44,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			beforeEach(() => {
 				// Fresh project per spec: install mutates vendor/, so specs can't
-				// share a fixture. scaffoldTempProject leaves no vendor/wheels/.
+				// share a fixture. scaffoldTempProject writes config/settings.cfm
+				// (so the app-root guard passes) and leaves no vendor/ directory.
 				variables.tempRoot = testHelper.scaffoldTempProject(expandPath("/"));
 				variables.mod = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
 			});
@@ -55,33 +56,33 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			describe("help", () => {
 
-				it("returns usage for --help", () => {
-					var result = mod.framework(help = true);
-					expect(result).toInclude("wheels framework install");
-					expect(result).toInclude("--to=");
-					expect(result).toInclude("upgrade apply");
-				});
-
-				it("returns usage for the bare command", () => {
-					var result = mod.framework(arg1 = "");
-					expect(result).toInclude("wheels framework install");
-				});
-
-				it("returns usage for the help subcommand", () => {
-					expect(mod.framework(arg1 = "help")).toInclude("wheels framework install");
-				});
-
-				it("the bare command does not create vendor/wheels/", () => {
-					mod.framework(arg1 = "");
+				it("prints usage ONCE for --help and installs nothing", () => {
+					mod.framework(help = true);
+					var printed = mod.capturedOutput();
+					expect(printed).toInclude("wheels framework install");
+					expect(printed).toInclude("--to=");
+					expect(printed).toInclude("upgrade apply");
+					// Printed via out() only — returning the text too would double it.
+					expect(arrayLen(reMatchNoCase("Usage:", printed))).toBe(1, "help must print once, not twice");
 					expect(vendorWheelsExists()).toBeFalse();
+				});
+
+				it("prints usage for the bare command and the help subcommand", () => {
+					mod.framework(arg1 = "");
+					expect(mod.capturedOutput()).toInclude("wheels framework install");
+				});
+
+				it("prints usage for the help subcommand", () => {
+					mod.framework(arg1 = "help");
+					expect(mod.capturedOutput()).toInclude("wheels framework install");
 				});
 
 			});
 
-			describe("install into an app with no vendor/wheels/", () => {
+			describe("install into an app with no vendor/ at all", () => {
 
-				it("installs the bundled framework", () => {
-					expect(vendorWheelsExists()).toBeFalse("precondition: no vendor/wheels/");
+				it("installs the bundled framework (creating vendor/)", () => {
+					expect(directoryExists(variables.tempRoot & "/vendor")).toBeFalse("precondition: no vendor/ dir");
 					mod.framework(arg1 = "install");
 					expect(vendorWheelsExists()).toBeTrue("install created vendor/wheels/");
 					expect(installedVersion()).toBe(variables.bundledVersion);
@@ -92,9 +93,39 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(installedVersion()).toBe(variables.bundledVersion);
 				});
 
+				it("runs the box.json wheels-core pin step", () => {
+					fileWrite(
+						variables.tempRoot & "/box.json",
+						'{"name":"myapp","dependencies":{"wheels-core":"1.0.0-OLD-PIN"},"installPaths":{"wheels-core":"vendor/wheels/"}}'
+					);
+					mod.framework(arg1 = "install");
+					expect(vendorWheelsExists()).toBeTrue();
+					// For a release build the pin is rewritten to the installed version;
+					// for a snapshot/placeholder build it is left with a note. Either way
+					// the pin step runs and names wheels-core in its output.
+					expect(mod.capturedOutput()).toInclude("wheels-core");
+				});
+
 			});
 
 			describe("refusals (no mutation)", () => {
+
+				it("refuses when the directory is not a Wheels app root", () => {
+					var bareDir = getTempDirectory() & "/f20-notapp-" & createUUID();
+					directoryCreate(bareDir, true, true);
+					var bareMod = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = bareDir);
+					var state = {threw = false, message = ""};
+					try {
+						bareMod.framework(arg1 = "install");
+					} catch (any e) {
+						state.threw = true;
+						state.message = e.message;
+					}
+					expect(state.threw).toBeTrue();
+					expect(state.message).toInclude("app root");
+					expect(directoryExists(bareDir & "/vendor/wheels")).toBeFalse("nothing was installed");
+					directoryDelete(bareDir, true);
+				});
 
 				it("refuses when vendor/wheels/ is already a framework and points to upgrade apply", () => {
 					seedVendorWheels(version = "0.0.1-spec-fixture");
@@ -107,7 +138,6 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					}
 					expect(state.threw).toBeTrue();
 					expect(state.message).toInclude("upgrade apply");
-					// untouched
 					expect(installedVersion()).toBe("0.0.1-spec-fixture");
 					expect(fileExists(variables.tempRoot & "/vendor/wheels/marker.txt")).toBeTrue();
 				});
