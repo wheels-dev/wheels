@@ -8611,10 +8611,10 @@ component extends="modules.BaseModule" {
 			{since: "4.0.4", severity: "advisory", pattern: "StructKeyExists\(\s*application\s*,\s*""wheelsdi""\s*\)",
 				description: "public/Application.cfc onError doesn't guard the DI container",
 				fix: "Without the guard an error page can rebuild the container and wipe registered services. #adopt# Guide: ""DI container guard in onError"", #guide41#"},
-			{since: "4.0.6", severity: "breaking", pattern: "applicationScope\.wo\.\$include",
+			{since: "4.0.6", severity: "breaking", pattern: "applicationScope\.wo\.\$include", requireFileMatches: "function\s+onApplicationEnd\s*\(",
 				description: "public/Application.cfc onApplicationEnd() doesn't go through arguments.applicationScope",
 				fix: "On Adobe ColdFusion, an onApplicationEnd() that reads the bare application scope can fail during shutdown and leave the whole site erroring until a service restart. Route it through arguments.applicationScope.wo with the StructKeyExists guards. #adopt# Guide: ""Adobe teardown guards in onError / onSessionEnd"", #guide41#"},
-			{since: "4.1.0", severity: "breaking", pattern: "applicationScope\.wo\.\$simpleLock",
+			{since: "4.1.0", severity: "breaking", pattern: "applicationScope\.wo\.\$simpleLock", requireFileMatches: "function\s+onSessionEnd\s*\(",
 				description: "public/Application.cfc onSessionEnd() doesn't go through arguments.applicationScope",
 				fix: "On Adobe ColdFusion, session cleanup can call onSessionEnd() after the application scope is gone, and a bare application.wo then throws. Route it through arguments.applicationScope.wo, guarded with StructKeyExists. #adopt# Guide: ""Adobe teardown guards in onError / onSessionEnd"", #guide41#"},
 			{since: "4.0.6", severity: "advisory", pattern: "testcontext\.cfm",
@@ -8646,7 +8646,7 @@ component extends="modules.BaseModule" {
 			if (targetKnown && semver.compare(arguments.target, fixSpec.since) < 0) {
 				continue;
 			}
-			arrayAppend(arguments.checks, {
+			var check = {
 				description: fixSpec.description,
 				severity: fixSpec.severity,
 				checkType: "grep",
@@ -8654,7 +8654,11 @@ component extends="modules.BaseModule" {
 				pattern: fixSpec.pattern,
 				scanTargets: [{path: "public/Application.cfc"}],
 				fix: fixSpec.fix
-			});
+			};
+			if (structKeyExists(fixSpec, "requireFileMatches")) {
+				check.requireFileMatches = fixSpec.requireFileMatches;
+			}
+			arrayAppend(arguments.checks, check);
 		}
 		return arguments.checks;
 	}
@@ -8859,6 +8863,21 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Whether a grep check leaves a file out of its scan: `skipIfFileMatches`
+	 * skips a file that matches anywhere (the environment.cfm checks skip one
+	 * that already reads WHEELS_ENV), and `requireFileMatches` skips one that
+	 * doesn't (the teardown checks need the function to be declared). A
+	 * skipped file doesn't count as scanned, so an `absent` check over it
+	 * passes.
+	 */
+	private boolean function $upgradeFileSkipped(required struct check, required string content) {
+		if (structKeyExists(arguments.check, "skipIfFileMatches") && reFindNoCase(arguments.check.skipIfFileMatches, arguments.content) > 0) {
+			return true;
+		}
+		return structKeyExists(arguments.check, "requireFileMatches") && reFindNoCase(arguments.check.requireFileMatches, arguments.content) == 0;
+	}
+
+	/**
 	 * Execute a single upgrade check, returning its severity, matched flag,
 	 * and matchEntry (populated only when matched).
 	 */
@@ -8880,6 +8899,7 @@ component extends="modules.BaseModule" {
 			var filesToScan = $upgradeCollectScanFiles(arguments.check);
 
 			var matches = [];
+			var scanned = 0;
 			for (var filePath in filesToScan) {
 				// Strip CFML comments before grepping (Anti-Pattern #14):
 				// a commented-out `// t.references(...)` or
@@ -8890,12 +8910,10 @@ component extends="modules.BaseModule" {
 				// `raw: true` scans the file as written: a JDBC URL's `//` would
 				// otherwise read as a line comment and hide the rest of the line.
 				var content = structKeyExists(arguments.check, "raw") && arguments.check.raw ? fileRead(filePath) : stripCfmlComments(fileRead(filePath));
-				// `skipIfFileMatches`: a file that matches it anywhere is not
-				// scanned (the environment.cfm checks skip a file that already
-				// reads WHEELS_ENV, wherever its set() line is).
-				if (structKeyExists(arguments.check, "skipIfFileMatches") && reFindNoCase(arguments.check.skipIfFileMatches, content) > 0) {
+				if ($upgradeFileSkipped(arguments.check, content)) {
 					continue;
 				}
+				scanned++;
 				var lines = listToArray(content, chr(10), true);
 				for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
 					if (reFindNoCase(arguments.check.pattern, lines[lineNum])) {
@@ -8912,7 +8930,7 @@ component extends="modules.BaseModule" {
 			// treat as pass to avoid noisy false positives.
 			var isAbsent = structKeyExists(arguments.check, "absent") && arguments.check.absent;
 			if (isAbsent) {
-				if (arrayLen(filesToScan) && !arrayLen(matches)) {
+				if (scanned && !arrayLen(matches)) {
 					matched = true;
 					var hint = structKeyExists(arguments.check, "scanDir") && len(arguments.check.scanDir)
 						? arguments.check.scanDir & "/ (no occurrences found)"

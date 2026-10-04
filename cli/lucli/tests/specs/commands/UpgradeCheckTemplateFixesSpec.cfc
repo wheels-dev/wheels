@@ -74,6 +74,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(arrayToList(flagged(runCheck(), "breaking"), "|")).toInclude("onSessionEnd()");
 			});
 
+			it("doesn't flag the teardown routing when onApplicationEnd isn't declared", () => {
+				// No function and no routing code: nothing to fix.
+				var noEnd = replace(variables.template, "function onApplicationEnd(", "function notAnAppEndHandler(", "all");
+				app(replace(noEnd, "applicationScope.wo.$include", "application.wo.$include", "all"));
+				expect(arrayToList(flagged(runCheck(), "breaking"), "|")).notToInclude("onApplicationEnd()");
+			});
+
+			it("doesn't flag the teardown routing when onSessionEnd isn't declared", () => {
+				var noEnd = replace(variables.template, "function onSessionEnd(", "function notASessionEndHandler(", "all");
+				app(replace(noEnd, "applicationScope.wo.$simpleLock", "application.wo.$simpleLock", "all"));
+				expect(arrayToList(flagged(runCheck(), "breaking"), "|")).notToInclude("onSessionEnd()");
+			});
+
 			it("is advisory when onError doesn't tell a running-app error from a startup failure", () => {
 				app(replace(variables.template, "startupPhase", "startupStage", "all"));
 				var report = runCheck();
