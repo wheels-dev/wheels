@@ -249,32 +249,29 @@ component {
 	}
 
 	/**
-	 * Internal: The callback-queue key of an open Wheels-managed transaction, when a tenant
-	 * datasource other than the job store is active; otherwise "". Only then is an enqueue
-	 * deferred to the commit: on the job store's own datasource it joins the transaction.
-	 * A raw transaction {} is not tracked by Wheels, so it is not covered.
+	 * Internal: When the innermost open Wheels-managed transaction writes to a datasource
+	 * other than the job store's (a tenant's, for a model that isn't shared), its
+	 * callback-queue key; otherwise "". Only then is an enqueue deferred to the commit: a
+	 * transaction on the job store's own datasource is joined. A raw transaction {} is not
+	 * tracked by Wheels, so it is not covered.
 	 */
 	public string function $crossDatasourceTransaction() {
 		if (
-			!IsDefined("request.wheels.tenant.dataSource")
-			|| !Len(request.wheels.tenant.dataSource)
-			|| CompareNoCase(request.wheels.tenant.dataSource, variables.$datasource) == 0
+			!StructKeyExists(request, "wheels")
+			|| !StructKeyExists(request.wheels, "$txnOwnerStack")
 			|| !StructKeyExists(request.wheels, "$txnCallbacks")
-			|| !StructKeyExists(request.wheels, "transactions")
 		) {
 			return "";
 		}
-		for (local.key in request.wheels.$txnCallbacks) {
+		local.stack = request.wheels.$txnOwnerStack;
+		for (local.i = ArrayLen(local.stack); local.i >= 1; local.i--) {
+			local.key = local.stack[local.i];
+			if (!StructKeyExists(request.wheels.$txnCallbacks, local.key)) {
+				continue;
+			}
 			local.store = request.wheels.$txnCallbacks[local.key];
-			if (
-				IsStruct(local.store)
-				&& StructKeyExists(local.store, "real")
-				&& local.store.real
-				&& StructKeyExists(request.wheels.transactions, local.key)
-				&& IsBoolean(request.wheels.transactions[local.key])
-				&& request.wheels.transactions[local.key]
-			) {
-				return local.key;
+			if (IsStruct(local.store) && StructKeyExists(local.store, "real") && local.store.real && StructKeyExists(local.store, "dataSource")) {
+				return CompareNoCase(local.store.dataSource, variables.$datasource) == 0 ? "" : local.key;
 			}
 		}
 		return "";
