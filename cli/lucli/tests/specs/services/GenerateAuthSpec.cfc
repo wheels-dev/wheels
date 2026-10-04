@@ -301,6 +301,35 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("generateAuth() — the API session controller answers in JSON", () => {
+
+			// provides("json") alone leaves a request with no .json extension
+			// and no Accept header on the html format, and renderWith() then
+			// looks for app/views/api/sessions/*.cfm, which doesn't exist.
+			it("token: forces the json format before the action runs", () => {
+				$expectForcesJson("token");
+			});
+
+			it("jwt: forces the json format before the action runs", () => {
+				$expectForcesJson("jwt");
+			});
+
+			it("token: quotes every renderWith() key so the JSON keys keep their case", () => {
+				$expectQuotedKeys("token");
+			});
+
+			it("jwt: quotes every renderWith() key so the JSON keys keep their case", () => {
+				$expectQuotedKeys("jwt");
+			});
+
+			it("emits a controller spec that doesn't pass the format itself", () => {
+				var spec = $stripComments(fileRead(fixtures.token.root & "/tests/specs/controllers/ApiSessionsControllerSpec.cfc"));
+				expect(spec).notToInclude('format: "json"');
+				expect(spec).toInclude('DeserializeJSON(result.body)');
+			});
+
+		});
+
 		describe("generateAuth() — --no-registration", () => {
 
 			it("omits the Registrations controller, its view, and its routes", () => {
@@ -594,6 +623,21 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+	}
+
+	private void function $expectForcesJson(required string strategy) {
+		var ctrl = $stripComments(fileRead(variables.fixtures[arguments.strategy].root & "/app/controllers/api/Sessions.cfc"));
+		expect(ctrl).toInclude('filters(through="setJsonResponse")');
+		expect(ctrl).toInclude('params.format = "json"');
+	}
+
+	private void function $expectQuotedKeys(required string strategy) {
+		var ctrl = $stripComments(fileRead(variables.fixtures[arguments.strategy].root & "/app/controllers/api/Sessions.cfc"));
+		var unquoted = reMatch("renderWith\(data=\{\s*[A-Za-z]+\s*:", ctrl);
+		ArrayAppend(unquoted, reMatch("renderWith\(data=\{[^}]*,\s*[A-Za-z]+\s*:", ctrl), true);
+		expect(unquoted).toBeEmpty();
+		expect(ctrl).toInclude('"token": token');
+		expect(ctrl).toInclude('"error": "Invalid email or password."');
 	}
 
 }
