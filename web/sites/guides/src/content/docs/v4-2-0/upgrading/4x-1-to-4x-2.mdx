@@ -218,6 +218,10 @@ A bare property or method name in a `condition` or `unless` expression now means
 
 `joinType` accepts `inner`, `outer`, `left` and `left outer` (the last three all emit `LEFT OUTER JOIN`). Any other value throws `Wheels.InvalidJoinType` when the association is registered, at application start ([#3936](https://github.com/wheels-dev/wheels/issues/3936)). Before, `joinType="left"` emitted a `LEFT JOIN` that the nested-include grouping didn't recognise, so a nested include under it was silently dropped.
 
+### Production error pages return 404, 403 or 406 for Wheels errors
+
+With `showErrorInformation` off (the default outside development), the error page now returns the HTTP status that fits the Wheels error instead of `500` for every error ([#4238](https://github.com/wheels-dev/wheels/pull/4238)): `404` for an unknown route, record, view, file or action (`Wheels.RouteNotFound`, `RecordNotFound`, `ViewNotFound`, `FileNotFound`, `ActionNotAllowed`, `ActionParameterMissing`), `403` for `Wheels.NotAuthorized` or an invalid CSRF token, and `406` for `Wheels.FormatNotAcceptable`. Other `Wheels.*NotFound` errors, such as a missing table, datasource or model, still return `500`, so monitoring still sees server faults. Development already returned these statuses. Monitoring, alerts or log searches that count production `500`s will see fewer of them; if one keys on `500` for these cases, update it to the new statuses.
+
 ### `renderNotFound` is a framework helper
 
 `renderNotFound(message, type, extendedInfo)` is a new public controller helper that produces a 404 from app code ([#3900](https://github.com/wheels-dev/wheels/issues/3900)). Because it is public, it is now a reserved action name: an existing controller **action** literally named `renderNotFound` gets `Wheels.ActionNotAllowed` instead of dispatching. Rename such an action. A controller that already defines its own `renderNotFound` helper overrides the framework one, and that keeps working.
