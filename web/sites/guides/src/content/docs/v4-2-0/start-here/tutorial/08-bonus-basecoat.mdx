@@ -337,7 +337,7 @@ The package ships a full component gallery under `vendor/wheels-basecoat/example
    xcopy /E /I vendor\wheels-basecoat\examples\showcase\views\showcase app\views\showcase
    ```
 
-3. Add a named route in `config/routes.cfm` (before `.wildcard()`):
+3. Add a named route in `config/routes.cfm` (above `.root()`):
 
    ```cfm title="config/routes.cfm"
    .get(name="basecoatShowcase", pattern="/basecoat-showcase", to="showcase##index")

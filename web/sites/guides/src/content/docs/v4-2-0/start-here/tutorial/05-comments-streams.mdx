@@ -172,8 +172,8 @@ The comment form will POST to `/posts/:postKey/comments`. Wheels builds that URL
            map.resources(name="comments", only="create");
        })
        .get(name="hello", pattern="/hello", to="main##hello")
-       .wildcard()
        .root(to="posts##index", method="get")
+       .wildcard()
    .end();
    ```
 
