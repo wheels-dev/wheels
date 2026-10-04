@@ -8036,8 +8036,8 @@ component extends="modules.BaseModule" {
 
 		// The version-appropriate guide + the soft-landing adapter, surfaced
 		// whenever breaking findings are reported (and always in JSON output).
-		var guideUrl = new services.GuidesLink().link(
-			"upgrading/" & (crosses42 && sameMajor ? "4x-1-to-4x-2" : (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x")) & "/",
+		var guideUrl = crosses42 && sameMajor ? $upgradeGuide4x2Url() : new services.GuidesLink().link(
+			"upgrading/" & (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/",
 			target
 		);
 
@@ -8589,6 +8589,16 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The 4.1 → 4.2 upgrade guide. It exists only in the v4-2-0 guide tree, so
+	 * the link is pinned there: GuidesLink.link() would clamp a 4.2 target to
+	 * the latest released tree until the 4.2 guides are marked released, and
+	 * the page isn't in older trees at all.
+	 */
+	private string function $upgradeGuide4x2Url() {
+		return new services.GuidesLink().pinned("v4-2-0", "upgrading/4x-1-to-4x-2/");
+	}
+
+	/**
 	 * The 4.1 → 4.2 checks: app-owned files the 4.2 template changed, and the
 	 * behaviour changes the upgrade guide lists. Severity "breaking" marks an
 	 * item that fails at runtime on 4.2 (an error, a refused request, a failed
@@ -8596,7 +8606,7 @@ component extends="modules.BaseModule" {
 	 * behaves differently. Each fix names the guide section to read.
 	 */
 	private array function $upgradeAppendChecks4x2(required array checks, required string target) {
-		var guide = new services.GuidesLink().link("upgrading/4x-1-to-4x-2/", arguments.target);
+		var guide = $upgradeGuide4x2Url();
 		// Selecting the environment from anything but WHEELS_ENV: adopting the
 		// 4.2 template drops that selection, and a server without WHEELS_ENV
 		// then starts in development.
