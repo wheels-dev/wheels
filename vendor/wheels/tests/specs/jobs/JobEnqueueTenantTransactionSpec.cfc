@@ -18,11 +18,14 @@ component extends="wheels.WheelsTest" {
 			} catch (any e) {
 				tenantAvailable = false;
 			}
-			if (!tenantAvailable) {
-				return;
-			}
+			// Always register the tests: skip() when the tenant datasource is missing, so an
+			// absent datasource shows as skipped, never as a silent pass.
+			var tenantState = {available = tenantAvailable};
 
 			beforeEach(function() {
+				if (!tenantState.available) {
+					return;
+				}
 				try { QueryExecute("DROP TABLE IF EXISTS job_tenant_tx_rows", [], {datasource = dsB}); } catch (any e) {}
 				QueryExecute("CREATE TABLE job_tenant_tx_rows (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(50))", [], {datasource = dsB});
 				variables.job = new wheels.tests._assets.jobs.ProbeJob();
@@ -32,6 +35,9 @@ component extends="wheels.WheelsTest" {
 			});
 
 			afterEach(function() {
+				if (!tenantState.available) {
+					return;
+				}
 				if (IsDefined("request.wheels.tenant")) {
 					StructDelete(request.wheels, "tenant");
 				}
@@ -40,6 +46,9 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("either stores the job in the job store or throws Wheels.Job.EnqueueFailed, never loses it", function() {
+				if (!tenantState.available) {
+					skip("The wheelstestdb_sqlite_tenant_b datasource is not configured on this engine.");
+				}
 				if (application.wo.$engineAdapter().isRustCFML()) {
 					// RustCFML sends every statement in a transaction to the first datasource
 					// it used, so the job row lands in the tenant database: written, but not
