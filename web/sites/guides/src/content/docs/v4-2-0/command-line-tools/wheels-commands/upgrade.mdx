@@ -16,6 +16,17 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 - Confirming an upgrade is "clean" — same major version, no code changes expected — `check`.
 - Pinning the scan to a specific target with `--to=<version>` when you're not chasing the latest release — `check`.
 - Swapping `vendor/wheels/` from the CLI bundle without a manual zip dance — `apply`.
+- Installing `vendor/wheels/` into an app that has **none** (for example one moving off CommandBox) — `wheels framework install` (see the note below).
+
+<Aside type="note" title="Fresh install: wheels framework install">
+`wheels upgrade apply` replaces an *existing* `vendor/wheels/`. For an app that has **no** `vendor/wheels/` yet — e.g. one installed via CommandBox's `box install` and moving onto the `wheels` CLI — run `wheels framework install` instead:
+
+```txt title="
+wheels framework install [--to=<version>]
+```
+
+It writes the CLI's bundled framework into `vendor/wheels/` (creating `vendor/` if needed), pins `box.json`'s `wheels-core` when a `box.json` is present, and **refuses** (pointing you back to `wheels upgrade apply`) if a framework is already installed. `--to=<version>` must match the bundled version — there are no downloads. After it finishes: `wheels start`, then `wheels migrate latest`.
+</Aside>
 
 ### Synopsis
 
