@@ -256,8 +256,8 @@ Part 2 restricted the resource to `only="index,show"`. Drop the restriction so a
        .get(name="up", to="up##index")
        .resources(name="posts", binding=true)
        .get(name="hello", pattern="/hello", to="main##hello")
-       .wildcard()
        .root(to="posts##index", method="get")
+       .wildcard()
    .end();
    ```
 
