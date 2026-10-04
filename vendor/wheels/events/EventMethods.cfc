@@ -256,7 +256,20 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	}
 
 	public string function $runOnErrorRenderTemplate(required exception, required eventName) {
-		$header(statusCode = 500);
+		// Classify the response status through the same $wheelsErrorStatusCode
+		// allow-list the development path uses ($runOnErrorRenderWheelsError),
+		// instead of returning 500 for every error. Otherwise a production
+		// (showErrorInformation off) request that raised a client-triggerable
+		// Wheels.*NotFound came back 500 rather than 404, and a
+		// Wheels.NotAuthorized came back 500 rather than 403 — the classification
+		// only ran when showErrorInformation was on (#2319/#3075/#3156). A
+		// non-Wheels exception has no resolved type and stays 500.
+		local.wheelsError = $runOnErrorResolveWheelsError(arguments.exception);
+		$header(
+			statusCode = (!StructIsEmpty(local.wheelsError) && StructKeyExists(local.wheelsError, "type"))
+				? $wheelsErrorStatusCode(local.wheelsError.type)
+				: 500
+		);
 
 		local.format = $getRequestFormat();
 		local.formatSpecificTemplate = "#application.wheels.eventPath#/onerror.#local.format#.cfm";

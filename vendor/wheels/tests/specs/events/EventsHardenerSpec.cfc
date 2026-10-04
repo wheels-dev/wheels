@@ -136,6 +136,64 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("S2b production error page (showErrorInformation off) uses the same status map", () => {
+
+			// Finding F24: with showErrorInformation off (the default outside
+			// development, i.e. production/testing), $runOnError routes to
+			// $runOnErrorRenderTemplate, which used to hardcode statusCode=500 for
+			// every error. So an app-thrown Wheels.*NotFound came back 500, not
+			// 404, and a Wheels.NotAuthorized came back 500, not 403 — the status
+			// classification only ran on the showErrorInformation=on branch. The
+			// production path must classify through the same $wheelsErrorStatusCode
+			// allow-list as the development path (#2319/#3075/#3156).
+
+			beforeEach(() => {
+				_savedShowError = application.wheels.showErrorInformation;
+				application.wheels.showErrorInformation = false;
+			});
+
+			afterEach(() => {
+				application.wheels.showErrorInformation = _savedShowError;
+			});
+
+			it("maps Wheels.RecordNotFound to 404 through live $runOnError (production)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.RecordNotFound"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(404);
+			});
+
+			it("maps Wheels.RouteNotFound to 404 through live $runOnError (production)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.RouteNotFound"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(404);
+			});
+
+			it("maps Wheels.ActionNotAllowed to 404 through live $runOnError (production, ##3075)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.ActionNotAllowed"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(404);
+			});
+
+			it("maps Wheels.NotAuthorized to 403 through live $runOnError (production, ##3156)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.NotAuthorized"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(403);
+			});
+
+			it("keeps a server-side Wheels.TableNotFound at 500 through live $runOnError (production)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.TableNotFound"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(500);
+			});
+
+			it("keeps a generic non-allow-listed Wheels error at 500 (production)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.UnknownThingHappened"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(500);
+			});
+
+		});
+
 		describe("S3 $mail catch-any swallow stays (does not rethrow)", () => {
 
 			beforeEach(() => {
