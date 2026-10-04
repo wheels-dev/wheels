@@ -283,9 +283,7 @@
                     WriteOutput(SerializeJSON({
                         success = false,
                         error = "Test database not available",
-                        message = "The framework test suite would run on this app's primary datasource '" & local.coreDataSource.decision.primary
-                            & "'. Pass ?db= to use a wheelstestdb_<db> datasource, create '" & local.coreDataSource.decision.candidate
-                            & "', or run against the primary datasource intentionally with useTestDB=false.",
+                        message = local.coreDataSource.message,
                         datasource = local.coreDataSource.decision.primary,
                         candidate = local.coreDataSource.decision.candidate
                     }));

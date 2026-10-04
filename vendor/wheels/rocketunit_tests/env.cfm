@@ -30,9 +30,7 @@ if (coreDataSource.action == "refuse") {
 	WriteOutput(SerializeJSON({
 		success = false,
 		error = "Test database not available",
-		message = "The framework test suite would run on this app's primary datasource '" & coreDataSource.decision.primary
-			& "'. Pass ?db= to use a wheelstestdb_<db> datasource, create '" & coreDataSource.decision.candidate
-			& "', or run against the primary datasource intentionally with useTestDB=false.",
+		message = coreDataSource.message,
 		datasource = coreDataSource.decision.primary,
 		candidate = coreDataSource.decision.candidate
 	}));

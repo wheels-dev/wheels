@@ -1165,23 +1165,37 @@ public boolean function $isTestRunReentry(required struct requestUrl) {
 }
 
 /**
+ * Internal. Defaults `coreTestDataSourceName` to `dataSourceName` when the settings did not
+ * set it. onApplicationStart calls it after the settings files load, so the default follows
+ * the dataSourceName they set rather than the one derived from the app's folder before them.
+ */
+public void function $defaultCoreTestDataSourceName(required struct settings) {
+	if (!StructKeyExists(arguments.settings, "coreTestDataSourceName")) {
+		arguments.settings.coreTestDataSourceName = arguments.settings.dataSourceName;
+	}
+}
+
+/**
  * Internal. Which datasource the framework's own test runners (the core runner and the
  * RocketUnit runner) use. `?db=` naming one of `testDbList` selects `wheelstestdb_<db>`, and
  * the `|datasourceName|` placeholder selects `wheelstestdb`, as before. A
- * `coreTestDataSourceName` other than the app's primary datasource is used as it is. Only
+ * `coreTestDataSourceName` other than the app's primary datasource is used as it is when it
+ * exists, and refused when it does not. Only
  * when the run would otherwise use the app's primary datasource does the app-test rule apply
  * ($testDataSourceDecision): `<primary>_test`, the primary datasource only for an explicit
  * useTestDB=false (never through allowTestsAgainstPrimaryDatasource), or refused.
- * Returns `{action: use|swap|primary|refuse, target, decision}`.
+ * Returns `{action: use|swap|primary|refuse, target, decision, message}`; `message` explains a
+ * refusal.
  */
 public struct function $coreTestDataSource(
 	required string primary,
 	required string coreName,
 	required struct requestUrl,
 	string testDbList = "mysql,sqlserver,sqlserver_cicd,postgres,h2,oracle,sqlite,cockroachdb",
-	candidateRegistered
+	candidateRegistered,
+	targetRegistered
 ) {
-	local.rv = {action = "use", target = "", decision = {}, ignoredAllowPrimary = false};
+	local.rv = {action = "use", target = "", decision = {}, ignoredAllowPrimary = false, message = ""};
 	if (
 		StructKeyExists(arguments.requestUrl, "db")
 		&& IsSimpleValue(arguments.requestUrl.db)
@@ -1195,6 +1209,17 @@ public struct function $coreTestDataSource(
 		return local.rv;
 	}
 	if (Compare(arguments.coreName, arguments.primary) != 0) {
+		local.registered = (StructKeyExists(arguments, "targetRegistered") && !IsNull(arguments.targetRegistered))
+			? arguments.targetRegistered
+			: $testDataSourceRegistered(name = arguments.coreName);
+		if (!local.registered) {
+			local.rv.action = "refuse";
+			local.rv.decision = {primary = arguments.primary, candidate = arguments.coreName};
+			local.rv.message = "The framework test suite is set to use the datasource '" & arguments.coreName
+				& "' (coreTestDataSourceName), which does not exist. Set coreTestDataSourceName in config/settings.cfm, create '"
+				& arguments.coreName & "', or pass ?db= to use a wheelstestdb_<db> datasource.";
+			return local.rv;
+		}
 		local.rv.target = arguments.coreName;
 		return local.rv;
 	}
@@ -1221,6 +1246,11 @@ public struct function $coreTestDataSource(
 	}
 	local.rv.action = local.rv.decision.action;
 	local.rv.target = local.rv.decision.action == "refuse" ? "" : local.rv.decision.target;
+	if (local.rv.action == "refuse") {
+		local.rv.message = "The framework test suite would run on this app's primary datasource '" & local.rv.decision.primary
+			& "'. Pass ?db= to use a wheelstestdb_<db> datasource, create '" & local.rv.decision.candidate
+			& "', or run against the primary datasource intentionally with useTestDB=false.";
+	}
 	return local.rv;
 }
 
