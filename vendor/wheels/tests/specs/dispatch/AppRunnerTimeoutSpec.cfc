@@ -22,9 +22,17 @@ component extends="wheels.WheelsTest" {
 				expect(runPos).toBeGT(reapplyPos);
 			});
 
-			it("does not lower the request timeout in the tests/populate.cfm that wheels new creates", () => {
-				var template = FileRead(ExpandPath("/cli/lucli/templates/app/tests/populate.cfm"));
-				expect(FindNoCase("requestTimeOut", template)).toBe(0);
+			it("does not lower the request timeout in any tests/populate.cfm the repo ships", () => {
+				// the `wheels new` template, the starter app, and this repo's demo app
+				var paths = [
+					ExpandPath("/cli/lucli/templates/app/tests/populate.cfm"),
+					ExpandPath("/wheels/../..") & "/examples/starter-app/tests/populate.cfm",
+					ExpandPath("/wheels/../..") & "/tests/populate.cfm"
+				];
+				for (var path in paths) {
+					expect(FileExists(path)).toBeTrue(path);
+					expect(FindNoCase("requestTimeOut", FileRead(path))).toBe(0, path);
+				}
 			});
 
 			it("reports a run that did not finish as an error", () => {
