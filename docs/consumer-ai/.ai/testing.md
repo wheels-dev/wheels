@@ -14,20 +14,26 @@ try { /* exercise it */ } finally { application.wheels.cachePartials = original;
 
 To test partial caching, turn `cachePartials` on this way and call `application.wo.$clearCache("partial")` before and after, so cached output doesn't leak between specs.
 
-## Clearing the per-request query cache
+## Reading fresh rows past the per-request query cache
 
-Finders cache their results for the rest of the request (the `cacheQueriesDuringRequest` setting, on by default). A spec runs in a single request, so a finder re-run **after a write** — an `update()` / `create()`, raw SQL, or an HTTP request through the test client — returns the rows cached *before* the write, not the new ones.
+Finders cache their results for the rest of the request (the `cacheQueriesDuringRequest` setting, on by default), and a spec runs in a single request. A save **through a model** (`create`, `update`, `updateAll`, `delete`, `deleteAll`, `insertAll`) clears that model's cached queries, so re-reading the **same** model after its own save returns fresh rows — no extra step needed.
 
-Two ways to read fresh rows in a spec:
+The cache stays stale only when data changes *without* the cached model's own save clearing it:
+
+- **raw SQL** (`queryExecute`, or a migration's `execute`) — it bypasses the model, so nothing clears the cache;
+- a write through a **different** model than the one you re-query — e.g. creating a `Comment` does not refresh a cached `model("Post").findAll(include = "comments")`;
+- data changed in a **separate request** — an HTTP request through the test client runs in its own request, so the spec's own cached reads are unaffected.
+
+Two ways to read fresh rows in those cases:
 
 - Pass `reload=true` to the finder for a single call:
 
 ```cfm
-user.update(name = "new");
-expect(model("User").findByKey(key = user.key(), reload = true).name).toBe("new");
+// a Comment was created directly; the cached Post query still omits it
+expect(model("Post").findByKey(key = post.key(), include = "comments", reload = true).commentCount).toBe(1);
 ```
 
-- Clear the whole request cache when a later read must not see anything cached earlier (for example after raw SQL, or after a test-client request that changed data):
+- Clear the whole request cache when several later reads must not see anything cached earlier:
 
 ```cfm
 StructDelete(request.wheels, "$queryCache");
