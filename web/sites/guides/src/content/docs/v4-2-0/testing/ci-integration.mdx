@@ -128,7 +128,7 @@ Browser specs need the Playwright JARs (~370MB) and Chromium, so the framework s
 - **`WHEELS_CI=true`** — mark the environment as CI
 - **`WHEELS_BROWSER_CI_ENABLE=true`** (or `1` or `yes`) — opt browser specs in
 
-If `WHEELS_CI` is set and the opt-in isn't, `BrowserTest.cfc` sets `this.browserTestSkipped = true` in `beforeAll` and every browser `it` skips automatically — the suite stays green; the browser tests simply don't count.
+If `WHEELS_CI` is set and the opt-in isn't, `BrowserTest.cfc` skips every browser spec: each one is reported as skipped with the reason, and `wheels test` prints `N passed, M skipped` (in yellow, not green). The skipped specs don't fail the run, but they don't count as passed either.
 
 When you do opt in, cache the Playwright install — it's the slowest single step in the workflow:
 

@@ -1,4 +1,3 @@
-<cfsetting requestTimeOut="300">
 <!---
     tests/populate.cfm — bootstraps the test database before specs run.
 
