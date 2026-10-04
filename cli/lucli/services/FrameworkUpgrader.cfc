@@ -284,12 +284,20 @@ component {
 	 */
 	private void function $prepareBackupsDir(required string backupDir) {
 		var backupsDir = getDirectoryFromPath(reReplace(arguments.backupDir, "[\\/]+$", ""));
-		if (!directoryExists(backupsDir)) {
-			directoryCreate(backupsDir, true, true);
-		}
-		var ignoreFile = backupsDir & ".gitignore";
-		if (!fileExists(ignoreFile)) {
-			fileWrite(ignoreFile, "## Framework backups made by `wheels upgrade apply`. Never commit them." & chr(10) & "*" & chr(10));
+		try {
+			if (!directoryExists(backupsDir)) {
+				directoryCreate(backupsDir, true, true);
+			}
+			var ignoreFile = backupsDir & ".gitignore";
+			if (!fileExists(ignoreFile)) {
+				fileWrite(ignoreFile, "## Framework backups made by `wheels upgrade apply`. Never commit them." & chr(10) & "*" & chr(10));
+			}
+		} catch (any e) {
+			// Same contract as a refused rename: nothing has changed yet.
+			throw(
+				type = "Wheels.FrameworkUpgrader.RenameFailed",
+				message = "Could not prepare the backup directory " & backupsDir & " (" & e.message & "), so nothing was changed: vendor/wheels/ is intact. If vendor/ is a separate mount (a Docker volume, for example), copy vendor/wheels/ somewhere yourself, then run `wheels upgrade apply --nobackup`."
+			);
 		}
 	}
 
@@ -358,8 +366,8 @@ component {
 		var raw = fileRead(arguments.boxJsonPath, "utf-8");
 		var state = {count: 0};
 		var sections = len(arguments.section) ? [arguments.section] : ["dependencies", "devDependencies"];
-		for (var section in sections) {
-			var match = reFind('"' & section & '"\s*:\s*\{[^{}]*\}', raw, 1, true);
+		for (var sectionName in sections) {
+			var match = reFind('"' & sectionName & '"\s*:\s*\{[^{}]*\}', raw, 1, true);
 			if (match.pos[1] > 0) {
 				var block = $repinBlock(mid(raw, match.pos[1], match.len[1]), arguments.newValue, state);
 				var head = match.pos[1] > 1 ? left(raw, match.pos[1] - 1) : "";
@@ -406,7 +414,7 @@ component {
 		if (!src.renameTo(dst)) {
 			throw(
 				type = "Wheels.FrameworkUpgrader.RenameFailed",
-				message = "Failed to rename " & arguments.fromPath & " to " & arguments.toPath & ". The backup directory must live on the same filesystem as vendor/wheels/."
+				message = "Failed to rename " & arguments.fromPath & " to " & arguments.toPath & ", so nothing was changed: vendor/wheels/ is intact. The backup must be on the same filesystem as vendor/wheels/. If vendor/ is a separate mount (a Docker volume, for example), copy vendor/wheels/ somewhere yourself, then run `wheels upgrade apply --nobackup`."
 			);
 		}
 	}

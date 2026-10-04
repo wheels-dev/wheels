@@ -198,7 +198,7 @@ wheels upgrade apply --nobackup
 
 **`check` verb:** Nothing — the scanner is read-only.
 
-**`apply` verb:** `vendor/wheels/` is replaced with the framework bundled in the installed CLI. By default, the old copy is moved to a timestamped `.wheels/backups/wheels.bak-*` directory in the project before the swap, so recovery is a single `mv`. The backup sits outside `vendor/` because the framework loads every `vendor/` folder as a package, and `.wheels/backups/` carries its own `.gitignore`, so a backup is never committed.
+**`apply` verb:** `vendor/wheels/` is replaced with the framework bundled in the installed CLI. By default, the old copy is moved to a timestamped `.wheels/backups/wheels.bak-*` directory in the project before the swap, so recovery is a single `mv`. The backup sits outside `vendor/` because the framework loads every `vendor/` folder as a package, and `.wheels/backups/` carries its own `.gitignore`, so a backup is never committed. Backups an earlier version left at `vendor/wheels.bak-<timestamp>/` stay in `vendor/` and make the framework log an error on every start; `apply` lists any it finds. Move them to `.wheels/backups/` or delete them.
 
 If the app's `box.json` lists `wheels-core` under `dependencies` or `devDependencies` (a CommandBox-managed app), `apply` also sets that version to the framework it installed, and prints the change. Left at the old version, a later `box install` would copy the old framework back over `vendor/wheels/`. A `^` or `~` range is kept for a release version; a prerelease build is pinned exactly. If `box.json` isn't valid JSON, `apply` refuses before changing anything.
 

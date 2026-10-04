@@ -9183,6 +9183,7 @@ component extends="modules.BaseModule" {
 			summary &= "Recover with:  rm -rf ""#vendorDir#"" && mv ""#result.backupDir#"" ""#vendorDir#""" & nl;
 		}
 		summary &= $upgradeApplyUpdateBoxPin(upgrader, boxPin, result.newVersion);
+		summary &= $upgradeApplyLeftoverBackups();
 
 		// Surface root-level manifest files the user may want to review
 		// after the upgrade — version refs, dependencies, etc.
@@ -9284,6 +9285,27 @@ component extends="modules.BaseModule" {
 		}
 		pin.path = boxPath;
 		return pin;
+	}
+
+	/**
+	 * Old framework backups that an earlier `wheels upgrade apply` (before
+	 * 4.2) or a manual swap left inside vendor/. The framework loads every
+	 * vendor/ folder as a package, so each one logs a skipped-package error on
+	 * every start. Returns a note naming them, or "" when there are none.
+	 */
+	private string function $upgradeApplyLeftoverBackups() {
+		var vendorRoot = variables.projectRoot & "/vendor";
+		var leftovers = [];
+		for (var name in directoryList(vendorRoot, false, "name")) {
+			if (name != "wheels" && reFindNoCase("^wheels.*\.bak", name) && directoryExists(vendorRoot & "/" & name)) {
+				arrayAppend(leftovers, "vendor/" & name & "/");
+			}
+		}
+		if (!arrayLen(leftovers)) {
+			return "";
+		}
+		return "Old framework backups are still inside vendor/: " & arrayToList(leftovers, ", ")
+			& ". The framework loads every vendor/ folder as a package and logs an error for these on every start: move them to .wheels/backups/ or delete them." & chr(10);
 	}
 
 	/**
