@@ -2657,17 +2657,12 @@ component extends="modules.BaseModule" {
 		// 127.0.0.1-bound databases) and `wheels start` would boot on top of it.
 		// That is fixed upstream, but older LuCLI binaries still ship the bug, so
 		// when lucee.json pins a port we connect-probe it (both address families)
-		// and warn before delegating. We only reach here when our own server is
+		// and refuse before delegating. We only reach here when our own server is
 		// NOT already running (the reg.alive early-return above), so an in-use
 		// pinned port is a genuine foreign collision.
 		var pinnedPort = $readPinnedPort(variables.projectRoot);
 		if (pinnedPort > 0 && getService("portProbe").portInUse(pinnedPort)) {
-			out("");
-			out("Warning: port " & pinnedPort & " (configured in lucee.json) is already in use", "yellow");
-			out("by another process. The server may fail to start, or silently share the port", "yellow");
-			out("(IPv4 clients reaching the other process while localhost reaches Wheels).", "yellow");
-			out("Fix: stop the other process, or change the 'port' in lucee.json.", "yellow");
-			out("");
+			$refuseTakenHttpPort(pinnedPort);
 		}
 
 		out("Starting Wheels server...", "cyan");
@@ -3048,7 +3043,7 @@ component extends="modules.BaseModule" {
 	private any function newArgSpec() {
 		return new services.ArgSpec()
 			.positional(name = "appName", description = "Name of the application and of the directory it's created in")
-			.option(name = "port", default = 8080, type = "numeric", description = "Server port")
+			.option(name = "port", default = 8080, type = "numeric", description = "Server port (default: 8080, or the first port above it that is free and no other project pins)")
 			.option(name = "datasource", default = "", description = "Datasource name (default: the app name)")
 			.option(name = "reload-password", default = "", description = "Reload password (default: random)")
 			.flag(name = "setup-h2", default = false, description = "Use the H2 embedded database instead of SQLite")
@@ -3110,7 +3105,8 @@ component extends="modules.BaseModule" {
 			);
 		}
 		var options = {
-			port: opts.port,
+			// 0 = not given: scaffoldNewApp() picks a free, unpinned port.
+			port: structKeyExists(newColl, "port") ? opts.port : 0,
 			datasource: opts.datasource,
 			reloadPassword: opts.reloadPassword,
 			setupH2: opts.setupH2,
@@ -10855,7 +10851,7 @@ component extends="modules.BaseModule" {
 
 		// Merge defaults for any missing options
 		var opts = {
-			port: structKeyExists(options, "port") ? options.port : 8080,
+			port: structKeyExists(options, "port") && options.port > 0 ? options.port : $defaultNewPort(targetDir),
 			datasource: structKeyExists(options, "datasource") ? options.datasource : lCase(appName),
 			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : generateRandomPassword(),
 			luceeAdminPassword: generateRandomPassword(),
@@ -11445,6 +11441,21 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * HTTP port for a `wheels new` app created without --port: 8080, or the
+	 * first port above it that nothing listens on and no other project pins
+	 * in its lucee.json. Every app used to get 8080, so the second app on a
+	 * machine always collided with the first.
+	 */
+	private numeric function $defaultNewPort(required string targetDir) {
+		var pins = $otherProjectPins(arguments.targetDir);
+		var port = $nextFreePort(8080, pins);
+		if (port != 8080) {
+			out("Port 8080 is #structKeyExists(pins, 8080) ? 'pinned by ' & pins[8080] : 'in use'#; this app gets port #port#.", "yellow");
+		}
+		return port;
+	}
+
+	/**
 	 * Placeholder values for the `wheels new` project template.
 	 *
 	 * The shutdown port is the first free port above the HTTP port rather than
@@ -11522,6 +11533,34 @@ component extends="modules.BaseModule" {
 		if (arguments.enginePort > 0) {
 			out("Using port " & arguments.enginePort & " (shutdown " & shutdownPort & ").", "cyan");
 		}
+	}
+
+	/**
+	 * Stop `wheels start` when the HTTP port pinned in lucee.json is taken.
+	 *
+	 * Starting anyway either failed inside LuCLI, whose message names its
+	 * standalone binary ("Use: lucli server stop <name>", not on a Wheels
+	 * install's PATH), or, on a LuCLI with the IPv4-blind check, booted on top
+	 * of the other listener. This names the Wheels server that holds the port
+	 * when the registry knows it, says how to stop it, and suggests a free
+	 * port. Throws Wheels.PortInUse.
+	 */
+	private void function $refuseTakenHttpPort(required numeric port) {
+		var holder = getService("serverRegistry").registrationOnPort(arguments.port);
+		var freePort = $nextFreePort(arguments.port + 1, $otherProjectPins(variables.projectRoot));
+		var heldBy = len(holder.name) ? "the Wheels server '#holder.name#'" : "another process";
+		out("");
+		out("Port #arguments.port# (configured in lucee.json) is in use by #heldBy#.", "red");
+		if (len(holder.projectPath)) {
+			out("Stop it:   cd #holder.projectPath# && wheels stop", "yellow");
+		} else if (!len(holder.name)) {
+			out("Stop that process, or use another port.", "yellow");
+		}
+		out("Or start this app on a free port:   wheels start --port=#freePort#", "yellow");
+		throw(
+			type = "Wheels.PortInUse",
+			message = "wheels start: port #arguments.port# is in use by #heldBy#. Stop it, or run: wheels start --port=#freePort#"
+		);
 	}
 
 	/**
