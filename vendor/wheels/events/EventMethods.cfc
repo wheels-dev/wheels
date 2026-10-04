@@ -112,11 +112,15 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 				local.wheelsError = arguments.exception.cause.rootCause;
 			}
 		} else {
+			// IsDefined (not IsStruct): the production error path can hand us a
+			// rootCause that is a real caught exception / Java Throwable, not a plain
+			// struct, so IsStruct would wrongly drop a genuine Wheels error to 500.
+			// IsDefined string-resolves the whole dotted path in one evaluation —
+			// true for a struct OR an object that exposes `.type`, false when
+			// rootCause is absent, null, or has no type (so a typeless rootCause
+			// falls through to {} instead of crashing the error page).
 			if (
-				StructKeyExists(arguments.exception, "rootCause")
-				&& !IsNull(arguments.exception.rootCause)
-				&& IsStruct(arguments.exception.rootCause)
-				&& StructKeyExists(arguments.exception.rootCause, "type")
+				IsDefined("arguments.exception.rootCause.type")
 				&& Left(arguments.exception.rootCause.type, 6) == "Wheels"
 			) {
 				local.wheelsError = arguments.exception.rootCause;

@@ -521,6 +521,33 @@ component extends="wheels.WheelsTest" {
 				expect(em.$lastStatusCode()).toBe(500);
 			});
 
+			it("a REAL caught Wheels exception as the rootCause still classifies to 404", () => {
+				// The hand-built specs above use plain structs; the production path can
+				// hand the resolver a real caught exception / Java Throwable as the
+				// rootCause. Build it from a genuine throw/catch so the guard is proven
+				// against each engine's real exception object. Invariant 11: the catch
+				// writes into an outer struct field with NO local. prefix so it persists
+				// on BoxLang.
+				var state = {caught = ""};
+				try {
+					Throw(type = "Wheels.RecordNotFound", message = "real-not-found");
+				} catch (any e) {
+					state.caught = e;
+				}
+				// One wrapper both resolver branches read: Lucee/Adobe take
+				// exception.rootCause; BoxLang takes exception.cause.rootCause. The
+				// top-level type is non-Wheels so BoxLang does not classify it directly.
+				var wrapper = {
+					type = "Application",
+					message = "wrapped",
+					rootCause = state.caught,
+					cause = {rootCause = state.caught}
+				};
+				var em = $onErrorDouble();
+				em.$runOnError(exception = wrapper, eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(404);
+			});
+
 		});
 
 	}
