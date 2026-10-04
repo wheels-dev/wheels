@@ -3,7 +3,8 @@
     tests/populate.cfm — bootstraps the test database before specs run.
 
     The framework's app-test runner (included by tests/runner.cfm) runs the
-    specs on the `starterApp_test` datasource (H2, defined in config/app.cfm)
+    specs on the `starterApp_test` datasource (SQLite, or H2 under CommandBox;
+    defined in config/app.cfm)
     and includes this file first to apply your pending migrations there
     (migrateToLatest() is a no-op when already current). It isn't included
     for a run on the primary datasource (useTestDB=false).
@@ -13,7 +14,7 @@
     own state in beforeEach/it blocks instead.
 
     To start from a fresh test schema, stop the server and delete
-    db/h2/starterApp_test.*.
+    db/test.sqlite (or db/h2/starterApp_test.* under CommandBox).
 --->
 <cfscript>
     // Run all pending migrations against the active datasource —
@@ -41,7 +42,7 @@
             } catch (any dropErr) {}
             Throw(
                 type = "PopulateCfm.MigrationFailed",
-                message = "Test-db migration did not complete cleanly. Fix the failing migration and re-run (or delete db/h2/starterApp_test.* with the server stopped).",
+                message = "Test-db migration did not complete cleanly. Fix the failing migration and re-run (or, with the server stopped, delete db/test.sqlite, or db/h2/starterApp_test.* under CommandBox).",
                 detail = local.migrateResult
             );
         }
