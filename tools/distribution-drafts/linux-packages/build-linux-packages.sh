@@ -234,15 +234,17 @@ if [ -z "${JAVA_HOME:-}" ] && command -v java >/dev/null 2>&1; then
   _jh="${_j%/bin/java}"
   _wheels_java_ok "${_jh}" && export JAVA_HOME="${_jh}"
 fi
-# Last resort: glob the version-stamped RHEL/Fedora directories directly.
+# Last resort: glob the version-stamped RHEL/Fedora directories directly, Java 21 first,
+# then any other JDK under /usr/lib/jvm (e.g. a 25-only box whose /usr/bin/java
+# alternative points at an older JDK). _wheels_java_ok filters out anything below 21.
 if [ -z "${JAVA_HOME:-}" ]; then
-  for d in /usr/lib/jvm/java-21-openjdk-* /usr/lib/jvm/*jre-21* /usr/lib/jvm/*-21-*; do
+  for d in /usr/lib/jvm/java-21-openjdk-* /usr/lib/jvm/*jre-21* /usr/lib/jvm/*-21-* /usr/lib/jvm/*; do
     if _wheels_java_ok "${d}"; then export JAVA_HOME="${d}"; break; fi
   done
 fi
 if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
   echo "wheels: cannot find a Java 21 or newer runtime. Install openjdk-21-jre-headless (apt)" >&2
-  echo "        or java-21-openjdk-headless (yum/dnf); any Java 21+ works." >&2
+  echo "        or java-21-openjdk-headless (Rocky/RHEL) / java-25-openjdk-headless (Fedora); any Java 21+ works." >&2
   exit 1
 fi
 # --- java-resolve end -----------------------------------------------------
