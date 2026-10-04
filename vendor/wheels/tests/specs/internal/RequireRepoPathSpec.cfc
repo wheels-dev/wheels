@@ -41,9 +41,11 @@ component extends="wheels.WheelsTest" {
 
 		describe("repository-only specs", () => {
 
-			it("read cli/lucli/templates only after $requireRepoPath()", () => {
-				// Every spec under this suite that reads the CLI templates either calls
-				// $requireRepoPath() or is listed here with the reason it can run anywhere.
+			it("read repository-only paths only after $requireRepoPath()", () => {
+				// Every spec that names a path only the repository has (the CLI source and
+				// templates, .github, tools/ scripts, the guides and packages sites, the
+				// example apps) calls $requireRepoPath(), or uses the older inRepo check.
+				var repoOnly = "(cli/(lucli|src)/|\.github/|tools/(build|ci|docker|distribution-drafts|rustcfml)/|web/(sites|packages)/|examples/)";
 				var specsRoot = ExpandPath("/wheels/tests/specs");
 				var unguarded = [];
 				for (var path in DirectoryList(specsRoot, true, "path", "*.cfc")) {
@@ -55,11 +57,32 @@ component extends="wheels.WheelsTest" {
 						}
 					}
 					var source = ArrayToList(code, Chr(10));
-					if (FindNoCase("cli/lucli/templates", source) && !FindNoCase("$requireRepoPath(", source) && !FindNoCase("inRepo", source)) {
+					if (ReFind(repoOnly, source) && !FindNoCase("$requireRepoPath(", source) && !FindNoCase("inRepo", source)) {
 						ArrayAppend(unguarded, Replace(Replace(path, "\", "/", "all"), Replace(specsRoot, "\", "/", "all"), ""));
 					}
 				}
-				expect(unguarded).toBe([], "read cli/lucli/templates without $requireRepoPath(): " & ArrayToList(unguarded, ", "));
+				expect(unguarded).toBe([], "read repository-only paths without $requireRepoPath(): " & ArrayToList(unguarded, ", "));
+			});
+
+		});
+
+		describe("framework-repository runs", () => {
+
+			it("can see the repository whenever WHEELS_EXPECT_REPO is set", () => {
+				// compose.yml, pr.yml and tools/rustcfml/run-suite.sh set WHEELS_EXPECT_REPO for
+				// repository runs. There, a missing repository marker would make every guarded
+				// spec skip and the run stay green, so this fails instead. Unset, it skips with
+				// the reason, so a repository run the variable did not reach shows a named skip
+				// rather than a pass.
+				var env = (StructKeyExists(server, "system") && StructKeyExists(server.system, "environment")) ? server.system.environment : {};
+				var expected = StructKeyExists(env, "WHEELS_EXPECT_REPO") && CompareNoCase(Trim(env.WHEELS_EXPECT_REPO), "true") == 0;
+				if (!expected) {
+					skip("WHEELS_EXPECT_REPO not set (expected outside the Wheels repo).");
+				}
+				var marker = $frameworkRepoRoot() & "cli/lucli/templates";
+				expect(DirectoryExists(marker)).toBeTrue(
+					"WHEELS_EXPECT_REPO is set, but " & marker & " is missing: every spec that needs the Wheels framework repository would skip."
+				);
 			});
 
 		});
