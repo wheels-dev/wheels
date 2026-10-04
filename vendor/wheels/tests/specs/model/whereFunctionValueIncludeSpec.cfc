@@ -51,6 +51,13 @@ component extends="wheels.WheelsTest" {
 				expect(sql).toInclude("(title) LIKE TRIM(");
 			})
 
+			it("qualifies a condition after a lowercase or mixed-case and/or", () => {
+				var lower = g.model("post").findAll(include = "author", where = "title LIKE TRIM('%Title for%') and id = ABS(1)", returnAs = "query", reload = true);
+				var mixed = g.model("post").findAll(include = "author", where = "(id = ABS(1) Or id = ABS(2)) And title LIKE TRIM('%Title for%')", returnAs = "query", reload = true);
+				expect(lower.recordCount).toBe(1);
+				expect(mixed.recordCount).toBe(2);
+			})
+
 			it("leaves an expression that doesn't start with a property alone", () => {
 				var posts = g.model("post").findAll(include = "author", where = "ABS(c_o_r_e_posts.id) = ABS(1)", returnAs = "query", reload = true);
 				expect(posts.recordCount).toBe(1);
