@@ -58,6 +58,23 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Makes what middleware attached to the request context available to the controller:
+	 * the whole context as `request.wheels.middlewareContext`, and the AuthMiddleware result
+	 * as `request.auth` (as AuthMiddleware documents). Its parameter is deliberately not named
+	 * `request`, which would shadow the request scope (and resolves inconsistently on Adobe
+	 * 2025, cross-engine invariant 15).
+	 */
+	public void function $exposeMiddlewareContext(required struct context) {
+		if (!StructKeyExists(request, "wheels")) {
+			request.wheels = {};
+		}
+		request.wheels.middlewareContext = arguments.context;
+		if (StructKeyExists(arguments.context, "auth")) {
+			request.auth = arguments.context.auth;
+		}
+	}
+
+	/**
 	 * Retrieve plugin-registered middleware from the application scope.
 	 * Returns the pluginMiddleware array or an empty array if not present.
 	 */
@@ -448,6 +465,9 @@ component output="false" extends="wheels.Global"{
 
 			// The core handler that middleware wraps around.
 			local.coreHandler = function(required struct request) {
+				// What middleware attached to the context (the AuthMiddleware result, ...)
+				// must reach the controller, not just the params.
+				$exposeMiddlewareContext(context = arguments.request);
 				local.ctrl = controller(name = arguments.request.params.controller, params = arguments.request.params);
 				local.ctrl.processAction();
 
