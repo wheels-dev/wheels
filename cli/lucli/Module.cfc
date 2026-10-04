@@ -8439,19 +8439,40 @@ component extends="modules.BaseModule" {
 		var jump34 = arguments.currentMajor <= 3 && arguments.targetMajor >= 4;
 		var on4 = arguments.currentMajor >= 4 && arguments.targetMajor >= 4;
 		if (jump34 || on4) {
+			// An empty or missing plugins/ doesn't mean the app has no plugins:
+			// 3.x apps declare them in box.json (installed into plugins/ by the
+			// next box install), and 3.0's deletePluginDirectories=true default
+			// can leave the folder empty at runtime. So this also reports
+			// box.json plugin dependencies and code that reads
+			// application.wheels.plugins.
 			arrayAppend(checks, {
-				description: "Legacy plugin directory (deprecated as of 4.0, removed in 5.0)",
+				description: "Legacy plugins (deprecated as of 4.0, removed in 5.0)",
 				jumpOnly: true,
 				pattern: "",
-				checkType: "directory",
+				checkType: "plugins",
 				path: "plugins",
-				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>)"
+				references: {
+					pattern: "application\.wheels\.plugins\b",
+					checkType: "grep",
+					scanDir: "app",
+					extensions: "cfc,cfm",
+					scanTargets: [
+						{path: "Application.cfc"},
+						{path: "public/Application.cfc"},
+						{path: "config", extensions: "cfm,cfc", recurse: true}
+					],
+					skipPackages: true
+				},
+				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>), or to the 4.x built-in that replaces them, and remove their box.json dependencies (box install puts them back in plugins/)"
 			});
 			// application.wirebox → application.wheelsdi (guide item 10). The
-			// hardest real-world case is a root Application.cfc bootstrap that
+			// hardest real-world case is an Application.cfc bootstrap that
 			// calls `new wirebox.system.ioc.Injector(...)` — the WireBox
-			// package no longer ships in vendor/wheels/ — so scan the root
-			// Application.cfc and config/ in addition to app/.
+			// package no longer ships in vendor/wheels/ — so scan the root and
+			// public/ Application.cfc (where 3.x apps keep theirs) and config/
+			// in addition to app/. Packages under app/ (e.g. app/lib/logbox) are
+			// third-party code that uses WireBox itself, not the app, so they
+			// are skipped.
 			arrayAppend(checks, {
 				description: "Direct WireBox references (application.wirebox / wirebox.system.ioc)",
 				pattern: "application\.wirebox|wirebox\.system\.ioc",
@@ -8460,8 +8481,10 @@ component extends="modules.BaseModule" {
 				extensions: "cfc,cfm",
 				scanTargets: [
 					{path: "Application.cfc"},
+					{path: "public/Application.cfc"},
 					{path: "config", extensions: "cfm,cfc", recurse: true}
 				],
+				skipPackages: true,
 				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector(""wheels.Bindings"")` (the constructor requires the bindings path). The legacy adapter does NOT shim this item."
 			});
 			// renderPage()/renderPageToString() removed in 4.0 — shimmed by
@@ -9025,7 +9048,103 @@ component extends="modules.BaseModule" {
 			}
 		}
 
+		// `skipPackages`: leave out third-party package code: files under a
+		// directory box.json installs a package into, or under any directory
+		// below the project root that has its own box.json (a package moved or
+		// committed somewhere its installPaths entry doesn't say).
+		if (structKeyExists(arguments.check, "skipPackages") && arguments.check.skipPackages) {
+			var packageDirs = $upgradeInstallPathDirs();
+			var root = replace(variables.projectRoot, "\", "/", "all");
+			var hasBoxJson = {};
+			var kept = [];
+			for (var f in filesToScan) {
+				var normalized = replace(f, "\", "/", "all");
+				var inPackage = false;
+				for (var packageDir in packageDirs) {
+					if (findNoCase(packageDir, normalized) == 1) {
+						inPackage = true;
+						break;
+					}
+				}
+				// Walk up from the file's directory, stopping below the root.
+				var dir = getDirectoryFromPath(normalized);
+				while (!inPackage && len(dir) > len(root) + 1 && findNoCase(root & "/", dir) == 1) {
+					if (!structKeyExists(hasBoxJson, dir)) {
+						hasBoxJson[dir] = fileExists(dir & "box.json");
+					}
+					inPackage = hasBoxJson[dir];
+					dir = getDirectoryFromPath(reReplace(dir, "/+$", ""));
+				}
+				if (!inPackage) arrayAppend(kept, f);
+			}
+			filesToScan = kept;
+		}
+
 		return filesToScan;
+	}
+
+	/**
+	 * The app's box.json, parsed; an empty struct when it is missing or isn't a
+	 * JSON object.
+	 */
+	private struct function $upgradeReadBoxJson() {
+		var path = variables.projectRoot & "/box.json";
+		if (!fileExists(path)) return {};
+		try {
+			var parsed = deserializeJSON(fileRead(path));
+			return isStruct(parsed) ? parsed : {};
+		} catch (any e) {
+			return {};
+		}
+	}
+
+	/** A box.json installPaths value as a project-relative path: forward slashes, no leading `./` or trailing `/`. */
+	private string function $upgradeNormalizeInstallPath(required string installPath) {
+		return reReplace(replace(trim(arguments.installPath), "\", "/", "all"), "^(\./)+|/+$", "", "all");
+	}
+
+	/**
+	 * The plugin packages box.json declares, as "box.json: <name> (<installPath>)".
+	 * A dependency counts when its installPath is under plugins/ or, with no
+	 * installPath, when its name starts with "cfwheels-" (CommandBox installs
+	 * that package type into plugins/).
+	 */
+	private array function $upgradePluginDependencies() {
+		var box = $upgradeReadBoxJson();
+		var installPaths = structKeyExists(box, "installPaths") && isStruct(box.installPaths) ? box.installPaths : {};
+		var found = [];
+		for (var section in ["dependencies", "devDependencies"]) {
+			if (!structKeyExists(box, section) || !isStruct(box[section])) continue;
+			var names = structKeyArray(box[section]);
+			arraySort(names, "textnocase");
+			for (var name in names) {
+				var target = structKeyExists(installPaths, name) && isSimpleValue(installPaths[name])
+					? $upgradeNormalizeInstallPath(installPaths[name]) : "";
+				var isPlugin = len(target) ? reFindNoCase("^plugins(/|$)", target) > 0 : reFindNoCase("^cfwheels-", name) > 0;
+				if (isPlugin) {
+					arrayAppend(found, "box.json: " & name & (len(target) ? " (" & target & "/)" : ""));
+				}
+			}
+		}
+		return found;
+	}
+
+	/**
+	 * The directories box.json installs packages into (`installPaths`), as
+	 * absolute paths with forward slashes and a trailing slash.
+	 */
+	private array function $upgradeInstallPathDirs() {
+		var box = $upgradeReadBoxJson();
+		var dirs = [];
+		if (!structKeyExists(box, "installPaths") || !isStruct(box.installPaths)) return dirs;
+		var root = replace(variables.projectRoot, "\", "/", "all");
+		for (var name in box.installPaths) {
+			if (!isSimpleValue(box.installPaths[name])) continue;
+			var rel = $upgradeNormalizeInstallPath(box.installPaths[name]);
+			if (!len(rel) || rel == ".") continue;
+			arrayAppend(dirs, root & "/" & rel & "/");
+		}
+		return dirs;
 	}
 
 	/**
@@ -9041,6 +9160,36 @@ component extends="modules.BaseModule" {
 			return true;
 		}
 		return structKeyExists(arguments.check, "requireFileMatches") && reFindNoCase(arguments.check.requireFileMatches, arguments.content) == 0;
+	}
+
+	/**
+	 * Run a "plugins" check: it matches a non-empty plugin directory, the
+	 * plugin packages box.json declares, and the matches of its `references`
+	 * grep. Returns {matched, matchEntry}, matchEntry empty when nothing matched.
+	 */
+	private struct function $upgradePluginResult(required struct check) {
+		var found = [];
+		var pluginDir = variables.projectRoot & "/" & arguments.check.path;
+		if (directoryExists(pluginDir) && arrayLen(directoryList(pluginDir, false, "name"))) {
+			arrayAppend(found, arguments.check.path & "/");
+		}
+		for (var dependency in $upgradePluginDependencies()) {
+			arrayAppend(found, dependency);
+		}
+		// A copy, so the check definition isn't changed.
+		var references = duplicate(arguments.check.references);
+		references.description = arguments.check.description;
+		references.fix = arguments.check.fix;
+		var referenceResult = $upgradeExecuteCheck(references);
+		if (referenceResult.matched) {
+			for (var reference in referenceResult.matchEntry.matches) {
+				arrayAppend(found, reference);
+			}
+		}
+		if (!arrayLen(found)) {
+			return {matched: false, matchEntry: {}};
+		}
+		return {matched: true, matchEntry: {description: arguments.check.description, fix: arguments.check.fix, matches: found}};
 	}
 
 	/**
@@ -9124,6 +9273,10 @@ component extends="modules.BaseModule" {
 					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: matches};
 				}
 			}
+		} else if (arguments.check.checkType == "plugins") {
+			var pluginResult = $upgradePluginResult(arguments.check);
+			matched = pluginResult.matched;
+			matchEntry = pluginResult.matchEntry;
 		} else if (arguments.check.checkType == "envSelection") {
 			if ($upgradeEnvSelection() == arguments.check.expect) {
 				matched = true;
