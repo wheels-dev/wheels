@@ -10185,6 +10185,9 @@ component extends="modules.BaseModule" {
 			coreTests = arguments.coreTests
 		);
 		out(summary.text, summary.color);
+		for (var skipReason in $collectSkipReasons(arguments.result)) {
+			out("  Skipped (#skipReason.count#): #skipReason.message#", "yellow");
+		}
 		if (arguments.totalFail > 0 || arguments.totalError > 0) {
 			out("");
 
@@ -10227,10 +10230,13 @@ component extends="modules.BaseModule" {
 		boolean defaultScope = false,
 		boolean coreTests = false
 	) {
+		// Skipped specs did not run: they are counted, and a run with skips is never green.
+		var totalSkipped = isStruct(arguments.result) ? val(arguments.result.totalSkipped ?: 0) : 0;
+		var skippedStr = totalSkipped > 0 ? ", #totalSkipped# skipped" : "";
 		if (arguments.totalFail > 0 || arguments.totalError > 0) {
 			var failedToLoadStr = arguments.specsFailedToLoad > 0 ? ", #arguments.specsFailedToLoad# failed to load" : "";
 			return {
-				text = "#arguments.totalPass# passed, #arguments.totalFail# failed, #arguments.totalError# error(s)#failedToLoadStr##arguments.duration#",
+				text = "#arguments.totalPass# passed, #arguments.totalFail# failed, #arguments.totalError# error(s)#skippedStr##failedToLoadStr##arguments.duration#",
 				color = "red"
 			};
 		}
@@ -10252,7 +10258,52 @@ component extends="modules.BaseModule" {
 				color = "red"
 			};
 		}
+		if (totalSkipped > 0) {
+			return {text = "#arguments.totalPass# passed#skippedStr##arguments.duration#", color = "yellow"};
+		}
 		return {text = "#arguments.totalPass# passed#arguments.duration#", color = "green"};
+	}
+
+	/**
+	 * Why specs were skipped, from a TestBox result: one entry per distinct reason
+	 * (the skip message), with how many specs it covers, in the order first seen.
+	 * Pure, so specs can pin it.
+	 */
+	public array function $collectSkipReasons(required any result) {
+		var ctx = {reasons: [], index: {}};
+		if (!isStruct(arguments.result)) {
+			return ctx.reasons;
+		}
+		for (var bundle in (arguments.result.bundleStats ?: [])) {
+			for (var suite in (bundle.suiteStats ?: [])) {
+				$skipWalkSuite(suite, ctx);
+			}
+		}
+		return ctx.reasons;
+	}
+
+	/**
+	 * Recursively collect skipped specs' reasons from one suite into ctx.
+	 */
+	private void function $skipWalkSuite(required any suite, required struct ctx) {
+		for (var spec in (arguments.suite.specStats ?: [])) {
+			if ((spec.status ?: "") != "Skipped") {
+				continue;
+			}
+			var reason = trim(spec.failMessage ?: "");
+			if (!len(reason)) {
+				reason = "(no reason given)";
+			}
+			if (structKeyExists(arguments.ctx.index, reason)) {
+				arguments.ctx.reasons[arguments.ctx.index[reason]].count++;
+			} else {
+				arrayAppend(arguments.ctx.reasons, {message: reason, count: 1});
+				arguments.ctx.index[reason] = arrayLen(arguments.ctx.reasons);
+			}
+		}
+		for (var inner in (arguments.suite.suiteStats ?: [])) {
+			$skipWalkSuite(inner, arguments.ctx);
+		}
 	}
 
 	/**

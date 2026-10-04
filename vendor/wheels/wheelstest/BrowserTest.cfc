@@ -44,6 +44,11 @@ component extends="wheels.WheelsTest" {
     // "function [X] does not exist in the String".
     this.browser = new wheels.wheelstest.UnwiredBrowserGuard();
     this.browserTestSkipped = false;
+    // Why the bundle's browser specs don't run. A skip reason reports each spec as
+    // Skipped; a launch error reports each spec as an Error, so a browser that
+    // could not start never reads as a pass.
+    this.browserTestSkipReason = "";
+    this.browserLaunchError = "";
     // Per-spec base-URL override (issue #2779). Highest-precedence layer in
     // $resolveBaseUrl(). Set in the component pseudo-constructor (the
     // `this.baseUrl = "..."` line outside any function in the subclass),
@@ -64,42 +69,89 @@ component extends="wheels.WheelsTest" {
         // defaults to skipping browser specs. Set WHEELS_BROWSER_CI_ENABLE=true
         // to force execution once the fixture server is verified in CI.
         if ($isCiSkipEnabled()) {
-            this.browserTestSkipped = true;
+            $skipBrowserSpecs("Browser specs are skipped in CI (WHEELS_CI is set). Set WHEELS_BROWSER_CI_ENABLE=true to run them.");
             return;
         }
 
         try {
             variables.$launcher = $ensureLauncher();
         } catch (Wheels.BrowserNotInstalled e) {
-            this.browserTestSkipped = true;
+            $skipBrowserSpecs("Playwright is not installed. Run `wheels browser setup` to run browser specs.");
             return;
         } catch (Wheels.BrowserJvmUnavailable e) {
-            // Engine has no JVM class loading (e.g. RustCFML) — same clean
-            // skip path as "Playwright not installed".
-            this.browserTestSkipped = true;
+            // Engine has no JVM class loading (e.g. RustCFML).
+            $skipBrowserSpecs("This engine cannot load Playwright (no JVM class loading), so browser specs do not run here.");
             return;
         }
         try {
             variables.$browser = variables.$launcher.acquireBrowser(engine=this.browserEngine);
         } catch (Wheels.BrowserLaunchTimedOut e) {
             // Watchdog trip: the Playwright driver stalled (broken node
-            // runtime / stuck install step). Skipping beats wedging the whole
-            // suite for as long as the driver hangs — previously this blocked
-            // the test-runner lock indefinitely and every later test request
-            // queued behind it.
-            this.browserTestSkipped = true;
-            debug(e.message);
+            // runtime / stuck install step). Not starting beats wedging the whole
+            // suite for as long as the driver hangs, but the specs did not run:
+            // they report as errors (or skips, when launch failures are opted out).
+            $browserLaunchFailed(e.message);
             return;
         } catch (Wheels.BrowserLaunchFailed e) {
-            // Playwright installed but unusable (missing browser binary,
-            // corrupt driver). Skip browser coverage rather than failing the
-            // run for a local environment issue; `wheels browser setup`
-            // repairs it.
-            this.browserTestSkipped = true;
-            debug(e.message);
+            // Playwright installed but unusable (missing browser binary or
+            // system libraries, corrupt driver).
+            $browserLaunchFailed(e.message);
             return;
         }
         variables.$baseUrl = $resolveBaseUrl();
+    }
+
+    /**
+     * Marks this bundle's browser specs as skipped, with the reason each one reports.
+     */
+    public void function $skipBrowserSpecs(required string reason) {
+        this.browserTestSkipped = true;
+        this.browserTestSkipReason = arguments.reason;
+    }
+
+    /**
+     * The browser could not be started. Each browser spec then reports an error with
+     * this message, unless WHEELS_BROWSER_SKIP_LAUNCH_FAILURES=true asks to skip them.
+     */
+    public void function $browserLaunchFailed(required string message) {
+        this.browserTestSkipped = true;
+        if ($launchFailuresSkipped()) {
+            this.browserTestSkipReason = "The browser could not be started (WHEELS_BROWSER_SKIP_LAUNCH_FAILURES is set): " & arguments.message;
+        } else {
+            this.browserLaunchError = arguments.message;
+        }
+        try {
+            debug(arguments.message);
+        } catch (any e) {
+            // debug() needs a TestBox run; the gate above is what reports the failure.
+        }
+    }
+
+    /**
+     * What happens to a browser spec in this bundle: "run", "skip" (with the skip
+     * reason) or "error" (with the launch error). Used by browserDescribe().
+     */
+    public struct function $browserSpecGate() {
+        if (Len(this.browserLaunchError)) {
+            return {
+                action = "error",
+                message = "The browser could not be started, so this browser spec did not run: " & this.browserLaunchError
+                    & " Fix the browser install (`wheels browser setup`), or set WHEELS_BROWSER_SKIP_LAUNCH_FAILURES=true to skip browser specs instead."
+            };
+        }
+        if (this.browserTestSkipped) {
+            return {action = "skip", message = Len(this.browserTestSkipReason) ? this.browserTestSkipReason : "Browser specs are skipped."};
+        }
+        return {action = "run", message = ""};
+    }
+
+    private boolean function $launchFailuresSkipped() {
+        try {
+            var value = createObject("java", "java.lang.System").getenv("WHEELS_BROWSER_SKIP_LAUNCH_FAILURES") ?: "";
+            return listFindNoCase("true,1,yes", value) > 0;
+        } catch (any e) {
+            return false;
+        }
     }
 
     /**
@@ -164,8 +216,12 @@ component extends="wheels.WheelsTest" {
                 // hand-written `if (this.browserTestSkipped) return;` guards —
                 // a forgotten guard used to hit the UnwiredBrowserGuard
                 // sentinel and fail in CI instead of skipping.
-                if (me.browserTestSkipped) {
-                    return;
+                var gate = me.$browserSpecGate();
+                if (gate.action == "error") {
+                    throw(type = "Wheels.BrowserLaunchFailed", message = gate.message);
+                }
+                if (gate.action == "skip") {
+                    me.skip(gate.message);
                 }
                 try {
                     arguments.spec.body();

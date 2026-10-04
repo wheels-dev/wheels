@@ -1,5 +1,8 @@
 <cfsetting requestTimeOut="1800">
 <cfscript>
+    // The run's own request timeout, re-applied after tests/populate.cfm (below),
+    // which an app may have written to lower it.
+    local.runnerRequestTimeout = Max(1800, application.wo.$getRequestTimeout());
     // Built-in app-test runner. Used as a fallback by Public.cfc::testbox()
     // when the project doesn't have its own tests/runner.cfm. Scans the
     // project's tests/specs/ via TestBox and emits the same JSON shape as
@@ -207,6 +210,12 @@
                     abort;
                 }
             }
+            // tests/populate.cfm may lower the request timeout (the `wheels new`
+            // template set 300 seconds until 4.2), which then cut long runs short.
+            // The specs run under the runner's own limit.
+            if (application.wo.$getRequestTimeout() < local.runnerRequestTimeout) {
+                setting requestTimeout = local.runnerRequestTimeout;
+            }
 
             // Expand the TestBox mapping up front so constructor / run failures
             // can report the filesystem path (a missing `/tests` mapping after
@@ -291,8 +300,12 @@
                     writeOutput(SerializeJSON({
                         success: false,
                         error: "TestBox run failed",
-                        message: runErr.message,
+                        message: application.wo.$testRunFailureMessage(runErr = runErr),
                         detail: runErr.detail ?: "",
+                        // A run that did not finish reports an error, never an empty pass.
+                        totalPass: 0,
+                        totalFail: 0,
+                        totalError: 1,
                         bundlesDiscovered: local.bundlesDiscovered,
                         directoryResolved: local.testDirectory,
                         testDirectoryPath: local.testFsPath,

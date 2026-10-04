@@ -38,7 +38,9 @@ wheels browser setup
 
 The installer resolves seven JARs from Maven Central (Playwright client, driver, driver-bundle, transitive deps) and caches them under a per-project install directory. Subsequent runs skip the download when hashes match. Pass `--force` to re-download. Chromium is the only engine the browser DSL wires today — Firefox and WebKit are not yet selectable.
 
-If Playwright isn't installed when a spec runs, `BrowserTest.beforeAll` catches the missing-JAR error, sets `this.browserTestSkipped = true`, and the suite stays green. That's the safety net for CI cold starts and fresh dev machines. Inside `browserDescribe()` blocks the skip is automatic — its `aroundEach` returns early when the flag is set, so specs don't need a hand-written guard. Only `it` blocks inside a plain `describe()` need to check `this.browserTestSkipped` themselves.
+If Playwright isn't installed when a spec runs, `BrowserTest.beforeAll` catches the missing-JAR error, sets `this.browserTestSkipped = true`, and each browser spec is reported as **Skipped** with the reason. `wheels test` counts skipped specs and lists why (`3 passed, 1 skipped`), so a browser spec that did not run never reads as a pass. That's the safety net for CI cold starts and fresh dev machines.
+
+If Playwright is installed but the browser can't start (for example, the system libraries Chromium needs are missing, or the driver is broken), each browser spec is reported as an **error** with the launch message, so the run fails. Fix the install (`wheels browser setup`, plus any system packages it names), or set `WHEELS_BROWSER_SKIP_LAUNCH_FAILURES=true` to report those specs as skipped instead. Inside `browserDescribe()` blocks the skip is automatic — its `aroundEach` returns early when the flag is set, so specs don't need a hand-written guard. Only `it` blocks inside a plain `describe()` need to check `this.browserTestSkipped` themselves.
 
 ## A minimal browser spec
 
