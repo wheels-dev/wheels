@@ -13183,11 +13183,7 @@ component extends="modules.BaseModule" {
 		out("");
 		out("Installing #browserName# browser binaries...");
 
-		var classpath = "";
-		for (var entry in manifest.classpath) {
-			if (len(classpath)) classpath &= ":";
-			classpath &= installDir & "/lib/" & entry.filename;
-		}
+		var classpath = $browserClasspath(installDir, manifest);
 
 		var install = $browserRunProcess(["java", "-cp", classpath, "com.microsoft.playwright.CLI", "install", browserName], 300);
 		if (install.timedOut || install.exitCode != 0) {
@@ -13198,6 +13194,19 @@ component extends="modules.BaseModule" {
 		out("Browser install OK", "green");
 
 		return $browserFinishSetup(classpath, browserName);
+	}
+
+	/**
+	 * The Java classpath for the Playwright jars in `installDir`, joined with
+	 * the platform's separator (`:` on macOS and Linux, `;` on Windows).
+	 * Public so specs can check it.
+	 */
+	public string function $browserClasspath(required string installDir, required struct manifest) {
+		var jars = [];
+		for (var entry in arguments.manifest.classpath) {
+			arrayAppend(jars, arguments.installDir & "/lib/" & entry.filename);
+		}
+		return arrayToList(jars, createObject("java", "java.io.File").pathSeparator);
 	}
 
 	/**

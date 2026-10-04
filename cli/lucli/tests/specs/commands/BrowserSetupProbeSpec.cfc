@@ -77,18 +77,21 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		describe("wheels browser setup: the process runner", () => {
 
 			it("kills a process tree that outlives the timeout", () => {
-				if (!posix) return;
+				if (!posix) skip("POSIX shell and sleep only");
+				// A per-run duration makes the child's command line unique, so
+				// the pgrep below can only find this test's process.
+				var marker = "41." & randRange(100000, 999999);
 				var started = getTickCount();
-				var run = mod.$browserRunProcess(["sh", "-c", "sleep 41; echo done"], 1);
+				var run = mod.$browserRunProcess(["sh", "-c", "sleep #marker#; echo done"], 1);
 				expect(run.timedOut).toBeTrue();
 				expect(getTickCount() - started).toBeLT(15000);
 				expect(run.output).notToInclude("done");
 				// The shell's child is gone too.
-				expect(mod.$browserRunProcess(["pgrep", "-f", "sleep 41"], 5).exitCode).toBe(1);
+				expect(mod.$browserRunProcess(["pgrep", "-f", "sleep #marker#"], 5).exitCode).toBe(1);
 			});
 
 			it("returns the exit code and stdout and stderr together", () => {
-				if (!posix) return;
+				if (!posix) skip("POSIX shell only");
 				var run = mod.$browserRunProcess(["sh", "-c", "echo out; echo err 1>&2; exit 3"], 10);
 				expect(run.timedOut).toBeFalse();
 				expect(run.exitCode).toBe(3);
@@ -97,8 +100,17 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("passes an argument with spaces as one argument", () => {
-				if (!posix) return;
+				if (!posix) skip("POSIX printf only");
 				expect(mod.$browserRunProcess(["printf", "%s", "a path/with spaces.png"], 10).output).toBe("a path/with spaces.png");
+			});
+		});
+
+		describe("wheels browser setup: the classpath", () => {
+
+			it("joins the jars with the platform's path separator", () => {
+				var sep = createObject("java", "java.io.File").pathSeparator;
+				var cp = mod.$browserClasspath("/b", {classpath: [{filename: "one.jar"}, {filename: "two.jar"}]});
+				expect(cp).toBe("/b/lib/one.jar" & sep & "/b/lib/two.jar");
 			});
 		});
 
