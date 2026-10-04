@@ -73,6 +73,28 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(report.threw).toBeTrue();
 			});
 
+			it("is an error for a host lookup that picks between quoted literals", () => {
+				put("config/environment.cfm", lt & "cfscript>if (cgi.server_name == ""www.example.com"") { set(environment=""production""); } else { set(environment=""development""); }" & lt & "/cfscript>");
+				var report = runCheck();
+				expect(has(report.breaking, "selects the environment without WHEELS_ENV")).toBeTrue();
+				expect(has(report.advisories, "hardcodes the environment")).toBeFalse();
+			});
+
+			it("is an error for the same lookup written with cfif tags", () => {
+				put("config/environment.cfm", lt & "cfif cgi.server_name is ""www.example.com"">" & lt & "cfset set(environment=""production"")>" & lt & "cfelse>" & lt & "cfset set(environment=""development"")>" & lt & "/cfif>");
+				expect(has(runCheck().breaking, "selects the environment without WHEELS_ENV")).toBeTrue();
+			});
+
+			it("is an error for an interpolated value", () => {
+				put("config/environment.cfm", lt & "cfscript>set(environment=""##application.envName##"");" & lt & "/cfscript>");
+				expect(has(runCheck().breaking, "selects the environment without WHEELS_ENV")).toBeTrue();
+			});
+
+			it("is an error for more than one set(environment=)", () => {
+				put("config/environment.cfm", lt & "cfscript>set(environment=""development"");" & chr(10) & "set(environment=""production"");" & lt & "/cfscript>");
+				expect(has(runCheck().breaking, "selects the environment without WHEELS_ENV")).toBeTrue();
+			});
+
 			it("is advisory when environment.cfm hardcodes the environment", () => {
 				put("config/environment.cfm", lt & "cfscript>set(environment=""development"");" & lt & "/cfscript>");
 				var report = runCheck();

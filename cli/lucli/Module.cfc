@@ -8603,19 +8603,15 @@ component extends="modules.BaseModule" {
 		arrayAppend(arguments.checks, {
 			description: "config/environment.cfm selects the environment without WHEELS_ENV",
 			severity: "breaking",
-			checkType: "grep",
-			pattern: "set\s*\(\s*environment\s*=\s*[^""'\s]",
-			skipIfFileMatches: "WHEELS_ENV",
-			scanTargets: [{path: "config/environment.cfm"}],
+			checkType: "envSelection",
+			expect: "logic",
 			fix: "Keep your environment selection when you adopt the 4.2 config/environment.cfm: set WHEELS_ENV on every server before replacing the file, or carry your selection logic into the new file. Replacing it outright makes a server without WHEELS_ENV start in development. Guide: ""config/environment.cfm reads WHEELS_ENV"", #guide#"
 		});
 		arrayAppend(arguments.checks, {
 			description: "config/environment.cfm hardcodes the environment (4.2 reads WHEELS_ENV)",
 			severity: "advisory",
-			checkType: "grep",
-			pattern: "set\s*\(\s*environment\s*=\s*[""']",
-			skipIfFileMatches: "WHEELS_ENV",
-			scanTargets: [{path: "config/environment.cfm"}],
+			checkType: "envSelection",
+			expect: "literal",
 			fix: "A WHEELS_ENV=production set by the host has no effect while the file hardcodes the environment. Replace it with the 4.2 template's config/environment.cfm, or hardcode production on production servers. Guide: ""config/environment.cfm reads WHEELS_ENV"", #guide#"
 		});
 		arrayAppend(arguments.checks, {
@@ -8848,6 +8844,11 @@ component extends="modules.BaseModule" {
 					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: matches};
 				}
 			}
+		} else if (arguments.check.checkType == "envSelection") {
+			if ($upgradeEnvSelection() == arguments.check.expect) {
+				matched = true;
+				matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: ["config/environment.cfm"]};
+			}
 		} else if (arguments.check.checkType == "eventSilent") {
 			var loudFiles = $upgradeLoudEventTemplates(arguments.check.files);
 			if (arrayLen(loudFiles)) {
@@ -8884,6 +8885,35 @@ component extends="modules.BaseModule" {
 		}
 
 		return {severity: severity, matched: matched, matchEntry: matchEntry};
+	}
+
+	/**
+	 * How config/environment.cfm chooses the environment, comments stripped:
+	 * "none" when the file is missing, reads WHEELS_ENV, or never calls
+	 * set(environment=); "literal" for exactly one set(environment="...") with
+	 * a plain quoted value and no branching in the file; "logic" for anything
+	 * else (more than one set(), if/switch/ternary, # interpolation, an
+	 * unquoted value). Replacing a "logic" file with the 4.2 template drops
+	 * that selection.
+	 */
+	public string function $upgradeEnvSelection() {
+		var path = variables.projectRoot & "/config/environment.cfm";
+		if (!fileExists(path)) {
+			return "none";
+		}
+		var content = stripCfmlComments(fileRead(path));
+		var setCall = "set\s*\(\s*environment\s*=";
+		var sets = arrayLen(reMatchNoCase(setCall, content));
+		if (!sets || reFindNoCase("WHEELS_ENV", content)) {
+			return "none";
+		}
+		// chr(60) keeps literal CFML tags out of the source (Lucee's tag scanner).
+		var branching = "\bif\s*\(|\bswitch\s*\(|" & chr(60) & "cf(if|elseif|switch)\b|\?";
+		var plainLiteral = setCall & "\s*([""'])[^""'##]*\1\s*\)";
+		if (sets == 1 && reFindNoCase(plainLiteral, content) && !reFindNoCase(branching, content)) {
+			return "literal";
+		}
+		return "logic";
 	}
 
 	/**
