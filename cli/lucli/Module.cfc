@@ -1997,7 +1997,7 @@ component extends="modules.BaseModule" {
 		// string ("Can't cast Complex Object Type [URL scope] to String").
 		var bundleUrl = $docsBundleUrl(version);
 		var checksumUrl = bundleUrl & ".sha512";
-		var httpClient = new services.packages.HttpClient(timeoutSeconds = 300);
+		var timeouts = $docsFetchTimeouts();
 		out("Fetching docs for #version#...");
 		out("  #bundleUrl#");
 
@@ -2010,7 +2010,7 @@ component extends="modules.BaseModule" {
 		var checksumTmp = getTempDirectory() & "wheels-docs-#version#-#runId#.zip.sha512";
 		var checksumText = "";
 		try {
-			httpClient.download(checksumUrl, checksumTmp);
+			new services.packages.HttpClient(timeoutSeconds = timeouts.checksum).download(checksumUrl, checksumTmp);
 			checksumText = fileRead(checksumTmp, "utf-8");
 		} catch (any e) {
 			$docsFetchFail(
@@ -2036,7 +2036,7 @@ component extends="modules.BaseModule" {
 		var staging = home & "/docs/." & version & ".partial-" & runId;
 		try {
 			try {
-				httpClient.download(bundleUrl, tmp);
+				new services.packages.HttpClient(timeoutSeconds = timeouts.bundle).download(bundleUrl, tmp);
 			} catch (any e) {
 				$docsFetchFail("Download failed: #e.message#");
 			}
@@ -2336,6 +2336,18 @@ component extends="modules.BaseModule" {
 		} catch (any e) {
 			return "";
 		}
+	}
+
+	/**
+	 * Seconds each `docs fetch` download may take (cfhttp's total timeout). The
+	 * checksum is a few hundred bytes; the bundle is about 40 MB, so its limit
+	 * allows roughly 1 Mbit/s. Keep both as short as a real transfer allows: on
+	 * Lucee, a cfhttp call whose response completes before the tag starts
+	 * waiting for it only returns when the whole timeout has passed (the
+	 * executor's notify can come first; seen against a local stub, #4232).
+	 */
+	private struct function $docsFetchTimeouts() {
+		return {checksum: 30, bundle: 300};
 	}
 
 	/**

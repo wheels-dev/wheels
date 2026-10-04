@@ -900,25 +900,32 @@ component {
 		return {known: true, pids: pids};
 	}
 
-	private struct function $runCommand(required array cmdArgs) {
+	/**
+	 * Runs an introspection command (lsof, netstat, ls) and returns its exit code
+	 * and output. Bounded: output goes to a temp file (no pipe to fill or block on)
+	 * and a command still running after `timeoutSeconds` is killed and reported as
+	 * not run, the same as a missing command, so a stuck lsof can't hang the CLI.
+	 */
+	private struct function $runCommand(required array cmdArgs, numeric timeoutSeconds = 15) {
+		var outFile = getTempFile(getTempDirectory(), "wheels-cmd");
 		try {
 			var pb = createObject("java", "java.lang.ProcessBuilder").init(arguments.cmdArgs);
 			pb.redirectErrorStream(true);
+			pb.redirectOutput(createObject("java", "java.io.File").init(outFile));
 			var proc = pb.start();
-			var reader = createObject("java", "java.io.BufferedReader").init(
-				createObject("java", "java.io.InputStreamReader").init(proc.getInputStream(), "UTF-8")
+			var finished = proc.waitFor(
+				javaCast("long", arguments.timeoutSeconds),
+				createObject("java", "java.util.concurrent.TimeUnit").SECONDS
 			);
-			var sb = createObject("java", "java.lang.StringBuilder").init();
-			var line = reader.readLine();
-			while (!isNull(line)) {
-				sb.append(line);
-				sb.append(chr(10));
-				line = reader.readLine();
+			if (!finished) {
+				proc.destroyForcibly();
+				return {ran: false, exitCode: -1, output: ""};
 			}
-			proc.waitFor();
-			return {ran: true, exitCode: proc.exitValue(), output: sb.toString()};
+			return {ran: true, exitCode: proc.exitValue(), output: fileRead(outFile, "utf-8")};
 		} catch (any e) {
 			return {ran: false, exitCode: -1, output: ""};
+		} finally {
+			if (fileExists(outFile)) fileDelete(outFile);
 		}
 	}
 

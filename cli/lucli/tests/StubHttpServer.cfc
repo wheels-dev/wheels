@@ -26,7 +26,10 @@ component {
 	 * `routes`, when given, maps a request path (e.g. "/docs.zip", query
 	 * string ignored) to a raw binary response for that path; any other path
 	 * gets the fixed status / rawResponse. Build responses with
-	 * binaryResponse().
+	 * binaryResponse(). A route whose value is the string "HOLD" reads the
+	 * request and never answers: it holds the connection until the client
+	 * gives up, the stub stops, or 30 s pass (so a spec can't wedge the run),
+	 * standing in for a server that accepts and then stalls.
 	 */
 	public any function init(
 		required numeric statusCode,
@@ -37,17 +40,14 @@ component {
 		variables.statusCode = arguments.statusCode;
 		variables.rawResponse = arguments.rawResponse;
 		variables.routes = arguments.routes;
-		if (len(arguments.bindAddress)) {
-			// One address, exclusively (issue 3804): see TestSockets for why a
-			// wildcard bind can be shadowed on macOS and BSD.
-			variables.serverSocket = new TestSockets().exclusiveListener(arguments.bindAddress);
-		} else {
-			// Port 0 + no bind address = ephemeral port on the wildcard address,
-			// covering both stacks so the CLI's `http://localhost:<port>/...`
-			// connect succeeds whether localhost resolves to 127.0.0.1 or ::1
-			// (same dual-stack concern as PortProbeSpec).
-			variables.serverSocket = createObject("java", "java.net.ServerSocket").init(javacast("int", 0));
-		}
+		// One address, exclusively (issue 3804): a wildcard bind can be shadowed
+		// on macOS and BSD by another socket on 127.0.0.1:<same port>, which then
+		// takes the connection (a wrong answer, or a silent one the client waits
+		// on; #4232). The CLI dials 127.0.0.1, never localhost ($serverHost), so
+		// the default is the loopback address, the same as ChallengeStubServer.
+		variables.serverSocket = len(arguments.bindAddress)
+			? new TestSockets().exclusiveListener(arguments.bindAddress)
+			: new TestSockets().exclusiveLoopbackListener();
 		variables.threadName = "stub-http-" & createUUID();
 		// Raw request heads (request line + headers), in arrival order, so
 		// specs can assert what the CLI actually put on the wire. A Java
@@ -69,7 +69,10 @@ component {
 					try {
 						// Never let a silent client (e.g. the isPortOpen()
 						// connect-probe, which sends nothing) wedge the loop.
-						sock.setSoTimeout(javacast("int", 2000));
+						// Longer than the CLI's 3 s peer-identity check, which
+						// runs on an open connection before the request is
+						// written: a shorter timeout closed it first (#4232).
+						sock.setSoTimeout(javacast("int", 10000));
 						// Drain the request headers (until CRLFCRLF or EOF)
 						// before responding, so the client never sees a reset
 						// while its request is still in flight.
@@ -88,9 +91,22 @@ component {
 						}
 						// "GET /path?query HTTP/1.1" -> "/path"
 						reqPath = listFirst(listGetAt(listFirst(head, chr(13) & chr(10)) & " /", 2, " "), "?");
-						outStream = sock.getOutputStream();
-						outStream.write(structKeyExists(attributes.routes, reqPath) ? attributes.routes[reqPath] : responseBytes);
-						outStream.flush();
+						if (structKeyExists(attributes.routes, reqPath) && !isBinary(attributes.routes[reqPath])) {
+							// "HOLD": answer nothing; wait for the client to close.
+							holdUntil = getTickCount() + 30000;
+							sock.setSoTimeout(javacast("int", 250));
+							while (!attributes.srv.isClosed() && getTickCount() < holdUntil) {
+								try {
+									if (inStream.read() == -1) break;
+								} catch (any readErr) {
+									if (!findNoCase("timed out", readErr.message)) break;
+								}
+							}
+						} else {
+							outStream = sock.getOutputStream();
+							outStream.write(structKeyExists(attributes.routes, reqPath) ? attributes.routes[reqPath] : responseBytes);
+							outStream.flush();
+						}
 					} catch (any inner) {
 						// Per-connection failure (probe disconnects, read
 						// timeout) — keep serving until the socket closes.
