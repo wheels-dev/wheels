@@ -20,7 +20,9 @@ mapper()
 .end();
 ```
 
-Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`, `wheels.middleware.RateLimiter`, `wheels.middleware.AuthMiddleware` (authenticate + attach the result; `genericErrors=true` emits a generic `Unauthorized` JSON body instead of `authResult.error`), `wheels.middleware.TenantResolver` (resolve the active tenant; `failClosed=true` 403s unmatched tenants instead of proceeding on the default datasource). Custom: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
+Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`, `wheels.middleware.RateLimiter`, `wheels.middleware.AuthMiddleware` (authenticate + attach the result; with no `authenticator` passed it uses the DI container's `authenticator`, which `wheels generate auth` registers; the 401 body is `{"error": ..., "status": 401}`, and `genericErrors=true` emits a generic `Unauthorized` message instead of `authResult.error`), `wheels.middleware.TenantResolver` (resolve the active tenant; `failClosed=true` 403s unmatched tenants instead of proceeding on the default datasource). Custom: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
+
+A controller reads what middleware attached to the request: the `AuthMiddleware` result as `request.auth` (`success`, `principal`, `strategy`; with `allowAnonymous=true` a failed result is there too), and the whole middleware context as `request.wheels.middlewareContext`.
 
 **Singleton lifecycle contract**: both global and route-scoped middleware (including string-path entries) are resolved once and cached for the application lifetime. The same instance handles every matching request — stateful middleware (e.g. in-memory `RateLimiter` on a `.scope()`) accumulates state across requests as intended. Implication: every middleware component must be safe to share across concurrent requests (use CFML locks for any mutable state).
 
