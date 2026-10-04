@@ -162,6 +162,35 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 		});
 
+		describe("upgrade check: plugins in a 3.x app", () => {
+
+			it("reports a box.json plugin dependency when plugins/ is empty or missing", () => {
+				var files = $wheels30();
+				files["box.json"] = serializeJSON({dependencies: {"cfwheels-bcrypt": "^1.0.0"}, installPaths: {"cfwheels-bcrypt": "plugins/bcrypt/"}});
+				var root = $app(files);
+				directoryCreate(root & "/plugins");
+				expect($matchesFor($check(root), "Legacy plugins")).toBe(["box.json: cfwheels-bcrypt (plugins/bcrypt/)"]);
+			});
+
+			it("reports a cfwheels- dependency with no installPath and no plugins/ folder", () => {
+				var files = $wheels30();
+				files["box.json"] = serializeJSON({devDependencies: {"cfwheels-dbmigrate": "^2.0.0"}});
+				expect($matchesFor($check($app(files)), "Legacy plugins")).toBe(["box.json: cfwheels-dbmigrate"]);
+			});
+
+			it("reports code that reads application.wheels.plugins", () => {
+				var files = $wheels30();
+				files["app/models/User.cfc"] = "component {#chr(10)#	function hash(pw) { return application.wheels.plugins.bcrypt.hash(pw); }#chr(10)#}";
+				expect($matchesFor($check($app(files)), "Legacy plugins")).toBe(["app/models/User.cfc:2"]);
+			});
+
+			it("ignores dependencies installed outside plugins/", () => {
+				var files = $wheels30();
+				files["box.json"] = serializeJSON({dependencies: {"cfwheels-tools": "^1.0.0", logbox: "^7.0.0"}, installPaths: {"cfwheels-tools": "vendor/tools/", logbox: "app/lib/logbox/"}});
+				expect($matchesFor($check($app(files)), "Legacy plugins")).toBeEmpty();
+			});
+		});
+
 		describe("upgrade check: CSRF cookie key", () => {
 
 			it("doesn't flag the key for an app on the session store", () => {

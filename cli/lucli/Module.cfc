@@ -8272,13 +8272,31 @@ component extends="modules.BaseModule" {
 		var jump34 = arguments.currentMajor <= 3 && arguments.targetMajor >= 4;
 		var on4 = arguments.currentMajor >= 4 && arguments.targetMajor >= 4;
 		if (jump34 || on4) {
+			// An empty or missing plugins/ doesn't mean the app has no plugins:
+			// 3.x apps declare them in box.json (installed into plugins/ by the
+			// next box install), and 3.0's deletePluginDirectories=true default
+			// can leave the folder empty at runtime. So this also reports
+			// box.json plugin dependencies and code that reads
+			// application.wheels.plugins.
 			arrayAppend(checks, {
-				description: "Legacy plugin directory (deprecated as of 4.0, removed in 5.0)",
+				description: "Legacy plugins (deprecated as of 4.0, removed in 5.0)",
 				jumpOnly: true,
 				pattern: "",
-				checkType: "directory",
+				checkType: "plugins",
 				path: "plugins",
-				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>)"
+				references: {
+					pattern: "application\.wheels\.plugins\b",
+					checkType: "grep",
+					scanDir: "app",
+					extensions: "cfc,cfm",
+					scanTargets: [
+						{path: "Application.cfc"},
+						{path: "public/Application.cfc"},
+						{path: "config", extensions: "cfm,cfc", recurse: true}
+					],
+					skipPackages: true
+				},
+				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>), or to the 4.x built-in that replaces them, and remove their box.json dependencies (box install puts them back in plugins/)"
 			});
 			// application.wirebox → application.wheelsdi (guide item 10). The
 			// hardest real-world case is an Application.cfc bootstrap that
@@ -8845,6 +8863,32 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The plugin packages box.json declares, as "box.json: <name> (<installPath>)".
+	 * A dependency counts when its installPath is under plugins/ or, with no
+	 * installPath, when its name starts with "cfwheels-" (CommandBox installs
+	 * that package type into plugins/).
+	 */
+	private array function $upgradePluginDependencies() {
+		var box = $upgradeReadBoxJson();
+		var installPaths = structKeyExists(box, "installPaths") && isStruct(box.installPaths) ? box.installPaths : {};
+		var found = [];
+		for (var section in ["dependencies", "devDependencies"]) {
+			if (!structKeyExists(box, section) || !isStruct(box[section])) continue;
+			var names = structKeyArray(box[section]);
+			arraySort(names, "textnocase");
+			for (var name in names) {
+				var target = structKeyExists(installPaths, name) && isSimpleValue(installPaths[name])
+					? $upgradeNormalizeInstallPath(installPaths[name]) : "";
+				var isPlugin = len(target) ? reFindNoCase("^plugins(/|$)", target) > 0 : reFindNoCase("^cfwheels-", name) > 0;
+				if (isPlugin) {
+					arrayAppend(found, "box.json: " & name & (len(target) ? " (" & target & "/)" : ""));
+				}
+			}
+		}
+		return found;
+	}
+
+	/**
 	 * The directories box.json installs packages into (`installPaths`), as
 	 * absolute paths with forward slashes and a trailing slash.
 	 */
@@ -8928,6 +8972,29 @@ component extends="modules.BaseModule" {
 					matched = true;
 					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: matches};
 				}
+			}
+		} else if (arguments.check.checkType == "plugins") {
+			var pluginMatches = [];
+			var pluginDir = variables.projectRoot & "/" & arguments.check.path;
+			if (directoryExists(pluginDir) && arrayLen(directoryList(pluginDir, false, "name"))) {
+				arrayAppend(pluginMatches, arguments.check.path & "/");
+			}
+			for (var dependency in $upgradePluginDependencies()) {
+				arrayAppend(pluginMatches, dependency);
+			}
+			// A copy, so the check definition isn't changed.
+			var references = duplicate(arguments.check.references);
+			references.description = arguments.check.description;
+			references.fix = arguments.check.fix;
+			var referenceResult = $upgradeExecuteCheck(references);
+			if (referenceResult.matched) {
+				for (var reference in referenceResult.matchEntry.matches) {
+					arrayAppend(pluginMatches, reference);
+				}
+			}
+			if (arrayLen(pluginMatches)) {
+				matched = true;
+				matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: pluginMatches};
 			}
 		} else if (arguments.check.checkType == "envSelection") {
 			if ($upgradeEnvSelection() == arguments.check.expect) {
