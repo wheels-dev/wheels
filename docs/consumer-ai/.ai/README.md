@@ -6,7 +6,7 @@ scaffolds). It covers what an AI assistant needs while building an
 APPLICATION on Wheels — nothing about framework internals.
 
 - `../CLAUDE.md` — application-developer quick reference (models, routing,
-  views, middleware, DI, packages, CLI, testing, migrations, jobs, SSE).
+  views, middleware, DI, packages, CLI, testing, migrations, jobs, mail, SSE).
 - `../AGENTS.md` — cross-tool workflow guidance (MCP-first, conventions).
 - `models.md` — models: finders, associations, validations, callbacks, scopes.
 - `routing.md` — routing and route model binding.
@@ -19,6 +19,7 @@ APPLICATION on Wheels — nothing about framework internals.
 - `packages.md` — the package system.
 - `migrations.md` — migrations and seeding.
 - `jobs.md` — background jobs.
+- `mailers.md` — sending email: mailers, SMTP settings, testing a mailer.
 - `sse.md` — server-sent events.
 - `testing.md` — changing framework settings inside a spec, and testing partial caching.
 

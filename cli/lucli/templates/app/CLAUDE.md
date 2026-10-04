@@ -47,6 +47,7 @@ Open the file for a topic before working on it:
 - Packages: `.ai/packages.md`
 - Migrations, seeding: `.ai/migrations.md`
 - Background jobs: `.ai/jobs.md`
+- Sending email (mailers): `.ai/mailers.md`
 - Server-sent events: `.ai/sse.md`
 - Changing settings in specs: `.ai/testing.md`
 - Guides, `/wheels/ai`: `.ai/README.md`
