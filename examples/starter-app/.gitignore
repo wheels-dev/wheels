@@ -22,3 +22,6 @@ settings.json
 /db/h2/*.db
 /db/h2/*.trace.db
 !/db/h2/.keep
+
+# Wheels CLI state, including `wheels upgrade apply` framework backups
+.wheels/
