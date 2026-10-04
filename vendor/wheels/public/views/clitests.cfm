@@ -32,7 +32,7 @@ try {
 	// Lucee raises in whatever spec next touches a file; with these lines the
 	// script names the stalled bundle and takes a thread dump (#4232).
 	local.callbacks = {};
-	if (StructKeyExists(url, "progress") && url.progress) {
+	if (StructKeyExists(url, "progress") && IsBoolean(url.progress) && url.progress) {
 		local.callbacks = {
 			onBundleStart = function(target, testResults) {
 				request.cliSuiteBundleStarted = GetTickCount();

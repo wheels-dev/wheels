@@ -28,7 +28,9 @@ last_spec() { progress | { grep -a ' spec ' || true; } | tail -1 | cut -d' ' -f4
 
 code_file="$(mktemp)"
 trap 'rm -f "$code_file"' EXIT
-( curl -s -o "$result_file" --max-time "$max_time" --write-out "%{http_code}" "$url" > "$code_file" 2>/dev/null || echo "000" > "$code_file" ) &
+# curl itself in the background (not a subshell), so the watchdog's kill reaches
+# it. On a failed or killed transfer --write-out still writes 000.
+curl -s -o "$result_file" --max-time "$max_time" --write-out "%{http_code}" "$url" > "$code_file" 2>/dev/null &
 curl_pid=$!
 
 stalled=""
@@ -71,7 +73,8 @@ if [ -n "$stalled" ]; then
 fi
 
 wait "$curl_pid" 2>/dev/null || true
-code="$(cat "$code_file" 2>/dev/null || echo "000")"
+code="$(cat "$code_file" 2>/dev/null)"
+[ -n "$code" ] || code="000"
 case "$code" in
   200|417) ;;
   *)
