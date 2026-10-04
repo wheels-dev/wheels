@@ -455,9 +455,10 @@
 					);
 				} catch (any e) {
 					// A nested controller that writes extends="Controller" cannot find
-					// its base class. Carry a fix hint on the request (the dev error
-					// page and the log show it) and rethrow the ORIGINAL exception
-					// unchanged, so its type, tag context, cause and stack survive.
+					// its base class. Carry a fix hint on the request and log it to
+					// wheels.log (the hint is log-only — the app's minimal error page
+					// template is deliberately not touched), then rethrow the ORIGINAL
+					// exception unchanged, so its type, tag context, cause and stack survive.
 					local.hint = $missingBaseControllerHint(exception = e, name = arguments.name);
 					if (Len(local.hint)) {
 						if (!StructKeyExists(request, "wheels")) {
@@ -527,9 +528,13 @@
 			}
 		}
 		// Adobe appends a period after the name ("... interface Controller."); drop
-		// any trailing dots so the last path segment compares cleanly.
+		// any trailing dots before comparing.
 		local.missing = ReReplace(local.missing, "\.+$", "");
-		if (Len(local.missing) && ListLast(local.missing, ".") == "Controller") {
+		// Hint ONLY for the BARE base "Controller" (the nested-extends mistake). An
+		// already-qualified operand such as "app.controllers.Controller" that still
+		// failed is a different problem, and "use app.controllers.Controller" would
+		// be wrong advice, so it gets no hint.
+		if (CompareNoCase(local.missing, "Controller") == 0) {
 			return "a nested controller must extend ""app.controllers.Controller"", not ""Controller"" "
 				& "(a bare extends name resolves relative to the controller's own package), so '"
 				& arguments.name

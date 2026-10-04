@@ -66,6 +66,15 @@ component extends="wheels.WheelsTest" {
 				expect(hint).toBe("");
 			});
 
+			it("stays silent when the missing operand is an already-qualified *.Controller", () => {
+				// If a nested controller already extends the full path and that still
+				// fails, "use app.controllers.Controller" would be wrong advice — only
+				// the BARE base "Controller" operand gets the hint.
+				var e = {type = "expression", message = "invalid component definition, can't find component [app.controllers.Controller]", detail = ""};
+				var hint = application.wo.$missingBaseControllerHint(exception = e, name = "admin.Users");
+				expect(hint).toBe("");
+			});
+
 		});
 
 		describe("controller() catch path (end to end)", () => {
@@ -83,19 +92,22 @@ component extends="wheels.WheelsTest" {
 				// brokennest.Broken is a real fixture that declares extends="Controller"
 				// from a nested package, so instantiation fails exactly as a user's
 				// nested controller would.
-				var state = {caught = false, message = "", hintInMessage = true};
+				var state = {caught = false, message = "", type = "", hintInMessage = true};
 				try {
 					application.wo.controller(name = "brokennest.Broken");
 				} catch (any e) {
 					state.caught = true;
+					state.type = StructKeyExists(e, "type") ? e.type : "";
 					state.message = (StructKeyExists(e, "message") ? e.message : "") & " " & (StructKeyExists(e, "detail") ? e.detail : "");
 					state.hintInMessage = FindNoCase("app.controllers.Controller", StructKeyExists(e, "message") ? e.message : "") GT 0;
 				}
 
 				expect(state.caught).toBeTrue();
 				// The ORIGINAL exception is rethrown: the real component-not-found
-				// cause is intact and the hint was NOT merged into its message.
+				// cause is intact, it is NOT re-typed to a Wheels.* error, and the hint
+				// was NOT merged into its message.
 				expect(ReFindNoCase("component", state.message)).toBeGT(0);
+				expect(ReFindNoCase("^Wheels\.", state.type)).toBe(0);
 				expect(state.hintInMessage).toBeFalse();
 				// The hint is carried separately for the log / dev output.
 				expect(StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "errorHint")).toBeTrue();
