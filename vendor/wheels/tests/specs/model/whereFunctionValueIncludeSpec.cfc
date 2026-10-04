@@ -30,6 +30,27 @@ component extends="wheels.WheelsTest" {
 				expect(posts.recordCount).toBe(2);
 			})
 
+			it("uses the tbl alias under useIndex, as a bound condition does", () => {
+				// Only deleteAll() passes useIndex to the where clause, so check $whereClause directly.
+				// author has no soft-delete column; the alias applies only then, as for a bound condition.
+				var parts = g.model("author").$whereClause(where = "id = ABS(1)", include = "posts", sql = ["SELECT"], useIndex = {author: "idx_authors_123"});
+				var text = "";
+				for (var part in parts) {
+					if (IsSimpleValue(part)) {
+						text &= part & " ";
+					}
+				}
+				expect(ReFindNoCase("tbl\.[^ ]*id[^ ]* = ABS\(1\)", text)).toBeGT(0, text);
+			})
+
+			it("writes a calculated property's SQL in place of its name", () => {
+				var all = g.model("post").count(reload = true);
+				var posts = g.model("post").findAll(include = "author", where = "titleAlias LIKE TRIM('%Title for%')", returnAs = "query", reload = true);
+				var sql = g.model("post").findAll(include = "author", where = "titleAlias LIKE TRIM('%Title for%')", returnAs = "sql");
+				expect(posts.recordCount).toBe(all);
+				expect(sql).toInclude("(title) LIKE TRIM(");
+			})
+
 			it("leaves an expression that doesn't start with a property alone", () => {
 				var posts = g.model("post").findAll(include = "author", where = "ABS(c_o_r_e_posts.id) = ABS(1)", returnAs = "query", reload = true);
 				expect(posts.recordCount).toBe(1);
