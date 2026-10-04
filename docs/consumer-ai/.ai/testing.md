@@ -52,3 +52,21 @@ set(functionName = "sendEmail", deliver = false);
 ```
 
 To turn delivery off for a single spec instead, see `.ai/mailers.md`.
+
+## POSTs through the test client need the CSRF token
+
+Controllers extending the app's `Controller` call `protectsFromForgery()`, so a `$testClient()` POST, PUT or DELETE without the authenticity token gets a 403. Fetch a page first (the client keeps the session cookie), read the token from the `csrf-token` meta tag (`csrfMetaTags()` in the layout), and send it as `authenticityToken` or the `X-CSRF-Token` header:
+
+```cfm
+var testClient = $testClient();
+testClient.get("/posts/new");
+testClient.post("/posts", {"authenticityToken": csrfToken(testClient), "post[title]": "T", "post[body]": "B"})
+    .assertRedirect();  // redirectTo() answers a POST with 303
+
+// in the spec component:
+private string function csrfToken(required any testClient) {
+    var html = arguments.testClient.content();
+    var match = ReFindNoCase('<meta[^>]*name="csrf-token"[^>]*>', html, 1, true);
+    return match.len[1] ? ReReplaceNoCase(Mid(html, match.pos[1], match.len[1]), '.*content="([^"]*)".*', "\1") : "";
+}
+```

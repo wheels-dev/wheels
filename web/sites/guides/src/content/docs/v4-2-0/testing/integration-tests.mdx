@@ -104,7 +104,7 @@ For an A-vs-B interaction test, build two clients and log each in separately —
 
 ## Asserting on DB state
 
-After a workflow, the persistence side is the authoritative check. A 302 redirect only says the controller thought the save succeeded; a record in the database says it actually did.
+After a workflow, the persistence side is the authoritative check. A redirect only says the controller thought the save succeeded; a record in the database says it actually did.
 
 ```cfm {test:compile} title="tests/specs/integration/PostPersistenceSpec.cfc"
 component extends="wheels.WheelsTest" {
@@ -187,7 +187,7 @@ The payoff: one integration test catches regressions across every controller it 
 - **Reuse `$testClient()` throughout a spec.** Its cookie jar *is* the session state — building a fresh client drops the login.
 - **Build a fresh `$testClient()` per distinct user.** Two clients = two actors; don't try to share one and juggle cookies manually.
 - **`populate.cfm` handles common setup; the spec handles journey-specific data.** Users, roles, permissions — populate. The post Alice creates in this specific journey — the spec.
-- **Assert on DB state at the end, not just the HTTP response.** Silent failures in callbacks and filters don't surface in a 302.
+- **Assert on DB state at the end, not just the HTTP response.** Silent failures in callbacks and filters don't surface in a redirect.
 - **Extract the `Location` header when a flow needs to follow a redirect.** `TestClient` never auto-follows — `headers()["Location"]` gives you the target to hit next.
 
 ## When to prefer a browser test instead

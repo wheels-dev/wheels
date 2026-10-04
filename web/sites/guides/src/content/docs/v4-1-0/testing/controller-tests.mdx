@@ -97,14 +97,14 @@ describe("Posts index", () => {
 
 ## Testing POST and the create flow
 
-Creating a record has two outcomes to assert: a successful save redirects (typically 302 to the show page), and a validation failure re-renders the form (typically 200 with error messages in the body). Pass form fields as a struct to `post()` — the controller sees them on `params`, including nested keys like `params.post.title`.
+Creating a record has two outcomes to assert: a successful save redirects (a 303 to the show page: `redirectTo()` answers a POST with 303 See Other), and a validation failure re-renders the form (typically 200 with error messages in the body). Pass form fields as a struct to `post()` — the controller sees them on `params`, including nested keys like `params.post.title`.
 
 ```cfm {test:compile} title="tests/specs/controllers/PostsSpec.cfc"
 describe("Posts create", () => {
     it("redirects to the show page after a successful create", () => {
         var testClient = $testClient();
         testClient.post("/posts", {"post[title]": "New", "post[body]": "Body text"});
-        expect(testClient.statusCode()).toBe(302);
+        expect(testClient.statusCode()).toBe(303);
         testClient.assertRedirect(to="/posts/");
     });
 
@@ -112,12 +112,12 @@ describe("Posts create", () => {
         var testClient = $testClient();
         testClient.post("/posts", {"post[title]": "", "post[body]": "Body text"});
         expect(testClient.statusCode()).toBe(200);
-        testClient.assertSee("Title can't be empty");
+        testClient.assertSeeInOrder(["Title can", "t be empty"]);  // the apostrophe renders HTML-escaped
     });
 });
 ```
 
-The distinction matters: a 302 confirms the save succeeded and the controller called `redirectTo`; a 200 with the error message in the body confirms the validation caught a bad input and the action re-rendered `new`. If you ever see a 302 on invalid input, you know the validation isn't running — or the controller isn't branching on `.save()`'s return value.
+The distinction matters: a 303 confirms the save succeeded and the controller called `redirectTo`; a 200 with the error message in the body confirms the validation caught a bad input and the action re-rendered `new`. If you ever see a 303 on invalid input, you know the validation isn't running — or the controller isn't branching on `.save()`'s return value.
 
 ## Testing filter behavior
 
@@ -236,7 +236,7 @@ describe("Posts", () => {
         var testClient = $testClient();
         testClient.post("/login", {email: "alice@example.com", password: "secret"});
         testClient.post("/posts", {"post[title]": "T", "post[body]": "B"});
-        expect(testClient.statusCode()).toBe(302);
+        expect(testClient.statusCode()).toBe(303);
     });
 });
 ```
