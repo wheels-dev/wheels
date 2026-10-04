@@ -128,6 +128,51 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     }
 
     /**
+     * MockBox, with its stub directory in place. MockBox writes a generated stub for
+     * each mocked method under its generation path (`/testbox/system/stubs` by
+     * default, relative to the webroot) and fails when that directory is missing, as
+     * it is in an app made with `wheels new`. Every mock helper (createMock,
+     * createEmptyMock, createStub, prepareMock, querySim) goes through here.
+     *
+     * @generationPath Where MockBox writes its stubs; empty keeps the current path.
+     */
+    public any function getMockBox(string generationPath = "") {
+        local.mockBox = super.getMockBox(argumentCollection = arguments);
+        $ensureMockStubDirectory(local.mockBox);
+        return local.mockBox;
+    }
+
+    /**
+     * Creates `mockBox`'s stub directory, and any missing parents, when it does not
+     * exist. One level at a time with DirectoryCreate(): its create-parents argument
+     * is Lucee-only (issue #2567) and java.io.File is not available on every engine.
+     *
+     * @mockBox A wheels.wheelstest.system.MockBox.
+     */
+    public void function $ensureMockStubDirectory(required any mockBox) {
+        local.dir = ReReplace(ExpandPath(arguments.mockBox.getGenerationPath()), "[/\\]+$", "");
+        local.missing = [];
+        while (Len(local.dir) && !DirectoryExists(local.dir)) {
+            ArrayPrepend(local.missing, local.dir);
+            local.parent = ReReplace(GetDirectoryFromPath(local.dir), "[/\\]+$", "");
+            if (local.parent == local.dir) {
+                break;
+            }
+            local.dir = local.parent;
+        }
+        for (local.path in local.missing) {
+            try {
+                DirectoryCreate(local.path);
+            } catch (any e) {
+                // Another request may have created it meanwhile.
+                if (!DirectoryExists(local.path)) {
+                    rethrow;
+                }
+            }
+        }
+    }
+
+    /**
      * Delete a directory and everything in it, symlink-safe.
      *
      * `DirectoryDelete(path, recurse=true)` leaves the directory behind on
