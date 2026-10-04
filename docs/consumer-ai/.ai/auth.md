@@ -45,7 +45,7 @@ component extends="wheels.Controller" {
     }
 
     function index() {
-        renderWith(data={"articles": model("Article").where("userId", currentUser.id).get(returnAs="structs")});
+        renderWith(data={"articles": model("Article").where("userId", variables.currentUser.id).get(returnAs="structs")});
     }
 
     private function setJsonResponse() {
@@ -61,7 +61,9 @@ component extends="wheels.Controller" {
             renderWith(data={"error": result.error}, status=result.statusCode);
             return;
         }
-        currentUser = model("User").findByKey(result.principal.id);
+        // variables., not a bare name: under localMode="modern" a bare
+        // assignment stays local to this filter and the action never sees it.
+        variables.currentUser = model("User").findByKey(result.principal.id);
     }
 }
 ```

@@ -141,6 +141,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(guide).toInclude('service("authenticator").authenticate(');
 				expect(guide).toInclude("GetHttpRequestData(false).headers");
 				expect(guide).toInclude('seedOnce(modelName="User"');
+				// Shared with the action through variables. (a bare name would stay
+				// local to the filter under localMode="modern").
+				expect(guide).toInclude("variables.currentUser = ");
+				expect(guide).notToInclude("        currentUser = ");
 			});
 
 			it("injects the marked auth route block before the wildcard route", () => {
