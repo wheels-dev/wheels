@@ -88,6 +88,37 @@ component extends="Controller" {
 
 `enqueue()`, `enqueueIn()`, and `enqueueAt()` all return a struct with the persisted row's `id`. The controller keeps responding fast — the actual email send happens when the next `processQueue()` poll picks the row up.
 
+### Enqueueing inside a transaction
+
+`enqueue()` writes its `wheels_jobs` row through the app's datasource, so a job enqueued inside a transaction commits or rolls back with the rest of it. That makes a transactional outbox simple: save the data and enqueue the work in one model method, and run it with `invokeWithTransaction()`.
+
+```cfm {test:compile} title="app/models/User.cfc (fragment)"
+component extends="Model" {
+    public boolean function signupWithWelcome(required string email, required string firstName) {
+        var user = model("User").create(email = arguments.email, firstName = arguments.firstName);
+        var job = new app.jobs.SendWelcomeEmailJob();
+        job.enqueue(data = {userId: user.id});
+        return true;
+    }
+}
+```
+
+```cfm {test:compile} title="app/controllers/Signups.cfc (fragment)"
+component extends="Controller" {
+    function create() {
+        // If signupWithWelcome() throws, neither the user nor the job is saved.
+        model("User").new().invokeWithTransaction(
+            method = "signupWithWelcome",
+            email = params.email,
+            firstName = params.firstName
+        );
+        redirectTo(route = "root");
+    }
+}
+```
+
+The other side of this: work that must happen even when the transaction rolls back, such as a failure notice, can't be enqueued inside it. Enqueue it after the transaction ends.
+
 ## Process the queue
 
 The simplest way to drain the queue is the bundled worker — a long-lived CLI process that polls the `wheels_jobs` table, claims one `pending` job per cycle, and runs it. It talks to your running app server, so start that first (`wheels start`):
