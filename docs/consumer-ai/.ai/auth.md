@@ -21,6 +21,53 @@ if (bcryptNeedsRehash(hash)) { /* rehash + save */ }
 
 Authorization policies (4.0.6+): `wheels.Policy` base class + `app/policies/<Model>Policy.cfc`, generated with `wheels generate policy <Model>`. Helpers: `authorize(model)` (throws `Wheels.NotAuthorized` → 403 on deny, returns the record on allow), `can("action", model)` (boolean), `policyScope(model("Post"))` (no-rows scope on deny). Default-deny: every action denies unless the policy defines it.
 
+## Token APIs (`--strategy=token`)
+
+`wheels generate auth --strategy=token` gives you `POST /api/session` (email + password in, `{"token": …, "tokenType": "Bearer"}` out; only the token's SHA-256 digest is stored) and `DELETE /api/session` (revoke). It registers the `token` strategy on the `authenticator` service. Clients send the token back as `Authorization: Bearer <token>`.
+
+There is no sign-up endpoint, so create the first account yourself. The model hashes `password` on save:
+
+```cfm
+// app/db/seeds.cfm (or seeds/development.cfm), then: wheels seed
+seedOnce(modelName="User", uniqueProperties="email", properties={
+    email: "admin@example.com", password: "a-long-password-here", passwordConfirmation: "a-long-password-here"
+});
+```
+
+To require a token on other actions, authenticate the header in a `private` filter. `request.cgi` doesn't carry `Authorization`, so read it from the raw request:
+
+```cfm
+// app/controllers/api/Articles.cfc
+component extends="wheels.Controller" {
+    function config() {
+        provides("json");
+        filters(through="setJsonResponse,requireToken");
+    }
+
+    function index() {
+        renderWith(data={"articles": model("Article").where("userId", currentUser.id).get(returnAs="structs")});
+    }
+
+    private function setJsonResponse() {
+        params.format = "json";
+    }
+
+    private function requireToken() {
+        var headers = GetHttpRequestData(false).headers;
+        var result = service("authenticator").authenticate({
+            cgi: {http_authorization: headers["Authorization"] ?: ""}
+        });
+        if (!result.success) {
+            renderWith(data={"error": result.error}, status=result.statusCode);
+            return;
+        }
+        currentUser = model("User").findByKey(result.principal.id);
+    }
+}
+```
+
+A filter that renders a response stops the action from running. `result.principal` is what the strategy's validator returned (`{id, email}` from the generated one).
+
 ## Return-to URLs after sign-in
 
 `redirectTo(url=…)` refuses another host. Unless `allowExternalRedirects` is `true` (it's `false` by default), it throws `Wheels.UnsafeRedirect` for anything other than a relative URL or a URL on the current host. So you can pass a user-supplied `return_to` straight to it and fall back when it throws:

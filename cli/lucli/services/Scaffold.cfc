@@ -844,6 +844,12 @@ component {
 		ctx.apiTokenColumn = strategyName == "token"
 			? t & t & t & t & 't.string(columnNames="apiTokenDigest", allowNull=true, limit=64);' & nl
 			: "";
+		// The token strategy looks every request's token up by its digest.
+		// Not unique: most rows have no token, and SQL Server counts NULLs
+		// as duplicates in a unique index.
+		ctx.apiTokenIndex = strategyName == "token"
+			? t & t & t & t & 'addIndex(table="' & tableName & '", columnNames="apiTokenDigest");' & nl
+			: "";
 		// Emits `#linkTo(...)#` into the login view (## collapses to # in this
 		// CFC's string literal; the .txt templates are raw and keep single #).
 		ctx.registrationLink = withRegistration
