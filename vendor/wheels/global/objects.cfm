@@ -497,6 +497,12 @@
 	 * must extend "app.controllers.Controller". Returns "" when the error is
 	 * unrelated or the controller is top-level. Additive message text only — it
 	 * does not change the error type, status, or control flow.
+	 *
+	 * Lucee and Adobe name the missing component in the error ("... component
+	 * [Controller]" / "... component or interface Controller"), so the operand can
+	 * be parsed. BoxLang reports a generic "Could not initialize class <child>"
+	 * (the cause chain repeats the same text) with no operand, so this returns ""
+	 * there — no hint rather than a guessed one.
 	 */
 	public string function $missingBaseControllerHint(required any exception, required string name) {
 		// Only nested controllers (a dot in the name, e.g. "admin.users") hit
