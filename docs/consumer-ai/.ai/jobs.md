@@ -12,7 +12,7 @@ component extends="wheels.Job" {
     }
     public void function perform(struct data = {}) {
         // model() works in a job; sendEmail() is controller-only, so send through a mailer
-        user = model("User").findByKey(arguments.data.userId);
+        var user = model("User").findByKey(arguments.data.userId);
         new app.mailers.UserMailer().sendWelcome(user);
     }
 }
@@ -23,10 +23,13 @@ job.enqueue(data={userId: user.id});
 job.enqueueIn(seconds=300, data={userId: user.id});
 job.enqueueAt(runAt=scheduledDate, data={});
 
-// Process
-result = (new wheels.Job()).processQueue(queue="mailers", limit=10);
-stats = (new wheels.Job()).queueStats();
+// Process and inspect from code
+queue = new wheels.Job();
+result = queue.processQueue(queue="mailers", limit=10);
+stats = queue.queueStats();
 ```
+
+`UserMailer` is the mailer in `.ai/mailers.md` (`app/mailers/UserMailer.cfc` plus its view). With it and a `users` table that has `email` and `firstName`, this example runs as written.
 
 Worker CLI (`cli/lucli/Module.cfc::jobs()` — thin wrapper over the `jobsProcessNext`/`jobsStatus` bridge commands in `vendor/wheels/public/views/cli.cfm`; requires a running server):
 ```bash
