@@ -8026,6 +8026,7 @@ component extends="modules.BaseModule" {
 		if (crosses42) {
 			checks = $upgradeAppendChecks4x2(checks, target);
 		}
+		checks = $upgradeAppendTemplateFixChecks(checks, target);
 
 		// Run checks. Matched checks land in `issues` (severity=breaking) or
 		// `advisories` (severity=advisory); unmatched land in `passed`.
@@ -8586,6 +8587,76 @@ component extends="modules.BaseModule" {
 		}
 		var semver = new services.SemVer();
 		return semver.compare(arguments.currentVersion, "4.2.0") < 0 && semver.compare(arguments.target, "4.2.0") >= 0;
+	}
+
+	/**
+	 * The fixes that live in the app-owned public/Application.cfc. A framework
+	 * swap never updates that file, so each fix the target release has is
+	 * checked on its own: the file lacks the code the template carries for
+	 * it. The generic template-drift check only says the file differs. Each
+	 * entry: since (the first release whose template has it), a pattern the
+	 * template matches, and the guide section that documents the edit. The
+	 * teardown routing is an error because on Adobe ColdFusion a shutdown
+	 * that reads the bare application scope can leave the whole site
+	 * erroring until a restart; the rest are advisory.
+	 */
+	private array function $upgradeAppendTemplateFixChecks(required array checks, required string target) {
+		var guide41 = new services.GuidesLink().pinned("v4-1-0", "upgrading/4x-0-to-4x-1/");
+		var guide42 = $upgradeGuide4x2Url();
+		var adopt = "Adopt it from the app template (public/Application.cfc in a fresh wheels new app), keeping your own changes.";
+		var fixes = [
+			{since: "4.0.4", severity: "advisory", pattern: "this\.sessionCookie",
+				description: "public/Application.cfc doesn't set this.sessionCookie",
+				fix: "The session cookie's flags (including Secure over HTTPS) come from this block. #adopt# Guide: ""Session cookie Secure flag"", #guide41#"},
+			{since: "4.0.4", severity: "advisory", pattern: "StructKeyExists\(\s*application\s*,\s*""wheelsdi""\s*\)",
+				description: "public/Application.cfc onError doesn't guard the DI container",
+				fix: "Without the guard an error page can rebuild the container and wipe registered services. #adopt# Guide: ""DI container guard in onError"", #guide41#"},
+			{since: "4.0.6", severity: "breaking", pattern: "applicationScope\.wo\.\$include",
+				description: "public/Application.cfc onApplicationEnd() doesn't go through arguments.applicationScope",
+				fix: "On Adobe ColdFusion, an onApplicationEnd() that reads the bare application scope can fail during shutdown and leave the whole site erroring until a service restart. Route it through arguments.applicationScope.wo with the StructKeyExists guards. #adopt# Guide: ""Adobe teardown guards in onError / onSessionEnd"", #guide41#"},
+			{since: "4.1.0", severity: "breaking", pattern: "applicationScope\.wo\.\$simpleLock",
+				description: "public/Application.cfc onSessionEnd() doesn't go through arguments.applicationScope",
+				fix: "On Adobe ColdFusion, session cleanup can call onSessionEnd() after the application scope is gone, and a bare application.wo then throws. Route it through arguments.applicationScope.wo, guarded with StructKeyExists. #adopt# Guide: ""Adobe teardown guards in onError / onSessionEnd"", #guide41#"},
+			{since: "4.0.6", severity: "advisory", pattern: "testcontext\.cfm",
+				description: "public/Application.cfc doesn't include the isolated test context",
+				fix: "Without it the test suites run against your live application scope. #adopt# Guide: ""Isolated test-application include"", #guide41#"},
+			{since: "4.1.0", severity: "advisory", pattern: "resources/java",
+				description: "public/Application.cfc doesn't put the bundled jBCrypt jar on the Java load path",
+				fix: "Without it bcryptHash()/bcryptVerify() use the slow pure-CFML fallback, and code that loads a BCrypt class can fail. #adopt# Guide: ""jBCrypt load path"", #guide41#"},
+			{since: "4.1.0", severity: "advisory", pattern: "\$authorizeReload",
+				description: "public/Application.cfc reload handling predates the template's helper functions",
+				fix: "The template's onRequestStart moved its reload handling into helper functions. #adopt# Guide: ""Reload-password handoff"", #guide41#"},
+			{since: "4.1.1", severity: "advisory", pattern: "Compare\(\s*lCase\(\s*local\.value\s*\)\s*,\s*""true""\s*\)",
+				description: "public/Application.cfc .env parser predates the 4.1.1 boolean fix",
+				fix: "The older parser turns a numeric 1 (such as 1.0) into the boolean true. #adopt# Guide: "".env boolean parser"", #guide41#"},
+			{since: "4.2.0", severity: "advisory", pattern: "startupPhase",
+				description: "public/Application.cfc onError doesn't tell a running-app error from a startup failure",
+				fix: "The older fallback shows ""Wheels failed to initialize"" for any error and may not log it. #adopt# Guide: ""onError running-app message"", #guide42#"},
+			{since: "4.2.0", severity: "advisory", pattern: "GetHttpRequestData\(\s*false\s*\)\.headers",
+				description: "public/Application.cfc lacks the reload-password header fallback",
+				fix: "Without it wheels reload against a RustCFML server fails every other run. #adopt# Guide: ""Reload-password header fallback"", #guide42#"},
+			{since: "4.2.0", severity: "advisory", pattern: "\$normaliseRedirectPath",
+				description: "public/Application.cfc reload redirect doesn't keep the subfolder",
+				fix: "An app served under a subfolder is redirected to the site root after a reload. #adopt# Guide: ""Reload redirect keeps the subfolder"", #guide42#"}
+		];
+		var versionPattern = "^[vV]?\d+(\.\d+)*([-+][^\r\n]*)?$";
+		var targetKnown = reFind(versionPattern, trim(arguments.target)) > 0;
+		var semver = new services.SemVer();
+		for (var fixSpec in fixes) {
+			if (targetKnown && semver.compare(arguments.target, fixSpec.since) < 0) {
+				continue;
+			}
+			arrayAppend(arguments.checks, {
+				description: fixSpec.description,
+				severity: fixSpec.severity,
+				checkType: "grep",
+				absent: true,
+				pattern: fixSpec.pattern,
+				scanTargets: [{path: "public/Application.cfc"}],
+				fix: fixSpec.fix
+			});
+		}
+		return arguments.checks;
 	}
 
 	/**
