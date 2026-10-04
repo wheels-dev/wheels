@@ -33,13 +33,8 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("the monorepo sidebars directory ships at least one *.json the dynamic discovery can pick up", () => {
-				var sidebarsDir = ExpandPath("/wheels/../../web/sites/guides/src/sidebars");
-				if (!DirectoryExists(sidebarsDir)) {
-					// Installed-app environment — no monorepo web/ tree on
-					// disk. The discovery contract is "return [] silently",
-					// not "find a sidebar". Skip without failing.
-					return;
-				}
+				// An installed app has no web/ tree: the spec reports as skipped there.
+				var sidebarsDir = $requireRepoPath("web/sites/guides/src/sidebars");
 
 				// Mirror the discovery logic that guides.cfm / ai.cfm use:
 				// glob *.json under sidebars/ and sort basenames in
