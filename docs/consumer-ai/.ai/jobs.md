@@ -35,6 +35,7 @@ Run jobs with the worker. It needs this app's server running, started with `whee
 ```bash
 wheels jobs work --queue=mailers --interval=3   # long-lived worker loop; --quiet for less output
 wheels jobs work --max-jobs=10                  # stops after 10 processed jobs (it keeps polling until then)
+wheels jobs work --stop-when-empty              # exits once no job is ready to run: one-shot batches from cron/CI
 wheels jobs status [--queue=mailers] [--format=json]
 ```
 The `retry`/`purge`/`monitor` verbs are tracked follow-ups ([#3090](https://github.com/wheels-dev/wheels/issues/3090)). Invoking one errors and prints the programmatic equivalent: `retryFailed(queue=...)` or `purgeCompleted(days=7, queue=...)` on a `wheels.Job` instance.
