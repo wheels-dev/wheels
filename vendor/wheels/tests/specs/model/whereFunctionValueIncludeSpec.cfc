@@ -11,19 +11,22 @@ component extends="wheels.WheelsTest" {
 		describe("Where conditions with a function-call value under include", () => {
 
 			it("qualifies a shared column compared with a function call", () => {
-				var posts = g.model("post").findAll(include = "author", where = "id = ABS(1)", returnAs = "query", reload = true);
+				var ids = $postIds();
+				var posts = g.model("post").findAll(include = "author", where = "id = ABS(#ids[1]#)", returnAs = "query", reload = true);
 				expect(posts.recordCount).toBe(1);
 			})
 
 			it("qualifies a shared column when the function wraps a quoted value", () => {
-				var posts = g.model("post").findAll(include = "author", where = "id = ABS(CAST('1' AS DECIMAL))", returnAs = "query", reload = true);
+				var ids = $postIds();
+				var posts = g.model("post").findAll(include = "author", where = "id = ABS(CAST('#ids[1]#' AS DECIMAL))", returnAs = "query", reload = true);
 				expect(posts.recordCount).toBe(1);
 			})
 
 			it("qualifies each such condition, after AND/OR and inside parentheses", () => {
+				var ids = $postIds();
 				var posts = g.model("post").findAll(
 					include = "author",
-					where = "(id = ABS(1) OR id = ABS(2)) AND title LIKE TRIM('%Title for%')",
+					where = "(id = ABS(#ids[1]#) OR id = ABS(#ids[2]#)) AND title LIKE TRIM('%Title for%')",
 					returnAs = "query",
 					reload = true
 				);
@@ -52,19 +55,28 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("qualifies a condition after a lowercase or mixed-case and/or", () => {
-				var lower = g.model("post").findAll(include = "author", where = "title LIKE TRIM('%Title for%') and id = ABS(1)", returnAs = "query", reload = true);
-				var mixed = g.model("post").findAll(include = "author", where = "(id = ABS(1) Or id = ABS(2)) And title LIKE TRIM('%Title for%')", returnAs = "query", reload = true);
+				var ids = $postIds();
+				var lower = g.model("post").findAll(include = "author", where = "title LIKE TRIM('%Title for%') and id = ABS(#ids[1]#)", returnAs = "query", reload = true);
+				var mixed = g.model("post").findAll(include = "author", where = "(id = ABS(#ids[1]#) Or id = ABS(#ids[2]#)) And title LIKE TRIM('%Title for%')", returnAs = "query", reload = true);
 				expect(lower.recordCount).toBe(1);
 				expect(mixed.recordCount).toBe(2);
 			})
 
 			it("leaves an expression that doesn't start with a property alone", () => {
-				var posts = g.model("post").findAll(include = "author", where = "ABS(c_o_r_e_posts.id) = ABS(1)", returnAs = "query", reload = true);
+				var ids = $postIds();
+				var posts = g.model("post").findAll(include = "author", where = "ABS(c_o_r_e_posts.id) = ABS(#ids[1]#)", returnAs = "query", reload = true);
 				expect(posts.recordCount).toBe(1);
 			})
 
 		})
 
+	}
+
+	// Post ids from the fixtures: never hard-coded, since CockroachDB assigns SERIAL ids with
+	// unique_rowid(). Hoisted: ValueList() over a call expression doesn't compile on Adobe.
+	public array function $postIds() {
+		var posts = g.model("post").findAll(select = "id", order = "id", returnAs = "query", reload = true);
+		return ListToArray(ValueList(posts.id));
 	}
 
 }
