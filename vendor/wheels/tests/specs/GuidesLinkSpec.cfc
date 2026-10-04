@@ -74,8 +74,15 @@ component extends="wheels.WheelsTest" {
 				var root = ExpandPath("/wheels/../..") & "/";
 				var allowed = $pinnedPages();
 				var found = 0;
-				for (var file in ["cli/lucli/Module.cfc", "cli/lucli/services/Doctor.cfc"]) {
-					for (var call in ReMatch('pinned\(\s*"v[0-9]+-[0-9]+-0"\s*,\s*"[a-z0-9/_-]+"', FileRead(root & file))) {
+				// Every CLI component, not just the two that build GuidesLink today,
+				// so a pinned() added in another service is checked too. The CLI's
+				// own specs are skipped: a fixture may quote a pinned() call.
+				for (var path in DirectoryList(root & "cli/lucli", true, "path", "*.cfc")) {
+					if (ReFind("[\\/]cli[\\/]lucli[\\/]tests[\\/]", path)) {
+						continue;
+					}
+					var file = ReplaceNoCase(path, root, "");
+					for (var call in ReMatch('pinned\(\s*"v[0-9]+-[0-9]+-0"\s*,\s*"[a-z0-9/_-]+"', FileRead(path))) {
 						var parts = ReMatch('"[^"]+"', call);
 						var entry = ReReplace(parts[1], '"', "", "all") & "/" & ReReplace(ReReplace(parts[2], '"', "", "all"), "/$", "");
 						found++;
