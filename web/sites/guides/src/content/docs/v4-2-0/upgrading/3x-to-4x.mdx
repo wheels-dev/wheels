@@ -35,6 +35,8 @@ This guide walks every breaking change between Wheels 3.x and 4.0, with before/a
 
 5. Replace `vendor/wheels/` with the 4.0 source. If you vendor the framework, `git checkout` the 4.0 tag. If you clone-and-run, pull.
 
+   If the app is managed with CommandBox (its `box.json` lists `wheels-core` under `dependencies`), set that version to 4.x as well, for example `"wheels-core": "^4.2.0"`. Left at 3.x, the next `box install` (a CI job, a Docker build) copies the 3.x framework back over `vendor/wheels/` without clearing it, and the app runs a mix of both versions. `wheels upgrade apply` updates it for you.
+
 </Steps>
 
 ## The eleven breaking changes
@@ -284,7 +286,7 @@ var svc = service("emailService");
   **The legacy adapter does not cover this item.** Installing `wheels-legacy-adapter` does not create an `application.wirebox` alias and does not restore the `wirebox.system.ioc.Injector` package path. Both require manual remediation regardless of whether the adapter is installed:
 
   - Replace all `application.wirebox.getInstance("...")` calls with `application.wheelsdi.getInstance("...")` or the `service()` helper.
-  - Replace any `Application.cfc` bootstrap that calls `new wirebox.system.ioc.Injector(...)`. The WireBox package no longer ships in `vendor/wheels/`. The 4.0 equivalent is `new wheels.Injector()`.
+  - Replace any `Application.cfc` bootstrap that calls `new wirebox.system.ioc.Injector(...)`. The WireBox package no longer ships in `vendor/wheels/`. The 4.0 equivalent is `new wheels.Injector("wheels.Bindings")`: the constructor requires the bindings component's path, so a bare `new wheels.Injector()` fails.
 </Aside>
 
 ### 11. Vite manifest strictness — missing entries throw in production
@@ -501,7 +503,7 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 - **Plugin warning at startup.** Port to a package (see above) or accept the warning until you do.
 - **JWT tokens reject as invalid after upgrade.** Algorithm validation is on. Confirm your issuer sets `alg` to a supported value and the signature verification path uses constant-time comparison. See #2079, #2086.
 - **`Wheels.ViteAssetNotFound` thrown on first request after deploy.** The deploy shipped code referencing a Vite entrypoint that isn't in the manifest. Rebuild Vite assets (`npm run build`) before deploy, or temporarily `set(viteStrictManifest=false)` to restore 3.x silent fallback. See #2133.
-- **Boot fails with a "wirebox" package-not-found error.** The `wirebox` package was removed from `vendor/wheels/` (#1883). Installing the legacy adapter does not restore it. Replace `new wirebox.system.ioc.Injector(...)` in `Application.cfc` with `new wheels.Injector()`, and replace any `application.wirebox` references with `application.wheelsdi`. See [item 10](#10-applicationwirebox-renamed-to-applicationwheelsdi).
+- **Boot fails with a "wirebox" package-not-found error.** The `wirebox` package was removed from `vendor/wheels/` (#1883). Installing the legacy adapter does not restore it. Replace `new wirebox.system.ioc.Injector(...)` in `Application.cfc` with `new wheels.Injector("wheels.Bindings")`, and replace any `application.wirebox` references with `application.wheelsdi`. See [item 10](#10-applicationwirebox-renamed-to-applicationwheelsdi).
 - **"reloadPassword is empty" boot warning despite having `reloadPassword` in `.env`.** The reload password is populated only by `set(reloadPassword = ...)` in `config/settings.cfm` — a `.env` value does not flow through automatically. Add `set(reloadPassword = env("WHEELS_RELOAD_PASSWORD", ""));` to `config/settings.cfm`. See #2631.
 - **`?reload=true` does nothing — the app never restarts.** URL-based reload fails closed since 4.0.4: it requires a non-empty configured `reloadPassword` AND a matching `password` URL parameter (`?reload=true&password=...`). An empty `reloadPassword` — including the empty-string fallback from a missing `.env` key — disables URL reload entirely; in 3.x an empty password meant "no password required", so this breaks old muscle memory silently. In the development environment the debug bar now shows an inline notice explaining why a requested reload was refused; other environments log to `wheels_security.log` only. Wrong-password attempts are rate-limited (5 failures per IP within 5 minutes locks the source out for the window). See #3062, #3311.
 - **Production servers report `environment=development` despite `.env` containing `environment=production`.** `application.env.environment` is not reliably populated before `config/environment.cfm` runs — the load-order gap means the expression resolves to `""` and `set()` picks up the wrong value. Replace `set(environment=application.env.environment)` with `set(environment=env("environment", "production"))`. The `"production"` default ensures a missing key fails safe to production rather than development. See #2709.

@@ -22,7 +22,7 @@ Upgrade the CLI first (step 1 below), then run `wheels upgrade check --to=4.2.0`
 
 2. **Back up the current framework outside `vendor/`.** Move (don't delete) `vendor/wheels/` out of the project, e.g. to `../wheels-4.1.x.bak/`. Moving it back is the whole rollback. Don't leave the backup inside `vendor/`: 4.2 loads every folder there as a package, so a `vendor/wheels-4.1.x.bak/` logs a "skipped: unsafe directory name" error on every start, and [committing `vendor/`](#commit-vendor-420) would commit it.
 
-3. **Install 4.2.x.** Extract the 4.2 `vendor/wheels/` in its place (or `git checkout` the tag if you vendor the framework).
+3. **Install 4.2.x.** Extract the 4.2 `vendor/wheels/` in its place (or `git checkout` the tag if you vendor the framework). If the app is managed with CommandBox (its `box.json` lists `wheels-core` under `dependencies`), set that version to 4.2 as well, for example `"wheels-core": "^4.2.0"`: left at 4.1, the next `box install` copies the 4.1 framework back over `vendor/wheels/` without clearing it. `wheels upgrade apply` updates it for you.
 
 4. **Restart the server and run your suite.** Use `wheels stop` then `wheels start`, and `/wheels/app/tests`. The suite now runs against a separate `<datasource>_test` datasource and refuses to run without one; see [App tests use the test database](#app-tests-use-the-test-database-and-test-application). Then apply the edits below, and restart again after them: `?reload=true` rebuilds the application but doesn't recompile changed `app/events/*.cfm` or `public/Application.cfc` files on a running dev server.
 
@@ -35,6 +35,8 @@ Upgrade the CLI first (step 1 below), then run `wheels upgrade check --to=4.2.0`
 ### `config/environment.cfm` reads `WHEELS_ENV` (4.2.0)
 
 Apps generated before 4.2 hardcode the environment: `config/environment.cfm` contains `set(environment="development")`, so a `WHEELS_ENV=production` set by a Docker image, systemd unit or host has no effect ([#3946](https://github.com/wheels-dev/wheels/issues/3946)). The 4.2 template reads `WHEELS_ENV` through `env()` (`.env` first, then the process environment). Unset or empty means `development`. Any value other than `development`, `testing`, `maintenance` or `production` stops the app at startup with `Wheels.InvalidEnvironment`, because Wheels shows error details in any environment that isn't `production`.
+
+If your `config/environment.cfm` chooses the environment some other way (for example `set(environment=application.env.environment)`, or a lookup by host name), keep that selection when you adopt the template: set `WHEELS_ENV` on every server before replacing the file, or carry your selection logic into the new file. Replacing the file outright drops your selection, and a server without `WHEELS_ENV` then starts in `development`.
 
 Replace `config/environment.cfm` with the one from a fresh `wheels new` app (see [Environments and Configuration](/v4-2-0/core-concepts/environments-and-configuration/)), or keep yours and hardcode `set(environment="production");` on production servers.
 
