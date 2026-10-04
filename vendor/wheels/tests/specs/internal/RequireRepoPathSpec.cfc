@@ -71,16 +71,18 @@ component extends="wheels.WheelsTest" {
 			it("can see the repository whenever WHEELS_EXPECT_REPO is set", () => {
 				// compose.yml, pr.yml and tools/rustcfml/run-suite.sh set WHEELS_EXPECT_REPO for
 				// repository runs. There, a missing repository marker would make every guarded
-				// spec skip and the run stay green, so this fails instead. In an app the
-				// variable is unset and there is nothing to check.
+				// spec skip and the run stay green, so this fails instead. Unset, it skips with
+				// the reason, so a repository run the variable did not reach shows a named skip
+				// rather than a pass.
 				var env = (StructKeyExists(server, "system") && StructKeyExists(server.system, "environment")) ? server.system.environment : {};
 				var expected = StructKeyExists(env, "WHEELS_EXPECT_REPO") && CompareNoCase(Trim(env.WHEELS_EXPECT_REPO), "true") == 0;
-				var marker = $frameworkRepoRoot() & "cli/lucli/templates";
-				if (expected) {
-					expect(DirectoryExists(marker)).toBeTrue(
-						"WHEELS_EXPECT_REPO is set, but " & marker & " is missing: every spec that needs the Wheels framework repository would skip."
-					);
+				if (!expected) {
+					skip("WHEELS_EXPECT_REPO not set (expected outside the Wheels repo).");
 				}
+				var marker = $frameworkRepoRoot() & "cli/lucli/templates";
+				expect(DirectoryExists(marker)).toBeTrue(
+					"WHEELS_EXPECT_REPO is set, but " & marker & " is missing: every spec that needs the Wheels framework repository would skip."
+				);
 			});
 
 		});
