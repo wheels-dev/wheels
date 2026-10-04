@@ -47,6 +47,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		return false;
 	}
 
+	/** The matches of the entry whose description contains `description`; [] when there is none. */
+	private array function matchesFor(required array entries, required string description) {
+		for (var entry in arguments.entries) {
+			if (isStruct(entry) && findNoCase(arguments.description, entry.description)) {
+				return entry.matches;
+			}
+		}
+		return [];
+	}
+
 	function run() {
 
 		describe("wheels upgrade check, 4.1 -> 4.2", () => {
@@ -170,6 +180,47 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				put("config/settings.cfm", lt & "cfscript>set(trustProxyHeaders=true);" & lt & "/cfscript>");
 				variables.mod = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
 				expect(has(runCheck().advisories, "X-Forwarded-Proto")).toBeFalse();
+			});
+
+			it("flags app code that reads persisted from a job result", () => {
+				put("app/controllers/Signups.cfc", "component {#chr(10)#function create() {#chr(10)#var result = job.enqueue();#chr(10)#if (!result.persisted) { abort; }#chr(10)#}#chr(10)#}");
+				var found = matchesFor(runCheck().advisories, "reads persisted from a job result");
+				expect(found).toBe(["app/controllers/Signups.cfc:4"]);
+			});
+
+			it("doesn't flag persisted in a comment or inside another name", () => {
+				put("app/controllers/Signups.cfc", "component {#chr(10)#// if (!result.persisted) {}#chr(10)#function create() { var persistedCount = 1; }#chr(10)#}");
+				expect(has(runCheck().advisories, "reads persisted from a job result")).toBeFalse();
+			});
+
+			it("flags a tests/runner.cfm that doesn't include the built-in app runner, naming the file", () => {
+				// The only mention of app-runner.cfm is in a comment, which is stripped first.
+				put("tests/runner.cfm", lt & "!--- see wheels/tests/app-runner.cfm ---" & ">" & lt & "cfscript>application.wheels.dataSourceName = ""wheelstestdb"";" & lt & "/cfscript>");
+				var found = matchesFor(runCheck().advisories, "doesn't use the built-in app runner");
+				expect(ArrayLen(found)).toBe(1);
+				expect(found[1]).toInclude("tests/runner.cfm");
+			});
+
+			it("doesn't flag the app-runner include, or an app without tests/runner.cfm", () => {
+				put("tests/runner.cfm", lt & "cfinclude template=""##application.wo.$resolveSubpathInclude('/wheels/tests/app-runner.cfm')##"">");
+				expect(has(runCheck().advisories, "doesn't use the built-in app runner")).toBeFalse();
+
+				fileDelete(variables.tempRoot & "/tests/runner.cfm");
+				variables.mod = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
+				expect(has(runCheck().advisories, "doesn't use the built-in app runner")).toBeFalse();
+			});
+
+			it("lists empty-string where conditions, query-builder and dynamic-finder calls for review", () => {
+				put("app/models/Brand.cfc", "component extends=""Model"" {#chr(10)#function a() { return findAll(where=""brand = ''""); }#chr(10)#function b() { return deleteAll(where=""code <> ''""); }#chr(10)#function c() { return where(""brand"", """").count(); }#chr(10)#function d() { return findOneByToken(''); }#chr(10)#}");
+				var report = runCheck();
+				var found = matchesFor(report.advisories, "Review these: an empty string");
+				expect(found).toBe(["app/models/Brand.cfc:2", "app/models/Brand.cfc:3", "app/models/Brand.cfc:4", "app/models/Brand.cfc:5"]);
+				expect(has(report.breaking, "an empty string")).toBeFalse();
+			});
+
+			it("doesn't list an empty-string assignment or a commented-out condition", () => {
+				put("app/models/Brand.cfc", "component extends=""Model"" {#chr(10)#function a() { var label = ''; return label; }#chr(10)#// return findAll(where=""brand = ''"");#chr(10)#}");
+				expect(has(runCheck().advisories, "Review these: an empty string")).toBeFalse();
 			});
 
 			it("runs none of the 4.2 checks when the upgrade doesn't cross 4.2.0", () => {

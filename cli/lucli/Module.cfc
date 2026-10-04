@@ -9043,6 +9043,42 @@ component extends="modules.BaseModule" {
 			scanTargets: [{path: "config", extensions: "cfm,cfc", recurse: true}],
 			fix: "Keys with a dots-only segment or a drive-letter prefix are now rejected; leading, trailing and doubled slashes are normalised. Check keys built from user input or file names. Guide: ""LocalDisk storage keys are checked per segment"", #guide#"
 		});
+		// enqueue(), enqueueIn() and enqueueAt() throw Wheels.Job.EnqueueFailed in
+		// 4.2 instead of returning persisted: false, so a persisted check is dead
+		// code and the failure now surfaces as an exception.
+		arrayAppend(arguments.checks, {
+			description: "Code reads persisted from a job result (4.2 throws Wheels.Job.EnqueueFailed instead)",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "\.persisted\b|\[\s*[""']persisted[""']\s*\]",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			fix: "enqueue(), enqueueIn() and enqueueAt() no longer return persisted: false; they throw Wheels.Job.EnqueueFailed when the job can't be written. Remove the persisted check, and where an enqueue is best-effort, catch Wheels.Job.EnqueueFailed. Guide: ""enqueue() throws Wheels.Job.EnqueueFailed"", #guide#"
+		});
+		// A tests/runner.cfm of the app's own (often a copy of an older core
+		// runner) gets the <datasource>_test rule but not the built-in runner's
+		// behaviour, such as running tests/populate.cfm against the test database.
+		arrayAppend(arguments.checks, {
+			description: "tests/runner.cfm doesn't use the built-in app runner",
+			severity: "advisory",
+			checkType: "grep",
+			absent: true,
+			pattern: "wheels/tests/app-runner\.cfm",
+			scanTargets: [{path: "tests/runner.cfm"}],
+			fix: "Replace it with the runner wheels new creates, a single include of wheels/tests/app-runner.cfm, so the app gets the built-in runner's behaviour, including running tests/populate.cfm against the test database. Guide: ""App tests use the test database and test application"", #guide#"
+		});
+		// An empty string in a where condition binds as '' instead of NULL, so
+		// these conditions now match rows (and updateAll/deleteAll now change or
+		// delete them). A grep: expect false positives, hence "review these".
+		arrayAppend(arguments.checks, {
+			description: "Review these: an empty string in a where condition now matches ''",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "\b(where|updateAll|deleteAll)\b[^\r\n]*(<>|!=|=)\s*''|\bwhere\s*\(\s*[""'][^""']+[""']\s*,\s*(""""|'')\s*\)|\bfind(One|All)By\w+\s*\(\s*(""""|'')\s*\)",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			fix: "4.2 binds an empty string as '' instead of NULL: col = '' now matches rows that store '', col <> '' matches every other non-NULL row, and updateAll()/deleteAll() with such a condition now change or delete those rows. Check each line, and reject empty input before a lookup. Guide: ""An empty string in where matches empty strings"", #guide#"
+		});
 		return arguments.checks;
 	}
 
