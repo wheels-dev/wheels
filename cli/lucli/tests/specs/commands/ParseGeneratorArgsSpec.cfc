@@ -159,6 +159,82 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("parseGeneratorArgs — required-by-default and the :optional / =value markers", () => {
+
+			it("marks an unmarked column required", () => {
+				var p = probe.$parseGeneratorArgs(["title:string"]).properties[1];
+				expect(p.required).toBeTrue();
+				expect(structKeyExists(p, "default")).toBeFalse();
+			});
+
+			it("marks a :optional column not required", () => {
+				var p = probe.$parseGeneratorArgs(["note:text:optional"]).properties[1];
+				expect(p.name).toBe("note");
+				expect(p.type).toBe("text");
+				expect(p.required).toBeFalse();
+			});
+
+			it("captures a =value default and keeps the column required", () => {
+				var p = probe.$parseGeneratorArgs(["status:string=draft"]).properties[1];
+				expect(p.name).toBe("status");
+				expect(p.type).toBe("string");
+				expect(p.default).toBe("draft");
+				expect(p.required).toBeTrue();
+			});
+
+			it("combines =value with :optional (nullable, defaulted)", () => {
+				var p = probe.$parseGeneratorArgs(["note:string=none:optional"]).properties[1];
+				expect(p.type).toBe("string");
+				expect(p.default).toBe("none");
+				expect(p.required).toBeFalse();
+			});
+
+			it("keeps a =value alongside a brace size modifier", () => {
+				var p = probe.$parseGeneratorArgs(["title:string{120}=untitled"]).properties[1];
+				expect(p.type).toBe("string");
+				expect(p.limit).toBe("120");
+				expect(p.default).toBe("untitled");
+				expect(p.required).toBeTrue();
+			});
+
+			it("treats an empty =value ('name:string=') as no default", () => {
+				var p = probe.$parseGeneratorArgs(["code:string="]).properties[1];
+				expect(p.type).toBe("string");
+				expect(structKeyExists(p, "default")).toBeFalse();
+				expect(p.required).toBeTrue();
+			});
+
+			it("strips :optional before the enum value list, leaving values intact", () => {
+				var p = probe.$parseGeneratorArgs(["status:enum:draft,published:optional"]).properties[1];
+				expect(p.type).toBe("enum");
+				expect(p.values).toBe("draft,published");
+				expect(p.required).toBeFalse();
+			});
+
+			// LuCLI parses a positional "status:string=active" as a key=value named
+			// option and hands the module back the exact token "--status:string=active".
+			// parseGeneratorArgs must recover it as a defaulted property, not reject it
+			// as an unknown flag.
+			it("recovers the LuCLI-mangled --name:type=value form as a property", () => {
+				var parsed = probe.$parseGeneratorArgs(["name:string", "--status:string=active"]);
+				expect(arrayLen(parsed.properties)).toBe(2);
+				var p = parsed.properties[2];
+				expect(p.name).toBe("status");
+				expect(p.type).toBe("string");
+				expect(p.default).toBe("active");
+				expect(p.required).toBeTrue();
+			});
+
+			it("still rejects a genuine unknown --flag that is not a mangled property", () => {
+				// The recovery keys on the ":" every property token carries; a real flag
+				// typo has none, so it must still fail loudly rather than be swallowed.
+				expect(() => {
+					probe.$parseGeneratorArgs(["name:string", "--bogusflag"]);
+				}).toThrow(type = "Wheels.CLI.UnknownFlag");
+			});
+
+		});
+
 	}
 
 }
