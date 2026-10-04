@@ -34,7 +34,7 @@ component extends="[extends]" hint="[description]" {
 		var state = {};
 		transaction {
 			try {
-				addColumn(table = 'tableName', columnType = '', columnName = 'columnName', default = '', allowNull = true);
+				addColumn(table = 'tableName', columnType = '', columnName = 'columnName', allowNull = true);
 			} catch (any e) {
 				state.exception = e;
 			}

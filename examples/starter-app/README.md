@@ -314,21 +314,23 @@ DB_PASSWORD=
 
 ```
 tests/
-├── Test.cfc              # Base test
-├── functions/            # Test utilities
-├── requests/             # HTTP tests
-└── models/               # Model tests
+├── runner.cfm      # Entry point for /wheels/app/tests (the app template's runner)
+├── populate.cfm    # Migrates the test database before each run
+├── specs/          # WheelsTest (BDD) specs: what the runner runs
+└── RocketUnit/     # Legacy RocketUnit tests from the 3.x app (not run)
 ```
 
 ### Running Tests
 
-```bash
-# Run all tests
-wheels test run
+With the server running, open:
 
-# Run specific test suite
-wheels test run --directory tests/requests/
 ```
+http://localhost:8081/wheels/app/tests
+```
+
+Add `?format=json` for a JSON result. The specs run on the `starterApp_test`
+datasource (H2, defined in `config/app.cfm`), which `tests/populate.cfm`
+migrates before every run, so they never touch the development database.
 
 ## Support & Resources
 

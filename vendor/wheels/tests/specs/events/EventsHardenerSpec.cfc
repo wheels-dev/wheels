@@ -431,6 +431,30 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("S8 production (showErrorInformation off) keeps a non-Wheels exception at HTTP 500", () => {
+
+			// Complements the development status map (onerrorSpec / S2): the
+			// development path classifies Wheels error TYPES, but a genuine
+			// NON-Wheels exception (a plain Java/CFML runtime error) has no Wheels
+			// type to resolve, so on the production error-page path it must stay
+			// 500 — never accidentally 404/403.
+			beforeEach(() => {
+				_savedShowError = application.wheels.showErrorInformation;
+				application.wheels.showErrorInformation = false;
+			});
+
+			afterEach(() => {
+				application.wheels.showErrorInformation = _savedShowError;
+			});
+
+			it("a plain non-Wheels exception renders the production page with HTTP 500", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $plainException(), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(500);
+			});
+
+		});
+
 	}
 
 	private any function $onErrorDouble() {

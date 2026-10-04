@@ -350,10 +350,14 @@ fi
 TEST_URL="http://localhost:${PORT}/wheels/cli/tests?format=json"
 echo "Running CLI tests: ${TEST_URL}"
 
-HTTP_CODE=$(curl -s -o "$RESULT_FILE" \
-  --max-time 600 \
-  --write-out "%{http_code}" \
-  "$TEST_URL" || echo "000")
+# tools/ci/cli-suite-request.sh runs the suite request with a per-bundle
+# watchdog (WHEELS_CLI_BUNDLE_TIMEOUT, default 120 s): a stalled bundle is named,
+# a thread dump of the server JVM is shown, and the run fails fast (#4232).
+SUITE_REQUEST_RC=0
+HTTP_CODE="$(bash "$PROJECT_ROOT/tools/ci/cli-suite-request.sh" "$TEST_URL" "$RESULT_FILE" "$SERVER_LOG" "$PORT" 600)" || SUITE_REQUEST_RC=$?
+if [ "$SUITE_REQUEST_RC" = "3" ]; then
+  exit 1
+fi
 
 # ── Parse and display results ───────────────────────
 #

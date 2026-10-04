@@ -9,7 +9,7 @@
 	/*
 		If you leave these settings commented out, wheels will set the data source name to the same name as the folder the application resides in.
 	*/
-	set(coreTestDataSourceName="tweet");
+	set(coreTestDataSourceName="tweet_test");
 	set(dataSourceName="tweet");
 	// set(dataSourceUserName="");
 	// set(dataSourcePassword="");
