@@ -73,6 +73,7 @@ component extends="wheels.WheelsTest" {
 				expect(refusal.message).toInclude("myapp_test");
 				expect(refusal.message).toInclude("tests/runner.cfm");
 				expect(refusal.message).toInclude("--no-test-db");
+				expect(refusal.message).toInclude("allowTestsAgainstPrimaryDatasource");
 			});
 
 		});
@@ -93,6 +94,9 @@ component extends="wheels.WheelsTest" {
 					state.during.coreTestDataSourceName = application.wheels.coreTestDataSourceName;
 					state.during.preSwap = request.wheels.$testRunPreSwap;
 					state.during.outer = request.wheels.$testRunnerOuter;
+					state.during.token = StructKeyExists(application, "$$$appTestRunToken");
+					state.during.marker = StructKeyExists(application, "$$$appTestOriginalDataSource") ? application.$$$appTestOriginalDataSource : "";
+					state.during.deadline = StructKeyExists(application, "$$$appTestRunDeadline");
 				} finally {
 					g.$endTestRunDataSource(saved = saved);
 				}
@@ -101,6 +105,12 @@ component extends="wheels.WheelsTest" {
 				expect(state.during.coreTestDataSourceName).toBe(state.primary & "_test");
 				expect(state.during.preSwap.original).toBe(state.primary);
 				expect(state.during.outer).toBeTrue();
+				expect(state.during.token).toBeTrue();
+				expect(state.during.marker).toBe(state.primary);
+				expect(state.during.deadline).toBeTrue();
+				expect(StructKeyExists(application, "$$$appTestRunToken")).toBeFalse();
+				expect(StructKeyExists(application, "$$$appTestOriginalDataSource")).toBeFalse();
+				expect(StructKeyExists(application, "$$$appTestRunDeadline")).toBeFalse();
 
 				expect(application.wheels.dataSourceName).toBe(state.primary);
 				expect(StructKeyExists(application.wheels, "coreTestDataSourceName")).toBe(state.hadCore);
@@ -123,6 +133,71 @@ component extends="wheels.WheelsTest" {
 				}
 				expect(state.during).toBe(state.primary);
 				expect(application.wheels.dataSourceName).toBe(state.primary);
+			});
+
+		});
+
+		describe("$recoverStrandedTestRun()", () => {
+
+			it("restores the settings a run left switched once its deadline has passed", () => {
+				var state = {
+					primary = application.wheels.dataSourceName,
+					hadCore = StructKeyExists(application.wheels, "coreTestDataSourceName"),
+					core = StructKeyExists(application.wheels, "coreTestDataSourceName") ? application.wheels.coreTestDataSourceName : "",
+					restored = false,
+					after = {}
+				};
+				try {
+					g.$markTestRunSwap(original = state.primary);
+					application.$$$appTestRunDeadline = DateAdd("n", -1, Now());
+					application.wheels.dataSourceName = state.primary & "_stranded";
+					application.wheels.coreTestDataSourceName = state.primary & "_stranded";
+					state.restored = g.$recoverStrandedTestRun(force = false);
+					state.after.dataSourceName = application.wheels.dataSourceName;
+					state.after.core = StructKeyExists(application.wheels, "coreTestDataSourceName") ? application.wheels.coreTestDataSourceName : "";
+					state.after.marker = StructKeyExists(application, "$$$appTestOriginalDataSource");
+				} finally {
+					application.wheels.dataSourceName = state.primary;
+					if (state.hadCore) {
+						application.wheels.coreTestDataSourceName = state.core;
+					} else {
+						StructDelete(application.wheels, "coreTestDataSourceName");
+					}
+					g.$clearTestRunSwapMarkers();
+				}
+				expect(state.restored).toBeTrue();
+				expect(state.after.dataSourceName).toBe(state.primary);
+				expect(state.after.core).toBe(state.hadCore ? state.core : "");
+				expect(state.after.marker).toBeFalse();
+			});
+
+			it("leaves a run that may still be in progress alone until its deadline, unless forced", () => {
+				var state = {primary = application.wheels.dataSourceName, early = true, earlyDs = "", forced = false, forcedDs = ""};
+				try {
+					g.$markTestRunSwap(original = state.primary);
+					application.wheels.dataSourceName = state.primary & "_stranded";
+					state.early = g.$recoverStrandedTestRun(force = false);
+					state.earlyDs = application.wheels.dataSourceName;
+					state.forced = g.$recoverStrandedTestRun(force = true);
+					state.forcedDs = application.wheels.dataSourceName;
+				} finally {
+					application.wheels.dataSourceName = state.primary;
+					g.$clearTestRunSwapMarkers();
+				}
+				expect(state.early).toBeFalse();
+				expect(state.earlyDs).toBe(state.primary & "_stranded");
+				expect(state.forced).toBeTrue();
+				expect(state.forcedDs).toBe(state.primary);
+			});
+
+			it("does nothing when no run left markers", () => {
+				expect(g.$recoverStrandedTestRun(force = true)).toBeFalse();
+			});
+
+			it("runs at the start of every request and of every test run", () => {
+				expect(FindNoCase("application.wo.$recoverStrandedTestRun(force = false)", FileRead(ExpandPath("/wheels/events/EventMethods.cfc")))).toBeGT(0);
+				expect(FindNoCase("application.wo.$recoverStrandedTestRun(force = true)", FileRead(ExpandPath("/wheels/tests/app-runner.cfm")))).toBeGT(0);
+				expect(FindNoCase("application.wo.$recoverStrandedTestRun(force = true)", FileRead(ExpandPath("/wheels/Public.cfc")))).toBeGT(0);
 			});
 
 		});

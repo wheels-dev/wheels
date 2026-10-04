@@ -56,26 +56,11 @@
         } catch (any e) {}
     }
 
-    // Default app runs to the test database. Three states:
-    //   - explicit useTestDB=false  -> run against the primary datasource (opt out).
-    //   - explicit useTestDB=true   -> require <ds>_test; fail closed if absent
-    //                                  (the compatibility setting cannot weaken this).
-    //   - OMITTED                   -> default to the test DB, so an older CLI that
-    //                                  cannot send the parameter is still protected;
-    //                                  if <ds>_test is absent, the per-app
-    //                                  allowTestsAgainstPrimaryDatasource setting
-    //                                  decides refuse vs run-against-primary.
-    //   - PRESENT-BUT-INVALID       -> a supplied-but-not-a-boolean value is an
-    //                                  explicit intent, NOT an omission: it keeps the
-    //                                  test-DB requirement (swap if <ds>_test exists,
-    //                                  else refuse) and can never use the compat
-    //                                  fallback. Only a truly ABSENT parameter does.
-    local.testDBParamPresent = StructKeyExists(url, "useTestDB");
-    local.testDBValidBool = local.testDBParamPresent && IsBoolean(url.useTestDB);
-    local.testDBOmitted = !local.testDBParamPresent;
-    local.testDBExplicitTrue = local.testDBValidBool && url.useTestDB;
-    // Attempt the test DB unless an explicit, VALID useTestDB=false was supplied.
-    local.useTestDB = !(local.testDBValidBool && !url.useTestDB);
+    // Which datasource the run uses is decided inside the runner lock below by
+    // $testDataSourceDecision() (global/util.cfm), the one rule every app test
+    // runner shares: <datasource>_test when it is registered; the primary
+    // datasource only for an explicit useTestDB=false, or for an omitted useTestDB
+    // with allowTestsAgainstPrimaryDatasource=true; otherwise the run is refused.
 
     local.dirResolver = new wheels.tests._assets.dispatch.TestDirectoryResolver();
     local.testScope = local.dirResolver.resolveScope(url);
@@ -158,96 +143,40 @@
     // requestTimeout at the top of this template.
     lock name="wheelsTestRunner_#application.applicationName##local.runnerLockSuffix#" type="exclusive" timeout="1800" throwontimeout="true" {
         try {
-            // Resolve the target datasource INSIDE the lock: the previous
-            // owner restores before releasing, so the captured value is the
-            // configured datasource, never a stranded test DB.
-            local.originalDataSource = application.wheels.dataSourceName;
-            // Holding the exclusive lock means no other owner is live, so a
-            // marker still present was stranded by a run that died before its
-            // finally block. It records the configured datasource — recover it
-            // rather than capturing the stranded test datasource as original.
-            if (local.runnerOwnsSwap && StructKeyExists(application, "$$$appTestOriginalDataSource")) {
-                local.originalDataSource = application.$$$appTestOriginalDataSource;
-                if (Compare(application.wheels.dataSourceName, local.originalDataSource) != 0) {
-                    local.dbResolver.applyDataSource(
-                        wheelsScope = application.wheels,
-                        name = local.originalDataSource
-                    );
-                }
+            // Holding the exclusive lock means no other owner is live, so swap
+            // markers still present were stranded by a run that died before its
+            // finally block: restore the settings they recorded before reading them.
+            if (local.runnerOwnsSwap) {
+                application.wo.$recoverStrandedTestRun(force = true);
             }
+            local.originalDataSource = application.wheels.dataSourceName;
             local.targetDataSource = local.originalDataSource;
             // Pre-swapped by the outer runner: populate the test datasource as a swap would.
             local.swappedDataSource = !StructIsEmpty(local.preSwap);
             if (local.runnerOwnsSwap) {
+                local.decision = application.wo.$testDataSourceDecision(primary = local.originalDataSource, requestUrl = url);
+                if (local.decision.action == "refuse") {
+                    // Never silently run specs (which may write) against the primary
+                    // datasource. Nothing has been changed yet, so nothing to restore.
+                    cfheader(statuscode = 409);
+                    cfcontent(type = "application/json");
+                    writeOutput(SerializeJSON(application.wo.$testDataSourceRefusal(decision = local.decision)));
+                    abort;
+                }
+                // The run token and the swap markers let re-entrant sub-requests skip the
+                // swap and the shared lock, and let a later request restore the settings
+                // if this run dies before its finally block.
                 application["$$$appTestRunToken"] = CreateUUID();
-                // Record the pre-swap datasource as the ownership marker so
-                // re-entrant sub-requests skip the swap and the shared lock.
-                application.$$$appTestOriginalDataSource = local.originalDataSource;
-                if (local.useTestDB) {
-                    local.candidate = local.originalDataSource & "_test";
-                    local.appMetaData = GetApplicationMetaData();
-                    local.registered = (StructKeyExists(local.appMetaData, "datasources") && IsStruct(local.appMetaData.datasources))
-                        ? local.appMetaData.datasources
-                        : {};
-                    // A `_test` datasource registered at server level (Lucee admin,
-                    // lucee.json configuration, CF Administrator, cfconfig) is not in
-                    // the application metadata; probe it by name before refusing.
-                    // Only the candidate is probed, never the primary.
-                    local.candidateRegistered = StructKeyExists(local.registered, local.candidate)
-                        || application.wo.$dataSourceIsReachable(name = local.candidate);
-                    if (local.candidateRegistered) {
-                        local.targetDataSource = local.candidate;
-                        local.dbResolver.applyDataSource(
-                            wheelsScope = application.wheels,
-                            name = local.candidate
-                        );
-                        local.swappedDataSource = true;
-                    } else {
-                        // `<datasource>_test` is not registered. Decide
-                        // refuse vs run-against-primary with strict precedence:
-                        //   - explicit useTestDB=true: ALWAYS fail closed (the
-                        //     compatibility setting cannot weaken an explicit request).
-                        //   - OMITTED (e.g. an older CLI that cannot send
-                        //     useTestDB=false): honour the per-app opt-out setting
-                        //     allowTestsAgainstPrimaryDatasource — when true, run
-                        //     against the primary datasource with a loud warning
-                        //     instead of refusing; otherwise fail closed.
-                        // (explicit useTestDB=false never reaches here.)
-                        local.allowPrimary = StructKeyExists(application.wheels, "allowTestsAgainstPrimaryDatasource")
-                            && IsBoolean(application.wheels.allowTestsAgainstPrimaryDatasource)
-                            && application.wheels.allowTestsAgainstPrimaryDatasource;
-                        if (local.testDBOmitted && local.allowPrimary) {
-                            // Omitted + opt-out: run against the primary datasource
-                            // (no swap; populate is gated on swappedDataSource so the
-                            // real DB is not seeded). Warn that writes hit the real DB.
-                            cfheader(name = "X-Wheels-Test-Database", value = "primary");
-                            try {
-                                writeLog(
-                                    file = "wheels",
-                                    type = "warning",
-                                    text = "App tests are running against the PRIMARY datasource '" & local.originalDataSource & "' because allowTestsAgainstPrimaryDatasource=true and '" & local.candidate & "' is not registered. Test writes reach the real database."
-                                );
-                            } catch (any e) {}
-                        } else {
-                            // Explicit useTestDB=true, OR omitted with the setting
-                            // off/default: fail closed. Never silently run specs
-                            // (which may write) against the primary datasource. Clean
-                            // up the ownership markers set above (no run happened)
-                            // before aborting; the lock releases on request end.
-                            StructDelete(application, "$$$appTestRunToken");
-                            StructDelete(application, "$$$appTestOriginalDataSource");
-                            cfheader(statuscode = 409);
-                            cfcontent(type = "application/json");
-                            writeOutput(SerializeJSON({
-                                success: false,
-                                error: "Test database not available",
-                                message: "App tests default to the '" & local.candidate & "' datasource, which is not registered. Create it; or run against '" & local.originalDataSource & "' intentionally with `wheels test --no-test-db` (URL: useTestDB=false); or, for older CLIs that cannot send useTestDB=false, set(allowTestsAgainstPrimaryDatasource=true) in config/settings.cfm.",
-                                datasource: local.originalDataSource,
-                                candidate: local.candidate
-                            }));
-                            abort;
-                        }
-                    }
+                application.wo.$markTestRunSwap(original = local.originalDataSource);
+                if (local.decision.action == "swap") {
+                    local.targetDataSource = local.decision.target;
+                    local.dbResolver.applyDataSource(
+                        wheelsScope = application.wheels,
+                        name = local.decision.target
+                    );
+                    local.swappedDataSource = true;
+                } else if (local.decision.warn) {
+                    application.wo.$warnTestsOnPrimaryDataSource(decision = local.decision);
                 }
             }
 
@@ -431,8 +360,7 @@
                         name = local.originalDataSource
                     );
                 }
-                structDelete(application, "$$$appTestOriginalDataSource");
-                structDelete(application, "$$$appTestRunToken");
+                application.wo.$clearTestRunSwapMarkers();
             }
             // Coverage mode (`wheels coverage`): dump the function-level counter
             // map to an absolute path the CLI reads. Failure must never break the

@@ -1171,7 +1171,9 @@ public boolean function $testDataSourceRegistered(required string name) {
  * Internal. Points a project test runner (`tests/runner.cfm`) at the datasource
  * `decision` chose and returns what to restore with `$endTestRunDataSource()`.
  * Runners copied from older Wheels releases set `dataSourceName` from
- * `coreTestDataSourceName`, so both are pointed at the test datasource.
+ * `coreTestDataSourceName`, so both are pointed at the test datasource. Records the
+ * run's token (so re-entrant requests from the run skip the runner lock) and the swap
+ * markers $recoverStrandedTestRun() uses if the run dies before it restores.
  */
 public struct function $beginTestRunDataSource(required struct decision) {
 	local.saved = {
@@ -1184,6 +1186,8 @@ public struct function $beginTestRunDataSource(required struct decision) {
 	}
 	request.wheels.$testRunnerOuter = true;
 	request.wheels.$testDataSourceDecision = arguments.decision;
+	application["$$$appTestRunToken"] = CreateUUID();
+	$markTestRunSwap(original = local.saved.dataSourceName);
 	if (arguments.decision.action == "swap") {
 		application.wheels.dataSourceName = arguments.decision.target;
 		application.wheels.coreTestDataSourceName = arguments.decision.target;
@@ -1211,10 +1215,94 @@ public void function $endTestRunDataSource(required struct saved) {
 	} else {
 		StructDelete(application.wheels, "coreTestDataSourceName");
 	}
+	$clearTestRunSwapMarkers();
 	if (StructKeyExists(request, "wheels")) {
 		StructDelete(request.wheels, "$testRunnerOuter");
 		StructDelete(request.wheels, "$testDataSourceDecision");
 		StructDelete(request.wheels, "$testRunPreSwap");
+	}
+}
+
+/**
+ * Internal. Records, before a test run changes the datasource settings, what they were and
+ * when the run must have ended: the run's request timeout plus a margin, after which a
+ * request that still finds the markers knows the run died before restoring them.
+ */
+public void function $markTestRunSwap(required string original) {
+	application.$$$appTestOriginalDataSource = arguments.original;
+	application.$$$appTestOriginalCoreDataSource = {
+		exists = StructKeyExists(application.wheels, "coreTestDataSourceName"),
+		value = StructKeyExists(application.wheels, "coreTestDataSourceName") ? application.wheels.coreTestDataSourceName : ""
+	};
+	application.$$$appTestRunDeadline = DateAdd("s", Max(1800, $getRequestTimeout()) + 300, Now());
+}
+
+/**
+ * Internal. Removes the markers a test run set, once it has restored the settings.
+ */
+public void function $clearTestRunSwapMarkers() {
+	StructDelete(application, "$$$appTestOriginalDataSource");
+	StructDelete(application, "$$$appTestOriginalCoreDataSource");
+	StructDelete(application, "$$$appTestRunDeadline");
+	StructDelete(application, "$$$appTestRunToken");
+}
+
+/**
+ * Internal. Restores the datasource settings a test run changed when that run died
+ * before restoring them (its request was killed, so its finally block never ran).
+ * `force` is for a caller that holds the test-runner lock, which proves no run is in
+ * progress; otherwise the markers count as stranded only after the run's deadline.
+ * Returns true when it restored something.
+ */
+public boolean function $recoverStrandedTestRun(boolean force = false) {
+	if (!StructKeyExists(application, "$$$appTestOriginalDataSource")) {
+		return false;
+	}
+	if (
+		!arguments.force
+		&& (!StructKeyExists(application, "$$$appTestRunDeadline") || DateCompare(Now(), application.$$$appTestRunDeadline) <= 0)
+	) {
+		return false;
+	}
+	local.original = application.$$$appTestOriginalDataSource;
+	if (Compare(application.wheels.dataSourceName, local.original) != 0) {
+		application.wheels.dataSourceName = local.original;
+		if (StructKeyExists(application.wheels, "models")) {
+			StructClear(application.wheels.models);
+		}
+	}
+	if (StructKeyExists(application, "$$$appTestOriginalCoreDataSource")) {
+		if (application.$$$appTestOriginalCoreDataSource.exists) {
+			application.wheels.coreTestDataSourceName = application.$$$appTestOriginalCoreDataSource.value;
+		} else {
+			StructDelete(application.wheels, "coreTestDataSourceName");
+		}
+	}
+	$clearTestRunSwapMarkers();
+	try {
+		WriteLog(
+			file = "wheels",
+			type = "warning",
+			text = "Restored the datasource '" & local.original & "' left switched by a test run that did not finish."
+		);
+	} catch (any e) {
+	}
+	return true;
+}
+
+/**
+ * Internal. Marks a test run that uses the app's primary datasource because
+ * allowTestsAgainstPrimaryDatasource allows it: a response header and a warning in wheels.log.
+ */
+public void function $warnTestsOnPrimaryDataSource(required struct decision) {
+	cfheader(name = "X-Wheels-Test-Database", value = "primary");
+	try {
+		WriteLog(
+			file = "wheels",
+			type = "warning",
+			text = "App tests are running against the PRIMARY datasource '" & arguments.decision.primary & "' because allowTestsAgainstPrimaryDatasource=true and '" & arguments.decision.candidate & "' is not registered. Test writes reach the real database."
+		);
+	} catch (any e) {
 	}
 }
 
@@ -1225,8 +1313,9 @@ public struct function $testDataSourceRefusal(required struct decision) {
 	return {
 		success = false,
 		error = "Test database not available",
-		message = "App tests need the '" & arguments.decision.candidate & "' datasource, which is not registered. Create it; or run against '"
-			& arguments.decision.primary & "' intentionally with `wheels test --no-test-db` (URL: useTestDB=false). "
+		message = "App tests default to the '" & arguments.decision.candidate & "' datasource, which is not registered. Create it; or run against '"
+			& arguments.decision.primary & "' intentionally with `wheels test --no-test-db` (URL: useTestDB=false); or, for older CLIs that cannot send useTestDB=false, "
+			& "set(allowTestsAgainstPrimaryDatasource=true) in config/settings.cfm. "
 			& "If tests/runner.cfm was copied from an older Wheels release, replace it with the runner `wheels new` creates (it includes wheels/tests/app-runner.cfm).",
 		datasource = arguments.decision.primary,
 		candidate = arguments.decision.candidate

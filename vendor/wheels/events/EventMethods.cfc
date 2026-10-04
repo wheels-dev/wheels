@@ -298,6 +298,14 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			StructDelete(request.wheels, "redirectAfterReloadUrl");
 			$location(url = local.redirectAfterReloadUrl, addToken = false);
 		}
+		// A test run that died before restoring the datasource settings it switched
+		// (its request was killed, so its finally block never ran) leaves markers
+		// behind. Once that run's deadline has passed, put the settings back so the
+		// app does not keep reading and writing the test datasource.
+		if (StructKeyExists(application, "$$$appTestOriginalDataSource")) {
+			application.wo.$recoverStrandedTestRun(force = false);
+		}
+
 		// If the first debug point has not already been set in a reload request we set it here.
 		if ($get("showDebugInformation")) {
 			if (StructKeyExists(request.wheels, "execution")) {

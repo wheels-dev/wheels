@@ -867,6 +867,9 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			return;
 		}
 		lock name="wheelsTestRunner_#application.applicationName#" type="exclusive" timeout="1800" throwontimeout="true" {
+			// Holding the lock means no run is in progress: settings a killed run left
+			// switched are restored before this run reads them.
+			application.wo.$recoverStrandedTestRun(force = true);
 			var decision = application.wo.$testDataSourceDecision(primary = application.wheels.dataSourceName, requestUrl = url);
 			if (decision.action == "refuse") {
 				cfheader(statuscode = 409);
@@ -875,7 +878,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 				abort;
 			}
 			if (decision.warn) {
-				cfheader(name = "X-Wheels-Test-Database", value = "primary");
+				application.wo.$warnTestsOnPrimaryDataSource(decision = decision);
 			}
 			var saved = application.wo.$beginTestRunDataSource(decision = decision);
 			try {
