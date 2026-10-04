@@ -789,7 +789,7 @@ component {
 
 	/**
 	 * Generate a complete authentication scaffold over the wheels.auth
-	 * primitives (issue ##3155): User model with PBKDF2 password hashing,
+	 * primitives (issue ##3155): User model with bcrypt password hashing,
 	 * sessions/passwords/registrations controllers + views (session
 	 * strategy), or an api/Sessions controller (token/jwt strategies),
 	 * a create-table migration, marked route/service/strategy blocks
