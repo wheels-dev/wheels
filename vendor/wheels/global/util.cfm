@@ -1170,7 +1170,8 @@ public boolean function $isTestRunReentry(required struct requestUrl) {
  * the `|datasourceName|` placeholder selects `wheelstestdb`, as before. A
  * `coreTestDataSourceName` other than the app's primary datasource is used as it is. Only
  * when the run would otherwise use the app's primary datasource does the app-test rule apply
- * ($testDataSourceDecision): `<primary>_test`, the primary datasource on request, or refused.
+ * ($testDataSourceDecision): `<primary>_test`, the primary datasource only for an explicit
+ * useTestDB=false (never through allowTestsAgainstPrimaryDatasource), or refused.
  * Returns `{action: use|swap|primary|refuse, target, decision}`.
  */
 public struct function $coreTestDataSource(
@@ -1180,7 +1181,7 @@ public struct function $coreTestDataSource(
 	string testDbList = "mysql,sqlserver,sqlserver_cicd,postgres,h2,oracle,sqlite,cockroachdb",
 	candidateRegistered
 ) {
-	local.rv = {action = "use", target = "", decision = {}};
+	local.rv = {action = "use", target = "", decision = {}, ignoredAllowPrimary = false};
 	if (
 		StructKeyExists(arguments.requestUrl, "db")
 		&& IsSimpleValue(arguments.requestUrl.db)
@@ -1202,8 +1203,24 @@ public struct function $coreTestDataSource(
 		local.decisionArgs.candidateRegistered = arguments.candidateRegistered;
 	}
 	local.rv.decision = $testDataSourceDecision(argumentCollection = local.decisionArgs);
+	// allowTestsAgainstPrimaryDatasource is a compatibility setting for app tests from
+	// older CLIs. The framework's suite (and its populate.cfm, which drops and recreates
+	// tables) never uses it: only an explicit useTestDB=false reaches the primary.
+	if (local.rv.decision.action == "primary" && local.rv.decision.warn) {
+		local.rv.decision.action = "refuse";
+		local.rv.decision.warn = false;
+		local.rv.ignoredAllowPrimary = true;
+		try {
+			WriteLog(
+				file = "wheels",
+				type = "warning",
+				text = "The framework test suite ignores allowTestsAgainstPrimaryDatasource: it does not run on the primary datasource '" & arguments.primary & "' unless the request passes useTestDB=false."
+			);
+		} catch (any e) {
+		}
+	}
 	local.rv.action = local.rv.decision.action;
-	local.rv.target = local.rv.decision.target;
+	local.rv.target = local.rv.decision.action == "refuse" ? "" : local.rv.decision.target;
 	return local.rv;
 }
 

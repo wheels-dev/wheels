@@ -54,6 +54,45 @@ component extends="wheels.WheelsTest" {
 				expect(choice.target).toBe("myapp");
 			});
 
+			it("ignores allowTestsAgainstPrimaryDatasource: the framework suite never runs on the app's primary by default", () => {
+				var state = {was = StructKeyExists(application.wheels, "allowTestsAgainstPrimaryDatasource") ? application.wheels.allowTestsAgainstPrimaryDatasource : "", choice = {}};
+				application.wheels.allowTestsAgainstPrimaryDatasource = true;
+				try {
+					state.choice = g.$coreTestDataSource(primary = "myapp", coreName = "myapp", requestUrl = {}, candidateRegistered = false);
+				} finally {
+					application.wheels.allowTestsAgainstPrimaryDatasource = state.was;
+				}
+				expect(state.choice.action).toBe("refuse");
+				expect(state.choice.target).toBe("");
+				expect(state.choice.ignoredAllowPrimary).toBeTrue("the ignored setting is logged");
+				expect(FindNoCase("ignores allowTestsAgainstPrimaryDatasource", FileRead(ExpandPath("/wheels/global/util.cfm")))).toBeGT(0);
+			});
+
+			it("still uses <datasource>_test when allowTestsAgainstPrimaryDatasource is set and the test datasource exists", () => {
+				var state = {was = StructKeyExists(application.wheels, "allowTestsAgainstPrimaryDatasource") ? application.wheels.allowTestsAgainstPrimaryDatasource : "", choice = {}};
+				application.wheels.allowTestsAgainstPrimaryDatasource = true;
+				try {
+					state.choice = g.$coreTestDataSource(primary = "myapp", coreName = "myapp", requestUrl = {}, candidateRegistered = true);
+				} finally {
+					application.wheels.allowTestsAgainstPrimaryDatasource = state.was;
+				}
+				expect(state.choice.action).toBe("swap");
+				expect(state.choice.target).toBe("myapp_test");
+			});
+
+			it("still runs on the primary datasource for an explicit useTestDB=false when allowTestsAgainstPrimaryDatasource is set", () => {
+				var state = {was = StructKeyExists(application.wheels, "allowTestsAgainstPrimaryDatasource") ? application.wheels.allowTestsAgainstPrimaryDatasource : "", choice = {}};
+				application.wheels.allowTestsAgainstPrimaryDatasource = true;
+				try {
+					state.choice = g.$coreTestDataSource(primary = "myapp", coreName = "myapp", requestUrl = {useTestDB = false}, candidateRegistered = false);
+				} finally {
+					application.wheels.allowTestsAgainstPrimaryDatasource = state.was;
+				}
+				expect(state.choice.action).toBe("primary");
+				expect(state.choice.target).toBe("myapp");
+				expect(state.choice.ignoredAllowPrimary).toBeFalse();
+			});
+
 			it("only accepts ?db= values from the runner's own list", () => {
 				var choice = g.$coreTestDataSource(
 					primary = "myapp",
