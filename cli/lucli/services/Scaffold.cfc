@@ -702,22 +702,26 @@ component {
 			if (findNoCase('.resources(name="' & resourceName & '", except="new,edit")', content)) return false;
 			if (findNoCase(".resources(name='#resourceName#', except='new,edit')", content)) return false;
 
-			// Check if an API namespace block already exists
-			if (findNoCase('.namespace("api")', content) || findNoCase(".namespace('api')", content)) {
-				// Append inside the existing namespace block — find the .end() that closes it
-				var apiNsPos = findNoCase('.namespace("api")', content);
-				if (apiNsPos == 0) apiNsPos = findNoCase(".namespace('api')", content);
-
-				// Find the matching .end() after the namespace declaration
-				var afterNs = mid(content, apiNsPos, len(content));
-				var endPos = findNoCase(".end()", afterNs);
+			// Join an existing .namespace("api") block, unless it sits inside
+			// another generator's marked block (e.g. `wheels generate auth`'s
+			// wheels:generate-auth:routes:begin/end): that block is regenerated
+			// on --force, which would drop this route.
+			var apiNsPos = $findApiNamespace(content);
+			if (apiNsPos > 0) {
+				// Find the .end() that closes the namespace
+				var endPos = findNoCase(".end()", content, apiNsPos);
 				if (endPos > 0) {
-					// Detect indentation of the namespace line
+					// Insert a new line at the start of the .end() line, indented
+					// one level deeper than the namespace, so .end() keeps its own
+					// indentation.
 					var nsIndent = detectIndent(content, apiNsPos);
 					var resourceLine = nsIndent & t & '.resources(name="#resourceName#", except="new,edit")';
-					var insertPos = apiNsPos + endPos - 2;
-					var before = mid(content, 1, insertPos);
-					var after = mid(content, insertPos + 1, len(content));
+					var lineStart = endPos;
+					while (lineStart > 1 && mid(content, lineStart - 1, 1) != nl) {
+						lineStart--;
+					}
+					var before = lineStart > 1 ? left(content, lineStart - 1) : "";
+					var after = mid(content, lineStart, len(content));
 					content = before & resourceLine & nl & after;
 					$write(routesPath, content);
 					return true;
@@ -789,7 +793,7 @@ component {
 
 	/**
 	 * Generate a complete authentication scaffold over the wheels.auth
-	 * primitives (issue ##3155): User model with PBKDF2 password hashing,
+	 * primitives (issue ##3155): User model with bcrypt password hashing,
 	 * sessions/passwords/registrations controllers + views (session
 	 * strategy), or an api/Sessions controller (token/jwt strategies),
 	 * a create-table migration, marked route/service/strategy blocks
@@ -843,6 +847,12 @@ component {
 		ctx.apiTokenMethods = strategyName == "token" ? $renderAuthTemplate("api-token-methods", ctx) : "";
 		ctx.apiTokenColumn = strategyName == "token"
 			? t & t & t & t & 't.string(columnNames="apiTokenDigest", allowNull=true, limit=64);' & nl
+			: "";
+		// The token strategy looks every request's token up by its digest.
+		// Not unique: most rows have no token, and SQL Server counts NULLs
+		// as duplicates in a unique index.
+		ctx.apiTokenIndex = strategyName == "token"
+			? t & t & t & t & 'addIndex(table="' & tableName & '", columnNames="apiTokenDigest");' & nl
 			: "";
 		// Emits `#linkTo(...)#` into the login view (## collapses to # in this
 		// CFC's string literal; the .txt templates are raw and keep single #).
@@ -1247,6 +1257,38 @@ component {
 			arrayAppend(indented, len(trim(line)) ? arguments.indent & line : line);
 		}
 		return arrayToList(indented, chr(10));
+	}
+
+	/**
+	 * Position of the first `.namespace("api")` (either quote style) in a
+	 * routes file that is not inside a generator's marked block
+	 * (`// wheels:generate-<name>:routes:begin` ... `:routes:end`), or 0.
+	 */
+	public numeric function $findApiNamespace(required string content) {
+		var found = reFindNoCase("\.namespace\(\s*[""']api[""']\s*\)", arguments.content, 1, true);
+		while (found.pos[1] > 0) {
+			var before = left(arguments.content, found.pos[1] - 1);
+			var opened = $lastMatch(before, ":routes:begin");
+			var closed = $lastMatch(before, ":routes:end");
+			if (opened == 0 || closed > opened) {
+				return found.pos[1];
+			}
+			found = reFindNoCase("\.namespace\(\s*[""']api[""']\s*\)", arguments.content, found.pos[1] + found.len[1], true);
+		}
+		return 0;
+	}
+
+	/**
+	 * Position of the last occurrence of `needle` in `text`, or 0.
+	 */
+	public numeric function $lastMatch(required string text, required string needle) {
+		var at = 0;
+		var next = findNoCase(arguments.needle, arguments.text);
+		while (next > 0) {
+			at = next;
+			next = findNoCase(arguments.needle, arguments.text, next + 1);
+		}
+		return at;
 	}
 
 	/**

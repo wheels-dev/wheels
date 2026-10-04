@@ -144,17 +144,19 @@ component extends="wheels.WheelsTest" {
 				expect(local.row.status).toBe("completed");
 			});
 
-			it("B2: persist fail does not return status=pending", function() {
+			it("B2: persist fail throws Wheels.Job.EnqueueFailed instead of returning status=pending", function() {
 				local.job = new wheels.tests._assets.jobs.PersistFailJob();
-				local.result = local.job.enqueue(data = {test: true});
-
-				expect(local.result).toHaveKey("persisted");
-				expect(local.result.persisted).toBeFalse();
-				expect(local.result).toHaveKey("error");
-				expect(Len(local.result.error)).toBeGT(0);
-				if (StructKeyExists(local.result, "status")) {
-					expect(local.result.status).notToBe("pending");
+				var state = {type = "", message = "", result = {}};
+				try {
+					state.result = local.job.enqueue(data = {test: true});
+				} catch (any e) {
+					state.type = e.type;
+					state.message = e.message;
 				}
+
+				expect(state.type).toBe("Wheels.Job.EnqueueFailed");
+				expect(state.message).toInclude("PersistFailJob");
+				expect(StructIsEmpty(state.result)).toBeTrue("a failed persist must not return a result");
 			});
 
 			it("B2: successful enqueue still returns status=pending and persisted=true", function() {

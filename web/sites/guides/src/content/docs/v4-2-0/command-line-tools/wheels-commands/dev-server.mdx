@@ -58,6 +58,8 @@ wheels start
 
 Prints `Starting Wheels server...` in cyan and hands control off to `wheels server start` in the current project directory. The server runs in the background and the command returns once the server is up, leaving your terminal free.
 
+If the port in `lucee.json` is already taken, `wheels start` stops before starting anything. It names the Wheels server that holds the port, when it's one of yours, with the `cd <its folder> && wheels stop` to free it, and suggests a free port to pass as `wheels start --port=<port>`.
+
 <Aside type="note" title="Background process">
 `wheels start` returns control to your shell once the server is up — it does not block the terminal. Stop the server with `wheels stop`, and force a restart over an already-running instance with `wheels start -f` (or `--force`).
 </Aside>

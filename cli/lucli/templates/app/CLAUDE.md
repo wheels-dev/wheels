@@ -28,7 +28,7 @@ ships to consumers.
 - **Controller filters are `private`** — a public method is a routable action. Action names can't reuse framework helper names (`redirectTo`, `linkTo`, …).
 - **Redirecting to a URL from the request** (`return_to`, `next`): `redirectTo(url=…)` throws `Wheels.UnsafeRedirect` for another host. Catch that type and fall back (see `.ai/auth.md`); don't turn on `allowExternalRedirects`.
 - **`cfparam` every variable a view reads.**
-- **Never name a parameter or local variable after a CFML scope** (`url`, `form`, `request`, `session`, `application`, …) — the scope can win over the argument.
+- **Never name a parameter or local variable after a CFML scope** (`url`, `form`, `request`, `session`, `application`, `client`, …) — the scope can win over the argument.
 - **Structs and arrays aren't booleans**: `!x` and `x ? a : b` throw on a struct or array ("Can't cast Complex Object Type Struct to a boolean value"). Test the shape you mean: `IsBoolean(x) && x`, `IsSimpleValue(x) && Len(x)`, `IsStruct(x) && !StructIsEmpty(x)`, `IsArray(x) && ArrayLen(x)`.
 - **`timestamps()` adds `createdAt`, `updatedAt` and `deletedAt`**; migration seed data goes through `execute("…SQL…")` (no `parameters` argument), with `CURRENT_TIMESTAMP` rather than `NOW()`, which fails on SQLite and SQL Server.
 
@@ -38,6 +38,7 @@ Open the file for a topic before working on it:
 
 - Models (finders, associations, validations, scopes): `.ai/models.md`
 - Routing and route model binding: `.ai/routing.md`
+- JSON APIs: `.ai/api.md`
 - Pagination, development error page: `.ai/views.md`
 - Partial caching: `.ai/caching.md`
 - Middleware, rate limiting: `.ai/middleware.md`
@@ -47,6 +48,7 @@ Open the file for a topic before working on it:
 - Packages: `.ai/packages.md`
 - Migrations, seeding: `.ai/migrations.md`
 - Background jobs: `.ai/jobs.md`
+- Sending email (mailers): `.ai/mailers.md`
 - Server-sent events: `.ai/sse.md`
 - Changing settings in specs: `.ai/testing.md`
 - Guides, `/wheels/ai`: `.ai/README.md`
@@ -95,7 +97,7 @@ wheels test tests.specs.models   # a subdirectory of specs
 wheels test --filter=UserSpec    # one spec file, by name
 ```
 
-The CLI boots the app on an isolated port and runs the suite over HTTP,
-mirroring CI. Browser-driven specs need Playwright installed once:
-`wheels browser setup`.
+`wheels test` runs the suite over HTTP on this project's own server, so
+start it first with `wheels start`. Browser-driven specs need Playwright
+installed once: `wheels browser setup`.
 

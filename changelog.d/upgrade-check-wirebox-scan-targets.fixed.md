@@ -1,0 +1,1 @@
+- `wheels upgrade check`: "Direct WireBox references" now scans `public/Application.cfc`, where 3.x apps bootstrap WireBox, and skips third-party packages under `app/` (a `box.json` install path, or any folder with its own `box.json`, such as `app/lib/logbox/`). It used to miss the app's own bootstrap and flag the package's code instead.
