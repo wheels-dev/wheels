@@ -13100,6 +13100,21 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
+		// Downloading the binaries doesn't prove they run: on a bare Linux
+		// host the browser can be missing OS libraries. Launch it once.
+		out("Launching #browserName# to check it runs...");
+		var probe = $browserLaunchProbe(classpath, browserName);
+		if (!probe.ok) {
+			out("Browser launch FAILED", "red");
+			if (len(trim(probe.output))) {
+				out(trim(probe.output), "red");
+			}
+			out("");
+			out($browserLaunchRemedy(probe.output, classpath, browserName), "yellow");
+			return "";
+		}
+		out("Browser launch OK", "green");
+
 		out("");
 		out("Browser testing ready.", "green");
 		out("Run: wheels test --filter=browser  (or: wheels browser test)", "green");
@@ -13353,6 +13368,48 @@ component extends="modules.BaseModule" {
 		if (!arguments.verbose && len(arguments.message) > 400) {
 			out("    (truncated; pass --verbose for full output)", "yellow");
 		}
+	}
+
+	/**
+	 * Launch the browser once through Playwright's CLI (a headless screenshot of
+	 * about:blank) and report whether it ran. Success is judged by the
+	 * screenshot file, not the exit code. Returns {ok, output}.
+	 */
+	private struct function $browserLaunchProbe(required string classpath, required string browserName) {
+		var shot = getTempDirectory() & "wheels-browser-probe-" & createUUID() & ".png";
+		var rv = {ok: false, output: ""};
+		try {
+			cfexecute(
+				name="java",
+				arguments="-cp #arguments.classpath# com.microsoft.playwright.CLI screenshot --browser #arguments.browserName# about:blank #shot#",
+				timeout=120,
+				variable="local.probeOut",
+				errorVariable="local.probeErr"
+			);
+			rv.output = (local.probeErr ?: "") & (local.probeOut ?: "");
+		} catch (any e) {
+			rv.output = (local.probeErr ?: "") & e.message;
+		}
+		rv.ok = fileExists(shot) && getFileInfo(shot).size > 0;
+		if (fileExists(shot)) {
+			fileDelete(shot);
+		}
+		return rv;
+	}
+
+	/**
+	 * What to do after a failed launch probe. When Playwright reports missing
+	 * host libraries (a bare Linux install), print its install-deps command for
+	 * this install's classpath; otherwise point at the output above.
+	 * Public so specs can check the text.
+	 */
+	public string function $browserLaunchRemedy(required string output, required string classpath, required string browserName) {
+		if (findNoCase("missing dependencies", arguments.output) || findNoCase("install-deps", arguments.output)) {
+			return "The browser is installed but the system is missing libraries it needs. On Debian/Ubuntu, install them with:" & chr(10)
+				& "  sudo java -cp ""#arguments.classpath#"" com.microsoft.playwright.CLI install-deps #arguments.browserName#" & chr(10)
+				& "then run wheels browser setup again.";
+		}
+		return "The browser was installed but didn't start; see the output above. Run wheels browser setup --force to reinstall, then try again.";
 	}
 
 	/**

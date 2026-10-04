@@ -1,0 +1,1 @@
+- `wheels browser setup` now launches the browser once before it reports ready. On a host missing the OS libraries the browser needs (a bare Linux install), it reports the failure and prints Playwright's `install-deps` command for this install, instead of saying "Browser testing ready."
