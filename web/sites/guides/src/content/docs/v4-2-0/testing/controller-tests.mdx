@@ -110,27 +110,59 @@ describe("Posts index", () => {
 
 ## Testing POST and the create flow
 
-Creating a record has two outcomes to assert: a successful save redirects (typically 302 to the show page), and a validation failure re-renders the form (typically 200 with error messages in the body). Pass form fields as a struct to `post()` — the controller sees them on `params`, including nested keys like `params.post.title`.
+Creating a record has two outcomes to assert: a successful save redirects (a 303 to the show page: `redirectTo()` answers a POST with 303 See Other), and a validation failure re-renders the form (typically 200 with error messages in the body). Pass form fields as a struct to `post()` — the controller sees them on `params`, including nested keys like `params.post.title`.
 
-```cfm {test:compile} title="tests/specs/controllers/PostsSpec.cfc"
-describe("Posts create", () => {
-    it("redirects to the show page after a successful create", () => {
-        var testClient = $testClient();
-        testClient.post("/posts", {"post[title]": "New", "post[body]": "Body text"});
-        expect(testClient.statusCode()).toBe(302);
-        testClient.assertRedirect(to="/posts/");
-    });
+Controllers that extend the app's `Controller` call `protectsFromForgery()`, so a POST without a valid authenticity token is rejected with **403** before the action runs. A test-client request is a real request, so it needs the token too: fetch a page first (the client keeps the session cookie), read the token from the `csrf-token` meta tag that the layout renders with `csrfMetaTags()`, and send it as the `authenticityToken` field (or the `X-CSRF-Token` header). A small helper in the spec does the reading:
 
-    it("re-renders the new template when validation fails", () => {
-        var testClient = $testClient();
-        testClient.post("/posts", {"post[title]": "", "post[body]": "Body text"});
-        expect(testClient.statusCode()).toBe(200);
-        testClient.assertSee("Title can't be empty");
-    });
-});
+```cfm {test:compile} title="tests/specs/controllers/PostsCreateSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Posts create", () => {
+            it("redirects to the show page after a successful create", () => {
+                var testClient = $testClient();
+                testClient.get("/posts/new");
+                testClient.post("/posts", {"authenticityToken": csrfToken(testClient), "post[title]": "New", "post[body]": "Body text"});
+                expect(testClient.statusCode()).toBe(303);
+                testClient.assertRedirect(to="/posts/");
+            });
+
+            it("re-renders the new template when validation fails", () => {
+                var testClient = $testClient();
+                testClient.get("/posts/new");
+                testClient.post("/posts", {"authenticityToken": csrfToken(testClient), "post[title]": "", "post[body]": "Body text"});
+                expect(testClient.statusCode()).toBe(200);
+                testClient.assertSeeInOrder(["Title can", "t be empty"]);  // the apostrophe renders HTML-escaped
+            });
+
+            it("sends the token as a header just as well", () => {
+                var testClient = $testClient();
+                testClient.get("/posts/new");
+                testClient.withHeader("X-CSRF-Token", csrfToken(testClient))
+                    .post("/posts", {"post[title]": "Also new", "post[body]": "Body text"})
+                    .assertRedirect();
+            });
+
+            it("is rejected without the token", () => {
+                $testClient().post("/posts", {"post[title]": "New", "post[body]": "Body text"}).assertStatus(403);
+            });
+        });
+    }
+
+    // The CSRF token from the page the client fetched last (the csrf-token meta tag).
+    private string function csrfToken(required any testClient) {
+        var html = arguments.testClient.content();
+        var match = ReFindNoCase('<meta[^>]*name="csrf-token"[^>]*>', html, 1, true);
+        if (!match.len[1]) {
+            return "";
+        }
+        return ReReplaceNoCase(Mid(html, match.pos[1], match.len[1]), '.*content="([^"]*)".*', "\1");
+    }
+}
 ```
 
-The distinction matters: a 302 confirms the save succeeded and the controller called `redirectTo`; a 200 with the error message in the body confirms the validation caught a bad input and the action re-rendered `new`. If you ever see a 302 on invalid input, you know the validation isn't running — or the controller isn't branching on `.save()`'s return value.
+The other POST, PUT and DELETE examples on these pages leave the token out to stay short; against a controller with `protectsFromForgery()`, add `"authenticityToken": csrfToken(testClient)` to their bodies after a `get()`. A JSON API controller that extends `wheels.Controller` directly, as `wheels generate api-resource` writes it, has no CSRF filter.
+
+The distinction matters: a 303 confirms the save succeeded and the controller called `redirectTo`; a 200 with the error message in the body confirms the validation caught a bad input and the action re-rendered `new`. If you ever see a 303 on invalid input, you know the validation isn't running — or the controller isn't branching on `.save()`'s return value.
 
 ## Testing filter behavior
 
@@ -249,7 +281,7 @@ describe("Posts", () => {
         var testClient = $testClient();
         testClient.post("/login", {email: "alice@example.com", password: "secret"});
         testClient.post("/posts", {"post[title]": "T", "post[body]": "B"});
-        expect(testClient.statusCode()).toBe(302);
+        expect(testClient.statusCode()).toBe(303);
     });
 });
 ```
