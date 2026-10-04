@@ -8997,6 +8997,36 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Run a "plugins" check: it matches a non-empty plugin directory, the
+	 * plugin packages box.json declares, and the matches of its `references`
+	 * grep. Returns {matched, matchEntry}, matchEntry empty when nothing matched.
+	 */
+	private struct function $upgradePluginResult(required struct check) {
+		var found = [];
+		var pluginDir = variables.projectRoot & "/" & arguments.check.path;
+		if (directoryExists(pluginDir) && arrayLen(directoryList(pluginDir, false, "name"))) {
+			arrayAppend(found, arguments.check.path & "/");
+		}
+		for (var dependency in $upgradePluginDependencies()) {
+			arrayAppend(found, dependency);
+		}
+		// A copy, so the check definition isn't changed.
+		var references = duplicate(arguments.check.references);
+		references.description = arguments.check.description;
+		references.fix = arguments.check.fix;
+		var referenceResult = $upgradeExecuteCheck(references);
+		if (referenceResult.matched) {
+			for (var reference in referenceResult.matchEntry.matches) {
+				arrayAppend(found, reference);
+			}
+		}
+		if (!arrayLen(found)) {
+			return {matched: false, matchEntry: {}};
+		}
+		return {matched: true, matchEntry: {description: arguments.check.description, fix: arguments.check.fix, matches: found}};
+	}
+
+	/**
 	 * Execute a single upgrade check, returning its severity, matched flag,
 	 * and matchEntry (populated only when matched).
 	 */
@@ -9063,28 +9093,9 @@ component extends="modules.BaseModule" {
 				}
 			}
 		} else if (arguments.check.checkType == "plugins") {
-			var pluginMatches = [];
-			var pluginDir = variables.projectRoot & "/" & arguments.check.path;
-			if (directoryExists(pluginDir) && arrayLen(directoryList(pluginDir, false, "name"))) {
-				arrayAppend(pluginMatches, arguments.check.path & "/");
-			}
-			for (var dependency in $upgradePluginDependencies()) {
-				arrayAppend(pluginMatches, dependency);
-			}
-			// A copy, so the check definition isn't changed.
-			var references = duplicate(arguments.check.references);
-			references.description = arguments.check.description;
-			references.fix = arguments.check.fix;
-			var referenceResult = $upgradeExecuteCheck(references);
-			if (referenceResult.matched) {
-				for (var reference in referenceResult.matchEntry.matches) {
-					arrayAppend(pluginMatches, reference);
-				}
-			}
-			if (arrayLen(pluginMatches)) {
-				matched = true;
-				matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: pluginMatches};
-			}
+			var pluginResult = $upgradePluginResult(arguments.check);
+			matched = pluginResult.matched;
+			matchEntry = pluginResult.matchEntry;
 		} else if (arguments.check.checkType == "envSelection") {
 			if ($upgradeEnvSelection() == arguments.check.expect) {
 				matched = true;
