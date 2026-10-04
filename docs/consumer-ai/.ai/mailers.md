@@ -55,7 +55,7 @@ set(
 
 ## Testing a mailer
 
-`deliver = false` builds the email without sending it, and `sendEmail()` returns it as a struct (`to`, `subject`, `html` or `text`, …). Turn it off for one spec through the function defaults, and restore them (see `.ai/testing.md`):
+`deliver = false` builds the email without sending it, and `sendEmail()` returns it as a struct (`to`, `subject`, `html` or `text`, …). To turn delivery off for every spec, see `.ai/testing.md` (app specs run in the development environment). For one spec, set it through the function defaults and restore them:
 
 ```cfm
 // tests/specs/UserMailerSpec.cfc
