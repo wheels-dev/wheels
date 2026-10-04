@@ -91,7 +91,7 @@ component {
 						}
 						// "GET /path?query HTTP/1.1" -> "/path"
 						reqPath = listFirst(listGetAt(listFirst(head, chr(13) & chr(10)) & " /", 2, " "), "?");
-						if (structKeyExists(attributes.routes, reqPath) && !isBinary(attributes.routes[reqPath])) {
+						if (structKeyExists(attributes.routes, reqPath) && !isBinary(attributes.routes[reqPath]) && attributes.routes[reqPath] == "HOLD") {
 							// "HOLD": answer nothing; wait for the client to close.
 							holdUntil = getTickCount() + 30000;
 							sock.setSoTimeout(javacast("int", 250));

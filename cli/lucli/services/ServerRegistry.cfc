@@ -925,7 +925,12 @@ component {
 		} catch (any e) {
 			return {ran: false, exitCode: -1, output: ""};
 		} finally {
-			if (fileExists(outFile)) fileDelete(outFile);
+			// Best effort: on Windows a file the killed process still holds can't
+			// be deleted yet, and that must not replace the result.
+			try {
+				if (fileExists(outFile)) fileDelete(outFile);
+			} catch (any cleanupError) {
+			}
 		}
 	}
 
