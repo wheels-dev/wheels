@@ -85,7 +85,7 @@ Since 4.1.0 the migrator rejects `default=''` on `string`, `text` and `char` col
 - or pass a real value (`default='draft'`);
 - or use `default='NULL'` for an explicit `DEFAULT NULL`.
 
-`default=''` on other column types (`datetime`, `integer`, and so on) is still accepted and produces `DEFAULT NULL`.
+`default=''` is still accepted on `boolean`, `date`, `datetime`, `time`, `timestamp`, `decimal`, `float` and `integer` columns, where it produces `DEFAULT NULL`.
 
 <Aside type="caution" title="The 4.1.0–4.1.2 starter app">
 The `wheels-starter-app` zips for 4.1.0, 4.1.1 and 4.1.2 still contain nine of these defaults, so their first migration, `20180519095317_Creates_User_Table`, fails on a fresh database. Those zips are not being re-released. In your copy, remove `default=''` from the `t.string(...)` and `t.text(...)` lines in the `Creates_User_Table`, `Creates_Roles_Table`, `Creates_Permissions_Table` and `Creates_Settings_Table` migrations, then run `wheels migrate latest` again.
