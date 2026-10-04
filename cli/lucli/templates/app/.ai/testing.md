@@ -29,8 +29,9 @@ Two ways to read fresh rows in those cases:
 - Pass `reload=true` to the finder for a single call:
 
 ```cfm
-// a Comment was created directly; the cached Post query still omits it
-expect(model("Post").findByKey(key = post.key(), include = "comments", reload = true).commentCount).toBe(1);
+// data changed outside this model's own save (raw SQL, another model, or a
+// separate test-client request); reload=true re-runs the query
+expect(model("Post").findAll(reload = true).recordCount).toBe(3);
 ```
 
 - Clear the whole request cache when several later reads must not see anything cached earlier:
