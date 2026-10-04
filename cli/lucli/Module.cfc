@@ -8878,6 +8878,24 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The location line for an `absent` check that found nothing: the paths it
+	 * scanned (its scanDir and each scanTarget), so the report names the file
+	 * that lacks the code, e.g. "public/Application.cfc (no occurrences found)".
+	 */
+	private string function $upgradeAbsentHint(required struct check) {
+		var paths = [];
+		if (structKeyExists(arguments.check, "scanDir") && len(arguments.check.scanDir)) {
+			arrayAppend(paths, arguments.check.scanDir & "/");
+		}
+		if (structKeyExists(arguments.check, "scanTargets") && isArray(arguments.check.scanTargets)) {
+			for (var target in arguments.check.scanTargets) {
+				arrayAppend(paths, target.path);
+			}
+		}
+		return arrayLen(paths) ? arrayToList(paths, ", ") & " (no occurrences found)" : "(no occurrences found)";
+	}
+
+	/**
 	 * Execute a single upgrade check, returning its severity, matched flag,
 	 * and matchEntry (populated only when matched).
 	 */
@@ -8932,10 +8950,7 @@ component extends="modules.BaseModule" {
 			if (isAbsent) {
 				if (scanned && !arrayLen(matches)) {
 					matched = true;
-					var hint = structKeyExists(arguments.check, "scanDir") && len(arguments.check.scanDir)
-						? arguments.check.scanDir & "/ (no occurrences found)"
-						: "(no occurrences found)";
-					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: [hint]};
+					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: [$upgradeAbsentHint(arguments.check)]};
 				}
 			} else {
 				if (arrayLen(matches)) {
