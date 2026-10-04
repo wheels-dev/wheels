@@ -237,6 +237,7 @@ component extends="modules.BaseModule" {
 			"browser",  // multi-step browser testing flow
 			"jobs",     // `jobs work` is a long-lived poll loop — no single-call MCP semantics (like start/stop)
 			"coverage", // instruments app/ on disk then runs the suite — stateful, not single-call MCP semantics
+			"framework", // `framework install` writes the framework into vendor/wheels/ — a side-effecting install, not a query
 			// downloads a ~30 MB bundle from GitHub and unpacks it into the CLI
 			// home — a side-effecting install step, not a query
 			"docs",
@@ -573,6 +574,14 @@ component extends="modules.BaseModule" {
 			.accept("dry-run");
 	}
 
+	private any function frameworkArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "subcommand", default = "", choices = "install,help", description = "`install` installs the CLI's bundled framework into vendor/wheels/ for an app that has none (e.g. one moving off CommandBox). Omitted/empty prints usage and changes nothing")
+			.option(name = "to", default = "", description = "install only: target Wheels version. Must match the CLI's bundled framework version — no downloads")
+			.accept("help")
+			.accept("h");
+	}
+
 	private any function jobsArgSpec() {
 		return new services.ArgSpec()
 			.positional(name = "action", default = "status", description = "work (long-lived worker loop) or status (queue snapshot). Defaults to status")
@@ -818,6 +827,26 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The `hint:` of the public command function `fnName`, without the literal
+	 * "hint:" prefix Lucee keeps, or "". Walks up the component's `extends`
+	 * chain, because getMetaData() lists only the functions a component
+	 * declares itself: a subclass of Module (the spec fixtures) would
+	 * otherwise find no hint for any command.
+	 */
+	private string function $commandHint(required string fnName) {
+		var meta = getMetaData(this);
+		while (isStruct(meta)) {
+			for (var fn in (meta.functions ?: [])) {
+				if (lCase(fn.name ?: "") == arguments.fnName && (fn.access ?: "public") == "public") {
+					return trim(reReplaceNoCase(trim(fn.hint ?: ""), "^hint\s*:\s*", ""));
+				}
+			}
+			meta = structKeyExists(meta, "extends") ? meta.extends : "";
+		}
+		return "";
+	}
+
+	/**
 	 * Render per-command help for `wheels <cmd> --help` from the command function's
 	 * metadata hint. Returns "" for an unknown command so showHelp() falls back to
 	 * the global listing. Private so it isn't exposed as an MCP tool.
@@ -829,17 +858,7 @@ component extends="modules.BaseModule" {
 		if (fnName == "g") { fnName = "generate"; }
 		if (fnName == "d") { fnName = "destroy"; }
 
-		var hint = "";
-		var meta = getMetaData(this);
-		for (var fn in (meta.functions ?: [])) {
-			if (lCase(fn.name ?: "") == fnName && (fn.access ?: "public") == "public") {
-				hint = trim(fn.hint ?: "");
-				// The `/** hint: ... */` convention surfaces the value with the
-				// literal "hint:" key prefix on Lucee — strip it for clean output.
-				hint = trim(reReplaceNoCase(hint, "^hint\s*:\s*", ""));
-				break;
-			}
-		}
+		var hint = $commandHint(fnName);
 		if (!len(hint)) {
 			return "";
 		}
@@ -883,6 +902,12 @@ component extends="modules.BaseModule" {
 	/** Worked examples for `wheels <command> --help`, where a command has them. */
 	private array function $commandExamples(required string fnName) {
 		switch (arguments.fnName) {
+			case "new":
+				return [
+					"  wheels new myapp                              SQLite, port 8080",
+					"  wheels new myapp --port=3000 --setup-h2       H2 instead of SQLite",
+					"  wheels new myapp --datasource=mydb --no-sqlite  Your own datasource"
+				];
 			case "test":
 				return [
 					"  wheels test                                  Run every spec under tests/specs",
@@ -1997,7 +2022,7 @@ component extends="modules.BaseModule" {
 		// string ("Can't cast Complex Object Type [URL scope] to String").
 		var bundleUrl = $docsBundleUrl(version);
 		var checksumUrl = bundleUrl & ".sha512";
-		var httpClient = new services.packages.HttpClient(timeoutSeconds = 300);
+		var timeouts = $docsFetchTimeouts();
 		out("Fetching docs for #version#...");
 		out("  #bundleUrl#");
 
@@ -2010,7 +2035,7 @@ component extends="modules.BaseModule" {
 		var checksumTmp = getTempDirectory() & "wheels-docs-#version#-#runId#.zip.sha512";
 		var checksumText = "";
 		try {
-			httpClient.download(checksumUrl, checksumTmp);
+			new services.packages.HttpClient(timeoutSeconds = timeouts.checksum).download(checksumUrl, checksumTmp);
 			checksumText = fileRead(checksumTmp, "utf-8");
 		} catch (any e) {
 			$docsFetchFail(
@@ -2036,7 +2061,7 @@ component extends="modules.BaseModule" {
 		var staging = home & "/docs/." & version & ".partial-" & runId;
 		try {
 			try {
-				httpClient.download(bundleUrl, tmp);
+				new services.packages.HttpClient(timeoutSeconds = timeouts.bundle).download(bundleUrl, tmp);
 			} catch (any e) {
 				$docsFetchFail("Download failed: #e.message#");
 			}
@@ -2336,6 +2361,18 @@ component extends="modules.BaseModule" {
 		} catch (any e) {
 			return "";
 		}
+	}
+
+	/**
+	 * Seconds each `docs fetch` download may take (cfhttp's total timeout). The
+	 * checksum is a few hundred bytes; the bundle is about 40 MB, so its limit
+	 * allows roughly 1 Mbit/s. Keep both as short as a real transfer allows: on
+	 * Lucee, a cfhttp call whose response completes before the tag starts
+	 * waiting for it only returns when the whole timeout has passed (the
+	 * executor's notify can come first; seen against a local stub, #4232).
+	 */
+	private struct function $docsFetchTimeouts() {
+		return {checksum: 30, bundle: 300};
 	}
 
 	/**
@@ -3000,6 +3037,20 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * The arguments `wheels new` accepts. Also what `wheels new --help` lists.
+	 */
+	private any function newArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "appName", description = "Name of the application and of the directory it's created in")
+			.option(name = "port", default = 8080, type = "numeric", description = "Server port")
+			.option(name = "datasource", default = "", description = "Datasource name (default: the app name)")
+			.option(name = "reload-password", default = "", description = "Reload password (default: random)")
+			.flag(name = "setup-h2", default = false, description = "Use the H2 embedded database instead of SQLite")
+			.flag(name = "sqlite", default = true, description = "Set up the zero-config SQLite database")
+			.flag(name = "open-browser", default = true, description = "Open the browser when the server starts");
+	}
+
+	/**
 	 * Parse `wheels new` arguments from LuCLI's structured argCollection.
 	 *
 	 * `--no-sqlite` arrives as `sqlite=false`; the command's `noSQLite` flag is
@@ -3009,15 +3060,7 @@ component extends="modules.BaseModule" {
 	 * name → error" (GH #2214).
 	 */
 	private struct function parseNewArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.positional(name = "appName")
-			.option(name = "port", default = 8080, type = "numeric")
-			.option(name = "datasource", default = "")
-			.option(name = "reload-password", default = "")
-			.flag(name = "setup-h2", default = false)
-			.flag(name = "sqlite", default = true)
-			.flag(name = "open-browser", default = true)
-			.parse(arguments.coll);
+		var parsed = newArgSpec().parse(arguments.coll);
 
 		return {
 			appName = parsed.appName,
@@ -3044,23 +3087,8 @@ component extends="modules.BaseModule" {
 		);
 
 		if (opts.isEmpty) {
-			out("Usage: wheels new <appname> [options]", "yellow");
-			out("");
-			out("Creates a new Wheels application in the specified directory.");
-			out("By default, SQLite is configured as the zero-config database.");
-			out("");
-			out("Options:", "bold");
-			out("  --port=<number>           Server port (default: 8080)");
-			out("  --datasource=<name>       Datasource name (default: app name)");
-			out("  --reload-password=<pw>    Reload password (default: random)");
-			out("  --no-sqlite               Skip default SQLite database setup");
-			out("  --setup-h2                Use H2 embedded database instead of SQLite");
-			out("  --no-open-browser         Don't open browser on server start");
-			out("");
-			out("Examples:", "bold");
-			out("  wheels new myapp");
-			out("  wheels new myapp --port=3000 --setup-h2");
-			out("  wheels new myapp --datasource=mydb --no-sqlite");
+			// The same text as `wheels new --help`, so the two can't drift.
+			out($commandHelp("new"));
 			return "";
 		}
 
@@ -5942,6 +5970,144 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Install the Wheels framework into an existing app that has no vendor/wheels/.
+	 */
+	public string function framework() {
+		var coll = structuredArgs(arguments);
+		var opts = frameworkArgSpec().parse(coll);
+		var wantsHelp = !len(opts.subcommand)
+			|| opts.subcommand == "help"
+			|| (structKeyExists(opts, "help") && isBoolean(opts.help) && opts.help)
+			|| (structKeyExists(opts, "h") && isBoolean(opts.h) && opts.h);
+		if (wantsHelp) {
+			return $printFrameworkHelp();
+		}
+		// frameworkArgSpec()'s choices="install,help" has already rejected any
+		// other subcommand with a non-zero exit before we get here.
+		return runFrameworkInstall(opts.to);
+	}
+
+	// Fresh-install path: drop the CLI's bundled framework into an app that has
+	// no vendor/wheels/. Replacing an EXISTING framework is `wheels upgrade
+	// apply`'s job (one path for that), so this refuses when vendor/wheels/ is
+	// already present. Prints progress via out() and returns "" — out() is the
+	// display, and returning the text too would double it in MCP results (the
+	// U4 convention for runUpgradeApply). Refusals print-then-throw (#2941).
+	private string function runFrameworkInstall(string targetVersion = "") {
+		var nl = chr(10);
+		var vendorDir = variables.projectRoot & "/vendor/wheels";
+		var upgrader = new services.FrameworkUpgrader();
+
+		if ($safeDirExists(vendorDir)) {
+			if (upgrader.looksLikeWheelsFramework(vendorDir)) {
+				var present = upgrader.readFrameworkVersion(vendorDir);
+				out("vendor/wheels/ already exists#len(present) ? ' (Wheels ' & present & ')' : ''#.", "red");
+				out("Use 'wheels upgrade apply' to replace an existing framework.");
+				throw(
+					type = "Wheels.FrameworkInstallFailed",
+					message = "vendor/wheels/ already present — use `wheels upgrade apply` to replace an existing framework."
+				);
+			}
+			out("vendor/wheels/ exists but does not look like a Wheels framework.", "red");
+			out("Remove it (or use 'wheels upgrade apply'), then re-run 'wheels framework install'.");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = "vendor/wheels/ exists but is not a Wheels framework — remove it or use `wheels upgrade apply`."
+			);
+		}
+
+		var sourceDir = $resolveBundledFrameworkSource();
+		if (!len(sourceDir)) {
+			out("Could not locate the CLI's bundled framework — the CLI install may be incomplete.", "red");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = "Could not locate the CLI's bundled framework (tried WHEELS_FRAMEWORK_PATH, then the module's own install tree)."
+			);
+		}
+
+		var bundledVersion = upgrader.readFrameworkVersion(sourceDir);
+		if (len(arguments.targetVersion) && arguments.targetVersion != bundledVersion) {
+			out("Requested --to=#arguments.targetVersion# but the CLI bundles #len(bundledVersion) ? bundledVersion : 'unknown'#.", "red");
+			out("Only the bundled version can be installed (no downloads). Install a CLI that bundles your target, or omit --to.");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = "--to=#arguments.targetVersion# does not match the CLI's bundled framework version (#bundledVersion#); only the bundled version is installable."
+			);
+		}
+
+		// A fresh install may run in an app that has no vendor/ directory yet
+		// (e.g. one that never ran `box install`); create the parent so the swap
+		// has somewhere to land — validateSwap requires the parent to exist.
+		var vendorParent = getDirectoryFromPath(vendorDir);
+		if (!directoryExists(vendorParent)) {
+			directoryCreate(vendorParent, true, true);
+		}
+
+		// The service's pre-mutation refusal checks (source looks like a
+		// framework; target parent exists; no path overlap). An absent vendorDir
+		// is allowed — that is the fresh-install case.
+		var validationError = upgrader.validateSwap(sourceDir, vendorDir);
+		if (len(validationError)) {
+			out(validationError, "red");
+			throw(type = "Wheels.FrameworkInstallFailed", message = validationError);
+		}
+
+		// A box.json that pins wheels-core must be updated after the install, or a
+		// later `box install` would copy an old framework over vendor/wheels/. A
+		// missing box.json is the normal case for an app moving onto the CLI.
+		var boxPin = $upgradeApplyBoxPin(upgrader);
+
+		out("Source:  #sourceDir#");
+		out("Target:  #vendorDir#");
+		out("Installing Wheels #bundledVersion# into vendor/wheels/ ...");
+
+		var result = {};
+		try {
+			// doBackup = false: a fresh install has nothing to back up.
+			result = upgrader.applyUpgrade(sourceDir, vendorDir, false, "");
+		} catch (Wheels.FrameworkUpgrader e) {
+			out(e.message, "red");
+			throw(type = "Wheels.FrameworkInstallFailed", message = e.message);
+		}
+		if (!result.success) {
+			out(result.error, "red");
+			throw(type = "Wheels.FrameworkInstallFailed", message = result.error);
+		}
+
+		var summary = "Framework installed: #result.newVersion#" & nl;
+		summary &= $upgradeApplyUpdateBoxPin(upgrader, boxPin, result.newVersion);
+		summary &= nl & "Next: run 'wheels start', then 'wheels migrate latest'." & nl;
+		out(summary, "green");
+		return "";
+	}
+
+	/**
+	 * Help block for `wheels framework` / `wheels framework help` / `--help`.
+	 */
+	private string function $printFrameworkHelp() {
+		var nl = chr(10);
+		var help = "Usage:" & nl
+			& "  wheels framework install [--to=<version>]" & nl
+			& nl
+			& "Install the Wheels framework (vendor/wheels/) into an existing app that has" & nl
+			& "none — for example an app moving off CommandBox. To replace an existing" & nl
+			& "framework, use 'wheels upgrade apply' instead." & nl
+			& nl
+			& "Subcommands:" & nl
+			& "  install           Install the CLI's bundled framework into vendor/wheels/." & nl
+			& "                    Refuses if vendor/wheels/ already exists (use upgrade apply)." & nl
+			& nl
+			& "Options:" & nl
+			& "  --to=<version>    Must match the CLI's bundled framework version (no downloads)." & nl
+			& nl
+			& "Examples:" & nl
+			& "  wheels framework install             - install the bundled framework" & nl
+			& "  wheels framework install --to=4.2.0  - install, asserting the bundled version" & nl;
+		out(help, "yellow");
+		return help;
+	}
+
+	/**
 	 * Help block for `wheels upgrade help` / `--help`. Extracted so the
 	 * help short-circuit and the unknown-subcommand error path stay in sync.
 	 */
@@ -8273,19 +8439,40 @@ component extends="modules.BaseModule" {
 		var jump34 = arguments.currentMajor <= 3 && arguments.targetMajor >= 4;
 		var on4 = arguments.currentMajor >= 4 && arguments.targetMajor >= 4;
 		if (jump34 || on4) {
+			// An empty or missing plugins/ doesn't mean the app has no plugins:
+			// 3.x apps declare them in box.json (installed into plugins/ by the
+			// next box install), and 3.0's deletePluginDirectories=true default
+			// can leave the folder empty at runtime. So this also reports
+			// box.json plugin dependencies and code that reads
+			// application.wheels.plugins.
 			arrayAppend(checks, {
-				description: "Legacy plugin directory (deprecated as of 4.0, removed in 5.0)",
+				description: "Legacy plugins (deprecated as of 4.0, removed in 5.0)",
 				jumpOnly: true,
 				pattern: "",
-				checkType: "directory",
+				checkType: "plugins",
 				path: "plugins",
-				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>)"
+				references: {
+					pattern: "application\.wheels\.plugins\b",
+					checkType: "grep",
+					scanDir: "app",
+					extensions: "cfc,cfm",
+					scanTargets: [
+						{path: "Application.cfc"},
+						{path: "public/Application.cfc"},
+						{path: "config", extensions: "cfm,cfc", recurse: true}
+					],
+					skipPackages: true
+				},
+				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>), or to the 4.x built-in that replaces them, and remove their box.json dependencies (box install puts them back in plugins/)"
 			});
 			// application.wirebox → application.wheelsdi (guide item 10). The
-			// hardest real-world case is a root Application.cfc bootstrap that
+			// hardest real-world case is an Application.cfc bootstrap that
 			// calls `new wirebox.system.ioc.Injector(...)` — the WireBox
-			// package no longer ships in vendor/wheels/ — so scan the root
-			// Application.cfc and config/ in addition to app/.
+			// package no longer ships in vendor/wheels/ — so scan the root and
+			// public/ Application.cfc (where 3.x apps keep theirs) and config/
+			// in addition to app/. Packages under app/ (e.g. app/lib/logbox) are
+			// third-party code that uses WireBox itself, not the app, so they
+			// are skipped.
 			arrayAppend(checks, {
 				description: "Direct WireBox references (application.wirebox / wirebox.system.ioc)",
 				pattern: "application\.wirebox|wirebox\.system\.ioc",
@@ -8294,8 +8481,10 @@ component extends="modules.BaseModule" {
 				extensions: "cfc,cfm",
 				scanTargets: [
 					{path: "Application.cfc"},
+					{path: "public/Application.cfc"},
 					{path: "config", extensions: "cfm,cfc", recurse: true}
 				],
+				skipPackages: true,
 				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector(""wheels.Bindings"")` (the constructor requires the bindings path). The legacy adapter does NOT shim this item."
 			});
 			// renderPage()/renderPageToString() removed in 4.0 — shimmed by
@@ -8859,7 +9048,103 @@ component extends="modules.BaseModule" {
 			}
 		}
 
+		// `skipPackages`: leave out third-party package code: files under a
+		// directory box.json installs a package into, or under any directory
+		// below the project root that has its own box.json (a package moved or
+		// committed somewhere its installPaths entry doesn't say).
+		if (structKeyExists(arguments.check, "skipPackages") && arguments.check.skipPackages) {
+			var packageDirs = $upgradeInstallPathDirs();
+			var root = replace(variables.projectRoot, "\", "/", "all");
+			var hasBoxJson = {};
+			var kept = [];
+			for (var f in filesToScan) {
+				var normalized = replace(f, "\", "/", "all");
+				var inPackage = false;
+				for (var packageDir in packageDirs) {
+					if (findNoCase(packageDir, normalized) == 1) {
+						inPackage = true;
+						break;
+					}
+				}
+				// Walk up from the file's directory, stopping below the root.
+				var dir = getDirectoryFromPath(normalized);
+				while (!inPackage && len(dir) > len(root) + 1 && findNoCase(root & "/", dir) == 1) {
+					if (!structKeyExists(hasBoxJson, dir)) {
+						hasBoxJson[dir] = fileExists(dir & "box.json");
+					}
+					inPackage = hasBoxJson[dir];
+					dir = getDirectoryFromPath(reReplace(dir, "/+$", ""));
+				}
+				if (!inPackage) arrayAppend(kept, f);
+			}
+			filesToScan = kept;
+		}
+
 		return filesToScan;
+	}
+
+	/**
+	 * The app's box.json, parsed; an empty struct when it is missing or isn't a
+	 * JSON object.
+	 */
+	private struct function $upgradeReadBoxJson() {
+		var path = variables.projectRoot & "/box.json";
+		if (!fileExists(path)) return {};
+		try {
+			var parsed = deserializeJSON(fileRead(path));
+			return isStruct(parsed) ? parsed : {};
+		} catch (any e) {
+			return {};
+		}
+	}
+
+	/** A box.json installPaths value as a project-relative path: forward slashes, no leading `./` or trailing `/`. */
+	private string function $upgradeNormalizeInstallPath(required string installPath) {
+		return reReplace(replace(trim(arguments.installPath), "\", "/", "all"), "^(\./)+|/+$", "", "all");
+	}
+
+	/**
+	 * The plugin packages box.json declares, as "box.json: <name> (<installPath>)".
+	 * A dependency counts when its installPath is under plugins/ or, with no
+	 * installPath, when its name starts with "cfwheels-" (CommandBox installs
+	 * that package type into plugins/).
+	 */
+	private array function $upgradePluginDependencies() {
+		var box = $upgradeReadBoxJson();
+		var installPaths = structKeyExists(box, "installPaths") && isStruct(box.installPaths) ? box.installPaths : {};
+		var found = [];
+		for (var section in ["dependencies", "devDependencies"]) {
+			if (!structKeyExists(box, section) || !isStruct(box[section])) continue;
+			var names = structKeyArray(box[section]);
+			arraySort(names, "textnocase");
+			for (var name in names) {
+				var target = structKeyExists(installPaths, name) && isSimpleValue(installPaths[name])
+					? $upgradeNormalizeInstallPath(installPaths[name]) : "";
+				var isPlugin = len(target) ? reFindNoCase("^plugins(/|$)", target) > 0 : reFindNoCase("^cfwheels-", name) > 0;
+				if (isPlugin) {
+					arrayAppend(found, "box.json: " & name & (len(target) ? " (" & target & "/)" : ""));
+				}
+			}
+		}
+		return found;
+	}
+
+	/**
+	 * The directories box.json installs packages into (`installPaths`), as
+	 * absolute paths with forward slashes and a trailing slash.
+	 */
+	private array function $upgradeInstallPathDirs() {
+		var box = $upgradeReadBoxJson();
+		var dirs = [];
+		if (!structKeyExists(box, "installPaths") || !isStruct(box.installPaths)) return dirs;
+		var root = replace(variables.projectRoot, "\", "/", "all");
+		for (var name in box.installPaths) {
+			if (!isSimpleValue(box.installPaths[name])) continue;
+			var rel = $upgradeNormalizeInstallPath(box.installPaths[name]);
+			if (!len(rel) || rel == ".") continue;
+			arrayAppend(dirs, root & "/" & rel & "/");
+		}
+		return dirs;
 	}
 
 	/**
@@ -8875,6 +9160,36 @@ component extends="modules.BaseModule" {
 			return true;
 		}
 		return structKeyExists(arguments.check, "requireFileMatches") && reFindNoCase(arguments.check.requireFileMatches, arguments.content) == 0;
+	}
+
+	/**
+	 * Run a "plugins" check: it matches a non-empty plugin directory, the
+	 * plugin packages box.json declares, and the matches of its `references`
+	 * grep. Returns {matched, matchEntry}, matchEntry empty when nothing matched.
+	 */
+	private struct function $upgradePluginResult(required struct check) {
+		var found = [];
+		var pluginDir = variables.projectRoot & "/" & arguments.check.path;
+		if (directoryExists(pluginDir) && arrayLen(directoryList(pluginDir, false, "name"))) {
+			arrayAppend(found, arguments.check.path & "/");
+		}
+		for (var dependency in $upgradePluginDependencies()) {
+			arrayAppend(found, dependency);
+		}
+		// A copy, so the check definition isn't changed.
+		var references = duplicate(arguments.check.references);
+		references.description = arguments.check.description;
+		references.fix = arguments.check.fix;
+		var referenceResult = $upgradeExecuteCheck(references);
+		if (referenceResult.matched) {
+			for (var reference in referenceResult.matchEntry.matches) {
+				arrayAppend(found, reference);
+			}
+		}
+		if (!arrayLen(found)) {
+			return {matched: false, matchEntry: {}};
+		}
+		return {matched: true, matchEntry: {description: arguments.check.description, fix: arguments.check.fix, matches: found}};
 	}
 
 	/**
@@ -8958,6 +9273,10 @@ component extends="modules.BaseModule" {
 					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: matches};
 				}
 			}
+		} else if (arguments.check.checkType == "plugins") {
+			var pluginResult = $upgradePluginResult(arguments.check);
+			matched = pluginResult.matched;
+			matchEntry = pluginResult.matchEntry;
 		} else if (arguments.check.checkType == "envSelection") {
 			if ($upgradeEnvSelection() == arguments.check.expect) {
 				matched = true;
@@ -9300,9 +9619,10 @@ component extends="modules.BaseModule" {
 		}
 
 		out(summary, "green");
-		// Return value carries the pre-swap plan too, so callers (and the
-		// dispatch specs) see the full command output in order.
-		return plan & nl & summary;
+		// out() already printed the plan and the summary, and under the stdio MCP
+		// server out() is captured into the tool result too, so returning them as
+		// well printed the whole report twice in a terminal.
+		return "";
 	}
 
 	/**
@@ -10200,6 +10520,9 @@ component extends="modules.BaseModule" {
 			coreTests = arguments.coreTests
 		);
 		out(summary.text, summary.color);
+		for (var skipReason in $collectSkipReasons(arguments.result)) {
+			out("  Skipped (#skipReason.count#): #skipReason.message#", "yellow");
+		}
 		if (arguments.totalFail > 0 || arguments.totalError > 0) {
 			out("");
 
@@ -10242,10 +10565,13 @@ component extends="modules.BaseModule" {
 		boolean defaultScope = false,
 		boolean coreTests = false
 	) {
+		// Skipped specs did not run: they are counted, and a run with skips is never green.
+		var totalSkipped = isStruct(arguments.result) ? val(arguments.result.totalSkipped ?: 0) : 0;
+		var skippedStr = totalSkipped > 0 ? ", #totalSkipped# skipped" : "";
 		if (arguments.totalFail > 0 || arguments.totalError > 0) {
 			var failedToLoadStr = arguments.specsFailedToLoad > 0 ? ", #arguments.specsFailedToLoad# failed to load" : "";
 			return {
-				text = "#arguments.totalPass# passed, #arguments.totalFail# failed, #arguments.totalError# error(s)#failedToLoadStr##arguments.duration#",
+				text = "#arguments.totalPass# passed, #arguments.totalFail# failed, #arguments.totalError# error(s)#skippedStr##failedToLoadStr##arguments.duration#",
 				color = "red"
 			};
 		}
@@ -10267,7 +10593,52 @@ component extends="modules.BaseModule" {
 				color = "red"
 			};
 		}
+		if (totalSkipped > 0) {
+			return {text = "#arguments.totalPass# passed#skippedStr##arguments.duration#", color = "yellow"};
+		}
 		return {text = "#arguments.totalPass# passed#arguments.duration#", color = "green"};
+	}
+
+	/**
+	 * Why specs were skipped, from a TestBox result: one entry per distinct reason
+	 * (the skip message), with how many specs it covers, in the order first seen.
+	 * Pure, so specs can pin it.
+	 */
+	public array function $collectSkipReasons(required any result) {
+		var ctx = {reasons: [], index: {}};
+		if (!isStruct(arguments.result)) {
+			return ctx.reasons;
+		}
+		for (var bundle in (arguments.result.bundleStats ?: [])) {
+			for (var suite in (bundle.suiteStats ?: [])) {
+				$skipWalkSuite(suite, ctx);
+			}
+		}
+		return ctx.reasons;
+	}
+
+	/**
+	 * Recursively collect skipped specs' reasons from one suite into ctx.
+	 */
+	private void function $skipWalkSuite(required any suite, required struct ctx) {
+		for (var spec in (arguments.suite.specStats ?: [])) {
+			if ((spec.status ?: "") != "Skipped") {
+				continue;
+			}
+			var reason = trim(spec.failMessage ?: "");
+			if (!len(reason)) {
+				reason = "(no reason given)";
+			}
+			if (structKeyExists(arguments.ctx.index, reason)) {
+				arguments.ctx.reasons[arguments.ctx.index[reason]].count++;
+			} else {
+				arrayAppend(arguments.ctx.reasons, {message: reason, count: 1});
+				arguments.ctx.index[reason] = arrayLen(arguments.ctx.reasons);
+			}
+		}
+		for (var inner in (arguments.suite.suiteStats ?: [])) {
+			$skipWalkSuite(inner, arguments.ctx);
+		}
 	}
 
 	/**
@@ -10494,17 +10865,7 @@ component extends="modules.BaseModule" {
 			);
 		}
 
-		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
-		var context = {
-			"appName": appName,
-			"datasourceName": opts.datasource,
-			"reloadPassword": opts.reloadPassword,
-			"luceeAdminPassword": opts.luceeAdminPassword,
-			"port": opts.port,
-			"shutdownPort": opts.port + 1,
-			"openBrowser": opts.openBrowser ? "true" : "false",
-			"datasourcesBlock": opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(opts.datasource)
-		};
+		var context = $newTemplateContext(appName, opts);
 
 		// Copy template directory tree to target, processing placeholders.
 		// `rootTargetDir` is passed so recursive calls can compute paths
@@ -10544,7 +10905,7 @@ component extends="modules.BaseModule" {
 		out("Application created!", "green");
 		out("");
 		out("Configuration:", "bold");
-		out("  Port:            #opts.port#");
+		out("  Port:            #opts.port# (shutdown #context.shutdownPort#)");
 		out("  Datasource:      #opts.datasource#");
 		out("  Reload password:      #opts.reloadPassword#");
 		out("  Lucee admin password: (see .env — WHEELS_LUCEE_ADMIN_PASSWORD)");
@@ -10975,6 +11336,34 @@ component extends="modules.BaseModule" {
 			}
 		}
 		return arguments.from;
+	}
+
+	/**
+	 * Placeholder values for the `wheels new` project template.
+	 *
+	 * The shutdown port is the first free port above the HTTP port rather than
+	 * a blind port + 1: sibling apps are usually created with adjacent --port
+	 * values, so port + 1 is often another running app's port. `wheels start`
+	 * still moves a pinned shutdown port that is taken later
+	 * ($resolveStartPorts), but the pin `wheels new` writes should be free when
+	 * it is written.
+	 */
+	private struct function $newTemplateContext(required string appName, required struct opts) {
+		var shutdownPort = $nextFreePort(arguments.opts.port + 1);
+		if (shutdownPort != arguments.opts.port + 1) {
+			out("Shutdown port #arguments.opts.port + 1# is in use; using #shutdownPort#.", "yellow");
+		}
+		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
+		return {
+			"appName": arguments.appName,
+			"datasourceName": arguments.opts.datasource,
+			"reloadPassword": arguments.opts.reloadPassword,
+			"luceeAdminPassword": arguments.opts.luceeAdminPassword,
+			"port": arguments.opts.port,
+			"shutdownPort": shutdownPort,
+			"openBrowser": arguments.opts.openBrowser ? "true" : "false",
+			"datasourcesBlock": arguments.opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(arguments.opts.datasource)
+		};
 	}
 
 	/**
@@ -13183,11 +13572,7 @@ component extends="modules.BaseModule" {
 		out("");
 		out("Installing #browserName# browser binaries...");
 
-		var classpath = "";
-		for (var entry in manifest.classpath) {
-			if (len(classpath)) classpath &= ":";
-			classpath &= installDir & "/lib/" & entry.filename;
-		}
+		var classpath = $browserClasspath(installDir, manifest);
 
 		var install = $browserRunProcess(["java", "-cp", classpath, "com.microsoft.playwright.CLI", "install", browserName], 300);
 		if (install.timedOut || install.exitCode != 0) {
@@ -13198,6 +13583,19 @@ component extends="modules.BaseModule" {
 		out("Browser install OK", "green");
 
 		return $browserFinishSetup(classpath, browserName);
+	}
+
+	/**
+	 * The Java classpath for the Playwright jars in `installDir`, joined with
+	 * the platform's separator (`:` on macOS and Linux, `;` on Windows).
+	 * Public so specs can check it.
+	 */
+	public string function $browserClasspath(required string installDir, required struct manifest) {
+		var jars = [];
+		for (var entry in arguments.manifest.classpath) {
+			arrayAppend(jars, arguments.installDir & "/lib/" & entry.filename);
+		}
+		return arrayToList(jars, createObject("java", "java.io.File").pathSeparator);
 	}
 
 	/**

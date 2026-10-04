@@ -23,6 +23,11 @@
 #       # it contacts them. Run the suite's own server on a port outside that
 #       # list, or the sentinel cannot guard the port the server holds.
 #
+# The deploy SSH specs (SshClientSpec, SshPoolSpec) start a Docker sshd
+# fixture on ports 22022/22023 and leave it running, because every checkout
+# on the machine shares it. Stop it with `bash tools/deploy-sshd-down.sh`, or
+# set WHEELS_DEPLOY_SSHD_TEARDOWN=1 to stop it after each of those bundles.
+#
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

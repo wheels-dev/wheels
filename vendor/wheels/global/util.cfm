@@ -1405,4 +1405,18 @@ public struct function $testDataSourceRefusal(required struct decision) {
 		candidate = arguments.decision.candidate
 	};
 }
+
+/**
+ * Internal. The message an app test run reports when TestBox did not finish. A run
+ * stopped by the request timeout says so, with the limit, so it is not read as a
+ * failure of the specs themselves.
+ */
+public string function $testRunFailureMessage(required any runErr) {
+	local.message = StructKeyExists(arguments.runErr, "message") ? arguments.runErr.message : "";
+	local.type = StructKeyExists(arguments.runErr, "type") ? arguments.runErr.type : "";
+	if (FindNoCase("timeout", local.message & " " & local.type)) {
+		return "The test run hit the request timeout (" & $getRequestTimeout() & " seconds) and was stopped before it finished. " & local.message;
+	}
+	return local.message;
+}
 </cfscript>

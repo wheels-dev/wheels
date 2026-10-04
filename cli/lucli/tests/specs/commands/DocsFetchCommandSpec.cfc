@@ -44,18 +44,29 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		return arguments.hex & "  " & variables.zipName & chr(10);
 	}
 
-	/** Routes keyed by path; a missing key 404s (the stub's fixed status). */
+	/**
+	 * Routes keyed by path; a missing key 404s (the stub's fixed status).
+	 * "HOLD" passes through: the stub reads that request and never answers.
+	 */
 	private any function startStub(required struct routes) {
 		var bytesByPath = {};
 		for (var path in arguments.routes) {
-			bytesByPath[path] = stubFactory.binaryResponse(200, arguments.routes[path]);
+			var body = arguments.routes[path];
+			bytesByPath[path] = (!isBinary(body) && body == "HOLD") ? "HOLD" : stubFactory.binaryResponse(200, body);
 		}
 		return new cli.lucli.tests.StubHttpServer(statusCode = 404, bindAddress = "127.0.0.1", routes = bytesByPath);
 	}
 
-	private any function fetchModule(required any stub, required string home) {
+	/**
+	 * Short download timeouts: on Lucee a cfhttp response that completes
+	 * before the tag starts waiting returns only after the whole timeout, and
+	 * a local stub answers fast enough to hit that (#4232), so a spec must
+	 * never wait on the real 30 s / 300 s limits.
+	 */
+	private any function fetchModule(required any stub, required string home, struct timeouts = {checksum: 5, bundle: 5}) {
 		var m = new cli.lucli.Module(cwd = variables.tempRoot);
 		prepareMock(m);
+		m.$("$docsFetchTimeouts", arguments.timeouts);
 		m.$("$resolveLucliHome", arguments.home);
 		m.$("$docsBundleUrl", "http://127.0.0.1:#arguments.stub.getPort()#/#variables.zipName#");
 		m.$("$docsMountIntoWebroot");
@@ -143,6 +154,27 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				} finally {
 					stub.stop();
 				}
+				expect(directoryExists(home & "/docs/#version#")).toBeFalse();
+				expect(strayEntries(home)).toBeEmpty();
+				expect(arrayLen(tempFiles())).toBe(before);
+			});
+
+			it("gives up on a release server that answers nothing, within the download timeout", () => {
+				var home = newHome();
+				var before = arrayLen(tempFiles());
+				var stub = startStub({
+					"/#zipName#": zipBytes,
+					"/#zipName#.sha512": "HOLD"
+				});
+				var started = getTickCount();
+				try {
+					var thrown = runDocs(fetchModule(stub, home, {checksum: 2, bundle: 2}));
+				} finally {
+					stub.stop();
+				}
+				var elapsed = getTickCount() - started;
+				expect(thrown).toBe("Wheels.DocsFetchFailed");
+				expect(elapsed).toBeLT(15000, "docs fetch waited #elapsed# ms on a server that never answered");
 				expect(directoryExists(home & "/docs/#version#")).toBeFalse();
 				expect(strayEntries(home)).toBeEmpty();
 				expect(arrayLen(tempFiles())).toBe(before);
