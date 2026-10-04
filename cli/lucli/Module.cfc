@@ -8007,8 +8007,14 @@ component extends="modules.BaseModule" {
 		var currentMajor = val(listFirst(currentVersion, "."));
 		var targetMajor = val(listFirst(target, "."));
 		var sameMajor = (currentMajor == targetMajor);
+		var crosses42 = $upgradeCrosses42(currentVersion, target);
 
-		if (sameMajor && !jsonMode) {
+		if (crosses42 && sameMajor && !jsonMode) {
+			out("#currentVersion# -> #target#: no breaking framework changes, but 4.2 changes app-owned files and some behaviour.", "green");
+			out("Checking the 4.1 -> 4.2 items, then code left over from 3.x...", "green");
+			out("Also read the guide's database-specific changes (MySQL, Oracle, SQLite), which a source scan can't detect.", "green");
+			out("");
+		} else if (sameMajor && !jsonMode) {
 			out("Same major version — no new breaking changes in this upgrade.", "green");
 			out(currentMajor >= 4
 				? "Scanning for code left over from 3.x and for opt-in recommendations..."
@@ -8017,6 +8023,9 @@ component extends="modules.BaseModule" {
 		}
 
 		var checks = $upgradeBuildChecks(currentMajor, targetMajor, target);
+		if (crosses42) {
+			checks = $upgradeAppendChecks4x2(checks, target);
+		}
 
 		// Run checks. Matched checks land in `issues` (severity=breaking) or
 		// `advisories` (severity=advisory); unmatched land in `passed`.
@@ -8027,7 +8036,7 @@ component extends="modules.BaseModule" {
 
 		// The version-appropriate guide + the soft-landing adapter, surfaced
 		// whenever breaking findings are reported (and always in JSON output).
-		var guideUrl = new services.GuidesLink().link(
+		var guideUrl = crosses42 && sameMajor ? $upgradeGuide4x2Url() : new services.GuidesLink().link(
 			"upgrading/" & (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/",
 			target
 		);
@@ -8286,7 +8295,7 @@ component extends="modules.BaseModule" {
 					{path: "Application.cfc"},
 					{path: "config", extensions: "cfm,cfc", recurse: true}
 				],
-				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector()`. The legacy adapter does NOT shim this item."
+				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector(""wheels.Bindings"")` (the constructor requires the bindings path). The legacy adapter does NOT shim this item."
 			});
 			// renderPage()/renderPageToString() removed in 4.0 — shimmed by
 			// the optional wheels-legacy-adapter package, but unshimmed apps
@@ -8566,6 +8575,160 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * True when an upgrade from `currentVersion` to `target` crosses 4.2.0:
+	 * the app is below it and the target is at or above it. False when either
+	 * version can't be compared (a development checkout's placeholder).
+	 */
+	public boolean function $upgradeCrosses42(required string currentVersion, required string target) {
+		var versionPattern = "^[vV]?\d+(\.\d+)*([-+][^\r\n]*)?$";
+		if (!reFind(versionPattern, trim(arguments.currentVersion)) || !reFind(versionPattern, trim(arguments.target))) {
+			return false;
+		}
+		var semver = new services.SemVer();
+		return semver.compare(arguments.currentVersion, "4.2.0") < 0 && semver.compare(arguments.target, "4.2.0") >= 0;
+	}
+
+	/**
+	 * The 4.1 → 4.2 upgrade guide. It exists only in the v4-2-0 guide tree, so
+	 * the link is pinned there: GuidesLink.link() would clamp a 4.2 target to
+	 * the latest released tree until the 4.2 guides are marked released, and
+	 * the page isn't in older trees at all.
+	 */
+	private string function $upgradeGuide4x2Url() {
+		return new services.GuidesLink().pinned("v4-2-0", "upgrading/4x-1-to-4x-2/");
+	}
+
+	/**
+	 * The 4.1 → 4.2 checks: app-owned files the 4.2 template changed, and the
+	 * behaviour changes the upgrade guide lists. Severity "breaking" marks an
+	 * item that fails at runtime on 4.2 (an error, a refused request, a failed
+	 * validation); the rest are advisory because the app keeps running but
+	 * behaves differently. Each fix names the guide section to read.
+	 */
+	private array function $upgradeAppendChecks4x2(required array checks, required string target) {
+		var guide = $upgradeGuide4x2Url();
+		// Selecting the environment from anything but WHEELS_ENV: adopting the
+		// 4.2 template drops that selection, and a server without WHEELS_ENV
+		// then starts in development.
+		arrayAppend(arguments.checks, {
+			description: "config/environment.cfm selects the environment without WHEELS_ENV",
+			severity: "breaking",
+			checkType: "envSelection",
+			expect: "logic",
+			fix: "Keep your environment selection when you adopt the 4.2 config/environment.cfm: set WHEELS_ENV on every server before replacing the file, or carry your selection logic into the new file. Replacing it outright makes a server without WHEELS_ENV start in development. Guide: ""config/environment.cfm reads WHEELS_ENV"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "config/environment.cfm hardcodes the environment (4.2 reads WHEELS_ENV)",
+			severity: "advisory",
+			checkType: "envSelection",
+			expect: "literal",
+			fix: "A WHEELS_ENV=production set by the host has no effect while the file hardcodes the environment. Replace it with the 4.2 template's config/environment.cfm, or hardcode production on production servers. Guide: ""config/environment.cfm reads WHEELS_ENV"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "Event templates put blank lines before every response",
+			severity: "advisory",
+			checkType: "eventSilent",
+			files: ["onabort.cfm", "onapplicationend.cfm", "onapplicationstart.cfm", "onrequestend.cfm", "onrequeststart.cfm", "onsessionend.cfm", "onsessionstart.cfm"],
+			// chr(60) keeps a literal tag out of the source (Lucee's tag scanner).
+			fix: "Wrap each listed app/events/ file in " & chr(60) & "cfsilent>..." & chr(60) & "/cfsilent> with no trailing newline, or delete the empty ones. Leave onerror*.cfm, onmaintenance.cfm and onmissingtemplate.cfm alone. Guide: ""Event templates without leading whitespace"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: ".gitignore ignores vendor/ (4.2 apps commit it)",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "^\s*/?vendor/?\s*$",
+			scanTargets: [{path: ".gitignore"}],
+			fix: "Remove the vendor line and commit vendor/, so a clone, CI run or image build has the framework and your packages. Guide: ""Commit vendor/"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "findAll(returnAs=""structs"") now returns an array",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "returnAs\s*=\s*[""']structs?[""']",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			scanTargets: [{path: "tests", extensions: "cfc,cfm", recurse: true}],
+			fix: "Struct functions (StructCount, StructKeyList...) on the result now throw, and for-in loops hand you rows instead of keys. Guide: ""findAll(returnAs=""structs"") returns an array"", #guide#"
+		});
+		if (!$upgradeConfigMatches("trustProxyHeaders\s*=\s*true")) {
+			arrayAppend(arguments.checks, {
+				description: "The app reads X-Forwarded-Proto, but trustProxyHeaders is not set",
+				severity: "advisory",
+				checkType: "grep",
+				pattern: "x[-_]forwarded[-_]proto",
+				scanDir: "app",
+				extensions: "cfc,cfm",
+				scanTargets: [{path: "config", extensions: "cfm,cfc", recurse: true}],
+				fix: "Behind a TLS-terminating proxy, 4.2 builds absolute URLs as http:// unless config/settings.cfm has set(trustProxyHeaders=true). Guide: ""X-Forwarded-Proto needs trustProxyHeaders"", #guide#"
+			});
+		}
+		arrayAppend(arguments.checks, {
+			description: "Validation condition/unless uses is, and, or with this., or this. on the right",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "\b(condition|unless)\s*=\s*[""'][^""']*(\bthis\.[^""']*\s(is|and|or)\s|(==|!=|<>|\s(eq|neq|gt|lt|gte|lte)\s)\s*this\.)",
+			scanDir: "app/models",
+			extensions: "cfc",
+			fix: "4.2 throws Wheels.InvalidValidationCondition for these shapes: replace is with eq (or ==), and with &&, or with ||, and put any this. reference on the left. Guide: ""Validation condition / unless: bare names are resolved"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "Validation condition/unless expressions are evaluated differently",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "\b(condition|unless)\s*=",
+			scanDir: "app/models",
+			extensions: "cfc",
+			fix: "A bare name now means this.<name>: a rule 4.1 skipped may now run, and one that always ran may now be skipped. Run your model specs. Guide: ""Validation condition / unless: bare names are resolved"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "Association joinType is not inner, outer, left or left outer",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "joinType\s*=\s*[""'](?!\s*(inner|outer|left|left outer)\s*[""'])",
+			scanDir: "app/models",
+			extensions: "cfc",
+			fix: "Any other value throws Wheels.InvalidJoinType at application start. Guide: ""Association joinType values are checked"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "A route targets an action named renderNotFound (now a reserved framework helper)",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "renderNotFound",
+			scanTargets: [{path: "config/routes.cfm"}],
+			fix: "A request for that action gets Wheels.ActionNotAllowed. Rename the action and its route. Guide: ""renderNotFound is a framework helper"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "A MySQL datasource sets tinyInt1isBit=false",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "tinyInt1isBit\s*=\s*false",
+			raw: true,
+			scanTargets: [{path: "config", extensions: "cfm,cfc", recurse: true}, {path: "lucee.json"}, {path: "server.json"}, {path: ".env"}],
+			fix: "Existing TINYINT(1) booleans then read as plain integers and fail validation as ""is not a number"". Drop the option, or convert the columns with changeColumn(columnType=""boolean""). Guide: ""MySQL boolean columns are BIT(1)"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "withAdvisoryLock() can now throw Wheels.AdvisoryLockReleaseFailed",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "withAdvisoryLock\s*\(",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			fix: "On MySQL and PostgreSQL a lock that can't be released now throws after the callback finishes. A job that relies on the lock should catch it and alert. Guide: ""withAdvisoryLock() can throw Wheels.AdvisoryLockReleaseFailed"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "LocalDisk storage keys are checked per segment",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "LocalDisk",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			scanTargets: [{path: "config", extensions: "cfm,cfc", recurse: true}],
+			fix: "Keys with a dots-only segment or a drive-letter prefix are now rejected; leading, trailing and doubled slashes are normalised. Check keys built from user input or file names. Guide: ""LocalDisk storage keys are checked per segment"", #guide#"
+		});
+		return arguments.checks;
+	}
+
+	/**
 	 * True when `pattern` matches anywhere in config/ (.cfm/.cfc, recursive),
 	 * with CFML comments stripped first so a commented-out setting doesn't count.
 	 */
@@ -8653,7 +8816,15 @@ component extends="modules.BaseModule" {
 				// block comments collapse and may shift reported line
 				// numbers — same tradeoff other `stripCfmlComments` callers
 				// accept.
-				var content = stripCfmlComments(fileRead(filePath));
+				// `raw: true` scans the file as written: a JDBC URL's `//` would
+				// otherwise read as a line comment and hide the rest of the line.
+				var content = structKeyExists(arguments.check, "raw") && arguments.check.raw ? fileRead(filePath) : stripCfmlComments(fileRead(filePath));
+				// `skipIfFileMatches`: a file that matches it anywhere is not
+				// scanned (the environment.cfm checks skip a file that already
+				// reads WHEELS_ENV, wherever its set() line is).
+				if (structKeyExists(arguments.check, "skipIfFileMatches") && reFindNoCase(arguments.check.skipIfFileMatches, content) > 0) {
+					continue;
+				}
 				var lines = listToArray(content, chr(10), true);
 				for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
 					if (reFindNoCase(arguments.check.pattern, lines[lineNum])) {
@@ -8682,6 +8853,17 @@ component extends="modules.BaseModule" {
 					matched = true;
 					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: matches};
 				}
+			}
+		} else if (arguments.check.checkType == "envSelection") {
+			if ($upgradeEnvSelection() == arguments.check.expect) {
+				matched = true;
+				matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: ["config/environment.cfm"]};
+			}
+		} else if (arguments.check.checkType == "eventSilent") {
+			var loudFiles = $upgradeLoudEventTemplates(arguments.check.files);
+			if (arrayLen(loudFiles)) {
+				matched = true;
+				matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: loudFiles};
 			}
 		} else if (arguments.check.checkType == "templateDiff") {
 			// Compare app-owned template files against the CLI's bundled app
@@ -8713,6 +8895,59 @@ component extends="modules.BaseModule" {
 		}
 
 		return {severity: severity, matched: matched, matchEntry: matchEntry};
+	}
+
+	/**
+	 * How config/environment.cfm chooses the environment, comments stripped:
+	 * "none" when the file is missing, reads WHEELS_ENV, or never calls
+	 * set(environment=); "literal" for exactly one set(environment="...") with
+	 * a plain quoted value and no branching in the file; "logic" for anything
+	 * else (more than one set(), if/switch/ternary, # interpolation, an
+	 * unquoted value). Replacing a "logic" file with the 4.2 template drops
+	 * that selection.
+	 */
+	public string function $upgradeEnvSelection() {
+		var path = variables.projectRoot & "/config/environment.cfm";
+		if (!fileExists(path)) {
+			return "none";
+		}
+		var content = stripCfmlComments(fileRead(path));
+		var setCall = "set\s*\(\s*environment\s*=";
+		var sets = arrayLen(reMatchNoCase(setCall, content));
+		if (!sets || reFindNoCase("WHEELS_ENV", content)) {
+			return "none";
+		}
+		// chr(60) keeps literal CFML tags out of the source (Lucee's tag scanner).
+		var branching = "\bif\s*\(|\bswitch\s*\(|" & chr(60) & "cf(if|elseif|switch)\b|\?";
+		var plainLiteral = setCall & "\s*([""'])[^""'##]*\1\s*\)";
+		if (sets == 1 && reFindNoCase(plainLiteral, content) && !reFindNoCase(branching, content)) {
+			return "literal";
+		}
+		return "logic";
+	}
+
+	/**
+	 * The app/events/ templates among `files` that can write output before a
+	 * response: the file doesn't start with a cfsilent tag, or has anything
+	 * after its closing cfsilent tag (a trailing newline included). Returns
+	 * their app/events/ paths.
+	 */
+	private array function $upgradeLoudEventTemplates(required array files) {
+		var loud = [];
+		var open = chr(60) & "cfsilent";
+		var close = chr(60) & "/cfsilent>";
+		for (var name in arguments.files) {
+			var path = variables.projectRoot & "/app/events/" & name;
+			if (!fileExists(path)) {
+				continue;
+			}
+			var content = fileRead(path);
+			var wrapped = left(content, len(open)) == open && len(content) >= len(close) && right(content, len(close)) == close;
+			if (!wrapped) {
+				arrayAppend(loud, "app/events/" & name);
+			}
+		}
+		return loud;
 	}
 
 	/**

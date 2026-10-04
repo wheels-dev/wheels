@@ -120,6 +120,25 @@ The checks are hard-coded in the CLI and keyed by the major-version transition:
 - *(advisory)* `new wheels.middleware.SecurityHeaders` in `config/` — HSTS defaults on in production in 4.0; pass `hsts=false` if your load balancer already sets it (#2081).
 - *(advisory)* `protectsFromForgery` under `app/` — the CSRF cookie now sets `SameSite`; cross-site POSTs from third-party frames will break (#2035).
 
+**4.1 → 4.2** (an app below 4.2.0, a target of 4.2.0 or later)
+
+The report points at the [4.1 → 4.2 guide](/v4-2-0/upgrading/4x-1-to-4x-2/) instead of saying there are no breaking changes. Unmarked items fail the check; each one fails at runtime on 4.2.
+
+- `config/environment.cfm` that selects the environment from something other than `WHEELS_ENV` (for example `set(environment=application.env.environment)`): replacing it with the 4.2 template drops that selection, and a server without `WHEELS_ENV` then starts in `development`.
+- An association `joinType` other than `inner`, `outer`, `left` or `left outer` under `app/models/`: it throws `Wheels.InvalidJoinType` at application start.
+- A `condition` / `unless` under `app/models/` that uses `is`, `and` or `or` with `this.`, or puts `this.` on the right of a comparison: it throws `Wheels.InvalidValidationCondition`.
+- `renderNotFound` in `config/routes.cfm`: an action with that name now gets `Wheels.ActionNotAllowed`.
+- `tinyInt1isBit=false` in `config/`, `lucee.json`, `server.json` or `.env`: existing MySQL `TINYINT(1)` booleans fail validation.
+- *(advisory)* `config/environment.cfm` that hardcodes the environment.
+- *(advisory)* The seven event templates in `app/events/` that aren't wrapped in `cfsilent` or end with a newline.
+- *(advisory)* A `/vendor` line in `.gitignore`.
+- *(advisory)* `returnAs="structs"` under `app/` or `tests/`.
+- *(advisory)* `X-Forwarded-Proto` read under `app/` or `config/` without `set(trustProxyHeaders=true)`.
+- *(advisory)* Any `condition` / `unless` under `app/models/`.
+- *(advisory)* `withAdvisoryLock()` and `LocalDisk` under `app/` (and `config/` for `LocalDisk`).
+
+The database-specific changes (MySQL `BIT(1)` booleans and signed `t.bigInteger()`, Oracle integer precision, SQLite date columns) depend on your schema, not your source, so the report lists them as something to read in the guide.
+
 **Every run (any version)**
 
 - *(advisory)* App template drift (added in 4.1.0, #3379) — `public/Application.cfc` and `public/index.cfm` are compared byte-for-byte against the CLI's bundled app template (the one `wheels new` scaffolds from). A file that differs, or is missing, is reported by name only; no diff is printed. These files are app-owned, so a `vendor/wheels/` swap never updates them, and drift can mean the app is missing framework-side hardening such as the Adobe teardown guards in `onError`/`onSessionEnd`. Customized apps legitimately drift — diff the files yourself and reconcile, keeping your local changes.
