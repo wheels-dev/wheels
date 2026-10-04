@@ -13174,21 +13174,40 @@ component extends="modules.BaseModule" {
 			classpath &= installDir & "/lib/" & entry.filename;
 		}
 
-		try {
-			cfexecute(
-				name="java",
-				arguments="-cp #classpath# com.microsoft.playwright.CLI install #browserName#",
-				timeout=300,
-				variable="local.stdout",
-				errorVariable="local.stderr"
-			);
-			out("Browser install OK", "green");
-		} catch (any e) {
+		var install = $browserRunProcess(["java", "-cp", classpath, "com.microsoft.playwright.CLI", "install", browserName], 300);
+		if (install.timedOut || install.exitCode != 0) {
 			out("Browser install FAILED", "red");
-			out(local.stderr ?: e.message, "red");
-			return "";
+			out(install.timedOut ? "Playwright's install didn't finish within 300 seconds and was stopped." : trim(install.output), "red");
+			throw(type = "Wheels.BrowserSetupFailed", message = "wheels browser setup: installing the #browserName# binaries failed. See the output above.");
 		}
+		out("Browser install OK", "green");
 
+		return $browserFinishSetup(classpath, browserName);
+	}
+
+	/**
+	 * Launch the browser once and finish `wheels browser setup`: print "ready"
+	 * only when the launch worked; otherwise print Playwright's output and the
+	 * remedy, then throw so the command exits non-zero. Downloading the
+	 * binaries doesn't prove they run: on a bare Linux host the browser can be
+	 * missing OS libraries. Public so specs can drive it with a stubbed probe.
+	 */
+	public string function $browserFinishSetup(required string classpath, required string browserName) {
+		out("Launching #arguments.browserName# to check it runs...");
+		var probe = $browserLaunchProbe(arguments.classpath, arguments.browserName);
+		if (!probe.ok) {
+			out("Browser launch FAILED", "red");
+			if (probe.timedOut) {
+				out("The browser didn't finish starting within #probe.timeoutSeconds# seconds and was stopped.", "red");
+			}
+			if (len(trim(probe.output))) {
+				out(trim(probe.output), "red");
+			}
+			out("");
+			out($browserLaunchRemedy(probe.output, arguments.classpath, arguments.browserName), "yellow");
+			throw(type = "Wheels.BrowserSetupFailed", message = "wheels browser setup: #arguments.browserName# is installed but didn't start. See the output above.");
+		}
+		out("Browser launch OK", "green");
 		out("");
 		out("Browser testing ready.", "green");
 		out("Run: wheels test --filter=browser  (or: wheels browser test)", "green");
@@ -13442,6 +13461,93 @@ component extends="modules.BaseModule" {
 		if (!arguments.verbose && len(arguments.message) > 400) {
 			out("    (truncated; pass --verbose for full output)", "yellow");
 		}
+	}
+
+	/**
+	 * Launch the browser once through Playwright's CLI (a headless screenshot of
+	 * about:blank). It counts as running only when the process finished in
+	 * time, exited 0 and wrote the screenshot; a timed-out run never counts,
+	 * even if a screenshot appeared first. The screenshot is always removed.
+	 * Returns {ok, timedOut, timeoutSeconds, output}.
+	 */
+	public struct function $browserLaunchProbe(required string classpath, required string browserName, numeric timeoutSeconds = 120) {
+		var shot = getTempDirectory() & "wheels-browser-probe-" & createUUID() & ".png";
+		var rv = {ok: false, timedOut: false, timeoutSeconds: arguments.timeoutSeconds, output: ""};
+		try {
+			var run = $browserRunProcess(
+				["java", "-cp", arguments.classpath, "com.microsoft.playwright.CLI", "screenshot", "--browser", arguments.browserName, "about:blank", shot],
+				arguments.timeoutSeconds
+			);
+			rv.output = run.output;
+			rv.timedOut = run.timedOut;
+			rv.ok = !run.timedOut && run.exitCode == 0 && fileExists(shot) && getFileInfo(shot).size > 0;
+		} finally {
+			if (fileExists(shot)) {
+				fileDelete(shot);
+			}
+		}
+		return rv;
+	}
+
+	/**
+	 * Run a command (an argv array, so paths with spaces stay one argument) and
+	 * wait at most `timeoutSeconds`. On timeout the process and everything it
+	 * started are killed. Output (stdout and stderr together) goes through a
+	 * temp file, so a chatty process can't block on a full pipe. Returns
+	 * {exitCode, timedOut, output}. Public so specs can check the timeout.
+	 */
+	public struct function $browserRunProcess(required array argv, required numeric timeoutSeconds) {
+		var logFile = getTempDirectory() & "wheels-browser-run-" & createUUID() & ".log";
+		var rv = {exitCode: -1, timedOut: false, output: ""};
+		try {
+			var builder = createObject("java", "java.lang.ProcessBuilder").init(arguments.argv);
+			builder.redirectErrorStream(true);
+			builder.redirectOutput(createObject("java", "java.io.File").init(logFile));
+			var process = builder.start();
+			var seconds = createObject("java", "java.util.concurrent.TimeUnit").SECONDS;
+			if (process.waitFor(javaCast("long", arguments.timeoutSeconds), seconds)) {
+				rv.exitCode = process.exitValue();
+			} else {
+				rv.timedOut = true;
+				$browserKillProcessTree(process);
+			}
+			rv.output = fileExists(logFile) ? fileRead(logFile) : "";
+		} finally {
+			if (fileExists(logFile)) {
+				fileDelete(logFile);
+			}
+		}
+		return rv;
+	}
+
+	/**
+	 * Kill a process and every process it started, then wait briefly for it to
+	 * go. The parent goes first, so it can't react to a child's death (a shell
+	 * would run its next command); the children are listed before that, while
+	 * they are still its descendants.
+	 */
+	private void function $browserKillProcessTree(required any process) {
+		var children = arguments.process.descendants().toArray();
+		arguments.process.destroyForcibly();
+		for (var child in children) {
+			child.destroyForcibly();
+		}
+		arguments.process.waitFor(javaCast("long", 5), createObject("java", "java.util.concurrent.TimeUnit").SECONDS);
+	}
+
+	/**
+	 * What to do after a failed launch probe. When Playwright reports missing
+	 * host libraries (a bare Linux install), print its install-deps command for
+	 * this install's classpath; otherwise point at the output above.
+	 * Public so specs can check the text.
+	 */
+	public string function $browserLaunchRemedy(required string output, required string classpath, required string browserName) {
+		if (findNoCase("missing dependencies", arguments.output) || findNoCase("install-deps", arguments.output)) {
+			return "The browser is installed but the system is missing libraries it needs. On Debian/Ubuntu, install them with:" & chr(10)
+				& "  sudo java -cp ""#arguments.classpath#"" com.microsoft.playwright.CLI install-deps #arguments.browserName#" & chr(10)
+				& "then run wheels browser setup again.";
+		}
+		return "The browser was installed but didn't start; see the output above. Run wheels browser setup --force to reinstall, then try again.";
 	}
 
 	/**
