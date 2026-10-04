@@ -127,7 +127,8 @@ The simplest way to drain the queue is the bundled worker — a long-lived CLI p
 wheels jobs work                               # process all queues; loops until Ctrl-C
 wheels jobs work --queue=mailers               # only drain the mailers queue
 wheels jobs work --queue=mailers --interval=3  # poll every 3 seconds when idle (default 5)
-wheels jobs work --max-jobs=100                # stop after 100 jobs — one-shot batches from cron or CI
+wheels jobs work --stop-when-empty              # exit once no job is ready to run — one-shot batches from cron or CI
+wheels jobs work --max-jobs=100                # stop after 100 jobs (combine with --stop-when-empty to cap a batch)
 wheels jobs work --quiet                       # suppress per-job output; failures still print
 ```
 

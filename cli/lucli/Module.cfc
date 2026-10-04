@@ -588,6 +588,7 @@ component extends="modules.BaseModule" {
 			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. Empty = all queues")
 			.option(name = "interval", default = 5, type = "numeric", description = "work only: seconds to wait between polls when no job is available")
 			.option(name = "max-jobs", default = 0, type = "numeric", description = "work only: stop after this many jobs (successes + failures count). 0 = run until stopped")
+			.flag(name = "stop-when-empty", default = false, description = "work only: exit when a poll finds no job ready to run, instead of waiting for more. For one-shot batches from cron or CI; combines with --max-jobs")
 			.flag(name = "quiet", default = false, description = "work only: suppress per-job completion output, only print failures")
 			.option(name = "format", default = "table", description = "status only: output format, table or json");
 	}
@@ -5545,6 +5546,7 @@ component extends="modules.BaseModule" {
 			queue = trim(parsed.queue),
 			interval = parsed.interval,
 			maxJobs = parsed["max-jobs"],
+			stopWhenEmpty = parsed["stop-when-empty"],
 			quiet = parsed.quiet,
 			format = lCase(trim(parsed.format))
 		};
@@ -5601,7 +5603,7 @@ component extends="modules.BaseModule" {
 				);
 			default:
 				out("Unknown jobs action: #opts.action#", "red");
-				out("Usage: wheels jobs [work|status] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--quiet] [--format=table|json]");
+				out("Usage: wheels jobs [work|status] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--format=table|json]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
 		}
 	}
@@ -5629,6 +5631,9 @@ component extends="modules.BaseModule" {
 		out("Poll interval: #arguments.opts.interval#s");
 		if (arguments.opts.maxJobs > 0) {
 			out("Max jobs: #arguments.opts.maxJobs#");
+		}
+		if (arguments.opts.stopWhenEmpty) {
+			out("Stops when no job is ready to run");
 		}
 		out("Press Ctrl+C to stop");
 		out("");
@@ -5677,10 +5682,13 @@ component extends="modules.BaseModule" {
 			}
 
 			if (arguments.opts.maxJobs > 0 && (counters.processed + counters.failed) >= arguments.opts.maxJobs) {
-				out("");
-				out("Reached max jobs limit (#arguments.opts.maxJobs#). Shutting down.", "green");
-				out("Processed: #counters.processed# | Failed: #counters.failed#");
-				return "";
+				return $jobsWorkStop("Reached max jobs limit (#arguments.opts.maxJobs#). Shutting down.", counters);
+			}
+			// --stop-when-empty: an idle poll means nothing is ready to run, so
+			// a cron or CI batch is done. Without it the worker waits for more,
+			// which is what a supervised long-lived worker wants.
+			if (idle && arguments.opts.stopWhenEmpty) {
+				return $jobsWorkStop("No job ready to run. Shutting down.", counters);
 			}
 
 			// Only sleep when the queue was empty — back-to-back pending jobs
@@ -5690,6 +5698,17 @@ component extends="modules.BaseModule" {
 				sleep(arguments.opts.interval * 1000);
 			}
 		}
+	}
+
+	/**
+	 * Print why the worker loop is ending, plus its counts, and return "" for
+	 * runJobsWork() to return.
+	 */
+	private string function $jobsWorkStop(required string reason, required struct counters) {
+		out("");
+		out(arguments.reason, "green");
+		out("Processed: #arguments.counters.processed# | Failed: #arguments.counters.failed#");
+		return "";
 	}
 
 	/**
