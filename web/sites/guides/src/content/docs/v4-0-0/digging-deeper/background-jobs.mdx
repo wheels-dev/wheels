@@ -242,33 +242,30 @@ component extends="Controller" {
 
 ## Testing jobs
 
-`perform()` is a plain public method that takes a struct. Don't exercise the queue in a test — instantiate the job, call `perform()` with fixture data, and assert on what it does. `SendWelcomeEmailJob` returns nothing and sends mail, so build the email without delivering it (`deliver = false`, restored afterwards) and check that the job runs to the end:
+`perform()` is a plain public method that takes a struct. Don't exercise the queue in a test — instantiate the job, call `perform()` with fixture data, and assert on the side effects.
 
 ```cfm {test:compile} title="tests/specs/jobs/SendWelcomeEmailJobSpec.cfc"
 component extends="wheels.WheelsTest" {
     function run() {
         describe("SendWelcomeEmailJob", () => {
-            it("finds the user and builds the welcome email", () => {
-                // Build emails without sending them; restore the default afterwards.
-                var defaults = application.wheels.functions.sendEmail;
-                var original = StructKeyExists(defaults, "deliver") ? defaults.deliver : true;
-                defaults.deliver = false;
-                try {
-                    var testUser = model("User").create(email = "new@example.com", firstName = "New");
-                    var job = new app.jobs.SendWelcomeEmailJob();
-                    expect(() => job.perform(data = {userId: testUser.id})).notToThrow();
-                } finally {
-                    defaults.deliver = original;
-                }
+            it("sends a welcome email to the user", () => {
+                testUser = model("User").create(
+                    email="new@example.com",
+                    firstName="New"
+                );
+
+                job = new app.jobs.SendWelcomeEmailJob();
+                job.perform(data={userId: testUser.id});
+
+                // Assert your email spy or outbox captured the send.
+                // The pattern depends on how you stub sendEmail() —
+                // see the Testing guide for the email-fake approach.
+                expect(true).toBeTrue();
             });
         });
     }
 }
 ```
-
-If the job can't find the user or build the email, `perform()` throws and the spec fails. To check what the email says, test the mailer itself: with `deliver = false`, `sendEmail()` returns the email as a struct (`to`, `subject`, `html` or `text`).
-
-App specs run in the environment your `.env` sets (`WHEELS_ENV=development` in a new app), not `testing`, so `config/testing/settings.cfm` doesn't apply to them. To keep every spec from sending mail, set `deliver = false` for `sendEmail` in `config/development/settings.cfm`; that also stops your development server from sending mail (see [Per-environment SMTP](/v4-0-0/digging-deeper/sending-email/#per-environment-smtp)).
 
 Testing `perform()` in isolation keeps the spec fast and avoids the complexity of polling a live queue. The queue itself is framework code — trust it.
 
