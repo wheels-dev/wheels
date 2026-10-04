@@ -320,6 +320,21 @@ After `save()` the instance's primary key is populated and any property you set 
 
 This is rarely needed. Most apps don't use DB-computed columns, and when they do, the reload is usually only required in tests or in flows that show the record back to the user immediately.
 
+## Automatic timestamps
+
+`createdAt` and `updatedAt` are set for you on create and update, in UTC: the `timeStampMode` setting defaults to `"utc"`. The other values are `"local"` (the server's time) and `"epoch"`; change it with `set(timeStampMode = "local")` in `config/settings.cfm`.
+
+The values come back without a time zone. Rendered as is (for example in JSON), a date is labeled with the server's UTC offset, which is wrong for a UTC value. Format timestamps explicitly where you output them; with the default mode the stored value is UTC:
+
+```cfm {test:compile} title="app/models/Widget.cfc (fragment)"
+component extends="Model" {
+    // ISO-8601 in UTC, for JSON responses. Assumes the default timeStampMode ("utc").
+    public string function createdAtIso() {
+        return DateTimeFormat(this.createdAt, "yyyy-mm-dd'T'HH:nn:ss") & "Z";
+    }
+}
+```
+
 ## Related guides
 
 <CardGrid>
