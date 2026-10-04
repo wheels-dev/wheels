@@ -131,6 +131,12 @@ Wrap these seven files in `<cfsilent>…</cfsilent>` with no trailing newline, o
 
 **Fails safe** on the machine that has `vendor/`. A fresh clone of an app that ignores it has no framework and nothing to restore it from. Remove the `/vendor/` line from `.gitignore` and commit `vendor/`. Check `git status` first: `vendor/` should hold `wheels/` and your packages, not a backup of the old framework.
 
+### Dead format rule in `public/urlrewrite.xml` (optional)
+
+The "Convert dot to format parameter" rule is gone from the shipped `urlrewrite.xml` ([#4132](https://github.com/wheels-dev/wheels/issues/4132)). Its regex had doubled backslashes, so it never matched a normal URL, and format suffixes such as `/posts.json` work because the router reads them from the path.
+
+**Fails safe:** the rule does nothing. Delete it from your `public/urlrewrite.xml` if you like.
+
 ### AI coding docs (optional)
 
 The `CLAUDE.md` that ships with apps is now under 8 KB, with its reference topics in `.ai/<topic>.md` and an `AGENTS.md` that points agents at them ([#3960](https://github.com/wheels-dev/wheels/issues/3960)). Apps installed from the 4.x `wheels-base-template` download also got the framework maintainers' docs instead of the application-developer ones ([#3947](https://github.com/wheels-dev/wheels/issues/3947)).
@@ -172,6 +178,12 @@ Some clients send their requests to the live application:
 For a test server on another host name, set `testClientBaseUrl` or use `$testClient()`. If your suite runs in a Docker container that publishes the server on a different port (`-p 8080:60007`), set `testClientBaseUrl` to the address inside the container; see [Setting the test client's base URL](/v4-2-0/testing/controller-tests/#setting-the-test-clients-base-url). To address the live application from a spec on purpose, pass `testContext=false` to `$testClient()` or to `new wheels.wheelstest.TestClient()`.
 
 If a `TestClient` subclass or a test helper in your app sets the `X-Wheels-Test-Context` header or the `WHEELS_TEST_CONTEXT` cookie itself (a pattern from 4.1), delete those lines. `TestClient` and `$testClient()` now send the test context for you, and a value set by hand replaces theirs, so the requests reach the live application and its primary datasource (errors such as a missing table).
+
+The framework's own suite (`/wheels/core/tests`) follows the same rule more strictly: it ignores `allowTestsAgainstPrimaryDatasource` ([#4254](https://github.com/wheels-dev/wheels/pull/4254)). Without `<datasource>_test` it refuses to run and logs that the setting was ignored; only an explicit `useTestDB=false` runs it against the primary datasource. Its `populate.cfm` drops and recreates tables, so it never reaches your real data through the setting.
+
+A test run keeps the runner's 30-minute request timeout ([#4263](https://github.com/wheels-dev/wheels/pull/4263)). The `tests/populate.cfm` that 4.1's `wheels new` created starts with `<cfsetting requestTimeOut="300">`; the 4.2 runner restores its own limit after your `populate.cfm` runs, so you can leave the line or delete it. A run that is stopped before it finishes is now reported as an error, and says when the request timeout stopped it, instead of 0 passed, 0 failed, 0 errors.
+
+Browser specs that don't run no longer count as passed. Without Playwright (or in CI without `WHEELS_BROWSER_CI_ENABLE`), each `browserDescribe()` spec is reported as skipped, with the reason, and `wheels test` reports the skips (`2 passed, 1 skipped`) instead of a clean pass. When Playwright is installed but the browser can't start, each one is an error unless `WHEELS_BROWSER_SKIP_LAUNCH_FAILURES=true`. A CI job that ran browser specs without a browser now shows them; see [Browser tests](/v4-2-0/testing/browser-tests/).
 
 ### `findAll(returnAs="structs")` returns an array
 
@@ -228,6 +240,8 @@ t.bigInteger(columnNames = "accountId", unsigned = true);
 
 On Oracle, new `t.integer()`, `t.references()` and `id` columns are `NUMBER(10)`, new `t.bigInteger()` columns are `NUMBER(19)`, and new `t.boolean()` columns before Oracle 23ai are `NUMBER(1)` ([#4097](https://github.com/wheels-dev/wheels/issues/4097)). Earlier releases created a bare `NUMBER`, which binds as a decimal and validates as a float. The new columns validate as integers, so a fractional value such as `1.5` now fails automatic validation instead of being stored. Existing columns are unchanged and keep their current typing, and `changeColumn()` without a `precision` argument keeps a column's current precision, so it never re-types one. To convert one, see [Integer columns on Oracle](/v4-2-0/basics/migrations/).
 
+On Oracle 23ai and later, new `t.boolean()` columns are a native `BOOLEAN` ([#4057](https://github.com/wheels-dev/wheels/pull/4057)), which the model maps to `cf_sql_bit`; earlier Oracle releases get `NUMBER(1)` as above. Existing numeric boolean columns are unchanged.
+
 ### SQLite date columns are validated as dates
 
 On SQLite, new `t.date()`, `t.datetime()`, `t.time()` and `t.timestamp()` columns are declared `DATE`, `DATETIME` and `TIME` instead of `TEXT` ([#4093](https://github.com/wheels-dev/wheels/issues/4093)). The model validates them as dates, so automatic validations now reject a value such as `"not a date"` that earlier releases stored. Values are still stored as ISO-8601 text, exactly as before. Existing `TEXT` date columns are unchanged: they keep the old check, which treats a `TEXT` column as a date only when its name is a word such as `created`, `updated` or `date`, so a column like `publishedAt` gets no date check. To give an existing column the new behaviour, convert it in a migration with `changeColumn(columnType="datetime")` (or `"date"`). ISO-8601 text is kept as it is. Converting to any date type also rewrites older values in that column: the CFML date literals `{ts 'X'}`, `{d 'D'}` and `{t 'T'}` become `X`, `D 00:00:00` and `1899-12-30 T`, and bare text that is exactly `YYYY-MM-DD` or `HH:MM:SS` becomes `YYYY-MM-DD 00:00:00` or `1899-12-30 HH:MM:SS`. Any other value is copied unchanged.
@@ -276,6 +290,26 @@ An empty-string value in a `where` condition now binds as a real `''` ([#4055](h
 - On Oracle, which stores `''` as NULL, an empty-string comparison still matches no rows.
 
 To find affected code, search `app/` for `= ''`, `<> ''`, `!= ''`, for `where` strings that interpolate a value that may be empty (especially `params.*` values and `updateAll()` / `deleteAll()` calls), and for dynamic finders (`findOneBy…`, `findAllBy…`) called with request values.
+
+### Date values in `where()` and dynamic finders match on SQLite
+
+On SQLite, a date passed to the query builder (`where()`, `whereBetween()`, `whereIn()`) or to a dynamic finder (`findOneByPublishedAt(date)`) now compares as a date ([#4281](https://github.com/wheels-dev/wheels/pull/4281)). It used to reach the SQL as its CFML literal (`{ts '...'}`), which never matched a stored date, so the query returned no rows. Code that relied on such a query finding nothing now gets the matching rows. Other databases already matched; they now receive the plain date text.
+
+### `enqueue()` throws `Wheels.Job.EnqueueFailed`
+
+`enqueue()`, `enqueueIn()` and `enqueueAt()` throw `Wheels.Job.EnqueueFailed` when the job can't be written to the job store ([#4266](https://github.com/wheels-dev/wheels/pull/4266)). In 4.1 they returned a struct with `persisted: false`, which was easy to miss, so failed enqueues went unnoticed. One cause is enqueueing inside a transaction on another datasource (a tenant's), which some engines refuse. Remove checks of the returned `persisted` key; where an enqueue is best-effort, wrap it in `try` / `catch (Wheels.Job.EnqueueFailed e)`.
+
+### The job table gains a `claimTimeout` column
+
+A worker now records the `timeout` it claimed a job with, and a stale job is reaped on the claiming worker's timeout rather than the polling worker's, so workers with different timeouts can share a queue ([#3989](https://github.com/wheels-dev/wheels/issues/3989)). The `wheels_jobs.claimTimeout` column is added for you on first use, including to tables created by 4.1. If the database user can't run `ALTER TABLE`, the worker falls back to the polling worker's timeout and retries the change after a back-off; grant the privilege once (or add the column yourself) to get the new behaviour.
+
+### CSRF accepts the `X-CSRF-Token` header on any request
+
+A valid `X-CSRF-Token` header now passes CSRF protection on any non-GET request ([#3959](https://github.com/wheels-dev/wheels/issues/3959)). In 4.1 the header was read only when the request also sent `X-Requested-With: XMLHttpRequest`, which Turbo and `fetch()` don't send. Nothing breaks: clients that send both keep working, and a request passes when either the form field or the header holds a valid token. `startFormTag()` and `buttonTo()` gain `authenticityToken=false` to leave the hidden field out of markup that is cached and shared.
+
+### An empty `default` on a non-string column means no default
+
+In a migration, `default=""` on a column that isn't string-like (`bigInteger`, `binary`, `uniqueidentifier`, `integer`, `decimal`, `float`, `date` and so on) now means "no default" ([#4248](https://github.com/wheels-dev/wheels/pull/4248)). It renders as `DEFAULT NULL` when the column allows null and as no `DEFAULT` clause on a `NOT NULL` column. In 4.1, `bigInteger` and `uniqueidentifier` emitted a bare `DEFAULT`, `binary` emitted `DEFAULT ''`, and a `NOT NULL` column got `DEFAULT NULL NOT NULL`, which MySQL rejects; those migrations failed. They now run. Migrations that already worked produce the same schema.
 
 ### `withAdvisoryLock()` can throw `Wheels.AdvisoryLockReleaseFailed`
 
