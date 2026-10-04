@@ -107,6 +107,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("demo and wheels-new Application.cfc include testcontext.cfm after config/app.cfm", () => {
+					$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 					// Resolve the demo app via the /config mapping. Do not walk
 					// GetDirectoryFromPath() on an already-directory path —
 					// a trailing slash is a no-op walk on Lucee, which left
