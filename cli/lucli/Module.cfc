@@ -8883,6 +8883,11 @@ component extends="modules.BaseModule" {
 			);
 		}
 
+		// A box.json that pins wheels-core must be updatable before anything
+		// changes: left at the old version, a later `box install` copies the
+		// old framework back over vendor/wheels/.
+		var boxPin = $upgradeApplyBoxPin(upgrader);
+
 		out("Source:  #sourceDir#");
 		out("Target:  #vendorDir#");
 		out("");
@@ -8942,6 +8947,7 @@ component extends="modules.BaseModule" {
 			summary &= "Backup:  #result.backupDir#" & nl;
 			summary &= "Recover with:  rm -rf ""#vendorDir#"" && mv ""#result.backupDir#"" ""#vendorDir#""" & nl;
 		}
+		summary &= $upgradeApplyUpdateBoxPin(upgrader, boxPin, result.newVersion);
 
 		// Surface root-level manifest files the user may want to review
 		// after the upgrade — version refs, dependencies, etc.
@@ -9025,6 +9031,76 @@ component extends="modules.BaseModule" {
 		}
 
 		return "";
+	}
+
+	/**
+	 * Read box.json's wheels-core pin before `wheels upgrade apply` changes
+	 * anything. A box.json that can't be read is refused here: its old pin
+	 * would stay, and a later `box install` copies that framework back over
+	 * vendor/wheels/. Returns the pin (plus its path) for the post-swap update.
+	 */
+	private struct function $upgradeApplyBoxPin(required any upgrader) {
+		var boxPath = variables.projectRoot & "/box.json";
+		var pin = arguments.upgrader.readBoxJsonCorePin(boxPath);
+		if (len(pin.error)) {
+			out(pin.error, "red");
+			out("Fix box.json (or remove its wheels-core dependency), then re-run wheels upgrade apply. Nothing was changed.");
+			throw(type = "Wheels.UpgradeApplyFailed", message = pin.error & " Nothing was changed.");
+		}
+		pin.path = boxPath;
+		return pin;
+	}
+
+	/**
+	 * After the swap, point box.json's wheels-core pins at the framework now in
+	 * vendor/wheels/, so a later `box install` keeps it instead of copying
+	 * the old version back over it. Returns the summary lines, or "" when
+	 * box.json doesn't declare wheels-core. A version that isn't a release
+	 * number (a development checkout's placeholder) is never written.
+	 * Public so specs can drive it with a real version.
+	 */
+	public string function $upgradeApplyUpdateBoxPin(required any upgrader, required struct pin, required string newVersion) {
+		var nl = chr(10);
+		if (!arguments.pin.declared) {
+			return "";
+		}
+		if (!reFind("^\d+\.\d+", arguments.newVersion)) {
+			return "box.json: wheels-core left at #arguments.pin.value# (the new framework reports version ""#arguments.newVersion#"", not a release number). Set it to the installed version yourself, or box install copies #arguments.pin.value# back over vendor/wheels/." & nl;
+		}
+		var lines = "";
+		for (var entry in arguments.pin.pins) {
+			lines &= $upgradeApplyRepinOne(arguments.upgrader, arguments.pin.path, entry, arguments.newVersion) & nl;
+		}
+		return lines;
+	}
+
+	/**
+	 * Update one box.json wheels-core pin (one section) and return its summary
+	 * line. A spec apply doesn't rewrite (4.x, >=4.0.0, a channel, a forgebox
+	 * spec) gets a warning with the exact line to set; a change is reported
+	 * only when a value was actually written.
+	 */
+	private string function $upgradeApplyRepinOne(required any upgrader, required string path, required struct entry, required string newVersion) {
+		var label = arguments.entry.section == "dependencies" ? "box.json" : "box.json (#arguments.entry.section#)";
+		var newValue = arguments.upgrader.boxJsonCorePinFor(arguments.entry.value, arguments.newVersion);
+		if (!len(newValue)) {
+			return "#label#: wheels-core is ""#arguments.entry.value#"", which apply doesn't rewrite. If box install should keep this framework, change it to ""wheels-core"": ""#arguments.newVersion#"".";
+		}
+		if (newValue == arguments.entry.value) {
+			return "#label#: wheels-core already #newValue#";
+		}
+		var written = 0;
+		try {
+			written = arguments.upgrader.writeBoxJsonCorePin(arguments.path, newValue, arguments.entry.section);
+		} catch (any e) {
+			var failure = "vendor/wheels/ is now #arguments.newVersion#, but box.json could not be updated (#e.message#). Set its wheels-core dependency to ""#newValue#"" yourself, or box install copies #arguments.entry.value# back over vendor/wheels/.";
+			out(failure, "red");
+			throw(type = "Wheels.UpgradeApplyFailed", message = failure);
+		}
+		if (!written) {
+			return "#label#: wheels-core could not be located to rewrite. Set it to ""#newValue#"" yourself, or box install copies #arguments.entry.value# back over vendor/wheels/.";
+		}
+		return "#label#: wheels-core #arguments.entry.value# -> #newValue# (so box install keeps this framework)";
 	}
 
 	/**

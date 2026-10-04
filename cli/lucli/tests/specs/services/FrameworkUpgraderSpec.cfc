@@ -214,6 +214,81 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 		});
 
+		describe("FrameworkUpgrader box.json wheels-core pin", () => {
+
+			afterEach(() => $cleanupTempDirs());
+
+			it("reads the pin from dependencies or devDependencies", () => {
+				var dir = newTempDir("pin");
+				expect(upgrader.readBoxJsonCorePin(dir & "/box.json").declared).toBeFalse();
+				fileWrite(dir & "/box.json", '{"dependencies":{"wheels-core":"^3.0.1"}}');
+				var pin = upgrader.readBoxJsonCorePin(dir & "/box.json");
+				expect(pin.declared).toBeTrue();
+				expect(pin.value).toBe("^3.0.1");
+				fileWrite(dir & "/box.json", '{"devDependencies":{"wheels-core":"4.1.2"}}');
+				expect(upgrader.readBoxJsonCorePin(dir & "/box.json").value).toBe("4.1.2");
+				fileWrite(dir & "/box.json", '{"installPaths":{"wheels-core":"vendor/wheels/"}}');
+				expect(upgrader.readBoxJsonCorePin(dir & "/box.json").declared).toBeFalse();
+			});
+
+			it("reports a box.json that isn't a JSON object", () => {
+				var dir = newTempDir("pin");
+				fileWrite(dir & "/box.json", '{"dependencies":');
+				expect(upgrader.readBoxJsonCorePin(dir & "/box.json").error).toInclude("not valid JSON");
+				fileWrite(dir & "/box.json", '[1,2]');
+				expect(upgrader.readBoxJsonCorePin(dir & "/box.json").error).toInclude("not valid JSON");
+			});
+
+			it("lists each section's pin with its own value", () => {
+				var dir = newTempDir("pin");
+				fileWrite(dir & "/box.json", '{"dependencies":{"wheels-core":"^3.0.1"},"devDependencies":{"wheels-core":"~3.0.0"}}');
+				var pins = upgrader.readBoxJsonCorePin(dir & "/box.json").pins;
+				expect(arrayLen(pins)).toBe(2);
+				expect(pins[1].section).toBe("dependencies");
+				expect(pins[1].value).toBe("^3.0.1");
+				expect(pins[2].section).toBe("devDependencies");
+				expect(pins[2].value).toBe("~3.0.0");
+			});
+
+			it("doesn't rewrite a range, channel or forgebox spec", () => {
+				for (var spec in ["4.x", ">=4.0.0", "be", "stable", "forgebox:wheels-core@3.0.1", "*", ""]) {
+					expect(upgrader.boxJsonCorePinFor(spec, "4.2.0")).toBe("", "spec: " & spec);
+				}
+			});
+
+			it("rewrites only the named section", () => {
+				var dir = newTempDir("pin");
+				var before = '{"dependencies":{"wheels-core":"^3.0.1"},"devDependencies":{"wheels-core":"~3.0.0"}}';
+				fileWrite(dir & "/box.json", before);
+				expect(upgrader.writeBoxJsonCorePin(dir & "/box.json", "~4.2.0", "devDependencies")).toBe(1);
+				expect(fileRead(dir & "/box.json")).toBe(replace(before, '"~3.0.0"', '"~4.2.0"'));
+			});
+
+			it("keeps a ^ or ~ range for a release and pins a prerelease exactly", () => {
+				expect(upgrader.boxJsonCorePinFor("^3.0.1", "4.2.0")).toBe("^4.2.0");
+				expect(upgrader.boxJsonCorePinFor("~3.0.1", "4.2.0")).toBe("~4.2.0");
+				expect(upgrader.boxJsonCorePinFor("3.0.1", "4.2.0")).toBe("4.2.0");
+				expect(upgrader.boxJsonCorePinFor("^3.0.1", "4.2.0-snapshot.2867")).toBe("4.2.0-snapshot.2867");
+			});
+
+			it("rewrites only the dependency values and leaves the rest of the file as it was", () => {
+				var dir = newTempDir("pin");
+				var before = '{' & chr(10)
+					& '  "name": "app",' & chr(10)
+					& '  "dependencies": { "wheels-core": "^3.0.1", "other": "1.0.0" },' & chr(10)
+					& '  "devDependencies": {"wheels-core" :"3.0.1"},' & chr(10)
+					& '  "installPaths": { "wheels-core": "vendor/wheels/" }' & chr(10)
+					& '}' & chr(10);
+				fileWrite(dir & "/box.json", before);
+				// A version starting with a digit right after the kept prefix
+				// must not be read as a regex group reference.
+				var count = upgrader.writeBoxJsonCorePin(dir & "/box.json", "14.2.0");
+				expect(count).toBe(2);
+				var expected = replace(replace(before, '"wheels-core": "^3.0.1"', '"wheels-core": "14.2.0"'), '"wheels-core" :"3.0.1"', '"wheels-core" :"14.2.0"');
+				expect(fileRead(dir & "/box.json")).toBe(expected);
+			});
+		});
+
 		describe("FrameworkUpgrader.validateSwap", () => {
 
 			afterEach(() => $cleanupTempDirs());

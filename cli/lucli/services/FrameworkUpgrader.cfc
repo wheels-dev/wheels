@@ -294,6 +294,105 @@ component {
 	}
 
 	/**
+	 * Read the wheels-core pins from a CommandBox box.json. Returns
+	 * {declared, value, pins, error}: `pins` lists {section, value} for each of
+	 * `dependencies` and `devDependencies` that names wheels-core, `declared`
+	 * is true when there is at least one, and `value` is the first one's
+	 * value. `error` is non-empty when the file exists but isn't a JSON object
+	 * (a later `box install` couldn't read it either, so apply refuses before
+	 * touching anything).
+	 */
+	public struct function readBoxJsonCorePin(required string boxJsonPath) {
+		var rv = {declared: false, value: "", pins: [], error: ""};
+		if (!fileExists(arguments.boxJsonPath)) {
+			return rv;
+		}
+		var raw = fileRead(arguments.boxJsonPath, "utf-8");
+		if (!isJSON(raw) || !isStruct(deserializeJSON(raw))) {
+			rv.error = "box.json is not valid JSON, so its wheels-core version can't be updated: " & arguments.boxJsonPath;
+			return rv;
+		}
+		var box = deserializeJSON(raw);
+		for (var section in ["dependencies", "devDependencies"]) {
+			if (structKeyExists(box, section) && isStruct(box[section]) && structKeyExists(box[section], "wheels-core")) {
+				var value = isSimpleValue(box[section]["wheels-core"]) ? box[section]["wheels-core"] : "";
+				arrayAppend(rv.pins, {section: section, value: value});
+				if (!rv.declared) {
+					rv.declared = true;
+					rv.value = value;
+				}
+			}
+		}
+		return rv;
+	}
+
+	/**
+	 * The box.json value that pins wheels-core to `newVersion`, or "" when the
+	 * old value isn't one apply rewrites. Only an exact version or a ^ / ~
+	 * range is rewritten: anything else (4.x, >=4.0.0, a channel such as be,
+	 * a forgebox:...@ spec) says something about the user's intent that a bare
+	 * version would lose, so the caller warns instead. A release version keeps
+	 * the ^ or ~; a prerelease such as 4.2.0-snapshot.2867 is pinned exactly,
+	 * because a range could let `box install` resolve a different build.
+	 */
+	public string function boxJsonCorePinFor(required string oldValue, required string newVersion) {
+		if (!reFind("^\s*[\^~]?\d+(\.\d+){1,2}([-+][0-9A-Za-z.+-]+)?\s*$", arguments.oldValue)) {
+			return "";
+		}
+		if (find("-", arguments.newVersion)) {
+			return arguments.newVersion;
+		}
+		var prefix = reFind("^\s*[\^~]", arguments.oldValue) ? left(trim(arguments.oldValue), 1) : "";
+		return prefix & arguments.newVersion;
+	}
+
+	/**
+	 * Rewrite the wheels-core value inside box.json's `dependencies` and
+	 * `devDependencies` objects (or only `section`, when given) to `newValue`.
+	 * Everything else stays byte for
+	 * byte, including an `installPaths` entry that also names wheels-core:
+	 * re-serializing would reorder and reformat the user's file. Returns the
+	 * number of values rewritten.
+	 */
+	public numeric function writeBoxJsonCorePin(required string boxJsonPath, required string newValue, string section = "") {
+		var raw = fileRead(arguments.boxJsonPath, "utf-8");
+		var state = {count: 0};
+		var sections = len(arguments.section) ? [arguments.section] : ["dependencies", "devDependencies"];
+		for (var section in sections) {
+			var match = reFind('"' & section & '"\s*:\s*\{[^{}]*\}', raw, 1, true);
+			if (match.pos[1] > 0) {
+				var block = $repinBlock(mid(raw, match.pos[1], match.len[1]), arguments.newValue, state);
+				var head = match.pos[1] > 1 ? left(raw, match.pos[1] - 1) : "";
+				raw = head & block & mid(raw, match.pos[1] + match.len[1], len(raw));
+			}
+		}
+		if (state.count) {
+			fileWrite(arguments.boxJsonPath, raw, "utf-8");
+		}
+		return state.count;
+	}
+
+	/**
+	 * Replace the value of each "wheels-core": "<value>" pair in one JSON
+	 * object's text, by position (a regex replacement string would read
+	 * "\1" followed by a version's digits as a two-digit group reference).
+	 * Adds the number of pairs replaced to state.count.
+	 */
+	private string function $repinBlock(required string block, required string newValue, required struct state) {
+		var pair = '("wheels-core"\s*:\s*")[^"]*"';
+		var out = "";
+		var pos = 1;
+		var match = reFind(pair, arguments.block, pos, true);
+		while (match.pos[1] > 0) {
+			out &= mid(arguments.block, pos, match.pos[2] + match.len[2] - pos) & arguments.newValue & '"';
+			pos = match.pos[1] + match.len[1];
+			arguments.state.count++;
+			match = reFind(pair, arguments.block, pos, true);
+		}
+		return out & mid(arguments.block, pos, len(arguments.block));
+	}
+
+	/**
 	 * Atomic-ish directory rename via Java's File.renameTo. CFML's
 	 * directoryRename isn't available on every engine the CLI may host
 	 * under, and the cross-filesystem semantics are inconsistent — falling
