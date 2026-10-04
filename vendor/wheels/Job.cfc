@@ -214,6 +214,20 @@ component {
 	}
 
 	/**
+	 * Internal: A job that could not be written to the job store is an error, never a
+	 * silent loss: the caller gets Wheels.Job.EnqueueFailed. A common cause is enqueueing
+	 * inside a transaction on another datasource (a tenant's), which some engines refuse.
+	 */
+	public void function $throwEnqueueFailed(required string jobClass, required any error) {
+		writeLog(text = "Job '#arguments.jobClass#' could not be persisted: #arguments.error.message#", type = "error", file = "wheels_jobs");
+		Throw(
+			type = "Wheels.Job.EnqueueFailed",
+			message = "Job '#arguments.jobClass#' could not be written to the job store (datasource '#variables.$datasource#'): #arguments.error.message#",
+			extendedInfo = "The job was not enqueued. If this happened inside a transaction on another datasource (for example a tenant's), some engines refuse a second datasource in the same transaction; enqueue after the transaction commits."
+		);
+	}
+
+	/**
 	 * Internal: Persist a job to the queue table.
 	 */
 	private struct function $enqueueJob(
@@ -272,12 +286,10 @@ component {
 						enqueuedAt = local.now
 					);
 				} catch (any e2) {
-					writeLog(text = "Job enqueue failed after table creation: #e2.message#", type = "error", file = "wheels_jobs");
-					return {id = local.id, jobClass = arguments.jobClass, persisted = false, error = e2.message};
+					$throwEnqueueFailed(jobClass = arguments.jobClass, error = e2);
 				}
 			} else {
-				writeLog(text = "Job '#arguments.jobClass#' could not be persisted: #e.message#", type = "warning", file = "wheels_jobs");
-				return {id = local.id, jobClass = arguments.jobClass, persisted = false, error = e.message};
+				$throwEnqueueFailed(jobClass = arguments.jobClass, error = e);
 			}
 		}
 
