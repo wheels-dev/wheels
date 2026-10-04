@@ -107,7 +107,11 @@ component extends="wheels.WheelsTest" {
 		return [
 			// The 4.1 -> 4.2 upgrade guide is only in the 4.2 docs. `wheels
 			// upgrade check` links it for an upgrade into 4.2 (#4236).
-			"v4-2-0/upgrading/4x-1-to-4x-2"
+			"v4-2-0/upgrading/4x-1-to-4x-2",
+			// The 4.0 -> 4.1 upgrade guide isn't in the v4-0-0 docs. `wheels
+			// upgrade check` links it for the public/Application.cfc fixes it
+			// documents.
+			"v4-1-0/upgrading/4x-0-to-4x-1"
 		];
 	}
 

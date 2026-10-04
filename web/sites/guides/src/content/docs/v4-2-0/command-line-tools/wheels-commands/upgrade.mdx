@@ -141,6 +141,14 @@ The database-specific changes (MySQL `BIT(1)` booleans and signed `t.bigInteger(
 
 **Every run (any version)**
 
+- `public/Application.cfc` fixes. For each fix the target release's template carries, the check looks for that fix's code in your copy and names the ones it can't find, with the guide section that documents the edit:
+  - from 4.0.4: the session cookie settings, the DI container guard in `onError`;
+  - from 4.0.6: the isolated test context include;
+  - from 4.1.0: the jBCrypt load path, the reload helper functions;
+  - from 4.1.1: the `.env` boolean parser;
+  - from 4.2.0: the running-app `onError` message, the reload-password header fallback, the subfolder-preserving reload redirect.
+  
+  Routing `onApplicationEnd()` (from 4.0.6) and `onSessionEnd()` (from 4.1.0) through `arguments.applicationScope` fails the check: on Adobe ColdFusion, a shutdown that reads the bare `application` scope can leave the whole site erroring until a restart. The other fixes are advisory.
 - *(advisory)* App template drift (added in 4.1.0, #3379) — `public/Application.cfc` and `public/index.cfm` are compared byte-for-byte against the CLI's bundled app template (the one `wheels new` scaffolds from). A file that differs, or is missing, is reported by name only; no diff is printed. These files are app-owned, so a `vendor/wheels/` swap never updates them, and drift can mean the app is missing framework-side hardening such as the Adobe teardown guards in `onError`/`onSessionEnd`. Customized apps legitimately drift — diff the files yourself and reconcile, keeping your local changes.
 
 Each grep scan covers the file types relevant to that check (`.cfc` and `.cfm` for config and view checks; `Makefile`, `package.json`, `.yml`, `.yaml`, and `.sh` for the `wheels snippets` check) and reports `path:lineNumber` for every hit. Directory checks report only the top-level path when the directory exists and is non-empty.

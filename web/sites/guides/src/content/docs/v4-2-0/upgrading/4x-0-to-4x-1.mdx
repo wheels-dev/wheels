@@ -11,7 +11,7 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 Within the 4.x line there are **no breaking framework changes** — upgrading from any 4.0.x to 4.1.x is the same `vendor/wheels/` swap as a patch upgrade (see [Manual upgrades](/v4-2-0/upgrading/manual-upgrades/)). The work that the swap does **not** do for you is a short list of edits to the **app-owned `public/Application.cfc`**: that file is created once from the template and is yours, so framework updates never reach it. This page collects every one of those edits in one place, with the version it landed in and whether skipping it fails safe.
 
 <Aside type="tip" title="The fastest way to do all of this">
-Run `wheels upgrade check` once on a workstation — it scans your app for the drift and tells you exactly what to change. If you'd rather not run the CLI, diff your `public/Application.cfc` against the template that ships in `vendor/wheels/` (or a fresh `wheels new` app) and adopt the changes below, keeping your local customizations. The template `public/Application.cfc` is the authority.
+Run `wheels upgrade check` once on a workstation — it scans your app for the drift and tells you exactly what to change. With the 4.2 CLI it names each `public/Application.cfc` edit on this page that your copy is missing. If you'd rather not run the CLI, diff your `public/Application.cfc` against the template that ships in `vendor/wheels/` (or a fresh `wheels new` app) and adopt the changes below, keeping your local customizations. The template `public/Application.cfc` is the authority.
 </Aside>
 
 ## Swap the framework

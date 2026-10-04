@@ -167,6 +167,7 @@ The comment form will POST to `/posts/:postKey/comments`. Wheels builds that URL
 
    ```cfm {test:compile}
    mapper()
+       .get(name="up", to="up##index")
        .resources(name="posts", binding=true, callback=function(map) {
            map.resources(name="comments", only="create");
        })
@@ -314,25 +315,14 @@ A Frame (Part 4) replaces one specific region with a new version of itself. A St
 
 `includePartial(partial="/comments/form", post=post, comment=comment)` renders `app/views/comments/_form.cfm` below the list. The leading slash on `/comments/form` is what tells Wheels to resolve the path from the views root rather than as a subfolder of the current controller's view folder — without it, Wheels would look for `app/views/posts/comments/_form.cfm`. The new, unsaved `Comment` is built on the line above so the form partial's `errorMessagesFor("comment")` helper has a real model object to inspect on first render.
 
-## Fix the index to avoid N+1
+## When to eager-load with `include=`
 
-The post index doesn't call `post.comments()` today, but picture what happens if it did — say, to show a comment count next to each title. With ten posts, the page would run one query for the posts list, then ten more queries (one per post) to fetch each post's comments. That's the N+1 problem.
+The post index doesn't call `post.comments()`, so it stays as it is. But picture a view that did — say, one that printed each post's comments under its title. With ten posts, the page would run one query for the posts list, then ten more queries (one per post) to fetch each post's comments. That's the N+1 problem.
 
-The fix is `include=`, which tells the finder to eager-load the association in a single JOIN-backed query.
+The fix is `include=`, which tells the finder to load the association in the same JOIN-backed query: `model("Post").findAll(include="comments")`. Two things to know before you reach for it:
 
-<Steps>
-
-1. Update the `index` action in `app/controllers/Posts.cfc`:
-
-   ```cfm {test:compile}
-   function index() {
-       posts = model("Post").published().findAll(include="comments", order="publishedAt DESC");
-   }
-   ```
-
-</Steps>
-
-With `include="comments"`, Wheels issues one query that joins posts and comments. Calling `posts.comments()` (or any other access path through the association) doesn't hit the database again — the data is already in memory. Add `include=` whenever a view iterates over a collection and touches an association on each row.
+- On a `hasMany` like `comments`, the joined query has **one row per comment**. A post with three comments appears three times, so a view that loops over the query must group rows by post instead of printing one block per row. Don't add `include=` to a list that only shows post columns, like this index: it would list a post once per comment.
+- Use it when a view really reads the association on every row. Otherwise the plain finder is both simpler and cheaper.
 
 ## Smoke test
 
@@ -346,7 +336,7 @@ Three things to verify in the browser:
 
 1. `/posts/1` renders the post, an empty `<section id="comments">`, and the comment form below it.
 2. Filling in the comment form and clicking "Post comment" causes a new comment `<article>` to appear inside the comments section. The URL doesn't change, the rest of the page doesn't flicker, and the form inputs clear.
-3. Clicking Delete on the post removes both the post and its comments — no stale `comments.postId` rows visible to your controller's `findAll()` queries.
+3. Clicking Delete on a post you created yourself (not one of the two seeded posts; Part 8 uses `/posts/1`) removes both the post and its comments — no stale `comments.postId` rows visible to your controller's `findAll()` queries.
 
 <Aside type="note" title="Soft-delete is on by default">
 `wheels generate model/scaffold` writes a `deletedAt` column on every table, so `post.delete()` actually stamps `deletedAt = now()` instead of issuing a `DELETE FROM`. The cascade does the same to `comments`. Wheels finders (`model("Post").findAll()`, `model("Comment").findAll()`) hide soft-deleted rows automatically — that's why item 3 above feels like a hard delete from the app's perspective. If you connect to the SQLite file with `sqlite3 db/development.sqlite` and run `SELECT * FROM posts`, you'll see the row is still there with `deletedAt` set. To include soft-deleted records in finder results, pass `includeSoftDeletes=true` (e.g. `findAll(includeSoftDeletes=true)`); to actually remove a row from the table, call `post.delete(softDelete=false)`.
@@ -364,4 +354,4 @@ Three things to verify in the browser:
 
 In Part 6 you'll add a `User` model with signup and login. You'll build authentication by hand first — sessions, password hashing, a `beforeAction` filter — so you understand what's actually happening at each step, then swap in the built-in `wheels.auth.SessionStrategy` to see how much of that code Wheels ships out of the box.
 
-The `hasMany` / `belongsTo` pattern you just wired up — plus `dependent="delete"` and `include="comments"` — is covered in full at [Associations](/v4-2-0/basics/associations/). For dynamic queries beyond raw `where=` strings, see [Query Builder and Scopes](/v4-2-0/basics/query-builder-and-scopes/).
+The `hasMany` / `belongsTo` pattern you just wired up — plus `dependent="delete"` and, where a view needs it, `include="comments"` — is covered in full at [Associations](/v4-2-0/basics/associations/). For dynamic queries beyond raw `where=` strings, see [Query Builder and Scopes](/v4-2-0/basics/query-builder-and-scopes/).
