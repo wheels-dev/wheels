@@ -31,10 +31,12 @@ component extends="wheels.WheelsTest" {
 		describe("cli/src/commands/wheels/upgrade.cfc", () => {
 
 			it("the legacy upgrade command source file exists", () => {
+				$requireRepoPath("cli/src/commands/wheels/upgrade.cfc");
 				expect(fileExists(ctx.upgradePath)).toBeTrue("Missing file: " & ctx.upgradePath);
 			});
 
 			it("declares itself deprecated and points users at the new Wheels CLI", () => {
+				$requireRepoPath("cli/src/commands/wheels/upgrade.cfc");
 				if (!fileExists(ctx.upgradePath)) {
 					fail("Missing file: " & ctx.upgradePath);
 				}
@@ -51,6 +53,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("short-circuits before the stale ForgeBox / hardcoded version lookup", () => {
+				$requireRepoPath("cli/src/commands/wheels/upgrade.cfc");
 				if (!fileExists(ctx.upgradePath)) {
 					fail("Missing file: " & ctx.upgradePath);
 				}
@@ -84,6 +87,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("updates the post-upgrade recommendations URL to the canonical v4.0 guide", () => {
+				$requireRepoPath("cli/src/commands/wheels/upgrade.cfc");
 				if (!fileExists(ctx.upgradePath)) {
 					fail("Missing file: " & ctx.upgradePath);
 				}

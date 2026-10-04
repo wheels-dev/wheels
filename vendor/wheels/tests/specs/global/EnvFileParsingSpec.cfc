@@ -64,6 +64,7 @@ component extends="wheels.WheelsTest" {
 		describe("No copy of the parser may reintroduce the coercing test", () => {
 
 			it("every .env/settings parser compares booleans as strings", () => {
+				$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 				// Derived from THIS spec's own path so a worktree or a CI runner
 				// resolves the same files:
 				//   <root>/vendor/wheels/tests/specs/global/EnvFileParsingSpec.cfc

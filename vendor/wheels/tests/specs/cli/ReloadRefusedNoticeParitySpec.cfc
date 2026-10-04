@@ -45,6 +45,7 @@ component extends="wheels.WheelsTest" {
 				(function(relPath) {
 
 					it("records all three refusal reasons in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);
@@ -72,6 +73,7 @@ component extends="wheels.WheelsTest" {
 					});
 
 					it("keeps wrong-password and rate-limited refusals indistinguishable in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);

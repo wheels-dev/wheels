@@ -128,6 +128,33 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     }
 
     /**
+     * The Wheels repository root, with a trailing slash, derived from the `/wheels`
+     * mapping (`vendor/wheels`).
+     */
+    public string function $frameworkRepoRoot() {
+        return ExpandPath("/wheels/../..") & "/";
+    }
+
+    /**
+     * Skips the calling spec when the run is not inside the Wheels framework
+     * repository. The framework suite run from an app (`/wheels/core/tests`) has
+     * no `cli/`, `tools/`, `.github/`, `web/` or demo app, so a spec that reads
+     * them reports as skipped there, naming the path it needs, instead of
+     * erroring. Call it first in the spec, before any try/catch. Returns the
+     * absolute path.
+     *
+     * @relativePath The path the spec reads, relative to the repository root.
+     */
+    public string function $requireRepoPath(required string relativePath) {
+        local.relative = ReReplace(arguments.relativePath, "^[/\\]+", "");
+        local.root = $frameworkRepoRoot();
+        if (!DirectoryExists(local.root & "cli/lucli/templates")) {
+            skip("Needs '" & local.relative & "' from the Wheels framework repository, which an app does not have.");
+        }
+        return local.root & local.relative;
+    }
+
+    /**
      * Delete a directory and everything in it, symlink-safe.
      *
      * `DirectoryDelete(path, recurse=true)` leaves the directory behind on

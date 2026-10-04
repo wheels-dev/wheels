@@ -23,6 +23,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not lower the request timeout in any tests/populate.cfm the repo ships", () => {
+				$requireRepoPath("cli/lucli/templates/app/tests/populate.cfm");
 				// the `wheels new` template, the starter app, and this repo's demo app
 				var paths = [
 					ExpandPath("/cli/lucli/templates/app/tests/populate.cfm"),
