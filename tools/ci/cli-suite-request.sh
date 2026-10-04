@@ -6,15 +6,18 @@
 # Used by tools/test-cli-local.sh and tools/ci/run-tests.sh (#4232).
 #
 # The suite is one request. With progress=1 (added here), the runner view
-# (vendor/wheels/public/views/clitests.cfm) prints a "[cli-suite]" line to the
-# server's stdout as each bundle starts and ends, and per spec. A stall would
-# otherwise show only as the request timeout, which Lucee raises in whatever
-# spec next touches a file, not in the one that stalled. When a bundle runs
-# longer than WHEELS_CLI_BUNDLE_TIMEOUT seconds (default 120), this names the
-# bundle and its last spec, asks the server JVM for a thread dump (SIGQUIT
-# prints one to the server's stdout), shows the threads running CFML and the
-# full dump, stops the request and exits 3. A request that ends early for
-# another reason (e.g. the request timeout) reports the bundle that was running.
+# (vendor/wheels/public/views/clitests.cfm) prints "[cli-suite]" lines to the
+# server's stdout: "begin" when the view starts, "start"/"end" per bundle, and
+# "spec" per spec. A stall would otherwise show only as the request timeout,
+# which Lucee raises in whatever spec next touches a file, not where the time
+# went. When no progress line appears for WHEELS_CLI_BUNDLE_TIMEOUT seconds
+# (default 120; counted from the request when there is none yet), this names
+# where the run stopped (before the runner view began, in suite setup, in a
+# bundle and its last spec, or between bundles), asks the server JVM for a
+# thread dump (SIGQUIT prints one to the server's stdout), shows the threads
+# running CFML and the full dump, stops the request and exits 3. A request that
+# ends early for another reason (e.g. the request timeout) reports the bundle
+# that was running.
 set -euo pipefail
 
 url="$1"; result_file="$2"; server_log="$3"; port="$4"; max_time="${5:-600}"
@@ -33,24 +36,32 @@ trap 'rm -f "$code_file"' EXIT
 curl -s -o "$result_file" --max-time "$max_time" --write-out "%{http_code}" "$url" > "$code_file" 2>/dev/null &
 curl_pid=$!
 
+sent_s=$(date +%s)
 stalled=""
 while kill -0 "$curl_pid" 2>/dev/null; do
   sleep 5
-  last="$(last_bundle_event)"
-  case "$last" in
-    *" start "*)
-      started_ms="$(echo "$last" | awk '{print $2}')"
-      if [ $(( $(date +%s) - started_ms / 1000 )) -gt "$bundle_timeout" ]; then
-        stalled="$(echo "$last" | awk '{print $4}')"
-        break
-      fi
-      ;;
-  esac
+  last="$(progress | tail -1)"
+  if [ -z "$last" ]; then
+    since=$sent_s
+    where="before the runner view began (request queue, reload lock or application start)"
+  else
+    since=$(( $(echo "$last" | awk '{print $2}') / 1000 ))
+    bundle="$(last_bundle_event)"
+    case "$bundle" in
+      *" start "*) where="bundle $(echo "$bundle" | awk '{print $4}')" ;;
+      *" end "*) where="between bundles, after $(echo "$bundle" | awk '{print $4}')" ;;
+      *) where="suite setup (bundle discovery and compilation), before the first bundle" ;;
+    esac
+  fi
+  if [ $(( $(date +%s) - since )) -gt "$bundle_timeout" ]; then
+    stalled="$where"
+    break
+  fi
 done
 
 if [ -n "$stalled" ]; then
   {
-    echo "::error::CLI suite bundle ${stalled} has run for more than ${bundle_timeout}s (WHEELS_CLI_BUNDLE_TIMEOUT); stopping the run."
+    echo "::error::CLI suite made no progress for more than ${bundle_timeout}s (WHEELS_CLI_BUNDLE_TIMEOUT), stopped in ${stalled}; stopping the run."
     echo "Last spec started: $(last_spec)"
     pid="$(lsof -ti :"$port" -sTCP:LISTEN 2>/dev/null | head -1 || true)"
     if [ -n "$pid" ]; then
