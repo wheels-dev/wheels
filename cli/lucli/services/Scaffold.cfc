@@ -1307,7 +1307,12 @@ component {
 			// `default=''` just rendered DEFAULT NULL anyway, so an omitted default
 			// yields the same NULL for a nullable column.
 			if (structKeyExists(prop, "default") && len(prop.default)) {
-				params &= ", default='" & replace(prop.default, "'", "''", "all") & "'";
+				// The default is written into a generated CFML migration, so it must
+				// be a literal string: double each "##" (CFML interpolation delimiter)
+				// so "invoice#" / "#1+1#" stay literal, and double single quotes for
+				// the quoted attribute. ("##" in this source is one literal #.)
+				var safeDefault = replace(replace(prop.default, "##", "####", "all"), "'", "''", "all");
+				params &= ", default='" & safeDefault & "'";
 			}
 			params &= $columnSizeParams(prop, cfType);
 

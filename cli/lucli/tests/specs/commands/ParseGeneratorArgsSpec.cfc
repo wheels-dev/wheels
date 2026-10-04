@@ -211,26 +211,38 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(p.required).toBeFalse();
 			});
 
-			// LuCLI parses a positional "status:string=active" as a key=value named
-			// option and hands the module back the exact token "--status:string=active".
-			// parseGeneratorArgs must recover it as a defaulted property, not reject it
-			// as an unknown flag.
-			it("recovers the LuCLI-mangled --name:type=value form as a property", () => {
-				var parsed = probe.$parseGeneratorArgs(["name:string", "--status:string=active"]);
-				expect(arrayLen(parsed.properties)).toBe(2);
-				var p = parsed.properties[2];
-				expect(p.name).toBe("status");
+			it("keeps a colon-bearing URL default intact (does not truncate at the first colon)", () => {
+				var p = probe.$parseGeneratorArgs(["site:string=https://example.com"]).properties[1];
+				expect(p.name).toBe("site");
 				expect(p.type).toBe("string");
-				expect(p.default).toBe("active");
+				expect(p.default).toBe("https://example.com");
+			});
+
+			it("keeps a colon-bearing timestamp default intact", () => {
+				var p = probe.$parseGeneratorArgs(["startsAt:datetime=2026-10-04T12:00:00"]).properties[1];
+				expect(p.type).toBe("datetime");
+				expect(p.default).toBe("2026-10-04T12:00:00");
+			});
+
+			it("combines a :optional marker with a colon-bearing default", () => {
+				var p = probe.$parseGeneratorArgs(["site:string=https://example.com:optional"]).properties[1];
+				expect(p.default).toBe("https://example.com");
+				expect(p.required).toBeFalse();
+			});
+
+			it("captures a literal true/false default without losing it to flag conversion", () => {
+				var p = probe.$parseGeneratorArgs(["active:boolean=false"]).properties[1];
+				expect(p.name).toBe("active");
+				expect(p.type).toBe("boolean");
+				expect(p.default).toBe("false");
 				expect(p.required).toBeTrue();
 			});
 
-			it("still rejects a genuine unknown --flag that is not a mangled property", () => {
-				// The recovery keys on the ":" every property token carries; a real flag
-				// typo has none, so it must still fail loudly rather than be swallowed.
-				expect(() => {
-					probe.$parseGeneratorArgs(["name:string", "--bogusflag"]);
-				}).toThrow(type = "Wheels.CLI.UnknownFlag");
+			it("captures a default that contains a literal hash character", () => {
+				// "invoice##" in this source is the single-character default "invoice"
+				// followed by one hash.
+				var p = probe.$parseGeneratorArgs(["code:string=invoice##"]).properties[1];
+				expect(p.default).toBe("invoice##");
 			});
 
 		});

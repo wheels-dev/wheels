@@ -229,7 +229,72 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var migration = $migration("reviews");
 				expect(reFindNoCase("columnNames\s*=\s*['""]productId['""][^)]*allowNull\s*=\s*false", migration)).toBeGT(0);
 			});
+
+			// The cases below drive the REAL LuCLI handoff: a `name:type=value` token
+			// arrives as a ":"-key in the argCollection (not via attributes=), so it
+			// exercises structuredArgs -> ArgSpec.toArgv, where a generic boolean
+			// conversion used to drop true/false defaults.
+
+			it("preserves a boolean false default through the real argCollection handoff", () => {
+				mod.generate(argumentCollection = {arg1: "model", arg2: "Flag", "active:boolean": "false"});
+				var migration = $rawMigration("flags");
+				expect(reFindNoCase("columnNames\s*=\s*['""]active['""][^)]*allowNull\s*=\s*false", migration)).toBeGT(0);
+				expect(reFindNoCase("columnNames\s*=\s*['""]active['""][^)]*default\s*=\s*['""]false['""]", migration)).toBeGT(0);
+				// A defaulted column is excluded from presence.
+				expect($source("app/models/Flag.cfc")).notToInclude("validatesPresenceOf");
+			});
+
+			it("preserves a boolean true default (not dropped as a bare flag)", () => {
+				mod.generate(argumentCollection = {arg1: "model", arg2: "Toggle", "enabled:boolean": "true"});
+				var migration = $rawMigration("toggles");
+				expect(reFindNoCase("columnNames\s*=\s*['""]enabled['""][^)]*default\s*=\s*['""]true['""]", migration)).toBeGT(0);
+			});
+
+			it("keeps a colon-bearing URL default intact through the real handoff", () => {
+				mod.generate(argumentCollection = {arg1: "model", arg2: "Site", "homepage:string": "https://example.com"});
+				expect($rawMigration("sites")).toInclude("default='https://example.com'");
+			});
+
+			it("encodes a hashed default as a literal CFML string in the generated migration", () => {
+				// "invoice##" in this source is the single-character default "invoice"
+				// followed by one hash. The emitter must double it so the file holds a
+				// literal (written "invoice####" in this assertion) rather than a CFML
+				// interpolation that would break the migration.
+				mod.generate(argumentCollection = {arg1: "model", arg2: "Bill", "code:string": "invoice##"});
+				var migration = $rawMigration("bills");
+				expect(migration).toInclude("default='invoice####'");
+				expect(migration).notToInclude("invoice##'");
+			});
+
+			it("generate property accepts a =value token through the real handoff", () => {
+				// Previously LuCLI's conversion left generateProperty with "--status:string"
+				// -> "__status", which GeneratorPaths.identifier rejected. The token now
+				// arrives verbatim and the add-column migration carries the default.
+				mod.generate(argumentCollection = {arg1: "property", arg2: "Account", "status:string": "active"});
+				var paths = directoryList(variables.tempRoot & "/app/migrator/migrations", false, "path", "*Status*");
+				expect(arrayLen(paths)).toBeGTE(1);
+				var raw = fileRead(paths[arrayLen(paths)]);
+				expect(raw).toInclude("columnNames=""status""");
+				expect(raw).toInclude("default=""active""");
+			});
+
+			it("generate property escapes a hashed default in the generated migration", () => {
+				mod.generate(argumentCollection = {arg1: "property", arg2: "Invoice", "code:string": "ref##"});
+				var paths = directoryList(variables.tempRoot & "/app/migrator/migrations", false, "path", "*Code*");
+				expect(arrayLen(paths)).toBeGTE(1);
+				var raw = fileRead(paths[arrayLen(paths)]);
+				expect(raw).toInclude("default=""ref####""");
+				expect(raw).notToInclude("ref##""");
+			});
 		});
+	}
+
+	private string function $rawMigration(required string tableName) {
+		// Like $migration but WITHOUT comment-stripping: $stripComments treats "//"
+		// as a line comment, which would mangle a URL default (https://...).
+		var paths = directoryList(variables.tempRoot & "/app/migrator/migrations", false, "path", "*create_" & arguments.tableName & "_table.cfc");
+		expect(arrayLen(paths)).toBe(1);
+		return fileRead(paths[1]);
 	}
 
 	private numeric function $fkCount(required string migration, required string column) {

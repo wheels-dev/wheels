@@ -6618,7 +6618,10 @@ component extends="modules.BaseModule" {
 		// when given (and is safe — it backfills existing rows).
 		var colParams = 'columnNames="#propName#"';
 		if (structKeyExists(prop, "default") && len(prop.default)) {
-			colParams &= ', default="' & replace(prop.default, '"', '""', "all") & '"';
+			// Literal string in generated CFML: double "##" (interpolation delimiter)
+			// so a "#" in the default stays literal, and double the embedded quotes.
+			var safeDefault = replace(replace(prop.default, "##", "####", "all"), '"', '""', "all");
+			colParams &= ', default="' & safeDefault & '"';
 		}
 		content &= tab & tab & tab & 't.#colType#(#colParams#);' & nl;
 		content &= tab & tab & tab & 't.change();' & nl;
@@ -12031,15 +12034,6 @@ component extends="modules.BaseModule" {
 			} else if (reFindNoCase("^--hasOne=", arg)) {
 				var rels = $validAssociationNames(listToArray(valueAfterEquals(arg)), "hasOne");
 				result.hasOne.append(rels, true);
-			} else if (arg.startsWith("--") && find(":", mid(arg, 3, len(arg) - 2))) {
-				// A `name:type=value` property (the `=value` default marker) is parsed
-				// by LuCLI as a `key=value` named option and handed back as
-				// "--name:type=value". Recover it as a property token instead of
-				// rejecting it as an unknown flag. A real flag typo has no ":" (the
-				// association flags are matched above, and --force/--dry-run are
-				// stripped before this runs), so this only catches the mangled
-				// property form.
-				arrayAppend(result.properties, $parsePropertyArg(mid(arg, 3, len(arg) - 2)));
 			} else if (arg.startsWith("--")) {
 				var flagName = listFirst(arg, "=");
 				var hint = $closestFlag(flagName, known);
@@ -12169,38 +12163,37 @@ component extends="modules.BaseModule" {
 	 * shell — treats a bare `?` as a glob.
 	 */
 	private struct function $parsePropertyArg(required string arg) {
-		// Split on the FIRST two colons only — any additional colons
-		// (e.g. inside the comma-separated value list) belong in the
-		// values segment.
-		var parts = listToArray(arguments.arg, ":");
 		var names = new services.GeneratorPaths();
-		// Property names and types are written into generated CFML (models,
-		// migrations, forms), so only plain identifiers are accepted.
-		var propName = names.identifier($underscoreHyphens(arrayLen(parts) ? parts[1] : "", "property"), "property");
+		var token = arguments.arg;
 
-		// A trailing ":optional" marks the column nullable. Recognized only in
-		// the MODIFIER position (after both name and type), so a bare
-		// "name:optional" still reads "optional" as the type. Strip it before
-		// type/enum parsing so it never leaks into the enum value list.
+		// A trailing ":optional" marks the column nullable. Matched as a literal
+		// SUFFIX (not a positional colon segment) so a ":" inside a "=value"
+		// default — a URL or a timestamp — is never mistaken for the marker.
 		var optional = false;
-		if (arrayLen(parts) >= 3 && compareNoCase(trim(parts[arrayLen(parts)]), "optional") == 0) {
+		if (len(token) GT 9 && compareNoCase(right(token, 9), ":optional") == 0) {
 			optional = true;
-			arrayDeleteAt(parts, arrayLen(parts));
+			token = left(token, len(token) - 9);
 		}
 
-		var typeToken = arrayLen(parts) > 1 ? parts[2] : "string";
-
-		// A "=value" suffix on the type token sets a column DEFAULT. Split it off
-		// (on the first "=") before brace-modifier/type parsing. An empty value
+		// A "=value" suffix sets a column DEFAULT. Split on the FIRST "=" so the
+		// value keeps every ":" it contains (e.g. https://host, 12:00:00).
+		// Everything after the first "=" is the default; an empty value
 		// ("name:string=") is treated as no default.
 		var columnDefault = "";
 		var hasDefault = false;
-		var eqPos = find("=", typeToken);
+		var eqPos = find("=", token);
 		if (eqPos > 0) {
-			columnDefault = trim(mid(typeToken, eqPos + 1, len(typeToken) - eqPos));
-			typeToken = left(typeToken, eqPos - 1);
+			columnDefault = trim(mid(token, eqPos + 1, len(token) - eqPos));
+			token = left(token, eqPos - 1);
 			hasDefault = len(columnDefault) > 0;
 		}
+
+		// What remains is name[:type[:enumvalues]] (the type may carry {N}/{P,S}).
+		var parts = listToArray(token, ":");
+		// Property names and types are written into generated CFML (models,
+		// migrations, forms), so only plain identifiers are accepted.
+		var propName = names.identifier($underscoreHyphens(arrayLen(parts) ? parts[1] : "", "property"), "property");
+		var typeToken = arrayLen(parts) > 1 ? parts[2] : "string";
 		if (!len(typeToken)) {
 			typeToken = "string";
 		}
