@@ -816,6 +816,7 @@ component extends="modules.BaseModule" {
 		help &= "Packages & Deployment:" & nl;
 		help &= "  packages            Add, update, search Wheels packages (verb is `add`, not `install`)" & nl;
 		help &= "  upgrade             Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans, `apply` swaps" & nl;
+		help &= "  framework           Install the framework (vendor/wheels/) into an app that has none (e.g. moving off CommandBox)" & nl;
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
 		help &= "  setup               Configure this app for external tools (setup agents: AI assistants)" & nl;
@@ -900,6 +901,11 @@ component extends="modules.BaseModule" {
 					"  wheels test --filter=UserSpec                Run one spec file, by name",
 					"  wheels test tests/specs/models/UserSpec.cfc  Run one spec file, by path",
 					"  wheels test --reporter=json                  Print the raw JSON result"
+				];
+			case "framework":
+				return [
+					"  wheels framework install             Install the CLI's bundled framework into vendor/wheels/",
+					"  wheels framework install --to=4.2.0  Install, asserting the bundled version"
 				];
 			default:
 				return [];
@@ -5979,6 +5985,23 @@ component extends="modules.BaseModule" {
 		var vendorDir = variables.projectRoot & "/vendor/wheels";
 		var upgrader = new services.FrameworkUpgrader();
 
+		// Refuse unless we're at a Wheels app root — otherwise this would create a
+		// vendor/wheels/ in whatever directory the user happened to run it from.
+		// config/settings.cfm is the canonical marker (every Wheels app has it);
+		// config/app.cfm and public/Application.cfc are accepted too.
+		if (
+			!fileExists(variables.projectRoot & "/config/settings.cfm")
+			&& !fileExists(variables.projectRoot & "/config/app.cfm")
+			&& !fileExists(variables.projectRoot & "/public/Application.cfc")
+		) {
+			out("This does not look like a Wheels app root: #variables.projectRoot#", "red");
+			out("Run 'wheels framework install' from an app that has config/settings.cfm (e.g. one made with 'wheels new').");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = "Not a Wheels app root (#variables.projectRoot#) — run from an app with config/settings.cfm (or config/app.cfm / public/Application.cfc)."
+			);
+		}
+
 		if ($safeDirExists(vendorDir)) {
 			if (upgrader.looksLikeWheelsFramework(vendorDir)) {
 				var present = upgrader.readFrameworkVersion(vendorDir);
@@ -6009,12 +6032,19 @@ component extends="modules.BaseModule" {
 		var bundledVersion = upgrader.readFrameworkVersion(sourceDir);
 		if (len(arguments.targetVersion) && arguments.targetVersion != bundledVersion) {
 			out("Requested --to=#arguments.targetVersion# but the CLI bundles #len(bundledVersion) ? bundledVersion : 'unknown'#.", "red");
-			out("Only the bundled version can be installed (no downloads). Install a CLI that bundles your target, or omit --to.");
+			out("Only the bundled version can be installed (no downloads). Pass --to=#len(bundledVersion) ? bundledVersion : '<the bundled version>'# or omit --to. (A snapshot CLI bundles a version like 4.2.0-snapshot.NNNN, so --to=4.2.0 won't match.)");
 			throw(
 				type = "Wheels.FrameworkInstallFailed",
 				message = "--to=#arguments.targetVersion# does not match the CLI's bundled framework version (#bundledVersion#); only the bundled version is installable."
 			);
 		}
+
+		// Read the box.json pin BEFORE creating anything, so a pin-read failure
+		// leaves no half-made vendor/ behind (rev1-r3). The pin is updated after
+		// the install so a later `box install` doesn't copy an old framework over
+		// vendor/wheels/; a missing box.json is the normal case for an app moving
+		// onto the CLI.
+		var boxPin = $upgradeApplyBoxPin(upgrader);
 
 		// A fresh install may run in an app that has no vendor/ directory yet
 		// (e.g. one that never ran `box install`); create the parent so the swap
@@ -6033,11 +6063,6 @@ component extends="modules.BaseModule" {
 			throw(type = "Wheels.FrameworkInstallFailed", message = validationError);
 		}
 
-		// A box.json that pins wheels-core must be updated after the install, or a
-		// later `box install` would copy an old framework over vendor/wheels/. A
-		// missing box.json is the normal case for an app moving onto the CLI.
-		var boxPin = $upgradeApplyBoxPin(upgrader);
-
 		out("Source:  #sourceDir#");
 		out("Target:  #vendorDir#");
 		out("Installing Wheels #bundledVersion# into vendor/wheels/ ...");
@@ -6047,8 +6072,15 @@ component extends="modules.BaseModule" {
 			// doBackup = false: a fresh install has nothing to back up.
 			result = upgrader.applyUpgrade(sourceDir, vendorDir, false, "");
 		} catch (Wheels.FrameworkUpgrader e) {
+			// A fresh install has no backup to restore from, so a partial copy
+			// should be removed and the command re-run (not the upgrade/re-vendor
+			// recovery the service message describes for an in-place swap).
 			out(e.message, "red");
-			throw(type = "Wheels.FrameworkInstallFailed", message = e.message);
+			out("Remove the partial vendor/wheels/ and re-run 'wheels framework install'.");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = e.message & " — remove the partial vendor/wheels/ and re-run `wheels framework install`."
+			);
 		}
 		if (!result.success) {
 			out(result.error, "red");
@@ -6084,8 +6116,11 @@ component extends="modules.BaseModule" {
 			& "Examples:" & nl
 			& "  wheels framework install             - install the bundled framework" & nl
 			& "  wheels framework install --to=4.2.0  - install, asserting the bundled version" & nl;
+		// out() is the sole CLI display; returning the text too would print the
+		// whole block twice (the double-print U4/#4265 fixed in upgrade apply).
+		// Specs read capturedOutput() instead of the return value.
 		out(help, "yellow");
-		return help;
+		return "";
 	}
 
 	/**
