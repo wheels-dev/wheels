@@ -70,7 +70,9 @@ component extends="wheels.WheelsTest" {
 						default = "",
 						allowNull = false
 					);
-					state.notNullSql = variables.adapter.changeColumnInTable(name = tableName, column = column);
+					// SQLite rebuilds the table and returns its statements as an array.
+					var generated = variables.adapter.changeColumnInTable(name = tableName, column = column);
+					state.notNullSql = IsArray(generated) ? ArrayToList(generated, "; ") : generated;
 					state.step = "change to NOT NULL";
 					variables.migration.changeColumn(table = tableName, columnName = "amount", columnType = "biginteger", default = "", allowNull = false);
 					state.step = "change to nullable";
@@ -85,6 +87,8 @@ component extends="wheels.WheelsTest" {
 				}
 				expect(state.step).toBe("done", "failed at '#state.step#': #state.message#");
 				// a NOT NULL column with an empty default gets no DEFAULT on any adapter
+				expect(state.notNullSql).toInclude("amount", "the generated change must cover the column: #state.notNullSql#");
+				expect(state.notNullSql).toInclude("NOT NULL", "the generated change must make the column NOT NULL: #state.notNullSql#");
 				expect(state.notNullSql).notToInclude("DEFAULT", state.notNullSql);
 			});
 
