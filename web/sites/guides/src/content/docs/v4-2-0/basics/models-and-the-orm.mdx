@@ -330,7 +330,7 @@ The values come back without a time zone. Rendered as is (for example in JSON), 
 component extends="Model" {
     // ISO-8601 in UTC, for JSON responses. Assumes the default timeStampMode ("utc").
     public string function createdAtIso() {
-        return DateTimeFormat(this.createdAt, "yyyy-mm-dd'T'HH:nn:ss") & "Z";
+        return DateFormat(this.createdAt, "yyyy-mm-dd") & "T" & TimeFormat(this.createdAt, "HH:mm:ss") & "Z";
     }
 }
 ```

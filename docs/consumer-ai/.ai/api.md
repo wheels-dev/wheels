@@ -61,5 +61,5 @@ function index() {
 
 ```cfm
 // timeStampMode "utc" (the default): the stored value is UTC
-"createdAt" = DateTimeFormat(widget.createdAt, "yyyy-mm-dd'T'HH:nn:ss") & "Z"
+"createdAt" = DateFormat(widget.createdAt, "yyyy-mm-dd") & "T" & TimeFormat(widget.createdAt, "HH:mm:ss") & "Z"
 ```
