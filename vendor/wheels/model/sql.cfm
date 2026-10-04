@@ -1449,6 +1449,7 @@
 			}
 			local.wherePos = ArrayLen(local.rv) + 1;
 			local.params = [];
+			local.useTableAlias = (StructKeyExists(arguments, "useIndex") && !StructIsEmpty(arguments.useIndex)) && !($softDeletion() && arguments.softDelete);
 			// split on AND/OR only where they stand as keywords: `_` and `$` are identifier
 			// characters, so `ORDER_AND_ITEMS.id` / `X$OR_Y.id` must not be cut in two (#3675)
 			local.where = ReReplace(
@@ -1479,6 +1480,9 @@
 					1,
 					true
 				);
+				// A condition whose value is a function call is not a bound parameter: the part
+				// read above is the call's argument. Under include its column is qualified (the
+				// else branch below) so a column name the joined tables share is not ambiguous.
 				if (ArrayLen(local.temp.len) > 1) {
 					local.where = Replace(local.where, local.element, Replace(local.element, local.elementDataPart, "?", "one"));
 					local.param.property = Mid(local.elementDataPart, local.temp.pos[2], local.temp.len[2]);
@@ -1542,6 +1546,8 @@
 						local.param.list = true;
 					}
 					ArrayAppend(local.params, local.param);
+				} else if (ArrayLen(local.classes) > 1) {
+					local.where = $qualifyUnboundConditionColumn(where = local.where, element = local.element, classes = local.classes, useTableAlias = local.useTableAlias);
 				}
 			}
 			local.where = ReplaceList(local.where, "#Chr(7)#AND,#Chr(7)#OR", "AND,OR");
@@ -1607,6 +1613,68 @@
 			}
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. For a WHERE condition whose value is a function call (so not a
+	 * bound parameter), qualifies the property it starts with by its
+	 * table, as a bound condition's column is, so a column name shared by the included
+	 * tables is not ambiguous. Leaves the condition alone when it doesn't start with a
+	 * property of the model or an included one.
+	 */
+	public string function $qualifyUnboundConditionColumn(
+		required string where,
+		required string element,
+		required array classes,
+		required boolean useTableAlias
+	) {
+		local.match = ReFindNoCase(
+			"^(\s*(?:(?:AND|OR)\s+)?[\s(]*)([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)?)( ?#variables.wheels.class.RESQLOperators#)",
+			arguments.element,
+			1,
+			true
+		);
+		if (ArrayLen(local.match.len) < 4 || local.match.len[3] == 0) {
+			return arguments.where;
+		}
+		local.column = $whereConditionColumn(
+			property = Mid(arguments.element, local.match.pos[3], local.match.len[3]),
+			classes = arguments.classes,
+			useTableAlias = arguments.useTableAlias
+		);
+		if (!Len(local.column)) {
+			return arguments.where;
+		}
+		// Left() with a length of 0 throws on Lucee 7
+		local.prefix = local.match.len[2] > 0 ? Left(arguments.element, local.match.len[2]) : "";
+		local.qualified = local.prefix & local.column & Mid(arguments.element, local.match.pos[3] + local.match.len[3], Len(arguments.element));
+		return Replace(arguments.where, arguments.element, local.qualified, "one");
+	}
+
+	/**
+	 * Internal function. The SQL for a WHERE property: the first of the model and its
+	 * included classes that has it, as quoted table.column (or tbl.column under useIndex),
+	 * or a calculated property's SQL. Empty when no class has it.
+	 */
+	public string function $whereConditionColumn(required string property, required array classes, required boolean useTableAlias) {
+		local.table = ListFirst(arguments.property, ".");
+		local.name = ListLast(arguments.property, ".");
+		for (local.classData in arguments.classes) {
+			if (Find(".", arguments.property) && local.table != local.classData.tableName) {
+				continue;
+			}
+			if (StructKeyExists(local.classData.propertyStruct, local.name)) {
+				local.columnName = variables.wheels.class.adapter.$quoteIdentifier(local.classData.properties[local.name].column);
+				if (arguments.useTableAlias) {
+					return "tbl." & local.columnName;
+				}
+				return variables.wheels.class.adapter.$quoteIdentifier(local.classData.tableName) & "." & local.columnName;
+			}
+			if (StructKeyExists(local.classData.calculatedProperties, local.name)) {
+				return "(" & local.classData.calculatedProperties[local.name].sql & ")";
+			}
+		}
+		return "";
 	}
 
 	/**
