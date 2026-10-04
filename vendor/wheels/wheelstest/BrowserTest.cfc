@@ -114,11 +114,17 @@ component extends="wheels.WheelsTest" {
      * this message, unless WHEELS_BROWSER_SKIP_LAUNCH_FAILURES=true asks to skip them.
      */
     public void function $browserLaunchFailed(required string message) {
-        this.browserTestSkipped = true;
         if ($launchFailuresSkipped()) {
+            this.browserTestSkipped = true;
             this.browserTestSkipReason = "The browser could not be started (WHEELS_BROWSER_SKIP_LAUNCH_FAILURES is set): " & arguments.message;
         } else {
+            // Not a skip: browserTestSkipped stays false so a spec guarded by the
+            // old `if (this.browserTestSkipped) return;` does not pass silently,
+            // and this.browser raises the launch error instead of "not wired".
             this.browserLaunchError = arguments.message;
+            var guard = new wheels.wheelstest.UnwiredBrowserGuard();
+            guard.$launchError = $browserSpecGate().message;
+            this.browser = guard;
         }
         try {
             debug(arguments.message);
@@ -143,6 +149,28 @@ component extends="wheels.WheelsTest" {
             return {action = "skip", message = Len(this.browserTestSkipReason) ? this.browserTestSkipReason : "Browser specs are skipped."};
         }
         return {action = "run", message = ""};
+    }
+
+    /**
+     * Call first in a browser spec that is not inside browserDescribe() (which applies
+     * this for you): skips the spec, with the reason, when browser specs cannot run
+     * here, and fails it when the browser could not be started. Returns true when the
+     * spec should run.
+     *
+     *     it("signs up", () => {
+     *         browserSpecGuard();
+     *         ...
+     *     });
+     */
+    public boolean function browserSpecGuard() {
+        var gate = $browserSpecGate();
+        if (gate.action == "error") {
+            throw(type = "Wheels.BrowserLaunchFailed", message = gate.message);
+        }
+        if (gate.action == "skip") {
+            skip(gate.message);
+        }
+        return true;
     }
 
     private boolean function $launchFailuresSkipped() {
@@ -242,6 +270,9 @@ component extends="wheels.WheelsTest" {
      * manually instead of using browserDescribe().
      */
     public void function $startBrowserContext() {
+        if (Len(this.browserLaunchError)) {
+            throw(type = "Wheels.BrowserLaunchFailed", message = $browserSpecGate().message);
+        }
         if (this.browserTestSkipped) return;
 
         // A spec that overrides beforeAll() without calling super.beforeAll()

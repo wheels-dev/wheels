@@ -30,7 +30,44 @@ component extends="wheels.WheelsTest" {
 				expect(gate.action).toBe("error");
 				expect(gate.message).toInclude("Host system is missing dependencies to run browsers");
 				expect(gate.message).toInclude("WHEELS_BROWSER_SKIP_LAUNCH_FAILURES");
-				expect(bundle.browserTestSkipped).toBeTrue();
+				// not a skip: a spec guarded by `if (this.browserTestSkipped) return;` does not pass
+				expect(bundle.browserTestSkipped).toBeFalse();
+			});
+
+			it("makes this.browser raise the launch error after a launch failure", () => {
+				var bundle = new wheels.wheelstest.BrowserTest();
+				bundle.$browserLaunchFailed("Host system is missing dependencies to run browsers");
+				var visit = function() {
+					bundle.browser.visit("/");
+				};
+				expect(visit).toThrow(type = "Wheels.BrowserLaunchFailed", regex = "missing dependencies");
+			});
+
+		});
+
+		describe("BrowserTest browserSpecGuard() for specs outside browserDescribe()", () => {
+
+			it("lets the spec run when the browser started", () => {
+				var bundle = new wheels.wheelstest.BrowserTest();
+				expect(bundle.browserSpecGuard()).toBeTrue();
+			});
+
+			it("skips the spec, with the reason, when browser specs cannot run here", () => {
+				var bundle = new wheels.wheelstest.BrowserTest();
+				bundle.$skipBrowserSpecs("Playwright is not installed.");
+				var guard = function() {
+					bundle.browserSpecGuard();
+				};
+				expect(guard).toThrow(type = "TestBox.SkipSpec", regex = "Playwright is not installed");
+			});
+
+			it("fails the spec when the browser could not be started", () => {
+				var bundle = new wheels.wheelstest.BrowserTest();
+				bundle.$browserLaunchFailed("Host system is missing dependencies to run browsers");
+				var guard = function() {
+					bundle.browserSpecGuard();
+				};
+				expect(guard).toThrow(type = "Wheels.BrowserLaunchFailed", regex = "missing dependencies");
 			});
 
 			it("is what browserDescribe() uses to skip or fail a spec", () => {
