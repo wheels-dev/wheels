@@ -1792,13 +1792,17 @@
 
 	/**
 	 * Internal function. Parameter type settings for a bound value with no column to take
-	 * them from: integer or decimal for a number, 1/0 for TRUE/FALSE, string otherwise
+	 * them from: a 64-bit integer or a decimal for a number, 1/0 for TRUE/FALSE, string otherwise
 	 * (a quoted value, or NULL, which binds as a null).
 	 */
 	public struct function $boundValueType(required string value) {
 		local.value = Trim(arguments.value);
 		local.rv = {dataType: "string", type: "CF_SQL_VARCHAR", scale: 0, list: false};
-		if (ReFind("^[+-]?[0-9]+$", local.value) || ReFindNoCase("^(true|false)$", local.value)) {
+		if (ReFind("^[+-]?[0-9]+$", local.value)) {
+			// 64-bit: ids and other whole numbers can exceed 32 bits (CockroachDB SERIAL ids do)
+			local.rv.dataType = "integer";
+			local.rv.type = "CF_SQL_BIGINT";
+		} else if (ReFindNoCase("^(true|false)$", local.value)) {
 			local.rv.dataType = "integer";
 			local.rv.type = "CF_SQL_INTEGER";
 		} else if (ReFind("^[+-]?[0-9]*\.[0-9]+$", local.value)) {
@@ -1809,7 +1813,7 @@
 			local.rv.list = true;
 			if (!Find("'", local.value)) {
 				local.rv.dataType = "integer";
-				local.rv.type = "CF_SQL_INTEGER";
+				local.rv.type = "CF_SQL_BIGINT";
 			}
 		}
 		return local.rv;

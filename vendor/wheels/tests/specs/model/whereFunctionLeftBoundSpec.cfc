@@ -16,6 +16,12 @@ component extends="wheels.WheelsTest" {
 				expect(posts.id).toBe(first.id);
 			})
 
+			it("compares with a number outside 32 bits", () => {
+				var all = g.model("post").count(reload = true);
+				var posts = g.model("post").findAll(where = "ABS(id) < 9000000000000000000", returnAs = "query", reload = true);
+				expect(posts.recordCount).toBe(all);
+			})
+
 			it("compares with a quoted string", () => {
 				var first = $firstPost();
 				var posts = g.model("post").findAll(where = "UPPER(title) = '#UCase(first.title)#'", returnAs = "query", reload = true);
