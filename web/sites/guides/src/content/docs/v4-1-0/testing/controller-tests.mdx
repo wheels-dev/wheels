@@ -32,10 +32,10 @@ component extends="wheels.WheelsTest" {
     function run() {
         describe("Posts", () => {
             it("shows the index page", () => {
-                var client = $testClient();
-                client.get("/posts");
-                expect(client.statusCode()).toBe(200);
-                client.assertSee("Posts");
+                var testClient = $testClient();
+                testClient.get("/posts");
+                expect(testClient.statusCode()).toBe(200);
+                testClient.assertSee("Posts");
             });
         });
     }
@@ -46,7 +46,7 @@ Three things worth knowing:
 
 - `$testClient()` returns a fresh client per call. The base URL is auto-detected from `CGI.SERVER_PORT` — no setup is needed when you run the suite against the built-in test server.
 - `visit("/posts")` is shorthand for `$testClient().get("/posts")` — useful for one-liner assertions. Construct a client directly when you need to reuse cookies, set headers, or chain multiple requests.
-- `TestClient` assertions (`assertSee`, `assertRedirect`, `assertJson`, ...) throw `TestBox.AssertionFailed` on failure. They return `this`, so they chain: `client.assertOk().assertSee("Welcome")`.
+- `TestClient` assertions (`assertSee`, `assertRedirect`, `assertJson`, ...) throw `TestBox.AssertionFailed` on failure. They return `this`, so they chain: `testClient.assertOk().assertSee("Welcome")`.
 
 ## The response accessors
 
@@ -60,7 +60,7 @@ Three things worth knowing:
 | `json()` | Deserialized JSON body | Throws `TestBox.AssertionFailed` if the body isn't parseable JSON. |
 | `response()` | Full raw `cfhttp` result | Escape hatch for details the helpers don't expose. |
 
-Use the assertion shortcuts (`assertStatus`, `assertOk`, `assertNotFound`, `assertRedirect`, `assertSee`, `assertDontSee`, `assertJson`, `assertHeader`, `assertCookie`) when possible — their failure messages are more descriptive than a bare `expect(client.statusCode()).toBe(...)`.
+Use the assertion shortcuts (`assertStatus`, `assertOk`, `assertNotFound`, `assertRedirect`, `assertSee`, `assertDontSee`, `assertJson`, `assertHeader`, `assertCookie`) when possible — their failure messages are more descriptive than a bare `expect(testClient.statusCode()).toBe(...)`.
 
 ## Testing action dispatch
 
@@ -69,22 +69,22 @@ Start with the three basic shapes: a GET that returns content, a GET for a missi
 ```cfm {test:compile} title="tests/specs/controllers/PostsSpec.cfc"
 describe("Posts index", () => {
     it("returns 200 and lists posts", () => {
-        var client = $testClient();
-        client.get("/posts");
-        expect(client.statusCode()).toBe(200);
-        client.assertSee("Posts");
+        var testClient = $testClient();
+        testClient.get("/posts");
+        expect(testClient.statusCode()).toBe(200);
+        testClient.assertSee("Posts");
     });
 
     it("returns 404 for a missing post", () => {
-        var client = $testClient();
-        client.get("/posts/999999");
-        expect(client.statusCode()).toBe(404);
+        var testClient = $testClient();
+        testClient.get("/posts/999999");
+        expect(testClient.statusCode()).toBe(404);
     });
 
     it("redirects to login when the action requires authentication", () => {
-        var client = $testClient();
-        client.get("/posts/1/edit");
-        client.assertRedirect(to="/login");
+        var testClient = $testClient();
+        testClient.get("/posts/1/edit");
+        testClient.assertRedirect(to="/login");
     });
 });
 ```
@@ -102,17 +102,17 @@ Creating a record has two outcomes to assert: a successful save redirects (typic
 ```cfm {test:compile} title="tests/specs/controllers/PostsSpec.cfc"
 describe("Posts create", () => {
     it("redirects to the show page after a successful create", () => {
-        var client = $testClient();
-        client.post("/posts", {"post[title]": "New", "post[body]": "Body text"});
-        expect(client.statusCode()).toBe(302);
-        client.assertRedirect(to="/posts/");
+        var testClient = $testClient();
+        testClient.post("/posts", {"post[title]": "New", "post[body]": "Body text"});
+        expect(testClient.statusCode()).toBe(302);
+        testClient.assertRedirect(to="/posts/");
     });
 
     it("re-renders the new template when validation fails", () => {
-        var client = $testClient();
-        client.post("/posts", {"post[title]": "", "post[body]": "Body text"});
-        expect(client.statusCode()).toBe(200);
-        client.assertSee("Title can't be empty");
+        var testClient = $testClient();
+        testClient.post("/posts", {"post[title]": "", "post[body]": "Body text"});
+        expect(testClient.statusCode()).toBe(200);
+        testClient.assertSee("Title can't be empty");
     });
 });
 ```
@@ -126,17 +126,17 @@ Filters declared with `filter(through="authenticate")` run before the action. Th
 ```cfm {test:compile} title="tests/specs/controllers/PostsSpec.cfc"
 describe("Authentication filter", () => {
     it("redirects anonymous users from the edit page", () => {
-        var client = $testClient();
-        client.get("/posts/1/edit");
-        client.assertRedirect(to="/login");
+        var testClient = $testClient();
+        testClient.get("/posts/1/edit");
+        testClient.assertRedirect(to="/login");
     });
 
     it("lets a logged-in user edit a post", () => {
-        var client = $testClient();
-        // POST to the login action — the client captures the session cookie
-        client.post("/login", {email: "alice@example.com", password: "secret"});
-        client.get("/posts/1/edit");
-        expect(client.statusCode()).toBe(200);
+        var testClient = $testClient();
+        // POST to the login action — the testClient captures the session cookie
+        testClient.post("/login", {email: "alice@example.com", password: "secret"});
+        testClient.get("/posts/1/edit");
+        expect(testClient.statusCode()).toBe(200);
     });
 });
 ```
@@ -150,17 +150,17 @@ When a `before` filter checks record ownership (for example, "you can only edit 
 ```cfm {test:compile} title="tests/specs/controllers/PostsSpec.cfc"
 describe("Ownership filter", () => {
     it("lets alice edit her own post", () => {
-        var client = $testClient();
-        client.post("/login", {email: "alice@example.com", password: "secret"});
-        client.get("/posts/1/edit");
-        expect(client.statusCode()).toBe(200);
+        var testClient = $testClient();
+        testClient.post("/login", {email: "alice@example.com", password: "secret"});
+        testClient.get("/posts/1/edit");
+        expect(testClient.statusCode()).toBe(200);
     });
 
     it("blocks alice from editing bob's post", () => {
-        var client = $testClient();
-        client.post("/login", {email: "alice@example.com", password: "secret"});
-        client.get("/posts/2/edit");
-        client.assertRedirect(to="/posts");
+        var testClient = $testClient();
+        testClient.post("/login", {email: "alice@example.com", password: "secret"});
+        testClient.get("/posts/2/edit");
+        testClient.assertRedirect(to="/posts");
     });
 });
 ```
@@ -175,9 +175,9 @@ Send JSON instead by chaining `.asJson()` before the call:
 
 ```cfm {test:compile} title="tests/specs/controllers/PostsApiSpec.cfc"
 it("accepts a JSON body", () => {
-    var client = $testClient();
-    client.asJson().post("/api/posts", {title: "From JSON", body: "B"});
-    expect(client.statusCode()).toBe(201);
+    var testClient = $testClient();
+    testClient.asJson().post("/api/posts", {title: "From JSON", body: "B"});
+    expect(testClient.statusCode()).toBe(201);
 });
 ```
 
@@ -190,18 +190,18 @@ When the controller uses content negotiation (`provides("html", "json")` plus `r
 ```cfm {test:compile} title="tests/specs/controllers/PostsApiSpec.cfc"
 describe("Posts API", () => {
     it("returns JSON when Accept header requests it", () => {
-        var client = $testClient();
-        client.asJson().get("/posts/1");
-        expect(client.statusCode()).toBe(200);
-        client.assertHeader("Content-Type");
-        client.assertJson({title: "First post"});
+        var testClient = $testClient();
+        testClient.asJson().get("/posts/1");
+        expect(testClient.statusCode()).toBe(200);
+        testClient.assertHeader("Content-Type");
+        testClient.assertJson({title: "First post"});
     });
 
     it("resolves nested paths in the JSON response", () => {
-        var client = $testClient();
-        client.asJson().get("/posts/1");
-        client.assertJsonPath("post.title", "First post");
-        client.assertJsonPath("post.comments.1.author", "Alice");
+        var testClient = $testClient();
+        testClient.asJson().get("/posts/1");
+        testClient.assertJsonPath("post.title", "First post");
+        testClient.assertJsonPath("post.comments.1.author", "Alice");
     });
 });
 ```
@@ -211,7 +211,7 @@ describe("Posts API", () => {
 Set individual headers when you need finer control than `.asJson()` gives:
 
 ```cfm title="illustrative — do not type"
-client.withHeader("Authorization", "Bearer " & token)
+testClient.withHeader("Authorization", "Bearer " & token)
       .withHeader("Accept", "application/json")
       .get("/api/posts/1");
 ```
@@ -228,10 +228,10 @@ client.withHeader("Authorization", "Bearer " & token)
 ```cfm title="illustrative — do not type"
 it("creates a post inside a rollback", () => {
     transaction {
-        var client = $testClient();
-        client.post("/login", {email: "alice@example.com", password: "secret"});
-        client.post("/posts", {"post[title]": "T", "post[body]": "B"});
-        expect(client.statusCode()).toBe(302);
+        var testClient = $testClient();
+        testClient.post("/login", {email: "alice@example.com", password: "secret"});
+        testClient.post("/posts", {"post[title]": "T", "post[body]": "B"});
+        expect(testClient.statusCode()).toBe(302);
         transaction action="rollback";
     }
 });

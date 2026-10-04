@@ -45,23 +45,23 @@ component extends="wheels.WheelsTest" {
     function run() {
         describe("New-user content creation flow", () => {
             it("supports signup through first comment", () => {
-                var client = $testClient();
+                var testClient = $testClient();
 
                 // signup
-                client.post("/users", {"user[email]": "a@a.com", "user[password]": "secret"})
+                testClient.post("/users", {"user[email]": "a@a.com", "user[password]": "secret"})
                     .assertRedirect(to="/login");
 
                 // login — cookie jar captures the session
-                client.post("/login", {"session[email]": "a@a.com", "session[password]": "secret"})
+                testClient.post("/login", {"session[email]": "a@a.com", "session[password]": "secret"})
                     .assertRedirect();
 
                 // create a post
-                client.post("/posts", {"post[title]": "Hello", "post[body]": "World"})
+                testClient.post("/posts", {"post[title]": "Hello", "post[body]": "World"})
                     .assertRedirect();
 
                 // find the post in the database, then comment on it
                 var post = model("Post").findOne(where="title='Hello'");
-                client.post("/posts/##post.id##/comments", {"comment[author]": "Me", "comment[body]": "First"})
+                testClient.post("/posts/##post.id##/comments", {"comment[author]": "Me", "comment[body]": "First"})
                     .assertOk();
 
                 expect(post.commentCount()).toBe(1);
