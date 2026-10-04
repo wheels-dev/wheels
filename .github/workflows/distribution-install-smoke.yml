@@ -433,11 +433,10 @@ jobs:
       - name: Add apt.wheels.dev + install
         run: |
           set -euo pipefail
-          # The published wheels.gpg is ASCII-armored, so dearmor it into the
-          # keyring. (The apt-wheels README still shows a bare `tee` of the
-          # armored key — the user-facing docs should be updated to dearmor to
-          # match this; tracked as a follow-up.)
-          curl -fsSL https://apt.wheels.dev/wheels.gpg | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
+          # The documented command: the published wheels.gpg is ASCII-armored,
+          # so it is dearmored into the keyring; --batch --yes lets a re-run
+          # overwrite it without a TTY (guides, apt-wheels README + landing page).
+          curl -fsSL https://apt.wheels.dev/wheels.gpg | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/wheels.gpg
           echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
             | sudo tee /etc/apt/sources.list.d/wheels.list >/dev/null
           sudo apt-get update
@@ -548,8 +547,8 @@ jobs:
     name: "yum (rocky 9)"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # RHEL-family, dnf4 — matches the documented `dnf config-manager --add-repo`
-    # path. The release ships a noarch rpm; dnf serves it on this amd64 container.
+    # RHEL-family, dnf4 — runs the documented commands (the .repo file is
+    # downloaded into /etc/yum.repos.d/, which works on dnf4 and dnf5). The release ships a noarch rpm; dnf serves it on this amd64 container.
     # Gates (hard-fail): as of 4.0.5 the rpm's wrapper resolves the RHEL/Fedora
     # Java-21 layout, so `wheels --version` works on Rocky 9 (was the 4.0.4 bug).
     container:
@@ -560,8 +559,7 @@ jobs:
       - name: Add yum.wheels.dev + install (the documented path)
         run: |
           set -euo pipefail
-          dnf -y install dnf-plugins-core
-          dnf -y config-manager --add-repo https://yum.wheels.dev/wheels.repo
+          curl -fsSL https://yum.wheels.dev/wheels.repo -o /etc/yum.repos.d/wheels.repo
           dnf -y install wheels
       - name: Assert wheels --version == GA
         env:
