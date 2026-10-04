@@ -38,6 +38,7 @@ Open the file for a topic before working on it:
 
 - Models (finders, associations, validations, scopes): `.ai/models.md`
 - Routing and route model binding: `.ai/routing.md`
+- JSON APIs: `.ai/api.md`
 - Pagination, development error page: `.ai/views.md`
 - Partial caching: `.ai/caching.md`
 - Middleware, rate limiting: `.ai/middleware.md`
