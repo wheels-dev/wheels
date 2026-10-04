@@ -67,6 +67,41 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("$isTestRunReentry()", () => {
+
+			afterEach(() => {
+				StructDelete(application, "$$$appTestRunToken");
+			});
+
+			it("recognises a request that carries the token of the run in progress", () => {
+				application["$$$appTestRunToken"] = "run-token-1";
+				expect(g.$isTestRunReentry(requestUrl = {wheelsTestRun = "run-token-1"})).toBeTrue();
+			});
+
+			it("treats a request with another run's token as a new run", () => {
+				application["$$$appTestRunToken"] = "run-token-1";
+				expect(g.$isTestRunReentry(requestUrl = {wheelsTestRun = "run-token-0"})).toBeFalse();
+			});
+
+			it("treats a request without a token as a new run", () => {
+				application["$$$appTestRunToken"] = "run-token-1";
+				expect(g.$isTestRunReentry(requestUrl = {})).toBeFalse();
+			});
+
+			it("treats every request as a new run when no run is in progress", () => {
+				expect(g.$isTestRunReentry(requestUrl = {wheelsTestRun = ""})).toBeFalse();
+			});
+
+			it("is checked before the project runner takes the runner lock", () => {
+				var source = FileRead(ExpandPath("/wheels/Public.cfc"));
+				var reentryPos = FindNoCase("$isTestRunReentry(requestUrl = url)", source);
+				var lockPos = FindNoCase("wheelsTestRunner_##application.applicationName##", source);
+				expect(reentryPos).toBeGT(0);
+				expect(lockPos).toBeGT(reentryPos);
+			});
+
+		});
+
 		describe("runner wiring", () => {
 
 			it("the core runner picks its datasource with $coreTestDataSource() before swapping in the test config", () => {

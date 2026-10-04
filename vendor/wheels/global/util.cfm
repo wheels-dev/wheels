@@ -1152,6 +1152,19 @@ public struct function $testDataSourceDecision(
 }
 
 /**
+ * Internal. True when this request belongs to the app test run in progress: it carries
+ * that run's token (`wheelsTestRun`). Such a request runs inside the run, so it must not
+ * wait on the runner lock the run holds, nor swap or restore the datasource again.
+ */
+public boolean function $isTestRunReentry(required struct requestUrl) {
+	local.activeRunToken = StructKeyExists(application, "$$$appTestRunToken") ? application["$$$appTestRunToken"] : "";
+	local.requestRunToken = (StructKeyExists(arguments.requestUrl, "wheelsTestRun") && IsSimpleValue(arguments.requestUrl.wheelsTestRun))
+		? arguments.requestUrl.wheelsTestRun
+		: "";
+	return Len(local.activeRunToken) > 0 && Compare(local.requestRunToken, local.activeRunToken) == 0;
+}
+
+/**
  * Internal. Which datasource the framework's own test runners (the core runner and the
  * RocketUnit runner) use. `?db=` naming one of `testDbList` selects `wheelstestdb_<db>`, and
  * the `|datasourceName|` placeholder selects `wheelstestdb`, as before. A

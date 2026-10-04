@@ -860,9 +860,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 * in-progress run's token is included as-is (app-runner.cfm handles it).
 	 */
 	private void function $runProjectTestRunner() {
-		var activeRunToken = StructKeyExists(application, "$$$appTestRunToken") ? application["$$$appTestRunToken"] : "";
-		var requestRunToken = (StructKeyExists(url, "wheelsTestRun") && IsSimpleValue(url.wheelsTestRun)) ? url.wheelsTestRun : "";
-		if (Len(activeRunToken) && Compare(requestRunToken, activeRunToken) == 0) {
+		if (application.wo.$isTestRunReentry(requestUrl = url)) {
 			include "/tests/runner.cfm";
 			return;
 		}
