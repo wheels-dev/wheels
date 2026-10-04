@@ -560,7 +560,7 @@ component extends="modules.BaseModule" {
 			.option(name = "to", default = "", description = "Target Wheels version. check: version to scan against (default: latest). apply: must match the CLI's bundled framework version")
 			.option(name = "format", default = "", choices = "text,json", description = "check only: text (default) or json for machine-readable output")
 			.flag(name = "strict", default = false, description = "check only: escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them")
-			.flag(name = "nobackup", default = false, description = "apply only: skip the vendor/wheels.bak-<timestamp> backup of the existing framework")
+			.flag(name = "nobackup", default = false, description = "apply only: skip the .wheels/backups/wheels.bak-<timestamp> backup of the existing framework")
 			.flag(name = "allow-downgrade", default = false, description = "apply only: proceed even when the CLI's bundled framework is older than the app's vendor/wheels/ (refused by default)")
 			.flag(name = "offline", default = false, description = "check only: skip the latest-release lookup on GitHub (pass --to). Also set by WHEELS_OFFLINE=1")
 			// CLI-only spellings read by parseUpgradeArgs, deliberately NOT
@@ -5829,8 +5829,8 @@ component extends="modules.BaseModule" {
 	 *
 	 * `wheels upgrade apply` performs the framework swap (#3035): it
 	 * replaces the app's vendor/wheels/ with the framework bundled inside
-	 * the installed CLI, parking the old copy at vendor/wheels.bak-<timestamp>/
-	 * unless --nobackup. Recovery is a single mv (announced, with the exact
+	 * the installed CLI, parking the old copy at .wheels/backups/wheels.bak-<timestamp>/
+	 * (outside vendor/) unless --nobackup. Recovery is a single mv (announced, with the exact
 	 * backup path, before anything is touched). Only the CLI's bundled
 	 * framework is available as a source for now — pair it with your package
 	 * manager (`brew upgrade wheels`, `brew install wheels-be`, `scoop update
@@ -5960,8 +5960,8 @@ component extends="modules.BaseModule" {
 			& "                    non-zero when breaking changes are found." & nl
 			& "  apply             Apply the upgrade — replace vendor/wheels/ with" & nl
 			& "                    the CLI's bundled framework. Backs up the existing" & nl
-			& "                    vendor/wheels/ as vendor/wheels.bak-<timestamp>/" & nl
-			& "                    unless --nobackup." & nl
+			& "                    vendor/wheels/ as .wheels/backups/wheels.bak-<timestamp>/" & nl
+			& "                    (outside vendor/) unless --nobackup." & nl
 			& "  (none)            Print usage. Bare `wheels upgrade` never modifies" & nl
 			& "                    files — the swap requires the explicit `apply` verb." & nl
 			& nl
@@ -5971,7 +5971,7 @@ component extends="modules.BaseModule" {
 			& "                    CLI's bundled framework version." & nl
 			& "  --offline         Check only: never call GitHub. Without --to the" & nl
 			& "                    check fails and asks for one. Also WHEELS_OFFLINE=1." & nl
-			& "  --nobackup        Apply only: skip the vendor/wheels.bak-<timestamp>/" & nl
+			& "  --nobackup        Apply only: skip the .wheels/backups/wheels.bak-<timestamp>/" & nl
 			& "                    backup. Useful when vendor/wheels/ is tracked in git." & nl
 			& "  --allow-downgrade Apply only: proceed when the CLI's bundled framework" & nl
 			& "                    is OLDER than vendor/wheels/. Refused by default." & nl
@@ -6010,7 +6010,7 @@ component extends="modules.BaseModule" {
 			& "      Scan the app for breaking changes (read-only)." & nl
 			& "  wheels upgrade apply [--to=<version>] [--nobackup]" & nl
 			& "      Replace vendor/wheels/ with the CLI's bundled framework" & nl
-			& "      (backs up to vendor/wheels.bak-<timestamp>/ first)." & nl
+			& "      (backs up to .wheels/backups/wheels.bak-<timestamp>/ first)." & nl
 			& nl
 			& "Run `wheels upgrade help` for full usage." & nl;
 		// Returned for the caller to throw: the thrown error prints it once and
@@ -8904,7 +8904,7 @@ component extends="modules.BaseModule" {
 		var backupPath = "";
 		if (arguments.doBackup) {
 			backupPath = upgrader.reserveBackupPath(vendorDir);
-			plan &= "Backing up vendor/wheels -> vendor/#listLast(backupPath, "/")#" & nl
+			plan &= "Backing up vendor/wheels -> .wheels/backups/#listLast(backupPath, "/")#/ (outside vendor/, ignored by git)" & nl
 				& "If this is interrupted, restore with:" & nl
 				& "  rm -rf ""#vendorDir#"" && mv ""#backupPath#"" ""#vendorDir#""" & nl;
 		} else {

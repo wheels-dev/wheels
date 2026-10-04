@@ -96,7 +96,7 @@ component extends="wheels.WheelsTest" {
 					"Module.cfc should dispatch the `apply` verb to runUpgradeApply() (##3035/##3039)."
 				);
 				expect(source contains "wheels.bak-").toBeTrue(
-					"The apply path should reference the vendor/wheels.bak-<timestamp> "
+					"The apply path should reference the .wheels/backups/wheels.bak-<timestamp> "
 					& "backup convention so the help/recovery output stays truthful."
 				);
 			});

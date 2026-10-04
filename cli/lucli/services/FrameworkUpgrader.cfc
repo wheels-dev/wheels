@@ -3,8 +3,8 @@
  *
  * Replaces the contents of the app's vendor/wheels/ with a fresh copy
  * of the framework (typically the CLI's bundled vendor/wheels/). The
- * old vendor/wheels/ is renamed to vendor/wheels.bak-<timestamp> by
- * default so a mistake is recoverable with a single mv.
+ * old vendor/wheels/ is renamed to .wheels/backups/wheels.bak-<timestamp>
+ * in the project by default so a mistake is recoverable with a single mv.
  *
  * Isolated from Module.cfc so tests can exercise the file-level
  * behavior without the LuCLI runtime (mirrors FrameworkInstaller.cfc).
@@ -158,7 +158,8 @@ component {
 	 * Replace `vendorDir` with the contents of `sourceDir`. Both must be
 	 * Wheels framework directories (or vendorDir may be absent — fresh
 	 * install). When `doBackup` is true the existing vendorDir is renamed
-	 * to `<vendorDir>.bak-<timestamp>` before the copy. Callers that want
+	 * to `<project>/.wheels/backups/wheels.bak-<timestamp>` before the copy
+	 * (see reserveBackupPath). Callers that want
 	 * to announce the backup destination BEFORE invoking the swap can
 	 * reserve it via reserveBackupPath() and pass it in as `backupPath` —
 	 * the announced path and the actual backup are then guaranteed to
@@ -208,6 +209,7 @@ component {
 
 			if (arguments.doBackup) {
 				result.backupDir = len(trim(arguments.backupPath)) ? arguments.backupPath : reserveBackupPath(arguments.vendorDir);
+				$prepareBackupsDir(result.backupDir);
 				$renameDirectory(arguments.vendorDir, result.backupDir);
 			} else {
 				directoryDelete(arguments.vendorDir, true);
@@ -241,21 +243,54 @@ component {
 	}
 
 	/**
-	 * Build a unique backup path of the form <vendorDir>.bak-<yyyymmdd>-<HHmmss>,
-	 * appending a counter if a collision exists (concurrent or rapid re-runs).
-	 * Public so callers can announce the exact backup destination (and the
-	 * recovery one-liner) before invoking applyUpgrade — pass the reserved
-	 * path back in via `backupPath` so the plan and the swap can't disagree.
+	 * Build a unique backup path of the form
+	 * <project>/.wheels/backups/wheels.bak-<yyyymmdd>-<HHmmss>, where <project>
+	 * holds vendor/ (the parent of vendorDir's parent), appending a counter if a
+	 * collision exists (concurrent or rapid re-runs). Never inside vendor/: the
+	 * framework loads every vendor/ folder as a package, so a backup there
+	 * logs a skipped-package error on every boot, and it would be committed
+	 * along with vendor/. Same filesystem as vendorDir, so the backup is still
+	 * a single rename. Public so callers can announce the exact backup
+	 * destination (and the recovery one-liner) before invoking applyUpgrade —
+	 * pass the reserved path back in via `backupPath` so the plan and the swap
+	 * can't disagree.
 	 */
 	public string function reserveBackupPath(required string vendorDir) {
+		var backupsDir = backupsDirFor(arguments.vendorDir);
 		var ts = dateFormat(now(), "yyyymmdd") & "-" & timeFormat(now(), "HHmmss");
-		var candidate = arguments.vendorDir & ".bak-" & ts;
+		var candidate = backupsDir & "/wheels.bak-" & ts;
 		var counter = 1;
 		while (directoryExists(candidate)) {
-			candidate = arguments.vendorDir & ".bak-" & ts & "-" & counter;
+			candidate = backupsDir & "/wheels.bak-" & ts & "-" & counter;
 			counter++;
 		}
 		return candidate;
+	}
+
+	/**
+	 * The backups directory for a <project>/vendor/wheels target:
+	 * <project>/.wheels/backups.
+	 */
+	public string function backupsDirFor(required string vendorDir) {
+		var vendorParent = getDirectoryFromPath(reReplace(arguments.vendorDir, "[\\/]+$", ""));
+		var project = getDirectoryFromPath(reReplace(vendorParent, "[\\/]+$", ""));
+		return project & ".wheels/backups";
+	}
+
+	/**
+	 * Create the backup's parent directory and a .gitignore that ignores
+	 * everything in it, so a backup is never committed even when the app's
+	 * own .gitignore doesn't cover .wheels/.
+	 */
+	private void function $prepareBackupsDir(required string backupDir) {
+		var backupsDir = getDirectoryFromPath(reReplace(arguments.backupDir, "[\\/]+$", ""));
+		if (!directoryExists(backupsDir)) {
+			directoryCreate(backupsDir, true, true);
+		}
+		var ignoreFile = backupsDir & ".gitignore";
+		if (!fileExists(ignoreFile)) {
+			fileWrite(ignoreFile, "## Framework backups made by `wheels upgrade apply`. Never commit them." & chr(10) & "*" & chr(10));
+		}
 	}
 
 	/**
