@@ -35,7 +35,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(said).toInclude("Port #port# (configured in lucee.json) is in use by the Wheels server 'other-app'.");
 					expect(said).toInclude("cd #variables.base#/elsewhere/other-app && wheels stop");
 					expect(said).toInclude("wheels start --port=");
-					expect(said).notToInclude("lucli");
+					// The LuCLI wording this replaces ("Use: lucli server stop <name>").
+					// Not a bare "lucli": the project path in the cd line can contain
+					// one (CI's temp projects live under ~/.lucli/servers/).
+					expect(said).notToInclude("lucli server stop");
 				} finally {
 					held.close();
 				}
