@@ -1208,7 +1208,8 @@ public struct function $coreTestDataSource(
 		local.rv.target = "wheelstestdb";
 		return local.rv;
 	}
-	if (Compare(arguments.coreName, arguments.primary) != 0) {
+	// Datasource names are case-insensitive: 'App' is the primary 'app', not another datasource.
+	if (CompareNoCase(arguments.coreName, arguments.primary) != 0) {
 		local.registered = (StructKeyExists(arguments, "targetRegistered") && !IsNull(arguments.targetRegistered))
 			? arguments.targetRegistered
 			: $testDataSourceRegistered(name = arguments.coreName);
@@ -1421,18 +1422,33 @@ public void function $warnTestsOnPrimaryDataSource(required struct decision) {
 }
 
 /**
- * Internal. The JSON body for a refused app test run.
+ * Internal. The JSON body for a refused framework test run (`$coreTestDataSource()` chose
+ * `refuse`). Quoted keys keep their case when serialized.
+ */
+public struct function $coreTestDataSourceRefusal(required struct choice) {
+	return {
+		"success" = false,
+		"error" = "Test database not available",
+		"message" = arguments.choice.message,
+		"datasource" = arguments.choice.decision.primary,
+		"candidate" = arguments.choice.decision.candidate
+	};
+}
+
+/**
+ * Internal. The JSON body for a refused app test run. Quoted keys keep their case when
+ * serialized.
  */
 public struct function $testDataSourceRefusal(required struct decision) {
 	return {
-		success = false,
-		error = "Test database not available",
-		message = "App tests default to the '" & arguments.decision.candidate & "' datasource, which is not registered. Create it; or run against '"
+		"success" = false,
+		"error" = "Test database not available",
+		"message" = "App tests default to the '" & arguments.decision.candidate & "' datasource, which is not registered. Create it; or run against '"
 			& arguments.decision.primary & "' intentionally with `wheels test --no-test-db` (URL: useTestDB=false); or, for older CLIs that cannot send useTestDB=false, "
 			& "set(allowTestsAgainstPrimaryDatasource=true) in config/settings.cfm. "
 			& "If tests/runner.cfm was copied from an older Wheels release, replace it with the runner `wheels new` creates (it includes wheels/tests/app-runner.cfm).",
-		datasource = arguments.decision.primary,
-		candidate = arguments.decision.candidate
+		"datasource" = arguments.decision.primary,
+		"candidate" = arguments.decision.candidate
 	};
 }
 

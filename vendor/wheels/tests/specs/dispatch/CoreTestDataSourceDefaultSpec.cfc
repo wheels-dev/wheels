@@ -71,6 +71,12 @@ component extends="wheels.WheelsTest" {
 				expect(choice.target).toBe("app_core");
 			});
 
+			it("treats a coreTestDataSourceName differing from dataSourceName only in case as the primary", () => {
+				var choice = g.$coreTestDataSource(primary = "app", coreName = "App", requestUrl = {}, candidateRegistered = true, targetRegistered = true);
+				expect(choice.action).toBe("swap");
+				expect(choice.target).toBe("app_test");
+			});
+
 			it("still explains a refusal on the primary datasource", () => {
 				var choice = g.$coreTestDataSource(primary = "app", coreName = "app", requestUrl = {}, candidateRegistered = false);
 				expect(choice.action).toBe("refuse");
@@ -81,7 +87,30 @@ component extends="wheels.WheelsTest" {
 			it("is what both framework runners report", () => {
 				for (var path in ["/wheels/tests/runner.cfm", "/wheels/rocketunit_tests/env.cfm"]) {
 					var source = FileRead(ExpandPath(path));
-					expect(FindNoCase("message = coreDataSource.message", Replace(source, "local.coreDataSource", "coreDataSource", "all"))).toBeGT(0, path);
+					expect(FindNoCase("SerializeJSON(", source) && FindNoCase("$coreTestDataSourceRefusal(choice = ", source)).toBeTrue(path);
+				}
+			});
+
+		});
+
+		describe("409 bodies of the test runners", () => {
+
+			it("keep their keys lowercase for a refused framework run", () => {
+				var choice = g.$coreTestDataSource(primary = "app", coreName = "public", requestUrl = {}, targetRegistered = false);
+				var body = SerializeJSON(g.$coreTestDataSourceRefusal(choice = choice));
+				// Find() is case-sensitive.
+				for (var key in ["success", "error", "message", "datasource", "candidate"]) {
+					expect(Find('"' & key & '"', body)).toBeGT(0, body);
+					expect(Find('"' & UCase(key) & '"', body)).toBe(0, body);
+				}
+				expect(DeserializeJSON(body).message).toBe(choice.message);
+			});
+
+			it("keep their keys lowercase for a refused app run", () => {
+				var body = SerializeJSON(g.$testDataSourceRefusal(decision = {primary = "app", candidate = "app_test"}));
+				for (var key in ["success", "error", "message", "datasource", "candidate"]) {
+					expect(Find('"' & key & '"', body)).toBeGT(0, body);
+					expect(Find('"' & UCase(key) & '"', body)).toBe(0, body);
 				}
 			});
 

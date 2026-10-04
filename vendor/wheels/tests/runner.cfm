@@ -280,13 +280,7 @@
                 if (local.coreDataSource.action == "refuse") {
                     cfheader(statuscode = 409);
                     cfcontent(type = "application/json");
-                    WriteOutput(SerializeJSON({
-                        success = false,
-                        error = "Test database not available",
-                        message = local.coreDataSource.message,
-                        datasource = local.coreDataSource.decision.primary,
-                        candidate = local.coreDataSource.decision.candidate
-                    }));
+                    WriteOutput(SerializeJSON(application.wo.$coreTestDataSourceRefusal(choice = local.coreDataSource)));
                     abort;
                 }
                 variables.$_coreTestDataSourceName = local.coreDataSource.target;

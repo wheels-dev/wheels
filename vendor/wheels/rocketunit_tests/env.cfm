@@ -27,13 +27,7 @@ coreDataSource = $coreTestDataSource(
 if (coreDataSource.action == "refuse") {
 	cfheader(statuscode = 409);
 	cfcontent(type = "application/json");
-	WriteOutput(SerializeJSON({
-		success = false,
-		error = "Test database not available",
-		message = coreDataSource.message,
-		datasource = coreDataSource.decision.primary,
-		candidate = coreDataSource.decision.candidate
-	}));
+	WriteOutput(SerializeJSON($coreTestDataSourceRefusal(choice = coreDataSource)));
 	abort;
 }
 application.wheels.dataSourceName = coreDataSource.target;
