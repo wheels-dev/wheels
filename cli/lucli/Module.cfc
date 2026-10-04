@@ -10514,17 +10514,7 @@ component extends="modules.BaseModule" {
 			);
 		}
 
-		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
-		var context = {
-			"appName": appName,
-			"datasourceName": opts.datasource,
-			"reloadPassword": opts.reloadPassword,
-			"luceeAdminPassword": opts.luceeAdminPassword,
-			"port": opts.port,
-			"shutdownPort": opts.port + 1,
-			"openBrowser": opts.openBrowser ? "true" : "false",
-			"datasourcesBlock": opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(opts.datasource)
-		};
+		var context = $newTemplateContext(appName, opts);
 
 		// Copy template directory tree to target, processing placeholders.
 		// `rootTargetDir` is passed so recursive calls can compute paths
@@ -10564,7 +10554,7 @@ component extends="modules.BaseModule" {
 		out("Application created!", "green");
 		out("");
 		out("Configuration:", "bold");
-		out("  Port:            #opts.port#");
+		out("  Port:            #opts.port# (shutdown #context.shutdownPort#)");
 		out("  Datasource:      #opts.datasource#");
 		out("  Reload password:      #opts.reloadPassword#");
 		out("  Lucee admin password: (see .env — WHEELS_LUCEE_ADMIN_PASSWORD)");
@@ -10995,6 +10985,34 @@ component extends="modules.BaseModule" {
 			}
 		}
 		return arguments.from;
+	}
+
+	/**
+	 * Placeholder values for the `wheels new` project template.
+	 *
+	 * The shutdown port is the first free port above the HTTP port rather than
+	 * a blind port + 1: sibling apps are usually created with adjacent --port
+	 * values, so port + 1 is often another running app's port. `wheels start`
+	 * still moves a pinned shutdown port that is taken later
+	 * ($resolveStartPorts), but the pin `wheels new` writes should be free when
+	 * it is written.
+	 */
+	private struct function $newTemplateContext(required string appName, required struct opts) {
+		var shutdownPort = $nextFreePort(arguments.opts.port + 1);
+		if (shutdownPort != arguments.opts.port + 1) {
+			out("Shutdown port #arguments.opts.port + 1# is in use; using #shutdownPort#.", "yellow");
+		}
+		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
+		return {
+			"appName": arguments.appName,
+			"datasourceName": arguments.opts.datasource,
+			"reloadPassword": arguments.opts.reloadPassword,
+			"luceeAdminPassword": arguments.opts.luceeAdminPassword,
+			"port": arguments.opts.port,
+			"shutdownPort": shutdownPort,
+			"openBrowser": arguments.opts.openBrowser ? "true" : "false",
+			"datasourcesBlock": arguments.opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(arguments.opts.datasource)
+		};
 	}
 
 	/**
