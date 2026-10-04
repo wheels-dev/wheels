@@ -21,6 +21,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
      * datasource decision for the request); a no-op everywhere else.
      */
     public void function $guardTestRunDataSource() {
+        // A run that is still building bundles is alive: keep its deadline ahead, so
+        // the stranded-run recovery never restores the primary datasource mid-run.
+        if (StructKeyExists(application, "$$$appTestRunDeadline") && StructKeyExists(application, "wo")) {
+            application.wo.$extendTestRunDeadline(from = Now());
+        }
         if (!StructKeyExists(request, "wheels") || !StructKeyExists(request.wheels, "$testDataSourceDecision")) {
             return;
         }

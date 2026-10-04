@@ -190,6 +190,25 @@ component extends="wheels.WheelsTest" {
 				expect(state.forcedDs).toBe(state.primary);
 			});
 
+			it("is held off while the run keeps building spec bundles", () => {
+				var state = {primary = application.wheels.dataSourceName, extended = false, recovered = true, ds = ""};
+				try {
+					g.$markTestRunSwap(original = state.primary);
+					application.$$$appTestRunDeadline = DateAdd("n", -1, Now());
+					application.wheels.dataSourceName = state.primary & "_running";
+					var bundle = new wheels.WheelsTest();
+					state.extended = DateCompare(application.$$$appTestRunDeadline, Now()) > 0;
+					state.recovered = g.$recoverStrandedTestRun(force = false);
+					state.ds = application.wheels.dataSourceName;
+				} finally {
+					application.wheels.dataSourceName = state.primary;
+					g.$clearTestRunSwapMarkers();
+				}
+				expect(state.extended).toBeTrue("building a spec bundle must move the run's deadline forward");
+				expect(state.recovered).toBeFalse("recovery must not fire while the run keeps building bundles");
+				expect(state.ds).toBe(state.primary & "_running");
+			});
+
 			it("does nothing when no run left markers", () => {
 				expect(g.$recoverStrandedTestRun(force = true)).toBeFalse();
 			});

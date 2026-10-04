@@ -1238,6 +1238,17 @@ public void function $markTestRunSwap(required string original) {
 }
 
 /**
+ * Internal. Moves a running test run's deadline forward (from `from`, normally Now()).
+ * WheelsTest calls this as it builds each spec bundle, so a run that is still building
+ * bundles is never taken for a dead one and restored to the primary datasource mid-run.
+ */
+public void function $extendTestRunDeadline(required date from) {
+	if (StructKeyExists(application, "$$$appTestRunDeadline")) {
+		application.$$$appTestRunDeadline = DateAdd("s", Max(1800, $getRequestTimeout()) + 300, arguments.from);
+	}
+}
+
+/**
  * Internal. Removes the markers a test run set, once it has restored the settings.
  */
 public void function $clearTestRunSwapMarkers() {
