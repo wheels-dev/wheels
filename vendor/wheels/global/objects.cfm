@@ -446,18 +446,69 @@
 			local.controllerPath = local.controllerPathsArray[local.i];
 			local.fileName = $objectFileName(name = arguments.name, objectPath = local.controllerPath, type = arguments.type);
 			if (local.fileName != "Controller" || local.i == ArrayLen(local.controllerPathsArray)) {
-				application.wheels.controllers[arguments.name] = $createObjectFromRoot(
-					path = local.controllerPath,
-					fileName = local.fileName,
-					method = "$initControllerClass",
-					name = arguments.name
-				);
+				try {
+					application.wheels.controllers[arguments.name] = $createObjectFromRoot(
+						path = local.controllerPath,
+						fileName = local.fileName,
+						method = "$initControllerClass",
+						name = arguments.name
+					);
+				} catch (any e) {
+					// A nested controller that writes extends="Controller" cannot
+					// find its base class; add the fix to the error message.
+					local.hint = $missingBaseControllerHint(exception = e, name = arguments.name);
+					if (Len(local.hint)) {
+						Throw(
+							type = e.type,
+							message = e.message & " — " & local.hint,
+							detail = StructKeyExists(e, "detail") ? e.detail : "",
+							extendedInfo = StructKeyExists(e, "extendedInfo") ? e.extendedInfo : ""
+						);
+					}
+					rethrow;
+				}
 
 				local.rv = application.wheels.controllers[arguments.name];
 				break;
 			}
 		}
 		return local.rv;
+	}
+
+
+	/**
+	 * Returns a hint to append to a controller-instantiation error when it looks
+	 * like a NESTED controller declared extends="Controller" and the engine could
+	 * not find its base class. A bare extends name resolves relative to the
+	 * controller's own package, so a nested controller (app/controllers/<pkg>/X.cfc)
+	 * must extend "app.controllers.Controller". Returns "" when the error is
+	 * unrelated or the controller is top-level. Additive message text only — it
+	 * does not change the error type, status, or control flow.
+	 */
+	public string function $missingBaseControllerHint(required any exception, required string name) {
+		// Only nested controllers (a dot in the name, e.g. "admin.users") hit
+		// this; a top-level controller resolves "Controller" from its own path.
+		if (!Find(".", arguments.name)) {
+			return "";
+		}
+		local.text = (StructKeyExists(arguments.exception, "message") ? arguments.exception.message : "")
+			& " "
+			& (StructKeyExists(arguments.exception, "detail") ? arguments.exception.detail : "");
+		// Component-not-found phrasings across engines (Lucee: "can't find
+		// component [Controller]"; Adobe: "Could not find the ColdFusion component
+		// or interface Controller"; BoxLang: "could not find component
+		// [Controller]"), where the missing component is the base Controller.
+		if (
+			ReFindNoCase("(can'?t find|could not find|unable to (find|locate)|invalid component definition)", local.text)
+			&& ReFindNoCase("component|interface", local.text)
+			&& ReFindNoCase("\bController\b", local.text)
+		) {
+			return "a nested controller must extend ""app.controllers.Controller"", not ""Controller"" "
+				& "(a bare extends name resolves relative to the controller's own package), so '"
+				& arguments.name
+				& "' cannot find its base controller";
+		}
+		return "";
 	}
 
 
