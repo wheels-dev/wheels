@@ -10865,7 +10865,7 @@ component extends="modules.BaseModule" {
 			);
 		}
 
-		var context = $newTemplateContext(appName, opts);
+		var context = $newTemplateContext(appName, opts, targetDir);
 
 		// Copy template directory tree to target, processing placeholders.
 		// `rootTargetDir` is passed so recursive calls can compute paths
@@ -11327,15 +11327,86 @@ component extends="modules.BaseModule" {
 	 * port next to its requested HTTP port without colliding with another
 	 * project's server. Bounded so a pathological environment cannot spin
 	 * forever; falls back to `from` and lets LuCLI report the conflict itself.
+	 *
+	 * `avoid` is a struct keyed by port number: ports to skip even when nothing
+	 * listens on them right now, such as another project's lucee.json pins.
 	 */
-	private numeric function $nextFreePort(required numeric from) {
+	private numeric function $nextFreePort(required numeric from, struct avoid = {}) {
 		var probe = getService("portProbe");
 		for (var candidate = arguments.from; candidate < arguments.from + 100; candidate++) {
-			if (!probe.portInUse(candidate)) {
+			if (!structKeyExists(arguments.avoid, candidate) && !probe.portInUse(candidate)) {
 				return candidate;
 			}
 		}
 		return arguments.from;
+	}
+
+	/**
+	 * Ports pinned in other projects' lucee.json files, keyed by port, each
+	 * naming the project that pins it. A pin is a port that project will start
+	 * on, so it collides even while that project is stopped, which a listener
+	 * probe can't see. Projects come from the LuCLI server registry (every
+	 * project started on this machine) and from the folders next to
+	 * `targetDir` (siblings created but never started). `targetDir` itself is
+	 * skipped.
+	 */
+	private struct function $otherProjectPins(required string targetDir) {
+		var pins = {};
+		for (var root in $otherProjectRoots(arguments.targetDir)) {
+			var ported = $readPinnedPorts(root);
+			for (var key in ["port", "shutdownPort"]) {
+				if (ported[key] > 0 && !structKeyExists(pins, ported[key])) {
+					pins[ported[key]] = root;
+				}
+			}
+		}
+		return pins;
+	}
+
+	/**
+	 * Project roots for $otherProjectPins(): each registered server's
+	 * `.project-path`, then each sibling folder of `targetDir` that has a
+	 * lucee.json. Unique, without `targetDir`.
+	 */
+	private array function $otherProjectRoots(required string targetDir) {
+		var self = $canonicalDir(arguments.targetDir);
+		var seen = {};
+		var roots = [];
+		var candidates = [];
+		var serversDir = $resolveLucliHome() & "/servers";
+		if (directoryExists(serversDir)) {
+			for (var reg in directoryList(serversDir, false, "path")) {
+				if (fileExists(reg & "/.project-path")) {
+					arrayAppend(candidates, trim(fileRead(reg & "/.project-path")));
+				}
+			}
+		}
+		var parent = getDirectoryFromPath(reReplace(arguments.targetDir, "[\\/]+$", ""));
+		if (directoryExists(parent)) {
+			for (var sibling in directoryList(parent, false, "path")) {
+				arrayAppend(candidates, sibling);
+			}
+		}
+		for (var candidate in candidates) {
+			var dir = $canonicalDir(candidate);
+			if (len(dir) && dir != self && !structKeyExists(seen, dir) && fileExists(dir & "/lucee.json")) {
+				seen[dir] = true;
+				arrayAppend(roots, dir);
+			}
+		}
+		return roots;
+	}
+
+	/**
+	 * Canonical form of a directory path (symlinks resolved, no trailing
+	 * separator), or the path unchanged when it can't be resolved.
+	 */
+	private string function $canonicalDir(required string path) {
+		try {
+			return createObject("java", "java.io.File").init(arguments.path).getCanonicalPath();
+		} catch (any e) {
+			return arguments.path;
+		}
 	}
 
 	/**
@@ -11346,12 +11417,19 @@ component extends="modules.BaseModule" {
 	 * values, so port + 1 is often another running app's port. `wheels start`
 	 * still moves a pinned shutdown port that is taken later
 	 * ($resolveStartPorts), but the pin `wheels new` writes should be free when
-	 * it is written.
+	 * it is written. Ports that other projects pin in their lucee.json are
+	 * skipped too ($otherProjectPins), since those projects start on them
+	 * even when nothing listens there yet.
 	 */
-	private struct function $newTemplateContext(required string appName, required struct opts) {
-		var shutdownPort = $nextFreePort(arguments.opts.port + 1);
+	private struct function $newTemplateContext(required string appName, required struct opts, string targetDir = "") {
+		var pins = len(arguments.targetDir) ? $otherProjectPins(arguments.targetDir) : {};
+		if (structKeyExists(pins, arguments.opts.port)) {
+			out("Port #arguments.opts.port# is also pinned by #pins[arguments.opts.port]# (its lucee.json); the two apps can't run at the same time. Pass a different --port to avoid that.", "yellow");
+		}
+		var shutdownPort = $nextFreePort(arguments.opts.port + 1, pins);
 		if (shutdownPort != arguments.opts.port + 1) {
-			out("Shutdown port #arguments.opts.port + 1# is in use; using #shutdownPort#.", "yellow");
+			var why = structKeyExists(pins, arguments.opts.port + 1) ? "pinned by " & pins[arguments.opts.port + 1] : "in use";
+			out("Shutdown port #arguments.opts.port + 1# is #why#; using #shutdownPort#.", "yellow");
 		}
 		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
 		return {
