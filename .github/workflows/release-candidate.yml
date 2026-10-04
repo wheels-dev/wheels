@@ -100,7 +100,10 @@ jobs:
 
       - name: Install CommandBox
         run: |
-          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors https://downloads.ortussolutions.com/debs/gpg | sudo gpg --dearmor -o /usr/share/keyrings/ortussolutions.gpg
+          # Download to a file first: a retried transfer can't hand gpg a partial or
+          # duplicated stream.
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "$RUNNER_TEMP/ortussolutions.gpg" https://downloads.ortussolutions.com/debs/gpg
+          sudo gpg --dearmor -o /usr/share/keyrings/ortussolutions.gpg "$RUNNER_TEMP/ortussolutions.gpg"
           echo "deb [signed-by=/usr/share/keyrings/ortussolutions.gpg] https://downloads.ortussolutions.com/debs/noarch /" | sudo tee /etc/apt/sources.list.d/ortussolutions.list
           sudo apt-get update && sudo apt-get install -y commandbox
 
