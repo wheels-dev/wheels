@@ -203,7 +203,7 @@ if [ -n "${JAVA_HOME:-}" ] && ! _wheels_java_ok "${JAVA_HOME}"; then
   fi
   unset JAVA_HOME
 fi
-# Probe for OpenJDK 21 across the Debian/Ubuntu AND RHEL/Fedora layouts, on
+# Probe for Java 21+ (OpenJDK 21 named dirs first) across the Debian/Ubuntu AND RHEL/Fedora layouts, on
 # amd64 and arm64. default-java may point at an older JDK, hence the check.
 if [ -z "${JAVA_HOME:-}" ]; then
   for candidate in \
@@ -241,8 +241,8 @@ if [ -z "${JAVA_HOME:-}" ]; then
   done
 fi
 if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
-  echo "wheels: cannot find a Java 21 runtime. Install openjdk-21-jre-headless (apt)" >&2
-  echo "        or java-21-openjdk-headless (yum/dnf)." >&2
+  echo "wheels: cannot find a Java 21 or newer runtime. Install openjdk-21-jre-headless (apt)" >&2
+  echo "        or java-21-openjdk-headless (yum/dnf); any Java 21+ works." >&2
   exit 1
 fi
 # --- java-resolve end -----------------------------------------------------

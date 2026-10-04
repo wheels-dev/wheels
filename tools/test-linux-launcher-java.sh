@@ -157,7 +157,7 @@ fake_jdk "${CASE}/temurin-17" "$(banner 17.0.20)"
 fake_jdk "${JVM}/default-java" "$(banner 17.0.20)"
 run_case "${CASE}/temurin-17"
 check "no Java 21 anywhere exits 1" "$(is "${RC}" "1")"
-check "no Java 21 anywhere keeps the final error" "$(has "${ERR}" "cannot find a Java 21 runtime")"
+check "no Java 21 anywhere keeps the final error" "$(has "${ERR}" "cannot find a Java 21 or newer runtime")"
 check "no Java 21 anywhere still prints the notice" "$(has "${ERR}" "ignoring JAVA_HOME=${CASE}/temurin-17 (Java 17)")"
 
 # 11. The generated wrapper as a whole still parses.
