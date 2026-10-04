@@ -65,7 +65,7 @@ That pattern is the right fit for an API auth check that shouldn't touch marketi
 
 ## Writing your own
 
-Implement `wheels.middleware.MiddlewareInterface` — a single `handle(request, next)` method returning the response string — and drop the component into `app/middleware/`. Reference it either by instance in `config/settings.cfm` or by CFC path in a route scope. That is the whole contract: inspect the request, decide whether to call `next(request)`, decide what to do with the response when it comes back.
+Implement `wheels.middleware.MiddlewareInterface` — a single `handle(request, next)` method returning the response string — and drop the component into `app/middleware/`. Reference it either by instance in `config/settings.cfm` or by CFC path in a route scope. An `init()` is optional: for a CFC path, Wheels creates the component and calls its `init()` only if it has one, so a component that needs no configuration can skip it. That is the whole contract: inspect the request, decide whether to call `next(request)`, decide what to do with the response when it comes back.
 
 Reach for middleware when the concern is cross-cutting (every request, or every request in a subtree) and independent of your domain. Reach for a controller filter when the concern is bound to a specific controller's lifecycle — loading `@user` before a show action, say. The two tools layer cleanly; middleware runs first, filters run once the controller exists.
 
