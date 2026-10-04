@@ -1449,9 +1449,10 @@
 			}
 			local.wherePos = ArrayLen(local.rv) + 1;
 			local.params = [];
-			// split on AND/OR only where they stand as keywords: `_` and `$` are identifier
-			// characters, so `ORDER_AND_ITEMS.id` / `X$OR_Y.id` must not be cut in two (#3675)
-			local.where = ReReplace(
+			// split on AND/OR (in any case) only where they stand as keywords: `_` and `$` are
+			// identifier characters, so `ORDER_AND_ITEMS.id` / `X$OR_Y.id` must not be cut in two
+			// (#3675). Literals are masked at this point, so none of their text can split.
+			local.where = ReReplaceNoCase(
 				ReReplace(arguments.where, variables.wheels.class.RESQLWhere, "\1?\8", "all"),
 				"([^a-zA-Z0-9_$])(AND|OR)([^a-zA-Z0-9_$])",
 				"\1#Chr(7)#\2\3",
@@ -1472,7 +1473,12 @@
 					local.elementDataPart = local.element;
 				}
 				// strip a leading AND/OR keyword only, never the start of an identifier like ORDERS (#3675)
-				local.elementDataPart = Trim(ReReplace(local.elementDataPart, "^(AND|OR)([^a-zA-Z0-9_$]|$)", "\2"));
+				local.elementDataPart = Trim(ReReplaceNoCase(local.elementDataPart, "^(AND|OR)([^a-zA-Z0-9_$]|$)", "\2"));
+				// the condition ends at its placeholder; anything after it (a LIKE ... ESCAPE
+				// clause) stays in the SQL as written
+				if (Find("?", local.elementDataPart)) {
+					local.elementDataPart = Left(local.elementDataPart, Find("?", local.elementDataPart));
+				}
 				local.temp = ReFind(
 					"^([a-zA-Z0-9-_\.$]*) ?#variables.wheels.class.RESQLOperators#",
 					local.elementDataPart,
@@ -1544,7 +1550,7 @@
 					ArrayAppend(local.params, local.param);
 				}
 			}
-			local.where = ReplaceList(local.where, "#Chr(7)#AND,#Chr(7)#OR", "AND,OR");
+			local.where = Replace(local.where, Chr(7), "", "all");
 
 			// add to sql array
 			local.where = " " & local.where & " ";
