@@ -6412,7 +6412,7 @@ component extends="modules.BaseModule" {
 	private string function generateMigration(required array args) {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate migration <Name>", "yellow");
-			out("  Example: wheels generate migration AddEmailToUsers");
+			out("  Example: wheels generate migration BackfillUserSlugs");
 			$refuse("wheels generate migration: missing required arguments. Usage: wheels generate migration <Name>");
 		}
 
@@ -6434,6 +6434,52 @@ component extends="modules.BaseModule" {
 		$generateWrite(filePath, buildEmptyMigration(migrationName));
 
 		printCreated("app/migrator/migrations/#fileName#");
+		var hint = $migrationNameHint(migrationName);
+		if (len(hint)) {
+			out("");
+			out(hint, "yellow");
+		}
+		return "";
+	}
+
+	/**
+	 * A next step for a migration whose name reads like a column change
+	 * (`AddEmailToUsers`, `add_email_to_users`, `RemoveEmailFromUsers`).
+	 * `generate migration` writes a blank up()/down() whatever the name says,
+	 * so point an add at `wheels generate property`, which writes the
+	 * addColumn() for you, and show the removeColumn() call for a remove.
+	 * Returns "" for any other name. Public for specs; the `$` prefix keeps it
+	 * off the MCP tool list.
+	 */
+	public string function $migrationNameHint(required string migrationName) {
+		var name = arguments.migrationName;
+		var nl = chr(10);
+		var parts = reFind("^(?:Add([A-Z][A-Za-z0-9]*?)To([A-Z][A-Za-z0-9]*)|add_([a-z0-9_]+?)_to_([a-z0-9_]+))$", name, 1, true);
+		if (parts.pos[1] > 0) {
+			var column = parts.pos[2] > 0 ? mid(name, parts.pos[2], parts.len[2]) : mid(name, parts.pos[4], parts.len[4]);
+			var table = parts.pos[3] > 0 ? mid(name, parts.pos[3], parts.len[3]) : mid(name, parts.pos[5], parts.len[5]);
+			// Keep the words' case: lCase() first turned BlogPosts into "Blogpost".
+			// A snake_case table (blog_posts) is PascalCased first; singularize()
+			// then changes only the last word.
+			var pascalTable = "";
+			for (var word in listToArray(table, "_")) {
+				pascalTable &= uCase(left(word, 1)) & mid(word, 2, len(word));
+			}
+			var modelName = getService("helpers").singularize(pascalTable);
+			var columnName = lCase(left(column, 1)) & mid(column, 2, len(column));
+			return "This migration is blank: `generate migration` doesn't read columns from its name." & nl
+				& "To add #columnName# to #lCase(table)# with the migration written for you, use instead:" & nl
+				& "  wheels generate property #modelName# #columnName#:string   (or :integer, :boolean, ...)";
+		}
+		parts = reFind("^(?:Remove([A-Z][A-Za-z0-9]*?)From([A-Z][A-Za-z0-9]*)|remove_([a-z0-9_]+?)_from_([a-z0-9_]+))$", name, 1, true);
+		if (parts.pos[1] > 0) {
+			var column = parts.pos[2] > 0 ? mid(name, parts.pos[2], parts.len[2]) : mid(name, parts.pos[4], parts.len[4]);
+			var table = parts.pos[3] > 0 ? mid(name, parts.pos[3], parts.len[3]) : mid(name, parts.pos[5], parts.len[5]);
+			var columnName = lCase(left(column, 1)) & mid(column, 2, len(column));
+			return "This migration is blank: `generate migration` doesn't read columns from its name." & nl
+				& "Fill in up() with:" & nl
+				& '  removeColumn(table="#lCase(table)#", columnName="#columnName#");';
+		}
 		return "";
 	}
 
