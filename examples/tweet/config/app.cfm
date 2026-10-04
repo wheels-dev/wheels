@@ -13,6 +13,11 @@
         , connectionString: 'jdbc:h2:file:' & expandPath('../db/h2/tweet') & ';MODE=MySQL'
         , username = 'sa'
         };
+        this.datasources['tweet_test'] = {
+          class: 'org.h2.Driver'
+        , connectionString: 'jdbc:h2:file:' & expandPath('../db/h2/tweet_test') & ';MODE=MySQL'
+        , username = 'sa'
+        };
         this.datasources['wheelstestdb_h2'] = {
           class: 'org.h2.Driver'
         , connectionString: 'jdbc:h2:file:' & expandPath('../db/h2/wheelstestdb_h2') & ';MODE=MySQL'

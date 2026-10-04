@@ -34,6 +34,4 @@ You need [CommandBox](https://www.ortussolutions.com/products/commandbox).
 
 4. Open the site, choose **Sign up**, create an account, and post your first tweet.
 
-## Tests
-
-With the server running, open `/wheels/app/tests` to run the app's specs (`tests/specs/`).
+5. Run the tests. With the server running, open `/wheels/app/tests` to run the app's specs (`tests/specs/`). They run against a separate `tweet_test` H2 database (also under `db/h2/`), so your data in `tweet` isn't touched.
