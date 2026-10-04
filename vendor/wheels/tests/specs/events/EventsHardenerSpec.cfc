@@ -511,8 +511,30 @@ component extends="wheels.WheelsTest" {
 				expect(em.$lastStatusCode()).toBe(500);
 			});
 
+			it("a rootCause with no type does not crash the resolver and stays HTTP 500", () => {
+				// The non-BoxLang resolver branch reads exception.rootCause.type; a
+				// rootCause present but without a `type` key must not be dereferenced
+				// unguarded (it would crash the production error page itself). It falls
+				// through to {} and the status stays 500.
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $typelessRootCauseException(), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(500);
+			});
+
 		});
 
+	}
+
+	private struct function $typelessRootCauseException() {
+		// rootCause present but with no `type` key (and a non-Wheels top-level type),
+		// so neither engine branch should classify it — resolver returns {} -> 500.
+		return {
+			type = "java.lang.RuntimeException",
+			message = "boom",
+			rootCause = {
+				message = "root boom"
+			}
+		};
 	}
 
 	private any function $onErrorDouble() {

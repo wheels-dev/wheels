@@ -112,7 +112,13 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 				local.wheelsError = arguments.exception.cause.rootCause;
 			}
 		} else {
-			if (StructKeyExists(arguments.exception, "rootCause") && Left(arguments.exception.rootCause.type, 6) == "Wheels") {
+			if (
+				StructKeyExists(arguments.exception, "rootCause")
+				&& !IsNull(arguments.exception.rootCause)
+				&& IsStruct(arguments.exception.rootCause)
+				&& StructKeyExists(arguments.exception.rootCause, "type")
+				&& Left(arguments.exception.rootCause.type, 6) == "Wheels"
+			) {
 				local.wheelsError = arguments.exception.rootCause;
 			} else if (
 				StructKeyExists(arguments.exception, "cause")
