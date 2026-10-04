@@ -148,7 +148,7 @@ it("round-trips through new → create → show", () => {
 });
 ```
 
-`assertRedirect()` with no argument asserts a 3xx response without pinning the target path. Read the `Location` header off `testClient.headers()` and request it explicitly — the spec is about what the user sees after the redirect, not the intermediate 302.
+`assertRedirect()` with no argument asserts a 3xx response without pinning the target path. Read the `Location` header off `testClient.headers()` and request it explicitly — the spec is about what the user sees after the redirect, not the intermediate redirect.
 
 ## Testing inline validation errors
 
