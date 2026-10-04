@@ -270,6 +270,7 @@ Now wire URLs to those actions.
 
    ```cfm {test:compile}
    mapper()
+       .get(name="up", to="up##index")
        .resources(name="posts", only="index,show")
        .get(name="hello", pattern="/hello", to="main##hello")
        .wildcard()

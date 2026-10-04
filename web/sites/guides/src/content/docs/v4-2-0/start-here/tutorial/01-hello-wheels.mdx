@@ -184,6 +184,7 @@ You'll add a new URL, a new action on the existing `Main` controller, and a new 
    ```cfm title="config/routes.cfm — starting state"
    mapper()
        // CLI-Appends-Here
+       .get(name="up", to="up##index")
        .wildcard()
        .root(to="main##index", method="get")
    .end();
@@ -193,6 +194,7 @@ You'll add a new URL, a new action on the existing `Main` controller, and a new 
 
    ```cfm {test:compile}
    mapper()
+       .get(name="up", to="up##index")
        .get(name="hello", pattern="/hello", to="main##hello")
        .wildcard()
        .root(to="main##index", method="get")
