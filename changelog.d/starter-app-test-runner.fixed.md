@@ -1,0 +1,1 @@
+- The starter app's tests run again: its `tests/runner.cfm`, an old copy of the framework's core-test runner that set the datasource from the folder name ("Datasource [public] doesn't exist"), is replaced by the app template's runner, which runs the specs on the `starterApp_test` datasource.
