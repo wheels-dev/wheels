@@ -1152,6 +1152,49 @@ public struct function $testDataSourceDecision(
 }
 
 /**
+ * Internal. Which datasource the framework's own test runners (the core runner and the
+ * RocketUnit runner) use. `?db=` naming one of `testDbList` selects `wheelstestdb_<db>`, and
+ * the `|datasourceName|` placeholder selects `wheelstestdb`, as before. A
+ * `coreTestDataSourceName` other than the app's primary datasource is used as it is. Only
+ * when the run would otherwise use the app's primary datasource does the app-test rule apply
+ * ($testDataSourceDecision): `<primary>_test`, the primary datasource on request, or refused.
+ * Returns `{action: use|swap|primary|refuse, target, decision}`.
+ */
+public struct function $coreTestDataSource(
+	required string primary,
+	required string coreName,
+	required struct requestUrl,
+	string testDbList = "mysql,sqlserver,sqlserver_cicd,postgres,h2,oracle,sqlite,cockroachdb",
+	candidateRegistered
+) {
+	local.rv = {action = "use", target = "", decision = {}};
+	if (
+		StructKeyExists(arguments.requestUrl, "db")
+		&& IsSimpleValue(arguments.requestUrl.db)
+		&& ListFind(arguments.testDbList, arguments.requestUrl.db)
+	) {
+		local.rv.target = ListFind("sqlserver,sqlserver_cicd", arguments.requestUrl.db) ? "wheelstestdb_sqlserver" : "wheelstestdb_" & arguments.requestUrl.db;
+		return local.rv;
+	}
+	if (arguments.coreName == "|datasourceName|") {
+		local.rv.target = "wheelstestdb";
+		return local.rv;
+	}
+	if (Compare(arguments.coreName, arguments.primary) != 0) {
+		local.rv.target = arguments.coreName;
+		return local.rv;
+	}
+	local.decisionArgs = {primary = arguments.primary, requestUrl = arguments.requestUrl};
+	if (StructKeyExists(arguments, "candidateRegistered") && !IsNull(arguments.candidateRegistered)) {
+		local.decisionArgs.candidateRegistered = arguments.candidateRegistered;
+	}
+	local.rv.decision = $testDataSourceDecision(argumentCollection = local.decisionArgs);
+	local.rv.action = local.rv.decision.action;
+	local.rv.target = local.rv.decision.target;
+	return local.rv;
+}
+
+/**
  * Internal. True when `name` is in the application's datasources or the engine can
  * open it (a datasource registered at server level is not in the application metadata).
  */
