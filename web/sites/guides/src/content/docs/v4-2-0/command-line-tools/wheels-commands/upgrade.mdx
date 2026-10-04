@@ -135,17 +135,17 @@ The scanner catches the patterns that are most commonly missed during a major up
 `wheels upgrade apply` replaces the app's `vendor/wheels/` with the copy of the framework bundled inside the installed CLI binary. Before any file is touched, the command announces the plan — printing the reserved backup path and the exact one-liner to recover if the swap is interrupted:
 
 ```text title="illustrative — pre-swap announcement"
-Backing up vendor/wheels -> vendor/wheels.bak-20260611-141502
+Backing up vendor/wheels -> .wheels/backups/wheels.bak-20260611-141502/ (outside vendor/, ignored by git)
 If this is interrupted, restore with:
-  rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
+  rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/.wheels/backups/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
 ```
 
 After the swap, it reports the version transition, the backup location, and the recovery one-liner:
 
 ```text title="illustrative — swap summary"
 Framework upgraded: 3.5.1 -> 4.0.2
-Backup:  /path/to/app/vendor/wheels.bak-20260611-141502
-Recover with:  rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
+Backup:  /path/to/app/.wheels/backups/wheels.bak-20260611-141502
+Recover with:  rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/.wheels/backups/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
 ```
 
 If a safety check refuses the swap, the command prints only the refusal and exits non-zero — no backup is made and no restore command is shown, because there is nothing to restore.
@@ -179,7 +179,7 @@ wheels upgrade apply --nobackup
 
 **`check` verb:** Nothing — the scanner is read-only.
 
-**`apply` verb:** `vendor/wheels/` is replaced with the framework bundled in the installed CLI. By default, the old copy is moved to a timestamped `vendor/wheels.bak-*` directory before the swap, so recovery is a single `mv`.
+**`apply` verb:** `vendor/wheels/` is replaced with the framework bundled in the installed CLI. By default, the old copy is moved to a timestamped `.wheels/backups/wheels.bak-*` directory in the project before the swap, so recovery is a single `mv`. The backup sits outside `vendor/` because the framework loads every `vendor/` folder as a package, and `.wheels/backups/` carries its own `.gitignore`, so a backup is never committed.
 
 To also update the CLI binary itself:
 - **Homebrew:** `brew upgrade wheels`
@@ -194,7 +194,7 @@ After each CLI upgrade, run `wheels upgrade apply` to update your app's vendored
 **`apply` verb:** The old `vendor/wheels/` is moved to a timestamped backup before the swap. The pre-swap announcement prints the exact recovery command — copy it before the swap completes if you want it on hand:
 
 ```bash title="recovery — from pre-swap announcement"
-rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
+rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/.wheels/backups/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
 ```
 
 If you passed `--nobackup`, recover from git instead:

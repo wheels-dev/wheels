@@ -42,7 +42,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	private array function listBackups() {
-		return directoryList(variables.tempRoot & "/vendor", false, "name", "wheels.bak-*");
+		var backupsDir = variables.tempRoot & "/.wheels/backups";
+		if (!directoryExists(backupsDir)) {
+			return [];
+		}
+		return directoryList(backupsDir, false, "name", "wheels.bak-*");
 	}
 
 	function run() {
@@ -253,11 +257,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(seededVersion()).toBe(variables.bundledVersion);
 					expect(fileExists(variables.tempRoot & "/vendor/wheels/marker.txt")).toBeFalse();
 
-					// Old copy parked under vendor/wheels.bak-<timestamp>.
+					// Old copy parked under .wheels/backups/wheels.bak-<timestamp>,
+					// outside vendor/: the framework loads every vendor/ folder as a
+					// package, so a backup there logged an error on every boot.
 					var backups = listBackups();
 					expect(arrayLen(backups)).toBe(1);
 					expect(reFindNoCase("^wheels\.bak-\d{8}-\d{6}", backups[1])).toBeGT(0);
-					expect(fileRead(variables.tempRoot & "/vendor/" & backups[1] & "/marker.txt")).toBe("old-framework");
+					expect(fileRead(variables.tempRoot & "/.wheels/backups/" & backups[1] & "/marker.txt")).toBe("old-framework");
+					expect(directoryList(variables.tempRoot & "/vendor", false, "name")).toBe(["wheels"]);
+					// The backups directory ignores itself, whatever the app's .gitignore says.
+					expect(fileRead(variables.tempRoot & "/.wheels/backups/.gitignore")).toInclude("*");
 
 					// And the summary reports old -> new plus the recovery path.
 					expect(result).toInclude("0.0.1-spec-fixture");
@@ -276,7 +285,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(arrayLen(backups)).toBe(1);
 					// The announced destination is the directory the backup
 					// actually landed in (reserved up front, passed through).
-					expect(result).toInclude("Backing up vendor/wheels -> vendor/" & backups[1]);
+					expect(result).toInclude("Backing up vendor/wheels -> .wheels/backups/" & backups[1] & "/ (outside vendor/, ignored by git)");
 					expect(result).toInclude("If this is interrupted, restore with:");
 					expect(result).toInclude('rm -rf "');
 					expect(result).toInclude('/vendor/wheels" && mv "');
