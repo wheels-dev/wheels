@@ -237,6 +237,7 @@ component extends="modules.BaseModule" {
 			"browser",  // multi-step browser testing flow
 			"jobs",     // `jobs work` is a long-lived poll loop — no single-call MCP semantics (like start/stop)
 			"coverage", // instruments app/ on disk then runs the suite — stateful, not single-call MCP semantics
+			"framework", // `framework install` writes the framework into vendor/wheels/ — a side-effecting install, not a query
 			// downloads a ~30 MB bundle from GitHub and unpacks it into the CLI
 			// home — a side-effecting install step, not a query
 			"docs",
@@ -571,6 +572,14 @@ component extends="modules.BaseModule" {
 			.accept("help")
 			.accept("h")
 			.accept("dry-run");
+	}
+
+	private any function frameworkArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "subcommand", default = "", choices = "install,help", description = "`install` installs the CLI's bundled framework into vendor/wheels/ for an app that has none (e.g. one moving off CommandBox). Omitted/empty prints usage and changes nothing")
+			.option(name = "to", default = "", description = "install only: target Wheels version. Must match the CLI's bundled framework version — no downloads")
+			.accept("help")
+			.accept("h");
 	}
 
 	private any function jobsArgSpec() {
@@ -5939,6 +5948,144 @@ component extends="modules.BaseModule" {
 			throw(type = "Wheels.InvalidArguments", message = "Refusing to run upgrade apply for subcommand '#opts.subcommand#'.");
 		}
 		return runUpgradeApply(opts.targetVersion, opts.doBackup, opts.allowDowngrade);
+	}
+
+	/**
+	 * Install the Wheels framework into an existing app that has no vendor/wheels/.
+	 */
+	public string function framework() {
+		var coll = structuredArgs(arguments);
+		var opts = frameworkArgSpec().parse(coll);
+		var wantsHelp = !len(opts.subcommand)
+			|| opts.subcommand == "help"
+			|| (structKeyExists(opts, "help") && isBoolean(opts.help) && opts.help)
+			|| (structKeyExists(opts, "h") && isBoolean(opts.h) && opts.h);
+		if (wantsHelp) {
+			return $printFrameworkHelp();
+		}
+		// frameworkArgSpec()'s choices="install,help" has already rejected any
+		// other subcommand with a non-zero exit before we get here.
+		return runFrameworkInstall(opts.to);
+	}
+
+	// Fresh-install path: drop the CLI's bundled framework into an app that has
+	// no vendor/wheels/. Replacing an EXISTING framework is `wheels upgrade
+	// apply`'s job (one path for that), so this refuses when vendor/wheels/ is
+	// already present. Prints progress via out() and returns "" — out() is the
+	// display, and returning the text too would double it in MCP results (the
+	// U4 convention for runUpgradeApply). Refusals print-then-throw (#2941).
+	private string function runFrameworkInstall(string targetVersion = "") {
+		var nl = chr(10);
+		var vendorDir = variables.projectRoot & "/vendor/wheels";
+		var upgrader = new services.FrameworkUpgrader();
+
+		if ($safeDirExists(vendorDir)) {
+			if (upgrader.looksLikeWheelsFramework(vendorDir)) {
+				var present = upgrader.readFrameworkVersion(vendorDir);
+				out("vendor/wheels/ already exists#len(present) ? ' (Wheels ' & present & ')' : ''#.", "red");
+				out("Use 'wheels upgrade apply' to replace an existing framework.");
+				throw(
+					type = "Wheels.FrameworkInstallFailed",
+					message = "vendor/wheels/ already present — use `wheels upgrade apply` to replace an existing framework."
+				);
+			}
+			out("vendor/wheels/ exists but does not look like a Wheels framework.", "red");
+			out("Remove it (or use 'wheels upgrade apply'), then re-run 'wheels framework install'.");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = "vendor/wheels/ exists but is not a Wheels framework — remove it or use `wheels upgrade apply`."
+			);
+		}
+
+		var sourceDir = $resolveBundledFrameworkSource();
+		if (!len(sourceDir)) {
+			out("Could not locate the CLI's bundled framework — the CLI install may be incomplete.", "red");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = "Could not locate the CLI's bundled framework (tried WHEELS_FRAMEWORK_PATH, then the module's own install tree)."
+			);
+		}
+
+		var bundledVersion = upgrader.readFrameworkVersion(sourceDir);
+		if (len(arguments.targetVersion) && arguments.targetVersion != bundledVersion) {
+			out("Requested --to=#arguments.targetVersion# but the CLI bundles #len(bundledVersion) ? bundledVersion : 'unknown'#.", "red");
+			out("Only the bundled version can be installed (no downloads). Install a CLI that bundles your target, or omit --to.");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = "--to=#arguments.targetVersion# does not match the CLI's bundled framework version (#bundledVersion#); only the bundled version is installable."
+			);
+		}
+
+		// A fresh install may run in an app that has no vendor/ directory yet
+		// (e.g. one that never ran `box install`); create the parent so the swap
+		// has somewhere to land — validateSwap requires the parent to exist.
+		var vendorParent = getDirectoryFromPath(vendorDir);
+		if (!directoryExists(vendorParent)) {
+			directoryCreate(vendorParent, true, true);
+		}
+
+		// The service's pre-mutation refusal checks (source looks like a
+		// framework; target parent exists; no path overlap). An absent vendorDir
+		// is allowed — that is the fresh-install case.
+		var validationError = upgrader.validateSwap(sourceDir, vendorDir);
+		if (len(validationError)) {
+			out(validationError, "red");
+			throw(type = "Wheels.FrameworkInstallFailed", message = validationError);
+		}
+
+		// A box.json that pins wheels-core must be updated after the install, or a
+		// later `box install` would copy an old framework over vendor/wheels/. A
+		// missing box.json is the normal case for an app moving onto the CLI.
+		var boxPin = $upgradeApplyBoxPin(upgrader);
+
+		out("Source:  #sourceDir#");
+		out("Target:  #vendorDir#");
+		out("Installing Wheels #bundledVersion# into vendor/wheels/ ...");
+
+		var result = {};
+		try {
+			// doBackup = false: a fresh install has nothing to back up.
+			result = upgrader.applyUpgrade(sourceDir, vendorDir, false, "");
+		} catch (Wheels.FrameworkUpgrader e) {
+			out(e.message, "red");
+			throw(type = "Wheels.FrameworkInstallFailed", message = e.message);
+		}
+		if (!result.success) {
+			out(result.error, "red");
+			throw(type = "Wheels.FrameworkInstallFailed", message = result.error);
+		}
+
+		var summary = "Framework installed: #result.newVersion#" & nl;
+		summary &= $upgradeApplyUpdateBoxPin(upgrader, boxPin, result.newVersion);
+		summary &= nl & "Next: run 'wheels start', then 'wheels migrate latest'." & nl;
+		out(summary, "green");
+		return "";
+	}
+
+	/**
+	 * Help block for `wheels framework` / `wheels framework help` / `--help`.
+	 */
+	private string function $printFrameworkHelp() {
+		var nl = chr(10);
+		var help = "Usage:" & nl
+			& "  wheels framework install [--to=<version>]" & nl
+			& nl
+			& "Install the Wheels framework (vendor/wheels/) into an existing app that has" & nl
+			& "none — for example an app moving off CommandBox. To replace an existing" & nl
+			& "framework, use 'wheels upgrade apply' instead." & nl
+			& nl
+			& "Subcommands:" & nl
+			& "  install           Install the CLI's bundled framework into vendor/wheels/." & nl
+			& "                    Refuses if vendor/wheels/ already exists (use upgrade apply)." & nl
+			& nl
+			& "Options:" & nl
+			& "  --to=<version>    Must match the CLI's bundled framework version (no downloads)." & nl
+			& nl
+			& "Examples:" & nl
+			& "  wheels framework install             - install the bundled framework" & nl
+			& "  wheels framework install --to=4.2.0  - install, asserting the bundled version" & nl;
+		out(help, "yellow");
+		return help;
 	}
 
 	/**

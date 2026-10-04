@@ -37,6 +37,8 @@ This guide walks every breaking change between Wheels 3.x and 4.0, with before/a
 
    If the app is managed with CommandBox (its `box.json` lists `wheels-core` under `dependencies`), set that version to 4.x as well, for example `"wheels-core": "^4.2.0"`. Left at 3.x, the next `box install` (a CI job, a Docker build) copies the 3.x framework back over `vendor/wheels/` without clearing it, and the app runs a mix of both versions. `wheels upgrade apply` updates it for you.
 
+   Moving onto the `wheels` CLI from CommandBox and the app has no `vendor/wheels/` yet (the framework came in via `box install`)? Run `wheels framework install` from the app root — it installs the CLI's bundled framework into `vendor/wheels/` and pins `box.json`'s `wheels-core`. Once `vendor/wheels/` exists, use `wheels upgrade apply` to replace it.
+
 </Steps>
 
 ## The eleven breaking changes
