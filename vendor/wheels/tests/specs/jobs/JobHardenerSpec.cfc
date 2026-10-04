@@ -108,7 +108,7 @@ component extends="wheels.WheelsTest" {
 				local.oldTime = DateAdd("s", -600, Now());
 				$insertTestJob(
 					id = local.id,
-					jobClass = "app.jobs.ProcessOrdersJob",
+					jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
 					queue = "test_hard_b1_timeout",
 					status = "processing",
 					attempts = 1,
@@ -131,7 +131,7 @@ component extends="wheels.WheelsTest" {
 				local.worker.$scheduleRetry(
 					jobId = local.id,
 					currentAttempts = 1,
-					jobClass = "app.jobs.ProcessOrdersJob",
+					jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
 					maxRetries = 3,
 					errorMessage = "Job timed out after 300 seconds"
 				);
@@ -160,7 +160,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("B2: successful enqueue still returns status=pending and persisted=true", function() {
-				local.job = new app.jobs.ProcessOrdersJob();
+				local.job = new wheels.tests._assets.jobs.ProcessOrdersJob();
 				local.result = local.job.enqueue(data = {batchSize: 1}, queue = "test_hard_b2_ok");
 
 				expect(local.result.persisted).toBeTrue();
@@ -179,7 +179,7 @@ component extends="wheels.WheelsTest" {
 
 				$insertTestJob(
 					id = local.otherPending,
-					jobClass = "app.jobs.ProcessOrdersJob",
+					jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
 					queue = "test_hard_b3_other",
 					status = "pending",
 					createdAt = local.otherCreated,
@@ -187,7 +187,7 @@ component extends="wheels.WheelsTest" {
 				);
 				$insertTestJob(
 					id = local.targetPending,
-					jobClass = "app.jobs.ProcessOrdersJob",
+					jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
 					queue = "test_hard_b3_target",
 					status = "pending",
 					createdAt = local.targetCreated,
@@ -195,13 +195,13 @@ component extends="wheels.WheelsTest" {
 				);
 				$insertTestJob(
 					id = local.otherDone,
-					jobClass = "app.jobs.ProcessOrdersJob",
+					jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
 					queue = "test_hard_b3_other",
 					status = "completed"
 				);
 				$insertTestJob(
 					id = local.targetDone,
-					jobClass = "app.jobs.ProcessOrdersJob",
+					jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
 					queue = "test_hard_b3_target",
 					status = "completed"
 				);
@@ -308,7 +308,7 @@ component extends="wheels.WheelsTest" {
 				local.past = DateAdd("s", -30, Now());
 				$insertTestJob(
 					id = local.id,
-					jobClass = "app.jobs.ProcessOrdersJob",
+					jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
 					queue = "test_hard_s6_claim",
 					createdAt = local.past,
 					updatedAt = local.past
@@ -344,7 +344,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("S1: enqueue persists timeout=300 and perform honors it", function() {
-				local.job = new app.jobs.ProcessOrdersJob();
+				local.job = new wheels.tests._assets.jobs.ProcessOrdersJob();
 				local.enqueued = local.job.enqueue(data = {batchSize: 1}, queue = "test_hard_s1_persist");
 				expect(local.enqueued.persisted).toBeTrue();
 				local.row = queryExecute(
@@ -398,7 +398,7 @@ component extends="wheels.WheelsTest" {
 					dataSource = application.wheels.dataSourceName,
 					config = {secret = "s7-must-not-persist", nested = {token = "abc"}}
 				};
-				local.job = new app.jobs.ProcessOrdersJob();
+				local.job = new wheels.tests._assets.jobs.ProcessOrdersJob();
 				local.enqueued = local.job.enqueue(data = {orderId = 1}, queue = "test_hard_s7");
 				expect(local.enqueued.persisted).toBeTrue();
 				local.row = queryExecute(
@@ -486,15 +486,15 @@ component extends="wheels.WheelsTest" {
 
 				local.failA = CreateUUID();
 				local.failB = CreateUUID();
-				$insertTestJob(id = local.failA, jobClass = "app.jobs.ProcessOrdersJob", queue = "test_hard_s10_retry", status = "failed", attempts = 3);
-				$insertTestJob(id = local.failB, jobClass = "app.jobs.ProcessOrdersJob", queue = "test_hard_s10_retry", status = "failed", attempts = 3);
+				$insertTestJob(id = local.failA, jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob", queue = "test_hard_s10_retry", status = "failed", attempts = 3);
+				$insertTestJob(id = local.failB, jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob", queue = "test_hard_s10_retry", status = "failed", attempts = 3);
 				expect(local.job.retryFailed(queue = "test_hard_s10_retry")).toBe(2);
 
 				local.oldTime = DateAdd("d", -30, Now());
 				local.doneA = CreateUUID();
 				local.doneB = CreateUUID();
-				$insertTestJob(id = local.doneA, jobClass = "app.jobs.ProcessOrdersJob", queue = "test_hard_s10_purge", status = "completed", createdAt = local.oldTime, updatedAt = local.oldTime);
-				$insertTestJob(id = local.doneB, jobClass = "app.jobs.ProcessOrdersJob", queue = "test_hard_s10_purge", status = "completed", createdAt = local.oldTime, updatedAt = local.oldTime);
+				$insertTestJob(id = local.doneA, jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob", queue = "test_hard_s10_purge", status = "completed", createdAt = local.oldTime, updatedAt = local.oldTime);
+				$insertTestJob(id = local.doneB, jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob", queue = "test_hard_s10_purge", status = "completed", createdAt = local.oldTime, updatedAt = local.oldTime);
 				queryExecute(
 					"UPDATE wheels_jobs SET completedAt = :oldTime WHERE id IN (:a, :b)",
 					{
