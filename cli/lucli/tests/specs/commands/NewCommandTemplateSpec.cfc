@@ -34,6 +34,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileExists(templateRoot & ".ai/README.md")).toBeTrue();
 			});
 
+			it("puts the root route before the wildcard, and the wildcard last", () => {
+				// Routes match first to last; the app's CLAUDE.md says root, then
+				// the wildcard last. generate auth's fallback anchor inserts
+				// before .root(), which only precedes the wildcard in this order.
+				var routes = fileRead(templateRoot & "config/routes.cfm");
+				var rootAt = find(".root(", routes);
+				var wildcardAt = find(".wildcard()", routes);
+				expect(rootAt).toBeGT(0);
+				expect(wildcardAt).toBeGT(rootAt);
+				var afterWildcard = mid(routes, wildcardAt + len(".wildcard()"), len(routes));
+				expect(reFind("\.[a-zA-Z]+\(", reReplace(afterWildcard, "\.end\(\)", "", "all"))).toBe(0);
+			});
+
 			it("ships app/views/helpers.cfm (used by layout rendering)", () => {
 				expect(fileExists(templateRoot & "app/views/helpers.cfm")).toBeTrue();
 			});
