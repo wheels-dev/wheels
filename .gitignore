@@ -103,6 +103,11 @@ public/testbox/system/stubs/
 # Build outputs (docs bundle etc.)
 artifacts/
 
+# The starter app ships vendor/wheels/ in its release zip (prepare-starterApp.sh
+# copies it); a local `box install` in the example is not committed.
+/examples/starter-app/vendor/
+/examples/starter-app/db/*.sqlite
+
 # Linux package build staging (tools/distribution-drafts/linux-packages)
 .linux-pkg-build/
 

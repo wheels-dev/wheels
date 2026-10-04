@@ -10,29 +10,43 @@
 	// Added via Wheels CLI
 	this.name = "starterApp";
 
-	// H2 embedded database — boots out of the box with no .env or external
-	// database server. The H2 driver (org.h2.Driver) is bundled with Lucee, so
-	// it works on a plain `box install` / CommandBox install without any extra
-	// JDBC driver. MODE=MySQL gives MySQL-compatible SQL. Data files live under
-	// db/h2/. After install, create the schema from the migrator page
-	// (/wheels/migrator, "Migrate To Latest"); see the README's Quick Start.
+	// Embedded database: boots with no external database server.
+	//
+	// `wheels start` (the default): SQLite. The Wheels CLI provides the SQLite
+	// JDBC driver; the data files are db/development.sqlite and db/test.sqlite.
+	// Create the schema with `wheels migrate latest`; see the README.
+	//
+	// `box server start` (CommandBox): H2. CommandBox's Lucee has no SQLite
+	// driver, so server.json installs the H2 extension and sets
+	// WHEELS_STARTER_DB=h2, which selects the H2 files under db/h2/.
 	//
 	// To use a server-based database (MySQL/PostgreSQL/etc.) instead, copy
 	// .env.example to .env, fill in your credentials, and swap the datasource
-	// definition below for one that reads this.env.DB_* (see .env.example for
+	// definitions below for ones that read this.env.DB_* (see .env.example for
 	// the full set of keys).
-	this.datasources["starterApp"] = {
-		class: "org.h2.Driver",
-		connectionString: "jdbc:h2:file:" & expandPath("../db/h2/starterApp") & ";MODE=MySQL",
-		username: "sa"
-	};
-
-	// Test database datasource (used by the app test suite).
-	this.datasources["starterApp_test"] = {
-		class: "org.h2.Driver",
-		connectionString: "jdbc:h2:file:" & expandPath("../db/h2/starterApp_test") & ";MODE=MySQL",
-		username: "sa"
-	};
+	if (StructKeyExists(server.system.environment, "WHEELS_STARTER_DB") && server.system.environment.WHEELS_STARTER_DB == "h2") {
+		this.datasources["starterApp"] = {
+			class: "org.h2.Driver",
+			connectionString: "jdbc:h2:file:" & expandPath("../db/h2/starterApp") & ";MODE=MySQL",
+			username: "sa"
+		};
+		// Test database datasource (used by the app test suite).
+		this.datasources["starterApp_test"] = {
+			class: "org.h2.Driver",
+			connectionString: "jdbc:h2:file:" & expandPath("../db/h2/starterApp_test") & ";MODE=MySQL",
+			username: "sa"
+		};
+	} else {
+		this.datasources["starterApp"] = {
+			class: "org.sqlite.JDBC",
+			connectionString: "jdbc:sqlite:" & expandPath("../db/development.sqlite")
+		};
+		// Test database datasource (used by the app test suite).
+		this.datasources["starterApp_test"] = {
+			class: "org.sqlite.JDBC",
+			connectionString: "jdbc:sqlite:" & expandPath("../db/test.sqlite")
+		};
+	}
 
 	// buffer the output of a tag/function body to output in case of a exception
 	// Currently setting this to true as otherwise you can't do dump then abort in a controller for debugging in
