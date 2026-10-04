@@ -818,6 +818,26 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The `hint:` of the public command function `fnName`, without the literal
+	 * "hint:" prefix Lucee keeps, or "". Walks up the component's `extends`
+	 * chain, because getMetaData() lists only the functions a component
+	 * declares itself: a subclass of Module (the spec fixtures) would
+	 * otherwise find no hint for any command.
+	 */
+	private string function $commandHint(required string fnName) {
+		var meta = getMetaData(this);
+		while (isStruct(meta)) {
+			for (var fn in (meta.functions ?: [])) {
+				if (lCase(fn.name ?: "") == arguments.fnName && (fn.access ?: "public") == "public") {
+					return trim(reReplaceNoCase(trim(fn.hint ?: ""), "^hint\s*:\s*", ""));
+				}
+			}
+			meta = structKeyExists(meta, "extends") ? meta.extends : "";
+		}
+		return "";
+	}
+
+	/**
 	 * Render per-command help for `wheels <cmd> --help` from the command function's
 	 * metadata hint. Returns "" for an unknown command so showHelp() falls back to
 	 * the global listing. Private so it isn't exposed as an MCP tool.
@@ -829,17 +849,7 @@ component extends="modules.BaseModule" {
 		if (fnName == "g") { fnName = "generate"; }
 		if (fnName == "d") { fnName = "destroy"; }
 
-		var hint = "";
-		var meta = getMetaData(this);
-		for (var fn in (meta.functions ?: [])) {
-			if (lCase(fn.name ?: "") == fnName && (fn.access ?: "public") == "public") {
-				hint = trim(fn.hint ?: "");
-				// The `/** hint: ... */` convention surfaces the value with the
-				// literal "hint:" key prefix on Lucee — strip it for clean output.
-				hint = trim(reReplaceNoCase(hint, "^hint\s*:\s*", ""));
-				break;
-			}
-		}
+		var hint = $commandHint(fnName);
 		if (!len(hint)) {
 			return "";
 		}
@@ -883,6 +893,12 @@ component extends="modules.BaseModule" {
 	/** Worked examples for `wheels <command> --help`, where a command has them. */
 	private array function $commandExamples(required string fnName) {
 		switch (arguments.fnName) {
+			case "new":
+				return [
+					"  wheels new myapp                              SQLite, port 8080",
+					"  wheels new myapp --port=3000 --setup-h2       H2 instead of SQLite",
+					"  wheels new myapp --datasource=mydb --no-sqlite  Your own datasource"
+				];
 			case "test":
 				return [
 					"  wheels test                                  Run every spec under tests/specs",
@@ -3012,6 +3028,20 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * The arguments `wheels new` accepts. Also what `wheels new --help` lists.
+	 */
+	private any function newArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "appName", description = "Name of the application and of the directory it's created in")
+			.option(name = "port", default = 8080, type = "numeric", description = "Server port")
+			.option(name = "datasource", default = "", description = "Datasource name (default: the app name)")
+			.option(name = "reload-password", default = "", description = "Reload password (default: random)")
+			.flag(name = "setup-h2", default = false, description = "Use the H2 embedded database instead of SQLite")
+			.flag(name = "sqlite", default = true, description = "Set up the zero-config SQLite database")
+			.flag(name = "open-browser", default = true, description = "Open the browser when the server starts");
+	}
+
+	/**
 	 * Parse `wheels new` arguments from LuCLI's structured argCollection.
 	 *
 	 * `--no-sqlite` arrives as `sqlite=false`; the command's `noSQLite` flag is
@@ -3021,15 +3051,7 @@ component extends="modules.BaseModule" {
 	 * name → error" (GH #2214).
 	 */
 	private struct function parseNewArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.positional(name = "appName")
-			.option(name = "port", default = 8080, type = "numeric")
-			.option(name = "datasource", default = "")
-			.option(name = "reload-password", default = "")
-			.flag(name = "setup-h2", default = false)
-			.flag(name = "sqlite", default = true)
-			.flag(name = "open-browser", default = true)
-			.parse(arguments.coll);
+		var parsed = newArgSpec().parse(arguments.coll);
 
 		return {
 			appName = parsed.appName,
@@ -3056,23 +3078,8 @@ component extends="modules.BaseModule" {
 		);
 
 		if (opts.isEmpty) {
-			out("Usage: wheels new <appname> [options]", "yellow");
-			out("");
-			out("Creates a new Wheels application in the specified directory.");
-			out("By default, SQLite is configured as the zero-config database.");
-			out("");
-			out("Options:", "bold");
-			out("  --port=<number>           Server port (default: 8080)");
-			out("  --datasource=<name>       Datasource name (default: app name)");
-			out("  --reload-password=<pw>    Reload password (default: random)");
-			out("  --no-sqlite               Skip default SQLite database setup");
-			out("  --setup-h2                Use H2 embedded database instead of SQLite");
-			out("  --no-open-browser         Don't open browser on server start");
-			out("");
-			out("Examples:", "bold");
-			out("  wheels new myapp");
-			out("  wheels new myapp --port=3000 --setup-h2");
-			out("  wheels new myapp --datasource=mydb --no-sqlite");
+			// The same text as `wheels new --help`, so the two can't drift.
+			out($commandHelp("new"));
 			return "";
 		}
 
@@ -9312,9 +9319,10 @@ component extends="modules.BaseModule" {
 		}
 
 		out(summary, "green");
-		// Return value carries the pre-swap plan too, so callers (and the
-		// dispatch specs) see the full command output in order.
-		return plan & nl & summary;
+		// out() already printed the plan and the summary, and under the stdio MCP
+		// server out() is captured into the tool result too, so returning them as
+		// well printed the whole report twice in a terminal.
+		return "";
 	}
 
 	/**
