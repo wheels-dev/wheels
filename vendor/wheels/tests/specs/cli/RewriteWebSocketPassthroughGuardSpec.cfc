@@ -39,6 +39,7 @@ component extends="wheels.WheelsTest" {
 			ctx.catchAll = "RewriteRule ^/(.*)$ /index.cfm/$1 [L]";
 
 			it("gates the /ws/ pass-through on the Upgrade header in every surface", () => {
+				$requireRepoPath("cli/lucli/templates");
 				for (var relPath in ctx.targets) {
 					var rules = $rewriteDirectives(ctx.repoRoot & "/" & relPath);
 					var ruleAt = ArrayFind(rules, ctx.passthrough);
@@ -55,6 +56,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("places the /ws/ pass-through before the front-controller catch-all", () => {
+				$requireRepoPath("cli/lucli/templates");
 				for (var relPath in ctx.targets) {
 					var rules = $rewriteDirectives(ctx.repoRoot & "/" & relPath);
 					var ruleAt = ArrayFind(rules, ctx.passthrough);

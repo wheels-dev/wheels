@@ -25,10 +25,12 @@ component extends="wheels.WheelsTest" {
 			var modulePath = repoRoot & "/cli/lucli/Module.cfc";
 
 			it("Module.cfc source file is reachable", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(fileExists(modulePath)).toBeTrue("Missing file: " & modulePath);
 			});
 
 			it("showHelp() summary line advertises the upgrade capability", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				var source = fileRead(modulePath);
 
 				// Since #3035 the command can perform the swap, so the summary
@@ -41,6 +43,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("usage output still advertises the read-only check subcommand", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				var source = fileRead(modulePath);
 
 				expect(source contains "wheels upgrade check").toBeTrue(
@@ -50,6 +53,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("usage output advertises the explicit apply verb", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				var source = fileRead(modulePath);
 
 				// #3039 review: the swap is behind `wheels upgrade apply` —
@@ -63,6 +67,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("usage output points at the package manager for the CLI binary itself", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				var source = fileRead(modulePath);
 
 				expect(source contains "brew upgrade wheels").toBeTrue(
@@ -73,6 +78,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("usage output explicitly notes that --dry-run is not supported", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				var source = fileRead(modulePath);
 
 				// Either an explicit `--dry-run is not supported` line, or
@@ -90,6 +96,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("the apply path exists with the backup convention", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				var source = fileRead(modulePath);
 
 				expect(source contains "runUpgradeApply").toBeTrue(
@@ -102,6 +109,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("upgrade() docblock hint matches the apply-first reality", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				var source = fileRead(modulePath);
 
 				// Anchor on the function declaration first, then walk
