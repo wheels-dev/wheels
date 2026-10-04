@@ -454,16 +454,28 @@
 						name = arguments.name
 					);
 				} catch (any e) {
-					// A nested controller that writes extends="Controller" cannot
-					// find its base class; add the fix to the error message.
+					// A nested controller that writes extends="Controller" cannot find
+					// its base class. Carry a fix hint on the request (the dev error
+					// page and the log show it) and rethrow the ORIGINAL exception
+					// unchanged, so its type, tag context, cause and stack survive.
 					local.hint = $missingBaseControllerHint(exception = e, name = arguments.name);
 					if (Len(local.hint)) {
-						Throw(
-							type = e.type,
-							message = e.message & " — " & local.hint,
-							detail = StructKeyExists(e, "detail") ? e.detail : "",
-							extendedInfo = StructKeyExists(e, "extendedInfo") ? e.extendedInfo : ""
-						);
+						if (!StructKeyExists(request, "wheels")) {
+							request.wheels = {};
+						}
+						request.wheels.errorHint = local.hint;
+						// Surface the hint from framework code (wheels.log) so it
+						// appears even though the app's minimal error page lives in the
+						// app template, which this fix deliberately does not touch.
+						try {
+							WriteLog(
+								file = "wheels",
+								type = "error",
+								text = "Controller '#arguments.name#' failed to instantiate — #local.hint#"
+							);
+						} catch (any logErr) {
+							// Logging must never mask the original error.
+						}
 					}
 					rethrow;
 				}
@@ -494,15 +506,30 @@
 		local.text = (StructKeyExists(arguments.exception, "message") ? arguments.exception.message : "")
 			& " "
 			& (StructKeyExists(arguments.exception, "detail") ? arguments.exception.detail : "");
-		// Component-not-found phrasings across engines (Lucee: "can't find
-		// component [Controller]"; Adobe: "Could not find the ColdFusion component
-		// or interface Controller"; BoxLang: "could not find component
-		// [Controller]"), where the missing component is the base Controller.
-		if (
-			ReFindNoCase("(can'?t find|could not find|unable to (find|locate)|invalid component definition)", local.text)
-			&& ReFindNoCase("component|interface", local.text)
-			&& ReFindNoCase("\bController\b", local.text)
-		) {
+		// Must look like a component-resolution failure.
+		if (!ReFindNoCase("(can'?t find|could not find|unable to (find|locate)|invalid component definition)", local.text)) {
+			return "";
+		}
+		// Hint ONLY when the base "Controller" is the MISSING-COMPONENT OPERAND —
+		// not merely when the word "Controller" appears somewhere (a different
+		// missing component whose detail mentions "Controller" must not match).
+		// Parse the operand from each engine's phrasing:
+		//   Lucee / BoxLang: "... component [Controller]"
+		//   Adobe:           "... component or interface Controller"
+		local.missing = "";
+		local.m = ReFindNoCase("component\s*\[([A-Za-z0-9_.$]+)\]", local.text, 1, true);
+		if (ArrayLen(local.m.len) GTE 2 && local.m.len[2] GT 0) {
+			local.missing = Mid(local.text, local.m.pos[2], local.m.len[2]);
+		} else {
+			local.m = ReFindNoCase("component\s+or\s+interface\s+([A-Za-z0-9_.$]+)", local.text, 1, true);
+			if (ArrayLen(local.m.len) GTE 2 && local.m.len[2] GT 0) {
+				local.missing = Mid(local.text, local.m.pos[2], local.m.len[2]);
+			}
+		}
+		// Adobe appends a period after the name ("... interface Controller."); drop
+		// any trailing dots so the last path segment compares cleanly.
+		local.missing = ReReplace(local.missing, "\.+$", "");
+		if (Len(local.missing) && ListLast(local.missing, ".") == "Controller") {
 			return "a nested controller must extend ""app.controllers.Controller"", not ""Controller"" "
 				& "(a bare extends name resolves relative to the controller's own package), so '"
 				& arguments.name
