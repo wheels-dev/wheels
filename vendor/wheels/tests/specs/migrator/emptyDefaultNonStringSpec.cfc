@@ -52,6 +52,44 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("changeColumn with default='' on a column that is not string-like", () => {
+
+			it("changes the column to NOT NULL with no DEFAULT, and back to nullable", () => {
+				var state = {step = "", message = "", notNullSql = ""};
+				var tableName = "dbm_empty_dflt_change";
+				try {
+					state.step = "create";
+					var t = variables.migration.createTable(name = tableName, force = true);
+					t.bigInteger(columnNames = "amount", allowNull = true);
+					t.create();
+					state.step = "generate";
+					var column = CreateObject("component", "wheels.migrator.ColumnDefinition").init(
+						adapter = variables.adapter,
+						name = "amount",
+						type = "biginteger",
+						default = "",
+						allowNull = false
+					);
+					state.notNullSql = variables.adapter.changeColumnInTable(name = tableName, column = column);
+					state.step = "change to NOT NULL";
+					variables.migration.changeColumn(table = tableName, columnName = "amount", columnType = "biginteger", default = "", allowNull = false);
+					state.step = "change to nullable";
+					variables.migration.changeColumn(table = tableName, columnName = "amount", columnType = "biginteger", default = "", allowNull = true);
+					state.step = "done";
+				} catch (any e) {
+					state.message = e.message & " " & (e.detail ?: "");
+				}
+				try {
+					variables.migration.dropTable(tableName);
+				} catch (any e) {
+				}
+				expect(state.step).toBe("done", "failed at '#state.step#': #state.message#");
+				// a NOT NULL column with an empty default gets no DEFAULT on any adapter
+				expect(state.notNullSql).notToInclude("DEFAULT", state.notNullSql);
+			});
+
+		});
+
 		describe("createTable with default='' on types that are not string-like", () => {
 
 			it("creates the table whether the columns allow null or not", () => {
