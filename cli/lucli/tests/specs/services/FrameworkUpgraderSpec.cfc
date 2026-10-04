@@ -502,6 +502,57 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(result.error).toInclude("Parent");
 			});
 
+			it("throws RenameFailed naming the --nobackup workaround when the rename is refused", () => {
+				// An unwritable backups directory stands in for a separately
+				// mounted vendor/. POSIX-only, like the CopyFailed spec below.
+				var f = buildFixture();
+				directoryCreate(f.backupsDir, true, true);
+				fileWrite(f.backupsDir & "/.gitignore", "*");
+				var handle = createObject("java", "java.io.File").init(f.backupsDir);
+				if (!handle.setWritable(false, false) || handle.canWrite()) {
+					handle.setWritable(true, false);
+					return;
+				}
+				var state = {type = "", message = ""};
+				try {
+					upgrader.applyUpgrade(f.sourceDir, f.vendorDir, true);
+				} catch (any e) {
+					state.type = e.type;
+					state.message = e.message;
+				}
+				handle.setWritable(true, false);
+
+				expect(state.type).toBe("Wheels.FrameworkUpgrader.RenameFailed");
+				expect(state.message).toInclude("nothing was changed");
+				expect(state.message).toInclude("wheels upgrade apply --nobackup");
+				expect(fileRead(f.vendorDir & "/marker.txt")).toBe("old-framework");
+			});
+
+			it("throws RenameFailed, not a raw error, when the backup directory can't be prepared", () => {
+				// An unwritable backups directory stands in for a separately
+				// mounted vendor/. POSIX-only, like the CopyFailed spec below.
+				var f = buildFixture();
+				directoryCreate(f.backupsDir, true, true);
+				var handle = createObject("java", "java.io.File").init(f.backupsDir);
+				if (!handle.setWritable(false, false) || handle.canWrite()) {
+					handle.setWritable(true, false);
+					return;
+				}
+				var state = {type = "", message = ""};
+				try {
+					upgrader.applyUpgrade(f.sourceDir, f.vendorDir, true);
+				} catch (any e) {
+					state.type = e.type;
+					state.message = e.message;
+				}
+				handle.setWritable(true, false);
+
+				expect(state.type).toBe("Wheels.FrameworkUpgrader.RenameFailed");
+				expect(state.message).toInclude("nothing was changed");
+				expect(state.message).toInclude("wheels upgrade apply --nobackup");
+				expect(fileRead(f.vendorDir & "/marker.txt")).toBe("old-framework");
+			});
+
 			it("throws CopyFailed naming the backup to restore when the copy fails after the rename", () => {
 				// An unreadable file inside the source makes directoryCopy
 				// blow up AFTER the backup rename already ran — the exact

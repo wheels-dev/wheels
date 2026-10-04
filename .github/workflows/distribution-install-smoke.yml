@@ -608,3 +608,46 @@ jobs:
           if ! grep -q "Wheels CLI" <<<"$OUT"; then
             echo "::error::${CHANNEL}: wheels info did not reach the Wheels module through LuCLI"; exit 1
           fi
+
+  yum-fedora-be:
+    needs: resolve
+    name: "yum (fedora 44, bleeding-edge)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Fedora 44 (dnf5) ships Java 25, not 21: the rpm's Java 21-or-newer
+    # dependency (#4237) is what makes it installable. Bleeding-edge only for
+    # now; a stable Fedora leg is owed once 4.2.0 ships with that dependency.
+    container:
+      image: fedora:44
+    steps:
+      - name: Add yum.wheels.dev bleeding-edge + install (the documented path)
+        run: |
+          set -euo pipefail
+          curl -fsSL https://yum.wheels.dev/wheels-be.repo -o /etc/yum.repos.d/wheels-be.repo
+          dnf -y install wheels-be
+          java -version 2>&1 | head -1
+      - name: Assert wheels --version is a bleeding-edge snapshot
+        run: |
+          set -uo pipefail
+          RAW="$(wheels --version 2>&1 || true)"
+          FIRST="$(printf '%s\n' "$RAW" | head -1)"
+          echo "yum (fedora 44, bleeding-edge): wheels --version => '${FIRST}'"
+          # Snapshot numbers float, so assert the shape, not one version.
+          if ! printf '%s\n' "$FIRST" | grep -qE '^wheels [0-9]+\.[0-9]+\.[0-9]+-snapshot\.[0-9]+ \(bleeding-edge\)$'; then
+            echo "::error::Fedora bleeding-edge: unexpected wheels --version output"
+            printf '%s\n' "$RAW" | head -20
+            exit 1
+          fi
+      # `wheels --version` is answered by the wrapper; `wheels info` boots the
+      # JVM (Java 25 here) and the Wheels module through LuCLI.
+      - name: Assert the runtime boots on Fedora's Java
+        run: |
+          set -euo pipefail
+          if ! OUT="$(wheels info 2>&1)"; then
+            echo "::error::Fedora bleeding-edge: wheels info failed (the LuCLI runtime did not start)"
+            printf '%s\n' "$OUT" | tail -40; exit 1
+          fi
+          printf '%s\n' "$OUT" | head -20
+          if ! grep -q "Wheels CLI" <<<"$OUT"; then
+            echo "::error::Fedora bleeding-edge: wheels info did not reach the Wheels module through LuCLI"; exit 1
+          fi

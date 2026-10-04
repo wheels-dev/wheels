@@ -470,6 +470,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(mod.capturedOutput()).notToInclude("Backing up vendor/wheels");
 				});
 
+				it("names old framework backups still inside vendor/", () => {
+					seedVendorWheels(version = "4.1.0");
+					directoryCreate(variables.tempRoot & "/vendor/wheels.bak-20260101-000000", true, true);
+					directoryCreate(variables.tempRoot & "/vendor/wheels-basecoat", true, true);
+
+					var result = mod.upgrade(arg1 = "apply");
+
+					expect(result).toInclude("Old framework backups are still inside vendor/: vendor/wheels.bak-20260101-000000/.");
+					expect(result).toInclude("move them to .wheels/backups/ or delete them");
+					expect(result).notToInclude("vendor/wheels-basecoat");
+				});
+
 				it("leaves a box.json without wheels-core alone", () => {
 					seedVendorWheels(version = "4.1.0");
 					var box = '{"name":"app","dependencies":{"other":"1.0.0"}}';

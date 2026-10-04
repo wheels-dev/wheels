@@ -145,17 +145,10 @@
             application.wheels.csrfCookieEncryptionAlgorithm,
             application.wheels.csrfCookieEncryptionEncoding
         )
-        if (structKeyExists(url, "db") && listFind("mysql,sqlserver,sqlserver_cicd,postgres,h2,oracle,sqlite,cockroachdb", url.db)) {
-            if (listFind("sqlserver,sqlserver_cicd", url.db)) {
-                application.wheels.dataSourceName = "wheelstestdb_sqlserver";
-            } else {
-                application.wheels.dataSourceName = "wheelstestdb_" & url.db;
-            }
-        } else if (application.wheels.coreTestDataSourceName eq "|datasourceName|") {
-            application.wheels.dataSourceName = "wheelstestdb";
-        } else {
-            application.wheels.dataSourceName = application.wheels.coreTestDataSourceName;
-        }
+        // Chosen before this swap by $coreTestDataSource(): `?db=` / the |datasourceName|
+        // placeholder / a dedicated coreTestDataSourceName as before, and never the
+        // app's primary datasource unless the request asks for it (useTestDB=false).
+        application.wheels.dataSourceName = variables.$_coreTestDataSourceName;
 
         // Clear model cache when switching datasources so models are
         // re-initialized with the correct adapter for the target database.
@@ -275,6 +268,30 @@
                     application.wheels = application.$$$wheels;
                     structDelete(application, "$$$wheels");
                 }
+                // Pick the datasource before swapping in the test config, so a refusal
+                // leaves nothing to restore. In an app, a coreTestDataSourceName that is the
+                // app's own datasource would run the framework's specs (and populate.cfm)
+                // there; that run uses `<datasource>_test` or is refused.
+                local.coreDataSource = application.wo.$coreTestDataSource(
+                    primary = application.wheels.dataSourceName,
+                    coreName = StructKeyExists(application.wheels, "coreTestDataSourceName") ? application.wheels.coreTestDataSourceName : application.wheels.dataSourceName,
+                    requestUrl = url
+                );
+                if (local.coreDataSource.action == "refuse") {
+                    cfheader(statuscode = 409);
+                    cfcontent(type = "application/json");
+                    WriteOutput(SerializeJSON({
+                        success = false,
+                        error = "Test database not available",
+                        message = "The framework test suite would run on this app's primary datasource '" & local.coreDataSource.decision.primary
+                            & "'. Pass ?db= to use a wheelstestdb_<db> datasource, create '" & local.coreDataSource.decision.candidate
+                            & "', or run against the primary datasource intentionally with useTestDB=false.",
+                        datasource = local.coreDataSource.decision.primary,
+                        candidate = local.coreDataSource.decision.candidate
+                    }));
+                    abort;
+                }
+                variables.$_coreTestDataSourceName = local.coreDataSource.target;
                 application["$$$wheelsTestRunToken"] = CreateUUID();
                 variables.$_setTestboxEnv();
             }

@@ -8007,8 +8007,14 @@ component extends="modules.BaseModule" {
 		var currentMajor = val(listFirst(currentVersion, "."));
 		var targetMajor = val(listFirst(target, "."));
 		var sameMajor = (currentMajor == targetMajor);
+		var crosses42 = $upgradeCrosses42(currentVersion, target);
 
-		if (sameMajor && !jsonMode) {
+		if (crosses42 && sameMajor && !jsonMode) {
+			out("#currentVersion# -> #target#: no breaking framework changes, but 4.2 changes app-owned files and some behaviour.", "green");
+			out("Checking the 4.1 -> 4.2 items, then code left over from 3.x...", "green");
+			out("Also read the guide's database-specific changes (MySQL, Oracle, SQLite), which a source scan can't detect.", "green");
+			out("");
+		} else if (sameMajor && !jsonMode) {
 			out("Same major version — no new breaking changes in this upgrade.", "green");
 			out(currentMajor >= 4
 				? "Scanning for code left over from 3.x and for opt-in recommendations..."
@@ -8017,6 +8023,10 @@ component extends="modules.BaseModule" {
 		}
 
 		var checks = $upgradeBuildChecks(currentMajor, targetMajor, target);
+		if (crosses42) {
+			checks = $upgradeAppendChecks4x2(checks, target);
+		}
+		checks = $upgradeAppendTemplateFixChecks(checks, target);
 
 		// Run checks. Matched checks land in `issues` (severity=breaking) or
 		// `advisories` (severity=advisory); unmatched land in `passed`.
@@ -8027,7 +8037,7 @@ component extends="modules.BaseModule" {
 
 		// The version-appropriate guide + the soft-landing adapter, surfaced
 		// whenever breaking findings are reported (and always in JSON output).
-		var guideUrl = new services.GuidesLink().link(
+		var guideUrl = crosses42 && sameMajor ? $upgradeGuide4x2Url() : new services.GuidesLink().link(
 			"upgrading/" & (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/",
 			target
 		);
@@ -8286,7 +8296,7 @@ component extends="modules.BaseModule" {
 					{path: "Application.cfc"},
 					{path: "config", extensions: "cfm,cfc", recurse: true}
 				],
-				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector()`. The legacy adapter does NOT shim this item."
+				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector(""wheels.Bindings"")` (the constructor requires the bindings path). The legacy adapter does NOT shim this item."
 			});
 			// renderPage()/renderPageToString() removed in 4.0 — shimmed by
 			// the optional wheels-legacy-adapter package, but unshimmed apps
@@ -8566,6 +8576,234 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * True when an upgrade from `currentVersion` to `target` crosses 4.2.0:
+	 * the app is below it and the target is at or above it. False when either
+	 * version can't be compared (a development checkout's placeholder).
+	 */
+	public boolean function $upgradeCrosses42(required string currentVersion, required string target) {
+		var versionPattern = "^[vV]?\d+(\.\d+)*([-+][^\r\n]*)?$";
+		if (!reFind(versionPattern, trim(arguments.currentVersion)) || !reFind(versionPattern, trim(arguments.target))) {
+			return false;
+		}
+		var semver = new services.SemVer();
+		return semver.compare(arguments.currentVersion, "4.2.0") < 0 && semver.compare(arguments.target, "4.2.0") >= 0;
+	}
+
+	/**
+	 * The fixes that live in the app-owned public/Application.cfc. A framework
+	 * swap never updates that file, so each fix the target release has is
+	 * checked on its own: the file lacks the code the template carries for
+	 * it. The generic template-drift check only says the file differs. Each
+	 * entry: since (the first release whose template has it), a pattern the
+	 * template matches, and the guide section that documents the edit. The
+	 * teardown routing is an error because on Adobe ColdFusion a shutdown
+	 * that reads the bare application scope can leave the whole site
+	 * erroring until a restart; the rest are advisory.
+	 */
+	private array function $upgradeAppendTemplateFixChecks(required array checks, required string target) {
+		var guide41 = new services.GuidesLink().pinned("v4-1-0", "upgrading/4x-0-to-4x-1/");
+		var guide42 = $upgradeGuide4x2Url();
+		var adopt = "Adopt it from the app template (public/Application.cfc in a fresh wheels new app), keeping your own changes.";
+		var fixes = [
+			{since: "4.0.4", severity: "advisory", pattern: "this\.sessionCookie",
+				description: "public/Application.cfc doesn't set this.sessionCookie",
+				fix: "The session cookie's flags (including Secure over HTTPS) come from this block. #adopt# Guide: ""Session cookie Secure flag"", #guide41#"},
+			{since: "4.0.4", severity: "advisory", pattern: "StructKeyExists\(\s*application\s*,\s*""wheelsdi""\s*\)",
+				description: "public/Application.cfc onError doesn't guard the DI container",
+				fix: "Without the guard an error page can rebuild the container and wipe registered services. #adopt# Guide: ""DI container guard in onError"", #guide41#"},
+			{since: "4.0.6", severity: "breaking", pattern: "applicationScope\.wo\.\$include", requireFileMatches: "function\s+onApplicationEnd\s*\(",
+				description: "public/Application.cfc onApplicationEnd() doesn't go through arguments.applicationScope",
+				fix: "On Adobe ColdFusion, an onApplicationEnd() that reads the bare application scope can fail during shutdown and leave the whole site erroring until a service restart. Route it through arguments.applicationScope.wo with the StructKeyExists guards. #adopt# Guide: ""Adobe teardown guards in onError / onSessionEnd"", #guide41#"},
+			{since: "4.1.0", severity: "breaking", pattern: "applicationScope\.wo\.\$simpleLock", requireFileMatches: "function\s+onSessionEnd\s*\(",
+				description: "public/Application.cfc onSessionEnd() doesn't go through arguments.applicationScope",
+				fix: "On Adobe ColdFusion, session cleanup can call onSessionEnd() after the application scope is gone, and a bare application.wo then throws. Route it through arguments.applicationScope.wo, guarded with StructKeyExists. #adopt# Guide: ""Adobe teardown guards in onError / onSessionEnd"", #guide41#"},
+			{since: "4.0.6", severity: "advisory", pattern: "testcontext\.cfm",
+				description: "public/Application.cfc doesn't include the isolated test context",
+				fix: "Without it the test suites run against your live application scope. #adopt# Guide: ""Isolated test-application include"", #guide41#"},
+			{since: "4.1.0", severity: "advisory", pattern: "resources/java",
+				description: "public/Application.cfc doesn't put the bundled jBCrypt jar on the Java load path",
+				fix: "Without it bcryptHash()/bcryptVerify() use the slow pure-CFML fallback, and code that loads a BCrypt class can fail. #adopt# Guide: ""jBCrypt load path"", #guide41#"},
+			{since: "4.1.0", severity: "advisory", pattern: "\$authorizeReload",
+				description: "public/Application.cfc reload handling predates the template's helper functions",
+				fix: "The template's onRequestStart moved its reload handling into helper functions. #adopt# Guide: ""Reload-password handoff"", #guide41#"},
+			{since: "4.1.1", severity: "advisory", pattern: "Compare\(\s*lCase\(\s*local\.value\s*\)\s*,\s*""true""\s*\)",
+				description: "public/Application.cfc .env parser predates the 4.1.1 boolean fix",
+				fix: "The older parser turns a numeric 1 (such as 1.0) into the boolean true. #adopt# Guide: "".env boolean parser"", #guide41#"},
+			{since: "4.2.0", severity: "advisory", pattern: "startupPhase",
+				description: "public/Application.cfc onError doesn't tell a running-app error from a startup failure",
+				fix: "The older fallback shows ""Wheels failed to initialize"" for any error and may not log it. #adopt# Guide: ""onError running-app message"", #guide42#"},
+			{since: "4.2.0", severity: "advisory", pattern: "GetHttpRequestData\(\s*false\s*\)\.headers",
+				description: "public/Application.cfc lacks the reload-password header fallback",
+				fix: "Without it wheels reload against a RustCFML server fails every other run. #adopt# Guide: ""Reload-password header fallback"", #guide42#"},
+			{since: "4.2.0", severity: "advisory", pattern: "\$normaliseRedirectPath",
+				description: "public/Application.cfc reload redirect doesn't keep the subfolder",
+				fix: "An app served under a subfolder is redirected to the site root after a reload. #adopt# Guide: ""Reload redirect keeps the subfolder"", #guide42#"}
+		];
+		var versionPattern = "^[vV]?\d+(\.\d+)*([-+][^\r\n]*)?$";
+		var targetKnown = reFind(versionPattern, trim(arguments.target)) > 0;
+		var semver = new services.SemVer();
+		for (var fixSpec in fixes) {
+			if (targetKnown && semver.compare(arguments.target, fixSpec.since) < 0) {
+				continue;
+			}
+			var check = {
+				description: fixSpec.description,
+				severity: fixSpec.severity,
+				checkType: "grep",
+				absent: true,
+				pattern: fixSpec.pattern,
+				scanTargets: [{path: "public/Application.cfc"}],
+				fix: fixSpec.fix
+			};
+			if (structKeyExists(fixSpec, "requireFileMatches")) {
+				check.requireFileMatches = fixSpec.requireFileMatches;
+			}
+			arrayAppend(arguments.checks, check);
+		}
+		return arguments.checks;
+	}
+
+	/**
+	 * The 4.1 → 4.2 upgrade guide. It exists only in the v4-2-0 guide tree, so
+	 * the link is pinned there: GuidesLink.link() would clamp a 4.2 target to
+	 * the latest released tree until the 4.2 guides are marked released, and
+	 * the page isn't in older trees at all.
+	 */
+	private string function $upgradeGuide4x2Url() {
+		return new services.GuidesLink().pinned("v4-2-0", "upgrading/4x-1-to-4x-2/");
+	}
+
+	/**
+	 * The 4.1 → 4.2 checks: app-owned files the 4.2 template changed, and the
+	 * behaviour changes the upgrade guide lists. Severity "breaking" marks an
+	 * item that fails at runtime on 4.2 (an error, a refused request, a failed
+	 * validation); the rest are advisory because the app keeps running but
+	 * behaves differently. Each fix names the guide section to read.
+	 */
+	private array function $upgradeAppendChecks4x2(required array checks, required string target) {
+		var guide = $upgradeGuide4x2Url();
+		// Selecting the environment from anything but WHEELS_ENV: adopting the
+		// 4.2 template drops that selection, and a server without WHEELS_ENV
+		// then starts in development.
+		arrayAppend(arguments.checks, {
+			description: "config/environment.cfm selects the environment without WHEELS_ENV",
+			severity: "breaking",
+			checkType: "envSelection",
+			expect: "logic",
+			fix: "Keep your environment selection when you adopt the 4.2 config/environment.cfm: set WHEELS_ENV on every server before replacing the file, or carry your selection logic into the new file. Replacing it outright makes a server without WHEELS_ENV start in development. Guide: ""config/environment.cfm reads WHEELS_ENV"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "config/environment.cfm hardcodes the environment (4.2 reads WHEELS_ENV)",
+			severity: "advisory",
+			checkType: "envSelection",
+			expect: "literal",
+			fix: "A WHEELS_ENV=production set by the host has no effect while the file hardcodes the environment. Replace it with the 4.2 template's config/environment.cfm, or hardcode production on production servers. Guide: ""config/environment.cfm reads WHEELS_ENV"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "Event templates put blank lines before every response",
+			severity: "advisory",
+			checkType: "eventSilent",
+			files: ["onabort.cfm", "onapplicationend.cfm", "onapplicationstart.cfm", "onrequestend.cfm", "onrequeststart.cfm", "onsessionend.cfm", "onsessionstart.cfm"],
+			// chr(60) keeps a literal tag out of the source (Lucee's tag scanner).
+			fix: "Wrap each listed app/events/ file in " & chr(60) & "cfsilent>..." & chr(60) & "/cfsilent> with no trailing newline, or delete the empty ones. Leave onerror*.cfm, onmaintenance.cfm and onmissingtemplate.cfm alone. Guide: ""Event templates without leading whitespace"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: ".gitignore ignores vendor/ (4.2 apps commit it)",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "^\s*/?vendor/?\s*$",
+			scanTargets: [{path: ".gitignore"}],
+			fix: "Remove the vendor line and commit vendor/, so a clone, CI run or image build has the framework and your packages. Guide: ""Commit vendor/"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "findAll(returnAs=""structs"") now returns an array",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "returnAs\s*=\s*[""']structs?[""']",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			scanTargets: [{path: "tests", extensions: "cfc,cfm", recurse: true}],
+			fix: "Struct functions (StructCount, StructKeyList...) on the result now throw, and for-in loops hand you rows instead of keys. Guide: ""findAll(returnAs=""structs"") returns an array"", #guide#"
+		});
+		if (!$upgradeConfigMatches("trustProxyHeaders\s*=\s*true")) {
+			arrayAppend(arguments.checks, {
+				description: "The app reads X-Forwarded-Proto, but trustProxyHeaders is not set",
+				severity: "advisory",
+				checkType: "grep",
+				pattern: "x[-_]forwarded[-_]proto",
+				scanDir: "app",
+				extensions: "cfc,cfm",
+				scanTargets: [{path: "config", extensions: "cfm,cfc", recurse: true}],
+				fix: "Behind a TLS-terminating proxy, 4.2 builds absolute URLs as http:// unless config/settings.cfm has set(trustProxyHeaders=true). Guide: ""X-Forwarded-Proto needs trustProxyHeaders"", #guide#"
+			});
+		}
+		arrayAppend(arguments.checks, {
+			description: "Validation condition/unless uses is, and, or with this., or this. on the right",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "\b(condition|unless)\s*=\s*[""'][^""']*(\bthis\.[^""']*\s(is|and|or)\s|(==|!=|<>|\s(eq|neq|gt|lt|gte|lte)\s)\s*this\.)",
+			scanDir: "app/models",
+			extensions: "cfc",
+			fix: "4.2 throws Wheels.InvalidValidationCondition for these shapes: replace is with eq (or ==), and with &&, or with ||, and put any this. reference on the left. Guide: ""Validation condition / unless: bare names are resolved"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "Validation condition/unless expressions are evaluated differently",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "\b(condition|unless)\s*=",
+			scanDir: "app/models",
+			extensions: "cfc",
+			fix: "A bare name now means this.<name>: a rule 4.1 skipped may now run, and one that always ran may now be skipped. Run your model specs. Guide: ""Validation condition / unless: bare names are resolved"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "Association joinType is not inner, outer, left or left outer",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "joinType\s*=\s*[""'](?!\s*(inner|outer|left|left outer)\s*[""'])",
+			scanDir: "app/models",
+			extensions: "cfc",
+			fix: "Any other value throws Wheels.InvalidJoinType at application start. Guide: ""Association joinType values are checked"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "A route targets an action named renderNotFound (now a reserved framework helper)",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "renderNotFound",
+			scanTargets: [{path: "config/routes.cfm"}],
+			fix: "A request for that action gets Wheels.ActionNotAllowed. Rename the action and its route. Guide: ""renderNotFound is a framework helper"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "A MySQL datasource sets tinyInt1isBit=false",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "tinyInt1isBit\s*=\s*false",
+			raw: true,
+			scanTargets: [{path: "config", extensions: "cfm,cfc", recurse: true}, {path: "lucee.json"}, {path: "server.json"}, {path: ".env"}],
+			fix: "Existing TINYINT(1) booleans then read as plain integers and fail validation as ""is not a number"". Drop the option, or convert the columns with changeColumn(columnType=""boolean""). Guide: ""MySQL boolean columns are BIT(1)"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "withAdvisoryLock() can now throw Wheels.AdvisoryLockReleaseFailed",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "withAdvisoryLock\s*\(",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			fix: "On MySQL and PostgreSQL a lock that can't be released now throws after the callback finishes. A job that relies on the lock should catch it and alert. Guide: ""withAdvisoryLock() can throw Wheels.AdvisoryLockReleaseFailed"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "LocalDisk storage keys are checked per segment",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "LocalDisk",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			scanTargets: [{path: "config", extensions: "cfm,cfc", recurse: true}],
+			fix: "Keys with a dots-only segment or a drive-letter prefix are now rejected; leading, trailing and doubled slashes are normalised. Check keys built from user input or file names. Guide: ""LocalDisk storage keys are checked per segment"", #guide#"
+		});
+		return arguments.checks;
+	}
+
+	/**
 	 * True when `pattern` matches anywhere in config/ (.cfm/.cfc, recursive),
 	 * with CFML comments stripped first so a commented-out setting doesn't count.
 	 */
@@ -8625,6 +8863,39 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Whether a grep check leaves a file out of its scan: `skipIfFileMatches`
+	 * skips a file that matches anywhere (the environment.cfm checks skip one
+	 * that already reads WHEELS_ENV), and `requireFileMatches` skips one that
+	 * doesn't (the teardown checks need the function to be declared). A
+	 * skipped file doesn't count as scanned, so an `absent` check over it
+	 * passes.
+	 */
+	private boolean function $upgradeFileSkipped(required struct check, required string content) {
+		if (structKeyExists(arguments.check, "skipIfFileMatches") && reFindNoCase(arguments.check.skipIfFileMatches, arguments.content) > 0) {
+			return true;
+		}
+		return structKeyExists(arguments.check, "requireFileMatches") && reFindNoCase(arguments.check.requireFileMatches, arguments.content) == 0;
+	}
+
+	/**
+	 * The location line for an `absent` check that found nothing: the paths it
+	 * scanned (its scanDir and each scanTarget), so the report names the file
+	 * that lacks the code, e.g. "public/Application.cfc (no occurrences found)".
+	 */
+	private string function $upgradeAbsentHint(required struct check) {
+		var paths = [];
+		if (structKeyExists(arguments.check, "scanDir") && len(arguments.check.scanDir)) {
+			arrayAppend(paths, arguments.check.scanDir & "/");
+		}
+		if (structKeyExists(arguments.check, "scanTargets") && isArray(arguments.check.scanTargets)) {
+			for (var target in arguments.check.scanTargets) {
+				arrayAppend(paths, target.path);
+			}
+		}
+		return arrayLen(paths) ? arrayToList(paths, ", ") & " (no occurrences found)" : "(no occurrences found)";
+	}
+
+	/**
 	 * Execute a single upgrade check, returning its severity, matched flag,
 	 * and matchEntry (populated only when matched).
 	 */
@@ -8646,6 +8917,7 @@ component extends="modules.BaseModule" {
 			var filesToScan = $upgradeCollectScanFiles(arguments.check);
 
 			var matches = [];
+			var scanned = 0;
 			for (var filePath in filesToScan) {
 				// Strip CFML comments before grepping (Anti-Pattern #14):
 				// a commented-out `// t.references(...)` or
@@ -8653,7 +8925,13 @@ component extends="modules.BaseModule" {
 				// block comments collapse and may shift reported line
 				// numbers — same tradeoff other `stripCfmlComments` callers
 				// accept.
-				var content = stripCfmlComments(fileRead(filePath));
+				// `raw: true` scans the file as written: a JDBC URL's `//` would
+				// otherwise read as a line comment and hide the rest of the line.
+				var content = structKeyExists(arguments.check, "raw") && arguments.check.raw ? fileRead(filePath) : stripCfmlComments(fileRead(filePath));
+				if ($upgradeFileSkipped(arguments.check, content)) {
+					continue;
+				}
+				scanned++;
 				var lines = listToArray(content, chr(10), true);
 				for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
 					if (reFindNoCase(arguments.check.pattern, lines[lineNum])) {
@@ -8670,18 +8948,26 @@ component extends="modules.BaseModule" {
 			// treat as pass to avoid noisy false positives.
 			var isAbsent = structKeyExists(arguments.check, "absent") && arguments.check.absent;
 			if (isAbsent) {
-				if (arrayLen(filesToScan) && !arrayLen(matches)) {
+				if (scanned && !arrayLen(matches)) {
 					matched = true;
-					var hint = structKeyExists(arguments.check, "scanDir") && len(arguments.check.scanDir)
-						? arguments.check.scanDir & "/ (no occurrences found)"
-						: "(no occurrences found)";
-					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: [hint]};
+					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: [$upgradeAbsentHint(arguments.check)]};
 				}
 			} else {
 				if (arrayLen(matches)) {
 					matched = true;
 					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: matches};
 				}
+			}
+		} else if (arguments.check.checkType == "envSelection") {
+			if ($upgradeEnvSelection() == arguments.check.expect) {
+				matched = true;
+				matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: ["config/environment.cfm"]};
+			}
+		} else if (arguments.check.checkType == "eventSilent") {
+			var loudFiles = $upgradeLoudEventTemplates(arguments.check.files);
+			if (arrayLen(loudFiles)) {
+				matched = true;
+				matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: loudFiles};
 			}
 		} else if (arguments.check.checkType == "templateDiff") {
 			// Compare app-owned template files against the CLI's bundled app
@@ -8713,6 +8999,59 @@ component extends="modules.BaseModule" {
 		}
 
 		return {severity: severity, matched: matched, matchEntry: matchEntry};
+	}
+
+	/**
+	 * How config/environment.cfm chooses the environment, comments stripped:
+	 * "none" when the file is missing, reads WHEELS_ENV, or never calls
+	 * set(environment=); "literal" for exactly one set(environment="...") with
+	 * a plain quoted value and no branching in the file; "logic" for anything
+	 * else (more than one set(), if/switch/ternary, # interpolation, an
+	 * unquoted value). Replacing a "logic" file with the 4.2 template drops
+	 * that selection.
+	 */
+	public string function $upgradeEnvSelection() {
+		var path = variables.projectRoot & "/config/environment.cfm";
+		if (!fileExists(path)) {
+			return "none";
+		}
+		var content = stripCfmlComments(fileRead(path));
+		var setCall = "set\s*\(\s*environment\s*=";
+		var sets = arrayLen(reMatchNoCase(setCall, content));
+		if (!sets || reFindNoCase("WHEELS_ENV", content)) {
+			return "none";
+		}
+		// chr(60) keeps literal CFML tags out of the source (Lucee's tag scanner).
+		var branching = "\bif\s*\(|\bswitch\s*\(|" & chr(60) & "cf(if|elseif|switch)\b|\?";
+		var plainLiteral = setCall & "\s*([""'])[^""'##]*\1\s*\)";
+		if (sets == 1 && reFindNoCase(plainLiteral, content) && !reFindNoCase(branching, content)) {
+			return "literal";
+		}
+		return "logic";
+	}
+
+	/**
+	 * The app/events/ templates among `files` that can write output before a
+	 * response: the file doesn't start with a cfsilent tag, or has anything
+	 * after its closing cfsilent tag (a trailing newline included). Returns
+	 * their app/events/ paths.
+	 */
+	private array function $upgradeLoudEventTemplates(required array files) {
+		var loud = [];
+		var open = chr(60) & "cfsilent";
+		var close = chr(60) & "/cfsilent>";
+		for (var name in arguments.files) {
+			var path = variables.projectRoot & "/app/events/" & name;
+			if (!fileExists(path)) {
+				continue;
+			}
+			var content = fileRead(path);
+			var wrapped = left(content, len(open)) == open && len(content) >= len(close) && right(content, len(close)) == close;
+			if (!wrapped) {
+				arrayAppend(loud, "app/events/" & name);
+			}
+		}
+		return loud;
 	}
 
 	/**
@@ -8948,6 +9287,7 @@ component extends="modules.BaseModule" {
 			summary &= "Recover with:  rm -rf ""#vendorDir#"" && mv ""#result.backupDir#"" ""#vendorDir#""" & nl;
 		}
 		summary &= $upgradeApplyUpdateBoxPin(upgrader, boxPin, result.newVersion);
+		summary &= $upgradeApplyLeftoverBackups();
 
 		// Surface root-level manifest files the user may want to review
 		// after the upgrade — version refs, dependencies, etc.
@@ -9049,6 +9389,27 @@ component extends="modules.BaseModule" {
 		}
 		pin.path = boxPath;
 		return pin;
+	}
+
+	/**
+	 * Old framework backups that an earlier `wheels upgrade apply` (before
+	 * 4.2) or a manual swap left inside vendor/. The framework loads every
+	 * vendor/ folder as a package, so each one logs a skipped-package error on
+	 * every start. Returns a note naming them, or "" when there are none.
+	 */
+	private string function $upgradeApplyLeftoverBackups() {
+		var vendorRoot = variables.projectRoot & "/vendor";
+		var leftovers = [];
+		for (var name in directoryList(vendorRoot, false, "name")) {
+			if (name != "wheels" && reFindNoCase("^wheels.*\.bak", name) && directoryExists(vendorRoot & "/" & name)) {
+				arrayAppend(leftovers, "vendor/" & name & "/");
+			}
+		}
+		if (!arrayLen(leftovers)) {
+			return "";
+		}
+		return "Old framework backups are still inside vendor/: " & arrayToList(leftovers, ", ")
+			& ". The framework loads every vendor/ folder as a package and logs an error for these on every start: move them to .wheels/backups/ or delete them." & chr(10);
 	}
 
 	/**
@@ -12822,27 +13183,55 @@ component extends="modules.BaseModule" {
 		out("");
 		out("Installing #browserName# browser binaries...");
 
-		var classpath = "";
-		for (var entry in manifest.classpath) {
-			if (len(classpath)) classpath &= ":";
-			classpath &= installDir & "/lib/" & entry.filename;
-		}
+		var classpath = $browserClasspath(installDir, manifest);
 
-		try {
-			cfexecute(
-				name="java",
-				arguments="-cp #classpath# com.microsoft.playwright.CLI install #browserName#",
-				timeout=300,
-				variable="local.stdout",
-				errorVariable="local.stderr"
-			);
-			out("Browser install OK", "green");
-		} catch (any e) {
+		var install = $browserRunProcess(["java", "-cp", classpath, "com.microsoft.playwright.CLI", "install", browserName], 300);
+		if (install.timedOut || install.exitCode != 0) {
 			out("Browser install FAILED", "red");
-			out(local.stderr ?: e.message, "red");
-			return "";
+			out(install.timedOut ? "Playwright's install didn't finish within 300 seconds and was stopped." : trim(install.output), "red");
+			throw(type = "Wheels.BrowserSetupFailed", message = "wheels browser setup: installing the #browserName# binaries failed. See the output above.");
 		}
+		out("Browser install OK", "green");
 
+		return $browserFinishSetup(classpath, browserName);
+	}
+
+	/**
+	 * The Java classpath for the Playwright jars in `installDir`, joined with
+	 * the platform's separator (`:` on macOS and Linux, `;` on Windows).
+	 * Public so specs can check it.
+	 */
+	public string function $browserClasspath(required string installDir, required struct manifest) {
+		var jars = [];
+		for (var entry in arguments.manifest.classpath) {
+			arrayAppend(jars, arguments.installDir & "/lib/" & entry.filename);
+		}
+		return arrayToList(jars, createObject("java", "java.io.File").pathSeparator);
+	}
+
+	/**
+	 * Launch the browser once and finish `wheels browser setup`: print "ready"
+	 * only when the launch worked; otherwise print Playwright's output and the
+	 * remedy, then throw so the command exits non-zero. Downloading the
+	 * binaries doesn't prove they run: on a bare Linux host the browser can be
+	 * missing OS libraries. Public so specs can drive it with a stubbed probe.
+	 */
+	public string function $browserFinishSetup(required string classpath, required string browserName) {
+		out("Launching #arguments.browserName# to check it runs...");
+		var probe = $browserLaunchProbe(arguments.classpath, arguments.browserName);
+		if (!probe.ok) {
+			out("Browser launch FAILED", "red");
+			if (probe.timedOut) {
+				out("The browser didn't finish starting within #probe.timeoutSeconds# seconds and was stopped.", "red");
+			}
+			if (len(trim(probe.output))) {
+				out(trim(probe.output), "red");
+			}
+			out("");
+			out($browserLaunchRemedy(probe.output, arguments.classpath, arguments.browserName), "yellow");
+			throw(type = "Wheels.BrowserSetupFailed", message = "wheels browser setup: #arguments.browserName# is installed but didn't start. See the output above.");
+		}
+		out("Browser launch OK", "green");
 		out("");
 		out("Browser testing ready.", "green");
 		out("Run: wheels test --filter=browser  (or: wheels browser test)", "green");
@@ -13096,6 +13485,93 @@ component extends="modules.BaseModule" {
 		if (!arguments.verbose && len(arguments.message) > 400) {
 			out("    (truncated; pass --verbose for full output)", "yellow");
 		}
+	}
+
+	/**
+	 * Launch the browser once through Playwright's CLI (a headless screenshot of
+	 * about:blank). It counts as running only when the process finished in
+	 * time, exited 0 and wrote the screenshot; a timed-out run never counts,
+	 * even if a screenshot appeared first. The screenshot is always removed.
+	 * Returns {ok, timedOut, timeoutSeconds, output}.
+	 */
+	public struct function $browserLaunchProbe(required string classpath, required string browserName, numeric timeoutSeconds = 120) {
+		var shot = getTempDirectory() & "wheels-browser-probe-" & createUUID() & ".png";
+		var rv = {ok: false, timedOut: false, timeoutSeconds: arguments.timeoutSeconds, output: ""};
+		try {
+			var run = $browserRunProcess(
+				["java", "-cp", arguments.classpath, "com.microsoft.playwright.CLI", "screenshot", "--browser", arguments.browserName, "about:blank", shot],
+				arguments.timeoutSeconds
+			);
+			rv.output = run.output;
+			rv.timedOut = run.timedOut;
+			rv.ok = !run.timedOut && run.exitCode == 0 && fileExists(shot) && getFileInfo(shot).size > 0;
+		} finally {
+			if (fileExists(shot)) {
+				fileDelete(shot);
+			}
+		}
+		return rv;
+	}
+
+	/**
+	 * Run a command (an argv array, so paths with spaces stay one argument) and
+	 * wait at most `timeoutSeconds`. On timeout the process and everything it
+	 * started are killed. Output (stdout and stderr together) goes through a
+	 * temp file, so a chatty process can't block on a full pipe. Returns
+	 * {exitCode, timedOut, output}. Public so specs can check the timeout.
+	 */
+	public struct function $browserRunProcess(required array argv, required numeric timeoutSeconds) {
+		var logFile = getTempDirectory() & "wheels-browser-run-" & createUUID() & ".log";
+		var rv = {exitCode: -1, timedOut: false, output: ""};
+		try {
+			var builder = createObject("java", "java.lang.ProcessBuilder").init(arguments.argv);
+			builder.redirectErrorStream(true);
+			builder.redirectOutput(createObject("java", "java.io.File").init(logFile));
+			var process = builder.start();
+			var seconds = createObject("java", "java.util.concurrent.TimeUnit").SECONDS;
+			if (process.waitFor(javaCast("long", arguments.timeoutSeconds), seconds)) {
+				rv.exitCode = process.exitValue();
+			} else {
+				rv.timedOut = true;
+				$browserKillProcessTree(process);
+			}
+			rv.output = fileExists(logFile) ? fileRead(logFile) : "";
+		} finally {
+			if (fileExists(logFile)) {
+				fileDelete(logFile);
+			}
+		}
+		return rv;
+	}
+
+	/**
+	 * Kill a process and every process it started, then wait briefly for it to
+	 * go. The parent goes first, so it can't react to a child's death (a shell
+	 * would run its next command); the children are listed before that, while
+	 * they are still its descendants.
+	 */
+	private void function $browserKillProcessTree(required any process) {
+		var children = arguments.process.descendants().toArray();
+		arguments.process.destroyForcibly();
+		for (var child in children) {
+			child.destroyForcibly();
+		}
+		arguments.process.waitFor(javaCast("long", 5), createObject("java", "java.util.concurrent.TimeUnit").SECONDS);
+	}
+
+	/**
+	 * What to do after a failed launch probe. When Playwright reports missing
+	 * host libraries (a bare Linux install), print its install-deps command for
+	 * this install's classpath; otherwise point at the output above.
+	 * Public so specs can check the text.
+	 */
+	public string function $browserLaunchRemedy(required string output, required string classpath, required string browserName) {
+		if (findNoCase("missing dependencies", arguments.output) || findNoCase("install-deps", arguments.output)) {
+			return "The browser is installed but the system is missing libraries it needs. On Debian/Ubuntu, install them with:" & chr(10)
+				& "  sudo java -cp ""#arguments.classpath#"" com.microsoft.playwright.CLI install-deps #arguments.browserName#" & chr(10)
+				& "then run wheels browser setup again.";
+		}
+		return "The browser was installed but didn't start; see the output above. Run wheels browser setup --force to reinstall, then try again.";
 	}
 
 	/**

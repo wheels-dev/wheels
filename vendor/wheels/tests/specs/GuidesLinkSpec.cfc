@@ -70,6 +70,23 @@ component extends="wheels.WheelsTest" {
 				expect(cliSource).toInclude('variables.latest = "#guides.latestVersion()#"');
 			});
 
+			it("pins only allowlisted pages, and each exists in its pinned tree", () => {
+				var root = ExpandPath("/wheels/../..") & "/";
+				var allowed = $pinnedPages();
+				var found = 0;
+				for (var file in ["cli/lucli/Module.cfc", "cli/lucli/services/Doctor.cfc"]) {
+					for (var call in ReMatch('pinned\(\s*"v[0-9]+-[0-9]+-0"\s*,\s*"[a-z0-9/_-]+"', FileRead(root & file))) {
+						var parts = ReMatch('"[^"]+"', call);
+						var entry = ReReplace(parts[1], '"', "", "all") & "/" & ReReplace(ReReplace(parts[2], '"', "", "all"), "/$", "");
+						found++;
+						expect(ArrayFindNoCase(allowed, entry)).toBeGT(0, "#file# pins #entry#, which isn't in $pinnedPages()");
+						var base = docsRoot & entry;
+						expect(FileExists(base & ".mdx") || FileExists(base & "/index.mdx")).toBeTrue("missing pinned page #entry#");
+					}
+				}
+				expect(found).toBe(ArrayLen(allowed), "an allowlisted pinned page is no longer used");
+			});
+
 			it("links only to pages that exist in every tree it can resolve to", () => {
 				var pages = $linkedPages();
 				expect(ArrayLen(pages)).toBeGT(5, "the source scan found too few GuidesLink calls");
@@ -81,6 +98,21 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 		});
+	}
+
+	// Pages linked with the CLI's GuidesLink.pinned(tree, path): fixed to one
+	// tree because the page exists only there, so link()'s clamping would
+	// 404. Each entry needs its reason here.
+	private array function $pinnedPages() {
+		return [
+			// The 4.1 -> 4.2 upgrade guide is only in the 4.2 docs. `wheels
+			// upgrade check` links it for an upgrade into 4.2 (#4236).
+			"v4-2-0/upgrading/4x-1-to-4x-2",
+			// The 4.0 -> 4.1 upgrade guide isn't in the v4-0-0 docs. `wheels
+			// upgrade check` links it for the public/Application.cfc fixes it
+			// documents.
+			"v4-1-0/upgrading/4x-0-to-4x-1"
+		];
 	}
 
 	// Guide trees (vN-M-0 directory names) newer than GuidesLink's latest that
