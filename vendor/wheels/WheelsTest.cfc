@@ -11,6 +11,32 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     // Pseudo-constructor (runs automatically). Kept so specs that EXTEND
     // WheelsTest get their helpers bound during child compilation.
     $bindApplicationHelpers();
+    $guardTestRunDataSource();
+
+    /**
+     * Refuses to build a spec bundle when this run was meant to use the test
+     * datasource but the app's primary datasource is active, e.g. a project
+     * tests/runner.cfm that sets the datasource itself. Only acts inside a run
+     * started through Public.cfc's project-runner path (which records its
+     * datasource decision for the request); a no-op everywhere else.
+     */
+    public void function $guardTestRunDataSource() {
+        if (!StructKeyExists(request, "wheels") || !StructKeyExists(request.wheels, "$testDataSourceDecision")) {
+            return;
+        }
+        local.decision = request.wheels.$testDataSourceDecision;
+        if (
+            local.decision.action == "swap"
+            && StructKeyExists(application, "wheels")
+            && Compare(application.wheels.dataSourceName, local.decision.primary) == 0
+        ) {
+            Throw(
+                type = "Wheels.TestDatabaseNotAvailable",
+                message = "This test run uses the '#local.decision.target#' datasource, but the app's primary datasource '#local.decision.primary#' is active.",
+                extendedInfo = "Something in the run set the datasource back to the primary one; a tests/runner.cfm copied from an older Wheels release can do this. Replace it with the runner `wheels new` creates (it includes wheels/tests/app-runner.cfm)."
+            );
+        }
+    }
 
     /**
      * Bind application.wo's helpers into this instance (both variables and
@@ -61,6 +87,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
      */
     remote WheelsTest function init() {
         $bindApplicationHelpers();
+        $guardTestRunDataSource();
         return this;
     }
 

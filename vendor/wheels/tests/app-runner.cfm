@@ -140,7 +140,15 @@
     // token an overlapping run now queues on the lock instead.
     local.activeRunToken = StructKeyExists(application, "$$$appTestRunToken") ? application["$$$appTestRunToken"] : "";
     local.requestRunToken = (StructKeyExists(url, "wheelsTestRun") && IsSimpleValue(url.wheelsTestRun)) ? url.wheelsTestRun : "";
-    local.runnerOwnsSwap = !(
+    // A project tests/runner.cfm that includes this file runs inside
+    // Public.cfc's $runProjectTestRunner(), which already holds this lock and has
+    // already chosen (and, on a swap, applied) the test datasource. Neither the
+    // lock nor the swap is repeated here, and the outer runner restores.
+    local.outerRunner = StructKeyExists(request, "wheels")
+        && StructKeyExists(request.wheels, "$testRunnerOuter")
+        && request.wheels.$testRunnerOuter;
+    local.preSwap = (local.outerRunner && StructKeyExists(request.wheels, "$testRunPreSwap")) ? request.wheels.$testRunPreSwap : {};
+    local.runnerOwnsSwap = !local.outerRunner && !(
         StructKeyExists(application, "$$$appTestOriginalDataSource")
         && Len(local.activeRunToken)
         && Compare(local.requestRunToken, local.activeRunToken) == 0
@@ -168,7 +176,8 @@
                 }
             }
             local.targetDataSource = local.originalDataSource;
-            local.swappedDataSource = false;
+            // Pre-swapped by the outer runner: populate the test datasource as a swap would.
+            local.swappedDataSource = !StructIsEmpty(local.preSwap);
             if (local.runnerOwnsSwap) {
                 application["$$$appTestRunToken"] = CreateUUID();
                 // Record the pre-swap datasource as the ownership marker so

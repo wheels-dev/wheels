@@ -154,6 +154,8 @@ For another database, add a `myapp_test` entry with the same settings as `myapp`
 
 A CLI too old to send `useTestDB=false` can still run the suite against the primary datasource with `set(allowTestsAgainstPrimaryDatasource=true)` in `config/settings.cfm`. Specs then write to that database, and each run logs a warning to `wheels.log`. The setting only applies when the request has no `useTestDB` parameter: `wheels test`, which sends `useTestDB=true`, still requires `<datasource>_test`.
 
+The same rule applies to a `tests/runner.cfm` of your own: the run uses `<datasource>_test`, or it is refused unless you ask for the primary datasource as above. A runner copied from an older Wheels release (it sets `dataSourceName` from `coreTestDataSourceName` and includes its own `populate.cfm`) keeps working: for the duration of the run, both settings point at `<datasource>_test`. Replace it with the runner `wheels new` creates, a single include of `wheels/tests/app-runner.cfm`, so your app gets the built-in runner's behaviour, including running `tests/populate.cfm` against the test database.
+
 HTTP requests your specs make reach that same test application, so they see the same datasource as the spec code, when they come from:
 - `$testClient()`;
 - a `wheels.wheelstest.TestClient` you create inside the spec run (including in a thread started during the run) whose `baseUrl` points at the test server: a loopback host (`localhost`, `127.x.x.x`, `[::1]`) or the host of a configured `testClientBaseUrl`;

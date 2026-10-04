@@ -1101,4 +1101,135 @@ public boolean function $dataSourceIsReachable(required string name) {
 	}
 	return state.reachable;
 }
+
+/**
+ * Internal. Which datasource an app test run may use, by the same rules as the
+ * built-in runner (`vendor/wheels/tests/app-runner.cfm`):
+ * - an explicit, valid `useTestDB=false` runs on the primary datasource (intentional);
+ * - otherwise `<primary>_test` is used when it is registered or reachable ("swap");
+ * - otherwise an omitted `useTestDB` with `allowTestsAgainstPrimaryDatasource=true`
+ *   runs on the primary datasource with a warning;
+ * - anything else is refused.
+ * Returns `{action: swap|primary|refuse, primary, candidate, target, warn}`.
+ * `candidateRegistered` is probed when not passed (passed by specs).
+ */
+public struct function $testDataSourceDecision(
+	required string primary,
+	required struct requestUrl,
+	candidateRegistered
+) {
+	local.rv = {
+		action = "refuse",
+		primary = arguments.primary,
+		candidate = arguments.primary & "_test",
+		target = "",
+		warn = false
+	};
+	local.paramPresent = StructKeyExists(arguments.requestUrl, "useTestDB");
+	local.validBoolean = local.paramPresent && IsBoolean(arguments.requestUrl.useTestDB);
+	if (local.validBoolean && !arguments.requestUrl.useTestDB) {
+		local.rv.action = "primary";
+		local.rv.target = arguments.primary;
+		return local.rv;
+	}
+	if (!StructKeyExists(arguments, "candidateRegistered") || IsNull(arguments.candidateRegistered)) {
+		arguments.candidateRegistered = $testDataSourceRegistered(local.rv.candidate);
+	}
+	if (arguments.candidateRegistered) {
+		local.rv.action = "swap";
+		local.rv.target = local.rv.candidate;
+		return local.rv;
+	}
+	local.allowPrimary = StructKeyExists(application.wheels, "allowTestsAgainstPrimaryDatasource")
+		&& IsBoolean(application.wheels.allowTestsAgainstPrimaryDatasource)
+		&& application.wheels.allowTestsAgainstPrimaryDatasource;
+	if (!local.paramPresent && local.allowPrimary) {
+		local.rv.action = "primary";
+		local.rv.target = arguments.primary;
+		local.rv.warn = true;
+	}
+	return local.rv;
+}
+
+/**
+ * Internal. True when `name` is in the application's datasources or the engine can
+ * open it (a datasource registered at server level is not in the application metadata).
+ */
+public boolean function $testDataSourceRegistered(required string name) {
+	local.meta = GetApplicationMetaData();
+	if (
+		StructKeyExists(local.meta, "datasources")
+		&& IsStruct(local.meta.datasources)
+		&& StructKeyExists(local.meta.datasources, arguments.name)
+	) {
+		return true;
+	}
+	return $dataSourceIsReachable(name = arguments.name);
+}
+
+/**
+ * Internal. Points a project test runner (`tests/runner.cfm`) at the datasource
+ * `decision` chose and returns what to restore with `$endTestRunDataSource()`.
+ * Runners copied from older Wheels releases set `dataSourceName` from
+ * `coreTestDataSourceName`, so both are pointed at the test datasource.
+ */
+public struct function $beginTestRunDataSource(required struct decision) {
+	local.saved = {
+		dataSourceName = application.wheels.dataSourceName,
+		hasCoreTestDataSourceName = StructKeyExists(application.wheels, "coreTestDataSourceName"),
+		coreTestDataSourceName = StructKeyExists(application.wheels, "coreTestDataSourceName") ? application.wheels.coreTestDataSourceName : ""
+	};
+	if (!StructKeyExists(request, "wheels")) {
+		request.wheels = {};
+	}
+	request.wheels.$testRunnerOuter = true;
+	request.wheels.$testDataSourceDecision = arguments.decision;
+	if (arguments.decision.action == "swap") {
+		application.wheels.dataSourceName = arguments.decision.target;
+		application.wheels.coreTestDataSourceName = arguments.decision.target;
+		if (StructKeyExists(application.wheels, "models")) {
+			StructClear(application.wheels.models);
+		}
+		request.wheels.$testRunPreSwap = {original = arguments.decision.primary, target = arguments.decision.target};
+	}
+	return local.saved;
+}
+
+/**
+ * Internal. Restores what `$beginTestRunDataSource()` changed. Called from a
+ * `finally` block, so it does all of its own work (no loops in the caller).
+ */
+public void function $endTestRunDataSource(required struct saved) {
+	if (Compare(application.wheels.dataSourceName, arguments.saved.dataSourceName) != 0) {
+		application.wheels.dataSourceName = arguments.saved.dataSourceName;
+		if (StructKeyExists(application.wheels, "models")) {
+			StructClear(application.wheels.models);
+		}
+	}
+	if (arguments.saved.hasCoreTestDataSourceName) {
+		application.wheels.coreTestDataSourceName = arguments.saved.coreTestDataSourceName;
+	} else {
+		StructDelete(application.wheels, "coreTestDataSourceName");
+	}
+	if (StructKeyExists(request, "wheels")) {
+		StructDelete(request.wheels, "$testRunnerOuter");
+		StructDelete(request.wheels, "$testDataSourceDecision");
+		StructDelete(request.wheels, "$testRunPreSwap");
+	}
+}
+
+/**
+ * Internal. The JSON body for a refused app test run.
+ */
+public struct function $testDataSourceRefusal(required struct decision) {
+	return {
+		success = false,
+		error = "Test database not available",
+		message = "App tests need the '" & arguments.decision.candidate & "' datasource, which is not registered. Create it; or run against '"
+			& arguments.decision.primary & "' intentionally with `wheels test --no-test-db` (URL: useTestDB=false). "
+			& "If tests/runner.cfm was copied from an older Wheels release, replace it with the runner `wheels new` creates (it includes wheels/tests/app-runner.cfm).",
+		datasource = arguments.decision.primary,
+		candidate = arguments.decision.candidate
+	};
+}
 </cfscript>
