@@ -102,6 +102,30 @@ component extends="wheels.WheelsTest" {
 				expect(withAnd.recordCount).toBe(2);
 			})
 
+			it("returns the rows between two quoted bounds whatever the keyword case", () => {
+				var ids = $postIds();
+				var lower = g.model("post").findAll(where = "title between 'T' and 'U'", returnAs = "query", reload = true);
+				var upper = g.model("post").findAll(where = "title BETWEEN 'T' AND 'U'", returnAs = "query", reload = true);
+				var none = g.model("post").findAll(where = "title between 'A' and 'B'", returnAs = "query", reload = true);
+				var withOr = g.model("post").findAll(where = "title between 'A' and 'B' or id = #ids[1]#", returnAs = "query", reload = true);
+				expect(lower.recordCount).toBe(ArrayLen(ids));
+				expect(upper.recordCount).toBe(ArrayLen(ids));
+				expect(none.recordCount).toBe(0);
+				expect(withOr.recordCount).toBe(1);
+			})
+
+			it("keeps quoted bounds that hold a quote and a backslash", () => {
+				var counts = {};
+				transaction {
+					g.model("post").create(title = "O'Q\R bound", body = "between bounds");
+					counts.lower = g.model("post").findAll(where = "title between 'O''Q\R bound' and 'O''Q\R bound'", returnAs = "query", reload = true).recordCount;
+					counts.upper = g.model("post").findAll(where = "title BETWEEN 'O''Q\R bound' AND 'O''Q\R bound'", returnAs = "query", reload = true).recordCount;
+					transaction action = "rollback";
+				}
+				expect(counts.lower).toBe(1);
+				expect(counts.upper).toBe(1);
+			})
+
 			it("keeps a BETWEEN next to a quoted literal", () => {
 				var ids = $postIds();
 				var titles = $postTitles();
