@@ -31,7 +31,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("uses a coreTestDataSourceName that is not the app's primary datasource as it is", () => {
-				var choice = g.$coreTestDataSource(primary = "myapp", coreName = "myapp_core", requestUrl = {}, candidateRegistered = false);
+				var choice = g.$coreTestDataSource(primary = "myapp", coreName = "myapp_core", requestUrl = {}, candidateRegistered = false, targetRegistered = true);
 				expect(choice.action).toBe("use");
 				expect(choice.target).toBe("myapp_core");
 			});

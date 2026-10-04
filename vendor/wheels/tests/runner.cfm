@@ -280,15 +280,7 @@
                 if (local.coreDataSource.action == "refuse") {
                     cfheader(statuscode = 409);
                     cfcontent(type = "application/json");
-                    WriteOutput(SerializeJSON({
-                        success = false,
-                        error = "Test database not available",
-                        message = "The framework test suite would run on this app's primary datasource '" & local.coreDataSource.decision.primary
-                            & "'. Pass ?db= to use a wheelstestdb_<db> datasource, create '" & local.coreDataSource.decision.candidate
-                            & "', or run against the primary datasource intentionally with useTestDB=false.",
-                        datasource = local.coreDataSource.decision.primary,
-                        candidate = local.coreDataSource.decision.candidate
-                    }));
+                    WriteOutput(SerializeJSON(application.wo.$coreTestDataSourceRefusal(choice = local.coreDataSource)));
                     abort;
                 }
                 variables.$_coreTestDataSourceName = local.coreDataSource.target;
