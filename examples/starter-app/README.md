@@ -186,14 +186,18 @@ embedded database instead: `server.json` installs the H2 Lucee extension and set
 `WHEELS_STARTER_DB=h2`, which `config/app.cfm` checks. The data files go in `db/h2/`.
 
 ```bash
-# 1. Start the server (http://localhost:8081)
+# 1. Create .env and set WHEELS_RELOAD_PASSWORD in it, as in step 2 above
+#    (WHEELS_LUCEE_ADMIN_PASSWORD is only read by `wheels start`)
+cp .env.example .env
+
+# 2. Start the server (http://localhost:8081)
 box server start
 
-# 2. Create the schema and seed the default data: open the migrator page
+# 3. Create the schema and seed the default data: open the migrator page
 #    http://localhost:8081/wheels/migrator
 #    and click "Migrate To Latest", then "Confirm & Execute".
 
-# 3. Restart the server so the app loads the seeded settings
+# 4. Restart the server so the app loads the seeded settings
 box server restart
 ```
 
