@@ -96,7 +96,7 @@ wheels test tests.specs.models   # a subdirectory of specs
 wheels test --filter=UserSpec    # one spec file, by name
 ```
 
-The CLI boots the app on an isolated port and runs the suite over HTTP,
-mirroring CI. Browser-driven specs need Playwright installed once:
-`wheels browser setup`.
+`wheels test` runs the suite over HTTP on this project's own server, so
+start it first with `wheels start`. Browser-driven specs need Playwright
+installed once: `wheels browser setup`.
 

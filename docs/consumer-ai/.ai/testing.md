@@ -41,3 +41,14 @@ StructDelete(request.wheels, "$queryCache");
 ```
 
 `$queryCache` is a reserved key under `request.wheels`; deleting it drops every model's cached finder results for the current request.
+
+## Which environment app specs run in
+
+`wheels test` runs your specs in the environment `.env` sets (`WHEELS_ENV=development` in a new app), not `testing`, so `config/testing/settings.cfm` doesn't apply to them. Put spec-wide defaults in `config/development/settings.cfm`. For example, to keep every spec from sending mail:
+
+```cfm
+// config/development/settings.cfm (this also stops your development server from sending mail)
+set(functionName = "sendEmail", deliver = false);
+```
+
+To turn delivery off for a single spec instead, see `.ai/mailers.md`.

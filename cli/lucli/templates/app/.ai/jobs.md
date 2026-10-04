@@ -31,6 +31,8 @@ stats = queue.queueStats();
 
 `UserMailer` is the mailer in `.ai/mailers.md` (`app/mailers/UserMailer.cfc` plus its view). With it and a `users` table that has `email` and `firstName`, this example runs as written.
 
+Enqueueing joins the caller's transaction: `enqueue()` writes its `wheels_jobs` row through the app's datasource, so inside `invokeWithTransaction()` the job commits or rolls back with your data. Enqueue there when the job should run only if the data commits (an outbox); enqueue after the transaction when the work must happen even if it rolls back.
+
 Run jobs with the worker. It needs this app's server running, started with `wheels start`:
 ```bash
 wheels jobs work --queue=mailers --interval=3   # long-lived worker loop; --quiet for less output
