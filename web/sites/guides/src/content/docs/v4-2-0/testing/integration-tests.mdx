@@ -125,33 +125,55 @@ component extends="wheels.WheelsTest" {
 
 The pattern: run the workflow, then reach into the model layer with `count()`, `findOne()`, or a scope to confirm the intended rows exist with the intended values. Silent failures — a callback that swallowed an exception, a filter that dropped a param, an association that didn't cascade — don't surface in the HTTP status. The DB assertion catches them.
 
-## Per-spec transaction isolation
+## Per-spec isolation
 
-`transactionMode` defaults to `none`, so writes persist between specs. `populate.cfm` only runs once per test run, not between `it`s. For a destructive spec that shouldn't leak data into the next one, wrap the work in a manual transaction and roll back at the end.
+WheelsTest doesn't wrap specs in a transaction, so writes persist between specs, and `populate.cfm` only runs once per test run, not between `it`s. How you undo a destructive spec depends on where its writes happen.
 
-```cfm {test:compile} title="tests/specs/integration/RollbackSpec.cfc"
+**Writes made through `$testClient()` requests** can't be rolled back from the spec. Each request runs as its own request and commits on its own, so a `transaction` in the spec doesn't contain them. Delete what the spec created in `afterEach`:
+
+```cfm {test:compile} title="tests/specs/integration/CleanupSpec.cfc"
 component extends="wheels.WheelsTest" {
     function run() {
         describe("Destructive spec", () => {
-            it("rolls back writes on completion", () => {
-                transaction {
-                    try {
-                        $testClient().post("/posts", {"post[title]": "Temp", "post[body]": "B"})
-                            .assertRedirect();
-                        expect(model("Post").count()).toBeGT(0);
-                    } finally {
-                        transaction action="rollback";
-                    }
-                }
+            afterEach(() => {
+                model("Post").deleteAll(where = "title='Temp'");
+            });
 
-                expect(model("Post").count(where="title='Temp'")).toBe(0);
+            it("creates a post through the app", () => {
+                $testClient().post("/posts", {"post[title]": "Temp", "post[body]": "B"})
+                    .assertRedirect();
+                expect(model("Post").count(where = "title='Temp'", reload = true)).toBe(1);
             });
         });
     }
 }
 ```
 
-The `finally` block is what makes this safe: even if an assertion fails midway, the rollback still runs and the next spec sees a clean table. Cross-link to [Fixtures & Test Data](/v4-2-0/testing/fixtures-and-test-data/) for the full fixture-lifecycle pattern — when to use rollback, when to use populate data, when to seed per-spec.
+**Writes the spec makes itself through the model layer** can be rolled back. The `finally` block is what makes this safe: even if an assertion fails midway, the rollback still runs and the next spec sees a clean table.
+
+```cfm {test:compile} title="tests/specs/models/RollbackSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Model-layer writes", () => {
+            it("rolls back on completion", () => {
+                transaction {
+                    try {
+                        model("Post").create(title = "Temp", body = "B");
+                        expect(model("Post").count(where = "title='Temp'")).toBe(1);
+                    } finally {
+                        transaction action="rollback";
+                    }
+                }
+
+                // reload = true: the same count() earlier in this request is cached.
+                expect(model("Post").count(where = "title='Temp'", reload = true)).toBe(0);
+            });
+        });
+    }
+}
+```
+
+See [Fixtures & Test Data](/v4-2-0/testing/fixtures-and-test-data/) for the full fixture-lifecycle pattern — when to use rollback, when to use populate data, when to seed per-spec.
 
 ## Cross-controller workflows
 

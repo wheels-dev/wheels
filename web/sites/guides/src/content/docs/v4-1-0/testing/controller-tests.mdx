@@ -222,18 +222,22 @@ testClient.withHeader("Authorization", "Bearer " & token)
 
 `TestClient` runs against your real database through real HTTP requests. Two concerns:
 
-- **State carries across specs.** WheelsTest does not wrap each `it` in a transaction — the default `transactionMode` is `none`. A `POST /posts` in one spec creates a row the next spec will see. `tests/populate.cfm` runs once at the start of the suite to DROP + CREATE + seed; it does not run between specs. If a spec must not leak state, wrap the action call in a manual transaction and roll back at the end.
+- **State carries across specs.** WheelsTest does not wrap each `it` in a transaction. A `POST /posts` in one spec creates a row the next spec will see. `tests/populate.cfm` runs once at the start of the suite to DROP + CREATE + seed; it does not run between specs. A transaction in the spec can't undo a request's writes: each test-client request runs as its own request and commits on its own, so rolling back in the spec leaves those rows in place. Delete what a spec created in `afterEach` instead.
 - **A fresh client has an empty cookie jar.** Build a new `$testClient()` at the top of each `it` (or in `beforeEach`) when you want to start logged out. Reuse one client when you want to chain logged-in requests.
 
 ```cfm title="illustrative — do not type"
-it("creates a post inside a rollback", () => {
-    transaction {
+describe("Posts", () => {
+    afterEach(() => {
+        // Requests commit on their own; remove what this spec created.
+        model("Post").deleteAll(where = "title='T'");
+    });
+
+    it("creates a post", () => {
         var testClient = $testClient();
         testClient.post("/login", {email: "alice@example.com", password: "secret"});
         testClient.post("/posts", {"post[title]": "T", "post[body]": "B"});
         expect(testClient.statusCode()).toBe(302);
-        transaction action="rollback";
-    }
+    });
 });
 ```
 
