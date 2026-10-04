@@ -1,0 +1,1 @@
+- `wheels upgrade apply` now updates a CommandBox app's `box.json` `wheels-core` version to the framework it installed, and prints the change. Before, the old pin stayed, and a later `box install` copied the old framework back over the new `vendor/wheels/`, leaving a mix of both versions. If `box.json` isn't valid JSON, `apply` refuses before changing anything.

@@ -396,6 +396,51 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(result).toInclude("Framework reinstalled: 4.1.1 -> 4.1.1");
 					expect(result).notToInclude("upgraded");
 				});
+
+				// A CommandBox app's box.json pins wheels-core. Left at the old
+				// version, a later `box install` copies that framework back
+				// over the new vendor/wheels/ and leaves a mix of both.
+				it("points box.json's wheels-core at the new framework and says so", () => {
+					seedVendorWheels(version = "4.1.0");
+					var box = '{' & chr(10)
+						& '    "name":"app",' & chr(10)
+						& '    "dependencies":{' & chr(10)
+						& '        "wheels-core":"^3.0.1"' & chr(10)
+						& '    },' & chr(10)
+						& '    "installPaths":{' & chr(10)
+						& '        "wheels-core":"vendor/wheels/"' & chr(10)
+						& '    }' & chr(10)
+						& '}' & chr(10);
+					fileWrite(variables.tempRoot & "/box.json", box);
+
+					var result = mod.upgrade(arg1 = "apply");
+
+					expect(seededVersion()).toBe("4.1.1");
+					expect(fileRead(variables.tempRoot & "/box.json")).toBe(replace(box, '"wheels-core":"^3.0.1"', '"wheels-core":"^4.1.1"'));
+					expect(result).toInclude("box.json: wheels-core ^3.0.1 -> ^4.1.1 (so box install keeps this framework)");
+				});
+
+				it("refuses before changing anything when box.json can't be read", () => {
+					seedVendorWheels(version = "4.1.0");
+					fileWrite(variables.tempRoot & "/box.json", '{"dependencies":{"wheels-core":"^3.0.1"');
+
+					expect(() => mod.upgrade(arg1 = "apply")).toThrow(type = "Wheels.UpgradeApplyFailed", regex = "box\.json is not valid JSON.*Nothing was changed");
+
+					expect(seededVersion()).toBe("4.1.0");
+					expect(arrayLen(listBackups())).toBe(0);
+					expect(mod.capturedOutput()).notToInclude("Backing up vendor/wheels");
+				});
+
+				it("leaves a box.json without wheels-core alone", () => {
+					seedVendorWheels(version = "4.1.0");
+					var box = '{"name":"app","dependencies":{"other":"1.0.0"}}';
+					fileWrite(variables.tempRoot & "/box.json", box);
+
+					var result = mod.upgrade(arg1 = "apply");
+
+					expect(fileRead(variables.tempRoot & "/box.json")).toBe(box);
+					expect(result).notToInclude("box.json: wheels-core");
+				});
 			});
 
 			describe("wheels upgrade check (read-only scan)", () => {
