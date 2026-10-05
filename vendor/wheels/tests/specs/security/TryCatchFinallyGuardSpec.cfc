@@ -42,10 +42,8 @@ component extends="wheels.WheelsTest" {
 				var selfName = "TryCatchFinallyGuardSpec.cfc";
 				var root = ExpandPath("/wheels");
 
-				// Reviewed, intentional exceptions: path-suffix match => reason.
-				var allowList = {
-					"/model/locking.cfm": "$advisoryLockTransactionBody outer try: the lock release already runs in an inner catch-free finally (invariant 22, PR ##4330); the outer catch/rollback is tracked separately."
-				};
+				// Reviewed, intentional exceptions: path-suffix match => reason. None at present.
+				var allowList = {};
 
 				// BoxLang's DirectoryList() returns a fixed-size array, so copy before appending (invariant 20).
 				var files = [];
