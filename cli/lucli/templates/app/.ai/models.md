@@ -62,6 +62,7 @@ component extends="Model" {
 Finders: `model("User").findAll()`, `findOne(where="...")`, `findByKey(params.key)`.
 Create: `model("User").new(params.user).save()`, or `model("User").create(params.user)`.
 Include associations: `findAll(include="role,orders")`. Pagination: `findAll(page=params.page, perPage=25)`.
+What the last save wrote (4.2+): `savedChanges()`, `hasSavedChange("status")`, `savedChangeFrom("status")`, `savedChangedProperties()`, the saved counterparts of `allChanges()` / `hasChanged()` / `changedFrom()` / `changedProperties()`. Use them in `afterCommit`: each call sees the save that queued it, so a record saved twice in one transaction is told apart, and no hand-kept flag is needed (`if (hasSavedChange("published") && this.published) ...`).
 Opt a `select=false` calculated property into one call (additive): `findAll(includeCalculated="fullName")`. Unknown names throw `Wheels.CalculatedPropertyNotFound` in dev/testing.
 
 ## Scopes / Enums / Builder / Batch

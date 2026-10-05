@@ -62,6 +62,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm --filter @wheels-dev/site-${{ matrix.site }} build
 
+      # The guides and API sites build llms.txt, llms-full.txt, llms-small.txt, the per-version
+      # llms-txt/ sets and a .md for every page. Fail before deploying if a file is missing, a link
+      # in llms.txt doesn't resolve, a page lacks its .md, or a non-current version leaks into
+      # llms-full.txt / llms-small.txt (web/scripts/check-llms.mjs).
+      - name: Check llms files
+        if: matrix.site == 'guides' || matrix.site == 'api'
+        working-directory: web
+        env:
+          SITE: ${{ matrix.site }}
+        run: node scripts/check-llms.mjs "sites/${SITE}/dist" "${SITE}"
+
       - name: Deploy to Cloudflare Pages
         # Dependabot-triggered runs can't read repository secrets (they use
         # the separate Dependabot secrets store), so CLOUDFLARE_API_TOKEN is

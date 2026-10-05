@@ -472,7 +472,84 @@
 	}
 
 	/**
-	 * Clears all internal knowledge of the current state of the object.
+	 * Returns a struct detailing the changes the last successful save wrote to the database, in the
+	 * same shape as `allChanges()`: `{property: {changedFrom, changedTo}}`. Available from the
+	 * save's `afterCreate` / `afterUpdate` / `afterSave` callbacks on, after `allChanges()` has been
+	 * reset. Each `afterCommit` sees the save that queued it, and an `afterRollback` the save that was
+	 * undone. Empty before the first save, after a save that changed nothing, and after `reload()`.
+	 *
+	 * [section: Model Object]
+	 * [category: Change Functions]
+	 */
+	public struct function savedChanges() {
+		if (!StructKeyExists(variables, "$savedChanges")) {
+			return {};
+		}
+		return Duplicate(variables.$savedChanges);
+	}
+
+	/**
+	 * Returns `true` if the last successful save changed the specified property, or any property if
+	 * none is passed in. See `savedChanges()` for when that information is available.
+	 *
+	 * [section: Model Object]
+	 * [category: Change Functions]
+	 *
+	 * @property Name of property (or a list of properties) to check.
+	 */
+	public boolean function hasSavedChange(string property = "") {
+		if (!StructKeyExists(variables, "$savedChanges")) {
+			return false;
+		}
+		if (!Len(arguments.property)) {
+			return !StructIsEmpty(variables.$savedChanges);
+		}
+		for (local.key in ListToArray(arguments.property)) {
+			if (StructKeyExists(variables.$savedChanges, Trim(local.key))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Returns the value a property had before the last successful save changed it, or an empty
+	 * string when that save didn't change it.
+	 *
+	 * [section: Model Object]
+	 * [category: Change Functions]
+	 *
+	 * @property Name of property to get the previous value for.
+	 */
+	public string function savedChangeFrom(required string property) {
+		if (StructKeyExists(variables, "$savedChanges") && StructKeyExists(variables.$savedChanges, arguments.property)) {
+			return variables.$savedChanges[arguments.property].changedFrom;
+		}
+		return "";
+	}
+
+	/**
+	 * Returns a list of the object properties the last successful save changed.
+	 *
+	 * [section: Model Object]
+	 * [category: Change Functions]
+	 */
+	public string function savedChangedProperties() {
+		local.rv = "";
+		if (!StructKeyExists(variables, "$savedChanges")) {
+			return local.rv;
+		}
+		for (local.key in variables.wheels.class.properties) {
+			if (StructKeyExists(variables.$savedChanges, local.key)) {
+				local.rv = ListAppend(local.rv, local.key);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Clears all internal knowledge of the current state of the object, including what the last save
+	 * changed (`savedChanges()`).
 	 *
 	 * [section: Model Object]
 	 * [category: Change Functions]
@@ -481,6 +558,62 @@
 	 */
 	public void function clearChangeInformation(string property) {
 		$updatePersistedProperties(argumentCollection = arguments);
+		if (!StructKeyExists(arguments, "property")) {
+			StructDelete(variables, "$savedChanges");
+		} else if (StructKeyExists(variables, "$savedChanges")) {
+			StructDelete(variables.$savedChanges, arguments.property);
+		}
+	}
+
+	/**
+	 * Internal function. Records what the save in progress just wrote, as `savedChanges()` reports it
+	 * (F49): what `allChanges()` reports right after the write, by value. On a create that is every
+	 * property holding a value (from ""), including the generated key; properties the object never
+	 * set aren't listed.
+	 */
+	public void function $captureSavedChanges() {
+		local.changes = allChanges();
+		for (local.key in StructKeyArray(local.changes)) {
+			local.change = local.changes[local.key];
+			if (
+				!StructKeyExists(this, local.key)
+				|| (IsSimpleValue(local.change.changedFrom) && IsSimpleValue(local.change.changedTo) && !Len(local.change.changedFrom) && !Len(local.change.changedTo))
+			) {
+				StructDelete(local.changes, local.key);
+			}
+		}
+		variables.$savedChanges = Duplicate(local.changes);
+	}
+
+	/**
+	 * Internal function. The saved-change state, to put back with $restoreSavedChanges().
+	 */
+	public struct function $savedChangesState() {
+		if (StructKeyExists(variables, "$savedChanges")) {
+			return {exists = true, value = Duplicate(variables.$savedChanges)};
+		}
+		return {exists = false, value = {}};
+	}
+
+	/**
+	 * Internal function. Puts back a saved-change state from $savedChangesState(): after a save that
+	 * failed or was rolled back, and around each queued afterCommit / afterRollback.
+	 */
+	public void function $restoreSavedChanges(required struct state) {
+		if (arguments.state.exists) {
+			variables.$savedChanges = Duplicate(arguments.state.value);
+		} else {
+			StructDelete(variables, "$savedChanges");
+		}
+	}
+
+	/**
+	 * Internal function. `reload()` for save(reload = true), keeping what the save changed.
+	 */
+	public void function $reloadKeepingSavedChanges() {
+		local.state = $savedChangesState();
+		this.reload();
+		$restoreSavedChanges(local.state);
 	}
 
 	/**
