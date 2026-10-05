@@ -35,7 +35,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(mod.$packagesHelp()).toInclude("remove <name> --yes");
 			});
 
-			it("tells seed-data users to move the files before running wheels seed", () => {
+			it("names the seed files wheels seed reads in the seed-data hint", () => {
 				makePublic(mod, "getSnippetRegistry");
 				var hint = mod.getSnippetRegistry()["seed-data"].hint;
 				expect(hint).toInclude("app/db/seeds.cfm");
