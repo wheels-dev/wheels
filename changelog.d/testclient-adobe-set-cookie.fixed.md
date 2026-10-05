@@ -1,0 +1,1 @@
+- `TestClient` keeps the session cookies on Adobe CF. Adobe returns repeated `Set-Cookie` headers as a struct, and the client walked its keys instead of its values, so no cookie was kept and every request started a new session: a spec that logged in, or relied on a session value, behaved differently on Adobe than on Lucee.

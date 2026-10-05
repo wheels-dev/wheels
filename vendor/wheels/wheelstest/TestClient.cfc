@@ -807,22 +807,61 @@ component {
 		$clearResponseCaches();
 
 		// Track cookies from response for subsequent requests (session support)
-		if (StructKeyExists(result, "responseHeader") && StructKeyExists(result.responseHeader, "Set-Cookie")) {
-			var setCookieHeader = result.responseHeader["Set-Cookie"];
-			if (IsSimpleValue(setCookieHeader)) {
-				setCookieHeader = [setCookieHeader];
+		if (StructKeyExists(result, "responseHeader") && IsStruct(result.responseHeader)) {
+			$absorbSetCookies(result.responseHeader);
+		}
+	}
+
+	/**
+	 * Keep each Set-Cookie's name=value for later requests (session support).
+	 * cfhttp hands Set-Cookie over as a simple value (one cookie), an array
+	 * (Lucee), or a struct keyed "1", "2", … (Adobe CF). A for-in over that
+	 * struct walks its keys, not the cookies, so on Adobe no cookie was kept and
+	 * every request started a new session. Public for specs ($-prefixed).
+	 */
+	public void function $absorbSetCookies(required struct responseHeader) {
+		if (!StructKeyExists(arguments.responseHeader, "Set-Cookie")) {
+			return;
+		}
+		var raw = arguments.responseHeader["Set-Cookie"];
+		var headerValues = [];
+		if (IsSimpleValue(raw)) {
+			headerValues = [raw];
+		} else if (IsArray(raw)) {
+			headerValues = raw;
+		} else if (IsStruct(raw)) {
+			var keys = StructKeyArray(raw);
+			var allNumeric = true;
+			for (var key in keys) {
+				if (!IsNumeric(key)) {
+					allNumeric = false;
+				}
 			}
-			for (var cookieStr in setCookieHeader) {
-				var cookieParts = ListToArray(cookieStr, ";");
-				if (ArrayLen(cookieParts)) {
-					var pair = Trim(cookieParts[1]);
-					var eqPos = Find("=", pair);
-					if (eqPos > 0) {
-						variables.cookies[Left(pair, eqPos - 1)] = Mid(pair, eqPos + 1, Len(pair) - eqPos);
-					}
+			ArraySort(keys, allNumeric ? "numeric" : "textnocase");
+			for (var key in keys) {
+				ArrayAppend(headerValues, raw[key]);
+			}
+		}
+		for (var cookieStr in headerValues) {
+			if (!IsSimpleValue(cookieStr)) {
+				continue;
+			}
+			var cookieParts = ListToArray(cookieStr, ";");
+			if (ArrayLen(cookieParts)) {
+				var pair = Trim(cookieParts[1]);
+				var eqPos = Find("=", pair);
+				if (eqPos > 0) {
+					variables.cookies[Left(pair, eqPos - 1)] = Mid(pair, eqPos + 1, Len(pair) - eqPos);
 				}
 			}
 		}
+	}
+
+	/**
+	 * A copy of the cookies this client sends. Public for specs ($-prefixed).
+	 */
+	public struct function $cookieJar() {
+		return Duplicate(variables.cookies);
 	}
 
 	/**
