@@ -1,0 +1,1 @@
+- The per-request finder cache (`cacheQueriesDuringRequest`) is now cleared across every model on any ORM write and on a transaction rollback, so a cached `include=` query no longer returns a joined model's pre-write columns — or a rolled-back transaction's phantom rows — for the rest of the request (#4429)

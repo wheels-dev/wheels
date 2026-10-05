@@ -167,6 +167,12 @@
 			) {
 				$resolveTransactionCallbacks(connection = arguments.connectionArgs, type = "afterRollback");
 			}
+			if (arguments.closeTransaction) {
+				// The transaction rolled back (the body threw). Reads made inside it may have cached
+				// uncommitted rows, so drop the whole request query cache — otherwise a later read in
+				// this request returns phantom data that never committed (#4429).
+				$clearRequestCache();
+			}
 			rethrow;
 		}
 		// Transaction block closed without an exception: fire afterCommit on commit, or
@@ -182,6 +188,12 @@
 				connection = arguments.connectionArgs,
 				type = local.ctx.txnState.rolledBack ? "afterRollback" : "afterCommit"
 			);
+			if (local.ctx.txnState.rolledBack) {
+				// A non-exception rollback (the method returned false, or transaction = "rollback"):
+				// same phantom-read risk as the throw path above, so drop the request query cache.
+				// A commit does not need this — its reads are of committed rows (#4429).
+				$clearRequestCache();
+			}
 		}
 		return local.ctx.rv;
 	}

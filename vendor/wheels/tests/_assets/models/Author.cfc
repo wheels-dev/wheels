@@ -19,4 +19,13 @@ component extends="Model" {
 		return true;
 	}
 
+	// #4429 rollback-cache probe: inside a transaction, write (uncommitted) then read — caching the
+	// uncommitted row — and return false so the transaction rolls back. The spec then checks that the
+	// phantom row is not still served from the request cache after the rollback.
+	public boolean function $cacheRollbackProbe4429() {
+		this.update(firstName = "Phantom4429", transaction = "none");
+		model("Author").findByKey(key = this.id);
+		return false;
+	}
+
 }

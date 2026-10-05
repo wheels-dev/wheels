@@ -376,6 +376,12 @@
 	 *   forgetCachedQueries("Post")           clears just the Post model's slot, by name (works anywhere)
 	 *   forgetCachedQueries(all = true)        clears every model's cached results this request
 	 *
+	 * This is only needed after RAW writes (`queryExecute(...)`) — ORM writes (create / update / delete
+	 * and the `*All` / `*ByKey` forms) already clear the whole request cache themselves (#4429). After a
+	 * raw write, prefer `all = true` when the tables you wrote are joined by other models' `include=`
+	 * queries: a cross-model result is cached in the *base* model's slot, so the single-model named form
+	 * misses it. The named form is for a raw single-table write whose table no other cached query joins.
+	 *
 	 * Called as a method on a model instance it scopes to that model automatically, because only a model
 	 * carries `variables.wheels.class.modelName` (Controller / view / job / base Global do not). Called
 	 * outside a model with neither a `modelName` nor `all`, it throws rather than silently wiping every
@@ -423,8 +429,7 @@
 			if (arguments.all) {
 				StructDelete(request.wheels, "$queryCache");
 			} else {
-				// Empty just this model's slot, keeping the key — the same shape $clearRequestCache
-				// leaves behind, so a re-query repopulates it in place.
+				// Empty just this model's slot, keeping the key, so a re-query repopulates it in place.
 				request.wheels["$queryCache"][local.slot] = {};
 			}
 		}
