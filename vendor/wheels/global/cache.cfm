@@ -197,14 +197,15 @@
 
 
 	/**
-	 * Internal function.
+	 * Internal function. Returns `true` when the value was stored, `false` when the cache was full.
 	 */
-	public void function $addToCache(
+	public boolean function $addToCache(
 		required string key,
 		required any value,
 		numeric time = application.wheels.defaultCacheTime,
 		string category = "main"
 	) {
+		local.stored = false;
 		lock name="#application.applicationName#wheelsCacheStore" type="exclusive" timeout="30" {
 		local.storeKey = arguments.key;
 		if (arguments.category == "action") {
@@ -256,6 +257,7 @@
 				local.cacheItem.value = Duplicate(arguments.value);
 			}
 			application.wheels.cache[arguments.category][local.storeKey] = local.cacheItem;
+			local.stored = true;
 			if (arguments.category == "action" && StructKeyExists(variables, "$class") && StructKeyExists(variables.$class, "name")) {
 				if (!StructKeyExists(application.wheels, "cacheActionIndex")) {
 					application.wheels.cacheActionIndex = {};
@@ -275,6 +277,7 @@
 			}
 		}
 		}
+		return local.stored;
 	}
 
 
@@ -366,6 +369,169 @@
 				StructClear(application.wheels.cache[local.cacheCategory]);
 			}
 		}
+	}
+
+
+	// ======================================================================
+	// APPLICATION DATA CACHE (public)
+	// ======================================================================
+
+	/**
+	 * Returns the value cached under `key`. On a miss, calls `callback`, caches what it returns for `time`
+	 * and returns it. A cached `false`, `0` or `""` counts as a hit, so `callback` isn't called again
+	 * until the entry expires or is deleted. When `callback` returns nothing, nothing is cached and `""`
+	 * is returned; when it throws, nothing is cached and the error propagates. `callback` runs outside
+	 * the cache lock, so two requests that miss at the same moment may both call it (the later write
+	 * wins). The cache lives in this server's memory and empties on an application reload or restart.
+	 *
+	 * [section: Global Helpers]
+	 * [category: Caching Functions]
+	 *
+	 * @key A string, or a struct or array of values (struct key order doesn't matter).
+	 * @callback A function that computes the value.
+	 * @time How long to keep the value, in `cacheDatePart` units (minutes by default).
+	 */
+	public any function appCacheFetch(
+		required any key,
+		required any callback,
+		numeric time = application.wheels.defaultCacheTime
+	) {
+		local.storeKey = $appCacheKey(arguments.key);
+		local.value = $getFromCache(key = local.storeKey, category = $appCacheCategory());
+		if (!$isCacheMiss()) {
+			return local.value;
+		}
+		local.fn = arguments.callback;
+		local.result = local.fn();
+		if (!StructKeyExists(local, "result")) {
+			return "";
+		}
+		$addToCache(key = local.storeKey, value = local.result, time = arguments.time, category = $appCacheCategory());
+		return local.result;
+	}
+
+	/**
+	 * Returns the value cached under `key`, or `defaultValue` when there is no unexpired entry. A cached
+	 * `false`, `0` or `""` is returned as it is. Complex values come back as a copy.
+	 *
+	 * [section: Global Helpers]
+	 * [category: Caching Functions]
+	 *
+	 * @key A string, or a struct or array of values (struct key order doesn't matter).
+	 * @defaultValue What to return on a miss. The named argument `default` is also accepted.
+	 */
+	public any function appCacheRead(required any key, any defaultValue = "") {
+		local.value = $getFromCache(key = $appCacheKey(arguments.key), category = $appCacheCategory());
+		if (!$isCacheMiss()) {
+			return local.value;
+		}
+		// `default` is a reserved word Adobe CF won't bind as a parameter name, but a named argument
+		// still arrives under its literal key on every engine.
+		if (StructKeyExists(arguments, "default")) {
+			return arguments.default;
+		}
+		return arguments.defaultValue;
+	}
+
+	/**
+	 * Caches `value` under `key` for `time`, replacing any entry already there. Complex values are
+	 * stored as a copy. Returns `false` when the value wasn't stored because the cache is full
+	 * (`maximumItemsToCache`).
+	 *
+	 * [section: Global Helpers]
+	 * [category: Caching Functions]
+	 *
+	 * @key A string, or a struct or array of values (struct key order doesn't matter).
+	 * @value The value to cache.
+	 * @time How long to keep the value, in `cacheDatePart` units (minutes by default).
+	 */
+	public boolean function appCacheWrite(
+		required any key,
+		required any value,
+		numeric time = application.wheels.defaultCacheTime
+	) {
+		return $addToCache(
+			key = $appCacheKey(arguments.key),
+			value = arguments.value,
+			time = arguments.time,
+			category = $appCacheCategory()
+		);
+	}
+
+	/**
+	 * Returns `true` when an unexpired entry exists for `key`, even one holding `false`, `0` or `""`.
+	 *
+	 * [section: Global Helpers]
+	 * [category: Caching Functions]
+	 *
+	 * @key A string, or a struct or array of values (struct key order doesn't matter).
+	 */
+	public boolean function appCacheExists(required any key) {
+		local.storeKey = $appCacheKey(arguments.key);
+		local.category = $appCacheCategory();
+		lock name="#application.applicationName#wheelsCacheStore" type="readonly" timeout="30" {
+			local.rv = StructKeyExists(application.wheels.cache[local.category], local.storeKey)
+				&& Now() <= application.wheels.cache[local.category][local.storeKey].expiresAt;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Removes the entry for `key`. Returns `true` when there was an unexpired entry to remove.
+	 *
+	 * [section: Global Helpers]
+	 * [category: Caching Functions]
+	 *
+	 * @key A string, or a struct or array of values (struct key order doesn't matter).
+	 */
+	public boolean function appCacheDelete(required any key) {
+		local.storeKey = $appCacheKey(arguments.key);
+		local.category = $appCacheCategory();
+		lock name="#application.applicationName#wheelsCacheStore" type="exclusive" timeout="30" {
+			local.rv = StructKeyExists(application.wheels.cache[local.category], local.storeKey)
+				&& Now() <= application.wheels.cache[local.category][local.storeKey].expiresAt;
+			StructDelete(application.wheels.cache[local.category], local.storeKey);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Removes every entry from the application data cache. The framework's own caches (actions, pages,
+	 * partials, queries) are left alone.
+	 *
+	 * [section: Global Helpers]
+	 * [category: Caching Functions]
+	 */
+	public void function appCacheClear() {
+		$clearCache(category = $appCacheCategory());
+	}
+
+	/**
+	 * Internal function. The `application.wheels.cache` category the application data cache uses,
+	 * created here when the running application started before it existed.
+	 */
+	public string function $appCacheCategory() {
+		if (!StructKeyExists(application.wheels.cache, "data")) {
+			lock name="#application.applicationName#wheelsCacheStore" type="exclusive" timeout="30" {
+				if (!StructKeyExists(application.wheels.cache, "data")) {
+					application.wheels.cache.data = {};
+				}
+			}
+		}
+		return "data";
+	}
+
+	/**
+	 * Internal function. The store key for an application data cache key. A string is hashed as it is, so
+	 * keys stay case-sensitive even though the cache struct isn't; anything else is hashed from its
+	 * canonical form, so struct key order doesn't matter. Unlike `$hashedKey()`, the host name isn't part
+	 * of it, so a job and a request share entries.
+	 */
+	public string function $appCacheKey(required any key) {
+		if (IsSimpleValue(arguments.key)) {
+			return "s:" & Hash(arguments.key, "SHA-256");
+		}
+		return "c:" & Hash(SerializeJSON($canonicalCacheValue(value = arguments.key)), "SHA-256");
 	}
 
 	/**
