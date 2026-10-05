@@ -395,6 +395,20 @@ component {
 	}
 
 	/**
+	 * Set the client address (REMOTE_ADDR) for subsequent requests, so per-client behaviour
+	 * (RateLimiter, IP allow/deny rules) can be exercised. Sent as the X-Wheels-Test-Remote-Addr
+	 * header; in the isolated test application (development/testing only) the framework maps it onto
+	 * the middleware request context's `remoteAddr` field. It is ignored outside the isolated test
+	 * context and never changes the cgi scope, so app code reading cgi.remote_addr directly is
+	 * unaffected.
+	 *
+	 * @ip Client IP address the request should appear to come from.
+	 */
+	public TestClient function fromAddress(required string ip) {
+		return withHeader("X-Wheels-Test-Remote-Addr", arguments.ip);
+	}
+
+	/**
 	 * Set a cookie to send with subsequent requests.
 	 *
 	 * @name  Cookie name

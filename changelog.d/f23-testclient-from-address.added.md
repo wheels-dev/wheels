@@ -1,0 +1,1 @@
+- `$testClient().fromAddress(ip)` sets the client address (`REMOTE_ADDR`) for subsequent requests, so per-client behaviour such as rate limiting and IP rules can be exercised in specs. In the isolated test application the address reaches middleware through the request context; it never changes the `cgi` scope and is ignored outside the test context (#4343)

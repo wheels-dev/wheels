@@ -178,6 +178,7 @@
                         name = local.decision.target
                     );
                     local.swappedDataSource = true;
+                    application.wo.$warnLiveScopeTestSwap(primary = local.originalDataSource, target = local.decision.target);
                 } else if (local.decision.warn) {
                     application.wo.$warnTestsOnPrimaryDataSource(decision = local.decision);
                 }
