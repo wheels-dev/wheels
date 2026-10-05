@@ -1,9 +1,13 @@
 /**
- * $maskWhereLiterals scans with Find() jumps instead of one Mid() per character
- * (#3903). Its output must not change, so these specs compare it with the
- * previous per-character implementation (kept here verbatim as
- * referenceMask) on hand-picked edge cases and on generated strings, including
- * the exception thrown for an unbalanced quote or a control character.
+ * $maskWhereLiterals reads the string into a one-pass char array (REMatch) and
+ * indexes it in O(1) when that array rejoins to the exact input, else falls back to
+ * the index scan (REMatch drops whitespace on some engines) — instead of one Mid()
+ * per character (#3903). Its output must
+ * not change, so these specs compare it with the previous per-character
+ * implementation (kept here verbatim as referenceMask) on hand-picked edge cases
+ * (including supplementary Unicode, combining marks, CR/LF/NUL, and the ODBC
+ * lookahead-window boundary) and on generated strings, including the exception
+ * thrown for an unbalanced quote or a control character.
  */
 component extends="wheels.WheelsTest" {
 
@@ -15,33 +19,26 @@ component extends="wheels.WheelsTest" {
 		describe("The WHERE literal masker", () => {
 
 			it("matches the previous implementation on edge cases", () => {
-				var cases = [
-					"",
-					"id = 1",
-					"lastName = 'smith'",
-					"lastName = ''",
-					"lastName = 'O''Brien'",
-					"lastName = ''''",
-					"lastName = 'a''''b'",
-					"a = 'x' AND b = 'y,z' OR c IN ('p','q','r')",
-					"note = '(paren)' AND t = '{not odbc}'",
-					"createdAt > {ts '2020-01-02 03:04:05'}",
-					"createdAt > '{ts ''2020-01-02 03:04:05''}'",
-					"d = {d '2020-01-02'} AND t = {t '03:04:05'}",
-					"x = {ts 'not a date'}",
-					"x = '{' AND y = '}'",
-					"{brace} = 1",
-					"lastName = 'trailing",
-					"lastName = 'a' AND",
-					"a = 'b",
-					"title = 'back\slash' AND body LIKE '%50\%%' ESCAPE '\'",
-					"name = 'caf" & Chr(233) & "' AND city = '" & Chr(26085) & Chr(26412) & "'",
-					"bad = '" & Chr(7) & "'",
-					"bad = '" & Chr(2) & "x'",
-					"plain text with no quote {but a brace}"
-				];
-				for (var w in cases) {
+				// Assert the supplementary-plane fixture (U+1F600) is real before relying on
+				// it, so a scalar-Unicode runtime that degrades it fails here loudly rather
+				// than passing the comparison on replacement chars (rev1-r2).
+				expect(LCase(BinaryEncode(CharsetDecode(supplementaryEmoji(), "utf-8"), "hex"))).toBe("f09f9880");
+				for (var w in edgeCases()) {
 					var cmp = compareMaskers(w);
+					expect(cmp.same).toBeTrue(cmp.detail);
+				}
+			});
+
+			// $maskWhereLiterals routes by capability: a JVM engine takes the index scan
+			// ($maskWhereLiteralsByScan), a JVM-free runtime (RustCFML) takes the char-array
+			// path ($maskWhereLiteralsFromChars). Each engine's CI leg therefore exercises
+			// only one path through the dispatcher. Force BOTH helpers directly on the same
+			// corpus on every engine, so the RustCFML-only char-array path is still proven on
+			// the JVM legs and the scan is still proven on RustCFML. Both must match the
+			// reference byte-for-byte and agree on which inputs throw (orch1 / rev1-r3).
+			it("masks via both the scan and char-array paths identically on every engine", () => {
+				for (var w in edgeCases()) {
+					var cmp = compareBothPaths(w);
 					expect(cmp.same).toBeTrue(cmp.detail);
 				}
 			});
@@ -73,13 +70,75 @@ component extends="wheels.WheelsTest" {
 			// or after the last literal, must not make each brace search the rest of the
 			// string again for the next quote (review of #3903).
 			it("scans a long brace run in linear time", () => {
+				// The char-array rewrite is linear on RustCFML too (#3903), so the brace
+				// run holds the same 25x bound as the JVM engines (was a quadratic-tolerant
+				// 250x). RustCFML keeps a smaller size to keep the run short.
 				var superLinear = application.wheels.engineAdapter.isRustCFML();
-				var plan = {small = superLinear ? 2000 : 20000, factor = 10, maxGrowth = superLinear ? 250 : 25};
+				var plan = {small = superLinear ? 2000 : 20000, factor = 10, maxGrowth = 25};
 				for (var shape in ["leading", "trailing"]) {
 					var ratio = maskGrowth(shape, plan);
 					debug(var = "#shape# brace run: #ratio.summary#", label = "masker linearity");
 					expect(ratio.growth).toBeLT(plan.maxGrowth, "#shape# brace run: #ratio.summary#");
 				}
+			});
+
+			// $maskWhereLiterals uses the one-pass char array only when it rejoins to the
+			// exact input; otherwise it falls back to the index scan. BoxLang's
+			// REMatch("[\s\S]") drops whitespace matches, so a value with spaces must still
+			// mask byte-identically there (via the fallback). Exact-byte vs the reference.
+			it("preserves whitespace-only and edge-whitespace literals exactly", () => {
+				var cases = [
+					"x = ' '",
+					"x = '  '",
+					"x = ' leading'",
+					"x = 'trailing '",
+					"a = ' ' AND b = '  x  '",
+					"x = '" & Chr(9) & "'",
+					"note = 'line1" & Chr(13) & Chr(10) & "line2'",
+					"a  b = 'c  d'   AND   e = 'f'"
+				];
+				for (var w in cases) {
+					var cmp = compareMaskers(w);
+					expect(cmp.same).toBeTrue(cmp.detail);
+				}
+			});
+
+			// On RustCFML Mid()/Find() are O(index), so the fast char-array path is what
+			// keeps the binder linear there. The ASCII linearity shapes must round-trip
+			// through REMatch so RustCFML takes that path (the 25x bounds measure it, not
+			// the O(n^2)-on-RustCFML fallback). Only required on RustCFML; other engines
+			// may legitimately take the fallback (their Mid() is O(1), still linear).
+			it("takes the char-array fast path on RustCFML for the linearity shapes", () => {
+				if (!application.wheels.engineAdapter.isRustCFML()) {
+					skip("fast-path guarantee only required where Mid() is O(index) (RustCFML)");
+				}
+				var shapes = [
+					"lastName = '" & RepeatString("z", 500) & "'",
+					"firstName = '" & RepeatString("''", 500) & "'",
+					"firstName IN ('" & ArrayToList(ListToArray(RepeatString("v,", 200), ","), "','") & "')",
+					RepeatString("{", 500) & " x = 'v'"
+				];
+				for (var w in shapes) {
+					expect(Compare(ArrayToList(REMatch("[\s\S]", w), ""), w)).toBe(0, "RustCFML must round-trip (fast path): #Left(w, 40)#");
+				}
+			});
+
+			// Record which path the dispatcher actually routes to on this engine (by its
+			// stringIndexIsLinear capability: JVM -> index scan, JVM-free -> char array) and
+			// prove the supplementary-character fixture masks correctly on that path. The
+			// fixture is built from UTF-8 bytes so it is a real U+1F600 (not Chr() surrogate
+			// halves that a scalar-Unicode runtime may not combine).
+			it("pins the supplementary-char fixture's masker path and masks it correctly", () => {
+				var emoji = CharsetEncode(BinaryDecode("F09F9880", "hex"), "utf-8");
+				expect(LCase(BinaryEncode(CharsetDecode(emoji, "utf-8"), "hex"))).toBe("f09f9880");
+				var w = "name = '" & emoji & "x' AND y = 'z'";
+				var usesScan = application.wheels.engineAdapter.stringIndexIsLinear();
+				debug(
+					var = "masker path on #application.wheels.engineAdapter.getName()#: " & (usesScan ? "index scan (JVM)" : "char array (JVM-free)"),
+					label = "masker path"
+				);
+				var cmp = compareMaskers(w);
+				expect(cmp.same).toBeTrue(cmp.detail);
 			});
 
 		});
@@ -138,6 +197,117 @@ component extends="wheels.WheelsTest" {
 			state.error = e.type;
 		}
 		return state;
+	}
+
+	// Supplementary-plane fixture U+1F600, built from its UTF-8 bytes (not Chr() surrogate
+	// halves, which a scalar-Unicode runtime may not combine) so every engine sees a real
+	// astral code point.
+	private string function supplementaryEmoji() {
+		return CharsetEncode(BinaryDecode("F09F9880", "hex"), "utf-8");
+	}
+
+	// The hand-picked edge-case corpus, shared by the auto-path comparison and the
+	// force-both-paths comparison so both exercise identical inputs.
+	private array function edgeCases() {
+		var emoji = supplementaryEmoji();
+		return [
+			"",
+			"id = 1",
+			"lastName = 'smith'",
+			"lastName = ''",
+			"lastName = 'O''Brien'",
+			"lastName = ''''",
+			"lastName = 'a''''b'",
+			"a = 'x' AND b = 'y,z' OR c IN ('p','q','r')",
+			"note = '(paren)' AND t = '{not odbc}'",
+			"createdAt > {ts '2020-01-02 03:04:05'}",
+			"createdAt > '{ts ''2020-01-02 03:04:05''}'",
+			"d = {d '2020-01-02'} AND t = {t '03:04:05'}",
+			"x = {ts 'not a date'}",
+			"x = '{' AND y = '}'",
+			"{brace} = 1",
+			"lastName = 'trailing",
+			"lastName = 'a' AND",
+			"a = 'b",
+			"title = 'back\slash' AND body LIKE '%50\%%' ESCAPE '\'",
+			"name = 'caf" & Chr(233) & "' AND city = '" & Chr(26085) & Chr(26412) & "'",
+			"bad = '" & Chr(7) & "'",
+			"bad = '" & Chr(2) & "x'",
+			"plain text with no quote {but a brace}",
+			// Supplementary (non-BMP) char U+1F600, before/inside a literal and before an
+			// ODBC escape. Both masker paths must round-trip it byte-for-byte like the old
+			// Mid() scan (#3903 / rev1-r2 equivalence review).
+			"x = " & emoji & " AND name = 'y'",
+			"name = '" & emoji & "smith'",
+			"name = 'sm" & emoji & "ith'",
+			"d = " & emoji & "{ts '2020-01-02 03:04:05'}",
+			"name = '" & emoji & "{ts ''2020-01-02''}'",
+			// A combining mark (U+0301) after a base letter, inside a literal.
+			"name = 'e" & Chr(769) & "clair'",
+			// CR / LF / NUL as ordinary literal data (not the rejected Chr(2)/Chr(7)).
+			"note = 'line1" & Chr(13) & Chr(10) & "line2'",
+			"note = 'a" & Chr(0) & "b'",
+			// ODBC escape lengths straddling the 60-char lookahead window: the value is
+			// [0-9:. -]+, so "{ts '" (5) + value + "'}" (2). value 52/53/54 gives a
+			// 59/60/61-char escape — 60 is the last that fits the window, 61 must fall
+			// through to ordinary quote handling, identically to old.
+			"id = {ts '" & RepeatString("1", 52) & "'}",
+			"id = {ts '" & RepeatString("1", 53) & "'}",
+			"id = {ts '" & RepeatString("1", 54) & "'}"
+		];
+	}
+
+	// Force both masker paths directly (not through the dispatcher) and require each to
+	// match the reference. $maskWhereLiteralsFromChars is fed a lossless per-character array
+	// so it can be exercised even on engines whose REMatch drops characters (BoxLang) or
+	// whose dispatcher would never route to it (every JVM engine). Both must agree with the
+	// reference on output and on which inputs throw.
+	private struct function compareBothPaths(required string where) {
+		var reference = runReference(arguments.where);
+		var scan = runForcedPath("scan", arguments.where);
+		var chars = runForcedPath("chars", arguments.where);
+		return {
+			same = (
+				Compare(scan.out, reference.out) == 0 && scan.error == reference.error
+				&& Compare(chars.out, reference.out) == 0 && chars.error == reference.error
+			),
+			detail = "where [" & arguments.where & "]: ref [" & reference.out & "|" & reference.error
+				& "] scan [" & scan.out & "|" & scan.error & "] chars [" & chars.out & "|" & chars.error & "]"
+		};
+	}
+
+	private struct function runReference(required string where) {
+		var state = {out = "", error = ""};
+		try {
+			state.out = referenceMask(arguments.where);
+		} catch (any e) {
+			state.error = e.type;
+		}
+		return state;
+	}
+
+	private struct function runForcedPath(required string path, required string where) {
+		var state = {out = "", error = ""};
+		try {
+			state.out = arguments.path == "scan"
+				? variables.ref.$maskWhereLiteralsByScan(arguments.where)
+				: variables.ref.$maskWhereLiteralsFromChars(faithfulChars(arguments.where));
+		} catch (any e) {
+			state.error = e.type;
+		}
+		return state;
+	}
+
+	// A one-character-per-element array built with Mid() rather than REMatch, so it is
+	// faithful to the input on every engine (BoxLang's REMatch("[\s\S]") drops whitespace).
+	// The corpus strings are short, so the O(index) Mid() on RustCFML is not a concern here.
+	private array function faithfulChars(required string where) {
+		var chars = [];
+		var n = Len(arguments.where);
+		for (var i = 1; i <= n; i++) {
+			ArrayAppend(chars, Mid(arguments.where, i, 1));
+		}
+		return chars;
 	}
 
 	// The per-character implementation before #3903, unchanged apart from calling

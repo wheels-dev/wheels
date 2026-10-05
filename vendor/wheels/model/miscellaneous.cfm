@@ -319,9 +319,6 @@
 	}
 
 	/**
-	 * Internal function.
-	 */
-	/**
 	 * Internal function. SQLite stores dates as TEXT and Wheels binds them as varchar. CFML's
 	 * default string for a date object is "{ts '...'}", which would be stored verbatim and then
 	 * fail to read from a DATETIME column, so a date is written as ISO-8601 text. Shared by every
@@ -367,6 +364,9 @@
 			&& variables.wheels.class.properties[arguments.property].validationtype == "datetime";
 	}
 
+	/**
+	 * Internal function.
+	 */
 	public struct function $buildQueryParamValues(required string property) {
 		local.rv = {};
 		local.rv.value = this[arguments.property];

@@ -1,0 +1,1 @@
+- `pluralize()` no longer throws `Index -1 out of bounds` on BoxLang for words ending in `-ex`, `-lf` or `-rf` (`vertex`, `index`, `half`, `shelf`, `wolf`), including model names that derive their table name from them. Output on Lucee and Adobe ColdFusion is unchanged (#4185)

@@ -29,18 +29,16 @@ component extends="wheels.WheelsTest" {
 				expect(g.$dataSourceIsReachable(name = "   ")).toBeFalse();
 			});
 
-			it("app-runner.cfm probes only the candidate test datasource before refusing", () => {
-				var source = FileRead(ExpandPath("/wheels/tests/app-runner.cfm"));
-				var probePos = FindNoCase("$dataSourceIsReachable(name = local.candidate)", source);
-				expect(probePos).toBeGT(0, "app-runner must probe <datasource>_test by name");
-				// The probe sits in the same decision that swaps or refuses.
-				var window = Mid(source, probePos, 4000);
-				expect(FindNoCase("local.candidateRegistered", window) > 0).toBeTrue();
-				expect(FindNoCase("Test database not available", window) > 0).toBeTrue(
-					"a failed probe must still reach the refusal"
-				);
-				// The primary datasource is never probed.
-				expect(FindNoCase("$dataSourceIsReachable(name = local.originalDataSource", source)).toBe(0);
+			it("the app test rule probes only the candidate test datasource before refusing", () => {
+				var helpers = FileRead(ExpandPath("/wheels/global/util.cfm"));
+				var probePos = FindNoCase("return $dataSourceIsReachable(name = arguments.name);", helpers);
+				expect(probePos).toBeGT(0, "$testDataSourceRegistered() must probe the datasource by name");
+				// The decision probes the candidate (<datasource>_test), never the primary.
+				expect(FindNoCase("$testDataSourceRegistered(local.rv.candidate)", helpers)).toBeGT(0);
+				expect(FindNoCase("$testDataSourceRegistered(arguments.primary", helpers)).toBe(0);
+				expect(FindNoCase("$dataSourceIsReachable(name = local.originalDataSource", FileRead(ExpandPath("/wheels/tests/app-runner.cfm")))).toBe(0);
+				// A candidate that is neither registered nor reachable is refused.
+				expect(g.$testDataSourceDecision(primary = "aow_no_such_datasource", requestUrl = {useTestDB = true}).action).toBe("refuse");
 			});
 
 		});

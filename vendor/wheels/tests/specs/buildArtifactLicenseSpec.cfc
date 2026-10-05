@@ -43,6 +43,7 @@ component extends="wheels.WheelsTest" {
 					describe(relPath, () => {
 
 						it("copies LICENSE into its BUILD_DIR", () => {
+							$requireRepoPath("tools/build/scripts");
 							var src = fileRead(repoRoot & "/" & relPath);
 							var hasLicense = reFindNoCase(
 								"cp[[:space:]]+(""?\$\{REPO_ROOT\}/)?LICENSE""?[[:space:]]+""\$\{BUILD_DIR\}",
@@ -54,6 +55,7 @@ component extends="wheels.WheelsTest" {
 						});
 
 						it("copies NOTICE into its BUILD_DIR", () => {
+							$requireRepoPath("tools/build/scripts");
 							var src = fileRead(repoRoot & "/" & relPath);
 							var hasNotice = reFindNoCase(
 								"cp[[:space:]]+(""?\$\{REPO_ROOT\}/)?NOTICE""?[[:space:]]+""\$\{BUILD_DIR\}",

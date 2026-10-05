@@ -48,7 +48,7 @@ Creates a new application in `<name>/` under the current working directory. SQLi
 
 | Flag | Default | Description |
 |---|---|---|
-| `--port=<number>` | `8080` | Server port written into `lucee.json`. The shutdown port is `port + 1`. |
+| `--port=<number>` | `8080` | Server port written into `lucee.json`. Without `--port`, the app gets 8080, or the first port above it that is free and not pinned in another project's `lucee.json`. The shutdown port is the first such port above the server port, usually `port + 1`. |
 | `--datasource=<name>` | app name (lowercased) | Datasource name registered in `config/app.cfm`. |
 | `--reload-password=<pw>` | random | Password required by `?reload=true&password=…`. A random value is generated when the flag is omitted. |
 | `--setup-h2` | off | Configure H2 as the embedded database instead of SQLite. Creates `db/h2/` and writes H2 datasource entries. |

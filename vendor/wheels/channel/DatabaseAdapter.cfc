@@ -599,6 +599,7 @@ component {
 				"SELECT 1 AS ready
 				FROM information_schema.columns
 				WHERE table_name = 'wheels_events'
+				AND table_schema = current_schema()
 				AND column_name = 'seq'
 				AND (column_default IS NOT NULL OR is_identity = 'YES')",
 				{},

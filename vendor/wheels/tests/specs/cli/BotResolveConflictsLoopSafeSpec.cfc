@@ -42,6 +42,7 @@ component extends="wheels.WheelsTest" {
 			var stepAnchor = "Verify resolution, push, or escalate (loop-safe)";
 
 			it("protects the merge commit so a failed commit cannot bypass escalation", () => {
+				$requireRepoPath(".github/workflows/bot-resolve-conflicts.yml");
 				expect(fileExists(workflow)).toBeTrue("Missing file: " & workflow);
 				var src = fileRead(workflow);
 
@@ -77,6 +78,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("always posts the conflict-attempted marker and needs-human label on the escalation path", () => {
+				$requireRepoPath(".github/workflows/bot-resolve-conflicts.yml");
 				var src = fileRead(workflow);
 
 				var anchorPos = find(stepAnchor, src);

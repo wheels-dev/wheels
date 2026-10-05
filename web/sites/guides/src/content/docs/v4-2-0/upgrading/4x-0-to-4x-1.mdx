@@ -11,7 +11,7 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 Within the 4.x line there are **no breaking framework changes** — upgrading from any 4.0.x to 4.1.x is the same `vendor/wheels/` swap as a patch upgrade (see [Manual upgrades](/v4-2-0/upgrading/manual-upgrades/)). The work that the swap does **not** do for you is a short list of edits to the **app-owned `public/Application.cfc`**: that file is created once from the template and is yours, so framework updates never reach it. This page collects every one of those edits in one place, with the version it landed in and whether skipping it fails safe.
 
 <Aside type="tip" title="The fastest way to do all of this">
-Run `wheels upgrade check` once on a workstation — it scans your app for the drift and tells you exactly what to change. If you'd rather not run the CLI, diff your `public/Application.cfc` against the template that ships in `vendor/wheels/` (or a fresh `wheels new` app) and adopt the changes below, keeping your local customizations. The template `public/Application.cfc` is the authority.
+Run `wheels upgrade check` once on a workstation — it scans your app for the drift and tells you exactly what to change. With the 4.2 CLI it names each `public/Application.cfc` edit on this page that your copy is missing. If you'd rather not run the CLI, diff your `public/Application.cfc` against the template that ships in `vendor/wheels/` (or a fresh `wheels new` app) and adopt the changes below, keeping your local customizations. The template `public/Application.cfc` is the authority.
 </Aside>
 
 ## Swap the framework
@@ -75,6 +75,22 @@ The `?reload=true` **gate itself is framework code** (in `onapplicationstart`) a
 
 **Fails safe:** the gate rejects an unauthorised reload regardless. If your copy predates the current template, diff the password handoff so it matches; `wheels upgrade check` flags the drift.
 
+## Migrations: empty-string defaults (4.1.0)
+
+Since 4.1.0 the migrator rejects `default=''` on `string`, `text` and `char` columns ([#3419](https://github.com/wheels-dev/wheels/pull/3419)). The migration fails with `Wheels.InvalidDefault`: "An empty string default is not allowed for string columns." Before 4.1.0 most adapters dropped the `DEFAULT` clause without a word, and PostgreSQL emitted `DEFAULT ''`, so the same migration built different schemas on different databases.
+
+**Does not fail safe on a fresh database.** Migrations you have already applied are unaffected. The failure shows up when a migration runs from zero: a new environment, CI, a teammate's first `wheels migrate latest`. Check your migrations for `default=''` on those column types and, for each one:
+
+- **remove the option** (`t.string(columnNames='title', allowNull=true)`): this builds the column most adapters built before 4.1.0;
+- or pass a real value (`default='draft'`);
+- or use `default='NULL'` for an explicit `DEFAULT NULL`.
+
+`default=''` is still accepted on `boolean`, `date`, `datetime`, `time`, `timestamp`, `decimal`, `float` and `integer` columns, where it produces `DEFAULT NULL`.
+
+<Aside type="caution" title="The 4.1.0–4.1.2 starter app">
+The `wheels-starter-app` zips for 4.1.0, 4.1.1 and 4.1.2 still contain nine of these defaults, so their first migration, `20180519095317_Creates_User_Table`, fails on a fresh database. Those zips are not being re-released. In your copy, remove `default=''` from the `t.string(...)` and `t.text(...)` lines in the `Creates_User_Table`, `Creates_Roles_Table`, `Creates_Permissions_Table` and `Creates_Settings_Table` migrations, then run `wheels migrate latest` again.
+</Aside>
+
 ## Verify
 
 <Steps>
@@ -83,6 +99,7 @@ The `?reload=true` **gate itself is framework code** (in `onapplicationstart`) a
 2. Run your suite (`/wheels/app/tests`).
 3. If you use authentication, time a login — `bcryptVerify()` should be fast (native Java), not seconds.
 4. Over HTTPS, confirm the session cookie carries `Secure`.
+5. Run `wheels migrate latest` against an empty database (a scratch environment or CI) to catch any `default=''` on a string column.
 
 </Steps>
 

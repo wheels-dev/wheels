@@ -13,6 +13,7 @@ component extends="wheels.WheelsTest" {
 			// advertise the broken verb.
 
 			it("the generated app's _gitignore does not reference `wheels install`", () => {
+				$requireRepoPath("cli/lucli/templates/app");
 				var path = ExpandPath("/cli/lucli/templates/app/_gitignore");
 				expect(FileExists(path)).toBeTrue();
 				var contents = FileRead(path);
@@ -20,6 +21,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("the generated app's plugins/README does not reference `wheels packages install`", () => {
+				$requireRepoPath("cli/lucli/templates/app");
 				var path = ExpandPath("/cli/lucli/templates/app/plugins/README.md");
 				expect(FileExists(path)).toBeTrue();
 				var contents = FileRead(path);
@@ -27,6 +29,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("the generated app's plugins/README points at the canonical `wheels packages add` verb", () => {
+				$requireRepoPath("cli/lucli/templates/app");
 				var path = ExpandPath("/cli/lucli/templates/app/plugins/README.md");
 				var contents = FileRead(path);
 				expect(contents).toInclude("wheels packages add");

@@ -119,7 +119,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// Lucee surfaces /** hint: ... */ values with the literal "hint:"
 				// prefix; the helper must regex-strip it before rendering. Match
 				// the case-insensitive ^hint\s*:\s* anchor.
-				expect(reFindNoCase("reReplaceNoCase\s*\(\s*hint\s*,\s*""\^hint", variables.source)).toBeGT(0);
+				// The strip lives in $commandHint(), which $commandHelp() calls.
+				expect(variables.source).toInclude('return trim(reReplaceNoCase(trim(fn.hint ?: ""), "^hint\s*:\s*", ""));');
 			});
 
 			it("returns empty string for unknown commands so showHelp() falls through", () => {

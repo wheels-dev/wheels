@@ -157,8 +157,8 @@ component extends="wheels.WheelsTest" {
 			it("retryFailed without a limit reports only the rows actually reset", function() {
 				local.failedId = CreateUUID();
 				local.pendingId = CreateUUID();
-				$insertTestJob(id = local.failedId, jobClass = "app.jobs.ProcessOrdersJob", queue = "test_rob_retry", status = "failed", attempts = 3);
-				$insertTestJob(id = local.pendingId, jobClass = "app.jobs.ProcessOrdersJob", queue = "test_rob_retry", status = "pending");
+				$insertTestJob(id = local.failedId, jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob", queue = "test_rob_retry", status = "failed", attempts = 3);
+				$insertTestJob(id = local.pendingId, jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob", queue = "test_rob_retry", status = "pending");
 
 				local.worker = new wheels.JobWorker();
 				local.count = local.worker.retryFailed(queue = "test_rob_retry");

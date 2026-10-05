@@ -31,6 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       WHEELS_CI: "true"
+      # A framework-repository run: RequireRepoPathSpec fails if the repository-only
+      # files are missing here, instead of letting those specs skip.
+      WHEELS_EXPECT_REPO: "true"
       WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:30007"
       WHEELS_BROWSER_CI_ENABLE: "true"
     steps:
