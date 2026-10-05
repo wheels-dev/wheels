@@ -100,20 +100,14 @@ component extends="wheels.WheelsTest" {
 				oldScriptName = request.cgi.script_name
 				request.cgi.script_name = "/index.cfm"
 				g.set(functionName = "buttonTo", encode = false)
-				_originalRoutes = Duplicate(application.wheels.routes)
-				_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
-				_originalNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
-				application.wheels.routes = []
-				application.wheels.staticRoutes = {}
-				application.wheels.namedRoutePositions = {}
+				_routeSnapshot = $snapshotRoutes()
+				$clearRoutes()
 				g.mapper().resources("posts").end()
 				g.$setNamedRoutePositions()
 			})
 
 			afterEach(() => {
-				application.wheels.routes = _originalRoutes
-				application.wheels.staticRoutes = _originalStaticRoutes
-				application.wheels.namedRoutePositions = _originalNamedRoutePositions
+				$restoreRoutes(_routeSnapshot)
 				application.wheels.URLRewriting = oldURLRewriting
 				request.cgi.script_name = oldScriptName
 				g.set(functionName = "buttonTo", encode = true)
