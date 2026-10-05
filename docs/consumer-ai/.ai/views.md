@@ -4,6 +4,8 @@ Part of the Wheels application guide; start with `../CLAUDE.md`.
 
 Requires a paginated query: `findAll(page=params.page, perPage=25)`. Recommended all-in-one helper: `paginationNav()`.
 
+For a JSON API, return `pagination()`'s values instead of rendering navigation (see `.ai/api.md`).
+
 ```cfm
 // All-in-one nav
 #paginationNav()#

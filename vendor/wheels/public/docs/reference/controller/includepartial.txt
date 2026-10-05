@@ -33,7 +33,18 @@ posts = model("Post").findAll(returnAs="objects");
 #includePartial(partial="/shared/post", objects=posts)#
 
 // 9. Cache the partial output for 30 minutes to reduce processing overhead.
+//     The cache key is a hash of every argument, including the full contents (all rows)
+//     of a "query" argument, so editing a row produces a new cache key automatically —
+//     there is no need to clear the cache by hand. Partial caching only runs when the
+//     "cachePartials" setting is on (on in production, off in development and testing).
 #includePartial(partial="sidebar", cache=30)#
+
+// 9b. Caching a partial that renders a query, plus viewer-specific output.
+//     The query's rows are part of the key, so the cache refreshes when the data changes.
+//     Pass any state the output depends on (here whether the viewer may edit) as an
+//     argument so it becomes part of the key and each variant is cached separately.
+posts = model("Post").findAll();
+#includePartial(partial="post", query=posts, editable=canEditPosts, cache=30)#
 
 // 10. Group a query result set by a column before rendering.
 //     Wheels splits the query into sub-queries grouped by "categoryId"

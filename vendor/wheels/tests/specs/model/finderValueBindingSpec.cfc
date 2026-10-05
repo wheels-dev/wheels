@@ -19,32 +19,34 @@ component extends="wheels.WheelsTest" {
 	 * quadratic one (a scanner that copies the rest of the string for every
 	 * character measured 40-50x).
 	 *
-	 * The WHERE literal scanner jumps between quotes instead of reading one
-	 * character at a time (#3903), so a plain value is cheap: 200000 characters
-	 * bind in about 16ms on Lucee 7 and 44ms on Adobe 2023. Measured with factor
-	 * 10 (fastest of three runs): Lucee 7 plain 8.3x, run of quotes 9.9x, IN list
-	 * 10.1x; Adobe 2023 9.6x, 10.2x, 10.3x; BoxLang 8.5x, 4.6x, 10.7x. The IN
+	 * The WHERE literal scanner reads the string into a one-pass char array and
+	 * walks it with O(1) indexing (#3903), so a plain value is cheap. Measured with
+	 * factor 10 (fastest of three runs): Lucee 7 plain 8.3x, run of quotes 9.9x, IN
+	 * list 10.1x; Adobe 2023 9.6x, 10.2x, 10.3x; BoxLang 8.5x, 4.6x, 10.7x. The IN
 	 * list kind counts values, not characters.
 	 *
-	 * RustCFML: Mid() and Find() cost O(index) there (they walk the string to
-	 * reach a position), so a plain value is now linear but a long run of
-	 * doubled quotes or a large IN list, which have a boundary at every few
-	 * characters, still grows about 85x for factor 10. RustCFML gets a "no worse
-	 * than quadratic" bound instead: a quadratic binder grows about 100x, and 250
-	 * adds 2.5x for timer and machine noise. That is not "anything goes": a cubic
-	 * or backtracking regression grows 1000x or more and still fails. The sizes
-	 * are smaller to keep the run short.
+	 * RustCFML: Mid() and Find() cost O(index) there (they walk the string to reach
+	 * a position), which made the old per-index scan O(n^2) for a value with a
+	 * boundary every few characters. Two more RustCFML O(n) primitives were found and
+	 * avoided in the rewrite: java.lang.StringBuilder.append is O(length) (so the
+	 * output and value are built in CFML arrays, ArrayAppend O(1), joined once) and
+	 * ArraySlice is O(start) (so spans are not sliced). With all three avoided the
+	 * masker is linear on RustCFML: measured plain 11.5x, doubled quotes 10.8x, IN
+	 * list 11.8x — so every kind holds the same 25x bound as the JVM engines. RustCFML
+	 * sizes are larger than the first cut so the small run clears timer noise under the
+	 * tightened bound, but smaller than the JVM sizes to keep the lane short.
 	 */
 	private struct function linearityPlan(required string kind) {
 		var adapter = application.wheels.engineAdapter;
-		var superLinear = adapter.isRustCFML();
-		var plan = {factor = 10, maxGrowth = superLinear ? 250 : 25};
+		var isRustCFML = adapter.isRustCFML();
+		var plan = {factor = 10, maxGrowth = 25};
 		if (arguments.kind == "plain") {
-			plan.small = superLinear ? 3000 : 200000;
+			plan.small = isRustCFML ? 8000 : 200000;
 		} else if (arguments.kind == "inList") {
-			plan.small = superLinear ? 600 : 2000;
+			plan.small = isRustCFML ? 600 : 2000;
 		} else {
-			plan.small = superLinear ? 1500 : 30000;
+			plan.small = isRustCFML ? 5000 : 30000;
+			plan.maxGrowth = 25;
 		}
 		plan.large = plan.small * plan.factor;
 		return plan;

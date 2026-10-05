@@ -18,7 +18,7 @@ component extends="wheels.migrator.Migration" hint="create {{tableName}} table f
 {{apiTokenColumn}}				t.timestamps();
 				t.create();
 				addIndex(table="{{tableName}}", columnNames="email", unique=true);
-			} catch (any e) {
+{{apiTokenIndex}}			} catch (any e) {
 				state.exception = e;
 			}
 

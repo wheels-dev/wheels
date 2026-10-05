@@ -1,0 +1,2 @@
+- `wheels upgrade apply` prints its report once; it used to appear twice in a terminal.
+- `wheels new --help` (and `wheels help new`) lists the options and examples; it used to print only a one-line summary. A bare `wheels new` prints the same help.

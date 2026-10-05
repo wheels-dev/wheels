@@ -460,10 +460,6 @@ component extends="wheels.migrator.Base" {
 	}
 
 	/**
-	 * Sanitizes a string for use as a filename component.
-	 * Lowercases, collapses non-alphanumeric chars to underscores, and trims edge underscores.
-	 */
-	/**
 	 * Fail-closed identifier for generated CFC source. Rejects quotes,
 	 * hashes, and other CFML/SQL metacharacters so a table/column name
 	 * cannot close a string and inject tags.
@@ -488,6 +484,10 @@ component extends="wheels.migrator.Base" {
 		return local.safe;
 	}
 
+	/**
+	 * Sanitizes a string for use as a filename component.
+	 * Lowercases, collapses non-alphanumeric chars to underscores, and trims edge underscores.
+	 */
 	public string function $sanitizeFileName(required string name) {
 		local.safe = LCase(arguments.name);
 		local.safe = ReReplace(local.safe, "[^a-z0-9_]+", "_", "all");

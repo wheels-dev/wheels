@@ -181,6 +181,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("every shipped Application.cfc delegates debug access to the framework", () => {
+				$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 				var root = expandPath("/wheels/../..");
 				var required = ["/public/Application.cfc", "/cli/lucli/templates/app/public/Application.cfc"];
 				for (var relative in required) {
