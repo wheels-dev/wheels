@@ -203,6 +203,11 @@
 	 * This escapes `LIKE` metacharacters only, not SQL quotes; quote the value the same way you would
 	 * any other `where`-string literal.
 	 *
+	 * On SQL Server, `[` is escaped only once a model has initialised the adapter. If you call
+	 * `escapeForLike()` before any `model()` call in a fresh or just-reloaded app, the adapter is not
+	 * known yet and `[` is left unescaped — call a `model()` finder first, or handle `[` yourself. Every
+	 * other database treats `[` as a literal, so this edge affects SQL Server only.
+	 *
 	 * [section: Global Helpers]
 	 * [category: String Functions]
 	 *
