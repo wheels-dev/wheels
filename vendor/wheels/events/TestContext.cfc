@@ -92,9 +92,8 @@ component {
 			return false;
 		}
 
-		// Path trigger — anchored to the request PATH (see $cgiHaystack).
-		var haystack = $cgiHaystack(arguments.cgiScope);
-		if (FindNoCase("/wheels/core/tests", haystack) || FindNoCase("/wheels/app/tests", haystack)) {
+		// Path trigger — the request path must be, or start a path segment with, a runner endpoint.
+		if ($pathTriggersTestContext(arguments.cgiScope)) {
 			return true;
 		}
 
@@ -240,6 +239,42 @@ component {
 			}
 		}
 		return haystack;
+	}
+
+	/**
+	 * True when the request path targets a test-runner endpoint, anchored at the START of the path.
+	 * For each of `path_info` and `script_name`: the query string is stripped; a non-canonical path
+	 * (one containing a `..` traversal or an empty `//` segment) is rejected outright; then the value
+	 * must EQUAL a runner path (`/wheels/core/tests`, `/wheels/app/tests`) or start with one followed
+	 * by `/`. Because the match is anchored at position 0 of a canonical path, a runner path that
+	 * merely appears later in an application route (`/files/x/wheels/app/tests`), or is reached via a
+	 * traversal (`/wheels/app/tests/../../files/x`) or a double slash, does NOT match. `path_info` is
+	 * the post-context path, so a context-root-mounted app's runner still matches there.
+	 *
+	 * Keep this rule in lockstep with the inline copy in events/testcontext.cfm, which cannot call this
+	 * method (it runs in Application.cfc's pseudo-constructor, before this.mappings is registered).
+	 */
+	public boolean function $pathTriggersTestContext(required struct cgiScope) {
+		var runners = ["/wheels/core/tests", "/wheels/app/tests"];
+		var keys = ["path_info", "script_name"];
+		for (var key in keys) {
+			if (!StructKeyExists(arguments.cgiScope, key)) {
+				continue;
+			}
+			var path = LCase(Trim(ToString(arguments.cgiScope[key])));
+			if (Find("?", path)) {
+				path = Left(path, Find("?", path) - 1);
+			}
+			if (!Len(path) || Find("..", path) || Find("//", path)) {
+				continue;
+			}
+			for (var runner in runners) {
+				if (path == runner || Left(path, Len(runner) + 1) == runner & "/") {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 }
