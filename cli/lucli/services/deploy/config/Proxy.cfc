@@ -27,9 +27,11 @@ component {
 	public numeric function appPort() {
 		// Support both snake_case (YAML) and camelCase, mirroring Kamal's
 		// preference for snake_case but tolerating the CFML convention.
-		if (structKeyExists(variables.raw, "app_port")) return variables.raw.app_port;
-		if (structKeyExists(variables.raw, "appPort")) return variables.raw.appPort;
-		return 80;
+		// A whole number: the default 80 (and YAML's 80) can arrive as 80.0, which `deploy config`
+		// printed as is (#4417).
+		if (structKeyExists(variables.raw, "app_port")) return javaCast("int", val(variables.raw.app_port));
+		if (structKeyExists(variables.raw, "appPort")) return javaCast("int", val(variables.raw.appPort));
+		return javaCast("int", 80);
 	}
 
 	public struct function healthcheck() {

@@ -20,7 +20,8 @@ component {
 	}
 
 	public numeric function port() {
-		return variables.raw.port ?: 22;
+		// A whole number: YAML's 22 can arrive as 22.0, which `deploy config` printed as is (#4417).
+		return javaCast("int", val(variables.raw.port ?: 22));
 	}
 
 	public string function proxy() {

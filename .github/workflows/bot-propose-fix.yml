@@ -20,7 +20,7 @@ concurrency:
 jobs:
   propose-fix:
     name: Propose fix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     # Phase 4 (auto-fire): runs from wheels-bot[bot] comments containing a
     # high- OR medium-confidence triage marker (bug path) or research marker

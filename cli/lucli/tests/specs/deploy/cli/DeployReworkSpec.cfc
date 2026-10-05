@@ -111,7 +111,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						var lines = $lines($cli(root).deploy({configPath: root & "/config/deploy.yml", version: "v1", dryRun: true}));
 						var localLogin = $indexOf(lines, "[local] docker login registry.example.com -u demo --password-stdin");
 						var hostLogin = $indexOf(lines, "[1.2.3.4] docker login 'registry.example.com' -u 'demo' --password-stdin");
-						var push = $indexOf(lines, "[local] docker buildx build --push --tag 'registry.example.com/acme/demo:v1'");
+						var push = $indexOf(lines, "[local] docker buildx build --push --platform linux/amd64 --label 'service=demo' --tag 'registry.example.com/acme/demo:v1'");
 						var pull = $indexOf(lines, "[1.2.3.4] docker pull 'registry.example.com/acme/demo:v1'");
 						expect(localLogin).toBeGT(0);
 						expect(hostLogin).toBeGT(0);
