@@ -1,1 +1,1 @@
-- `save(callbacks=false)` and `delete(callbacks=false)` now skip `afterCommit` and `afterRollback` too, like every other callback. They used to queue them. A save that changes nothing still queues `afterCommit`
+- `save(callbacks=false)` and `delete(callbacks=false)` now skip `afterCommit` and `afterRollback` too, like every other callback. They used to queue them. With callbacks on, a save that changes nothing still queues `afterCommit`
