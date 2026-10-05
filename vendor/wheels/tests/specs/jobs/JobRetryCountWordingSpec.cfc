@@ -14,6 +14,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("the background-jobs guide counts maxRetries as retries after the first run", () => {
+				$requireRepoPath("web/sites/guides/src/content/docs/v4-2-0/digging-deeper/background-jobs.mdx");
 				var guide = FileRead(ExpandPath("/wheels/../..") & "/web/sites/guides/src/content/docs/v4-2-0/digging-deeper/background-jobs.mdx");
 				expect(FindNoCase("counts total attempts", guide)).toBe(0);
 				expect(FindNoCase("counts the retries after the first run", guide)).toBeGT(0);
