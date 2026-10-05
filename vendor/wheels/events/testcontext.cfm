@@ -23,6 +23,13 @@
 	// because WHEELS_ENV is not a trustworthy production signal.
 
 	if (StructKeyExists(this, "name") && Len(this.name)) {
+		// Mark that test-context isolation is CONFIGURED for this app — this include is present and ran.
+		// The test-runner actions (wheels.Public testbox / tests_testbox) read this to refuse running
+		// specs in the live scope when a request reached them WITHOUT binding the isolated application
+		// (e.g. a custom route the path trigger doesn't cover). Apps without this include never set it,
+		// so they keep the existing live-scope swap behaviour.
+		request.$wheelsTestContextConfigured = true;
+
 		this.wheels.$testContext = {
 			suffix = "_wheelsTest",
 			match = false,
@@ -79,11 +86,11 @@
 				this.wheels.$testContext.match = (
 					(
 						!ReFind("\.\.|//", this.wheels.$testContext.pInfo)
-						&& ReFindNoCase("^/wheels/(core|app)/tests(/|$)", this.wheels.$testContext.pInfo) > 0
+						&& ReFindNoCase("^/wheels/(core/tests|app/tests|testbox|tests_testbox)(/|$)", this.wheels.$testContext.pInfo) > 0
 					)
 					|| (
 						!ReFind("\.\.|//", this.wheels.$testContext.pScript)
-						&& ReFindNoCase("^/wheels/(core|app)/tests(/|$)", this.wheels.$testContext.pScript) > 0
+						&& ReFindNoCase("^/wheels/(core/tests|app/tests|testbox|tests_testbox)(/|$)", this.wheels.$testContext.pScript) > 0
 					)
 				);
 

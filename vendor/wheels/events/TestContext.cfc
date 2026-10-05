@@ -68,6 +68,19 @@ component {
 	}
 
 	/**
+	 * True when a test-runner action (`testbox` / `tests_testbox`) must refuse to run in the current
+	 * application rather than execute specs against it. It refuses only when isolation IS configured for
+	 * the app — the `events/testcontext.cfm` include ran this request (`isolationConfigured`) — but the
+	 * request did not bind the isolated `<name>_wheelsTest` scope, e.g. it arrived through a custom route
+	 * the path trigger does not cover. An app WITHOUT the include (`isolationConfigured` false) is left
+	 * alone: it keeps the existing live-scope test swap (with the #4354 warning), so upgraded apps that
+	 * never adopted isolation are not broken.
+	 */
+	public boolean function testRunnerMustRefuse(required boolean isolationConfigured, required string applicationName) {
+		return arguments.isolationConfigured && !isIsolatedApplicationName(arguments.applicationName);
+	}
+
+	/**
 	 * True when this request should bind the isolated test application.
 	 *
 	 * Markers (any one is enough):
@@ -252,7 +265,7 @@ component {
 	 * For each of `path_info` and `script_name`: lowercase/trim, cut the query string off FIRST (so a
 	 * `//` or `..` living inside a query cannot reject a legitimate runner URL), reject any remaining
 	 * `..` traversal or `//` empty segment, then start-anchored match against
-	 * `^/wheels/(core|app)/tests(/|$)` — i.e. the value must EQUAL `/wheels/core/tests` /
+	 * `^/wheels/(core/tests|app/tests|testbox|tests_testbox)(/|$)` — i.e. the value must EQUAL `/wheels/core/tests` /
 	 * `/wheels/app/tests` or start with one followed by `/`. Because the match is anchored at position
 	 * 0 of a canonical path, a runner path that merely appears later in an application route
 	 * (`/files/x/wheels/app/tests`), or is reached via a traversal (`/wheels/app/tests/../../files/x`)
@@ -271,7 +284,7 @@ component {
 			var path = ReReplace(LCase(Trim(ToString(arguments.cgiScope[key]))), "\?.*$", "");
 			if (
 				!ReFind("\.\.|//", path)
-				&& ReFindNoCase("^/wheels/(core|app)/tests(/|$)", path) > 0
+				&& ReFindNoCase("^/wheels/(core/tests|app/tests|testbox|tests_testbox)(/|$)", path) > 0
 			) {
 				return true;
 			}
