@@ -79,6 +79,22 @@ component extends="wheels.WheelsTest" {
 				expect(state.liveChildren).toBe(state.children);
 			});
 
+			it("doesn't re-stamp soft-deleted children when a parent without deletedAt is deleted", () => {
+				var state = {};
+				transaction {
+					var authorId = g.model("post").findOne(where = "authorId IS NOT NULL", order = "id").authorId;
+					var earlier = g.model("post").findOne(where = "authorId = #authorId#", order = "id");
+					var stamp = CreateDateTime(2020, 1, 2, 3, 4, 5);
+					g.model("post").updateAll(where = "id = #earlier.id#", deletedAt = stamp, includeSoftDeletes = true);
+					var author = g.model("AuthorDependentAllPosts").findByKey(authorId);
+					state.deleted = author.delete();
+					state.earlierDeletedAt = g.model("post").findByKey(key = earlier.id, includeSoftDeletes = true).deletedAt;
+					transaction action="rollback";
+				}
+				expect(state.deleted).toBeTrue();
+				expect(Year(state.earlierDeletedAt)).toBe(2020, "deletedAt of the earlier soft delete: [" & state.earlierDeletedAt & "]");
+			});
+
 			it("still runs dependent= on a permanent delete", () => {
 				var state = {};
 				transaction {

@@ -202,8 +202,10 @@
 			if (Len($persistedSoftDeleteValue())) {
 				return false;
 			}
-		} else {
+		} else if (!arguments.softDelete) {
 			// A permanent delete is a real DELETE, so dependents that are already soft-deleted go too.
+			// A default delete of a model without a soft-delete column still soft-deletes its
+			// soft-delete dependents, and leaves the ones already soft-deleted as they are.
 			arguments.includeSoftDeletes = true;
 		}
 		arguments.sql = [];
