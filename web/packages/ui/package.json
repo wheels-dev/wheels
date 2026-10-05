@@ -7,8 +7,10 @@
 	"exports": {
 		"./components/Header.astro": "./src/components/Header.astro",
 		"./components/Footer.astro": "./src/components/Footer.astro",
+		"./components/FontPreload.astro": "./src/components/FontPreload.astro",
 		"./components/Logo.astro": "./src/components/Logo.astro",
 		"./components/RssPill.astro": "./src/components/RssPill.astro",
+		"./components/starlight/Head.astro": "./src/components/starlight/Head.astro",
 		"./components/starlight/Header.astro": "./src/components/starlight/Header.astro",
 		"./components/starlight/Footer.astro": "./src/components/starlight/Footer.astro",
 		"./components/starlight/SocialIcons.astro": "./src/components/starlight/SocialIcons.astro",

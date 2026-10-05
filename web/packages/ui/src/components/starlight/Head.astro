@@ -1,0 +1,12 @@
+---
+// Starlight's head tags (what its own Head component renders: route data from
+// Astro.locals.starlightRoute.head), plus the brand-font preloads. Rendered
+// directly rather than wrapping Starlight's Head, which this package can't
+// import without depending on @astrojs/starlight.
+import FontPreload from '../FontPreload.astro';
+
+const { head } = Astro.locals.starlightRoute;
+---
+
+{head.map(({ tag: Tag, attrs, content }) => <Tag {...attrs} set:html={content} />)}
+<FontPreload />
