@@ -37,7 +37,7 @@ jobs:
   # below only reads. Never blocks the gate (fork PRs get a read-only token).
   ensure-label:
     name: Ensure deferred label
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     continue-on-error: true
     permissions:
       issues: write
@@ -53,7 +53,7 @@ jobs:
 
   readiness:
     name: Release readiness
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: read

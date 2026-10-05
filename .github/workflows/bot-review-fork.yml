@@ -54,7 +54,7 @@ jobs:
     # a labeled fork PR (the pull_request one skips on the absent vars gate,
     # this one runs), so distinct check names keep the UI unambiguous.
     name: Reviewer (fork)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # Fork PRs only, and only once a maintainer has applied the `bot-review`
     # label. `synchronize` re-reviews on new pushes while the label is present;

@@ -63,7 +63,7 @@ permissions:
 jobs:
   resolve:
     name: Resolve expected version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.v.outputs.version }}
       lucli: ${{ steps.pin.outputs.lucli }}
@@ -128,7 +128,7 @@ jobs:
   index-integrity:
     needs: resolve
     name: "Index integrity (apt + yum dists)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     # Direct probe of the PUBLISHED dist indexes — no install, no containers.
     # Catches the #3218 cross-channel clobber deterministically: a regression
@@ -491,7 +491,7 @@ jobs:
   rpm-payload:
     needs: resolve
     name: "rpm payload (${{ matrix.label }})"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     # The GA .rpm must unpack with rpm2cpio on every rpm we support and install
     # with dnf (#3975). rpm 4.19 (Rocky 10) exits 1 on a package whose archive-
@@ -545,7 +545,7 @@ jobs:
   yum:
     needs: resolve
     name: "yum (rocky 9)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     # RHEL-family, dnf4 — runs the documented commands (the .repo file is
     # downloaded into /etc/yum.repos.d/, which works on dnf4 and dnf5). The release ships a noarch rpm; dnf serves it on this amd64 container.
@@ -612,7 +612,7 @@ jobs:
   yum-fedora-be:
     needs: resolve
     name: "yum (fedora 44, bleeding-edge)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # Fedora 44 (dnf5) ships Java 25, not 21: the rpm's Java 21-or-newer
     # dependency (#4237) is what makes it installable. Bleeding-edge only for
