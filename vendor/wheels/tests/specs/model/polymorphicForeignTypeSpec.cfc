@@ -70,7 +70,7 @@ component extends="wheels.WheelsTest" {
 			it("creates through hasMany and reads back through belongsTo", () => {
 				var post = variables.g.model("UPolyPost").create(title = "a post");
 				var note = post.createUPolyNote(body = "hello");
-				var raw = QueryExecute("SELECT notable_id, notable_type FROM c_o_r_e_upolynotes WHERE id = :id", {id = note.id}, {datasource = variables.g.get("dataSourceName")});
+				var raw = QueryExecute("SELECT notable_id, notable_type FROM c_o_r_e_upolynotes WHERE id = :id", {id = {value = note.id, cfsqltype = "cf_sql_bigint"}}, {datasource = variables.g.get("dataSourceName")});
 				expect(raw.notable_type).toBe("UPolyPost");
 				expect(raw.notable_id).toBe(post.id);
 				var owner = variables.g.model("UPolyNote").findByKey(note.id).notable();
