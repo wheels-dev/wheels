@@ -232,12 +232,12 @@ component extends="wheels.WheelsTest" {
 
 - The assertions return what `callback` returned, so a call can stay inline.
 - Every function takes an optional `dataSource` that counts only statements sent to that datasource, which is useful in a multi-tenant app.
-- A failure lists the statements that ran, with a `?` for each value. Values are never recorded, so a failure can't put data into a CI log.
+- A failure lists the statements that ran, with each bound value replaced by `?`, so a failure can't put bound data into a CI log. A value written into the SQL text itself (`parameterize=false`) appears as written.
 - Assertions can be nested: each counts its own callback's statements.
 - **What counts:** every statement the model layer sends, including finders, `count()`, `save()`, `create()`, `update()`, `delete()`, `updateAll()` and `deleteAll()`.
 - **What doesn't count:**
   - a finder answered from the per-request query cache, because it sends no SQL (pass `reload=true` to force the query);
-  - raw `queryExecute()` / `cfquery`;
+  - raw `queryExecute()` / `cfquery`, including the framework features built on it: advisory locks, the migration lock, the job store and SQL Server's settings probes;
   - transaction control;
   - requests made through the test client, which run in a request of their own.
 
