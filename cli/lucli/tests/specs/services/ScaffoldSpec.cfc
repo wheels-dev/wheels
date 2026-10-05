@@ -374,7 +374,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						properties = [{name: "title", type: "string"}]
 					);
 					var content = fileRead(path);
-					expect(content).toInclude("t.string(columnNames='title', allowNull=true, limit='255')");
+					expect(content).toInclude("t.string(columnNames='title', allowNull=false, limit='255')");
 				});
 
 				it("emits custom string limit from title:string{50}", () => {
@@ -383,7 +383,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						properties = [{name: "title", type: "string", limit: "50"}]
 					);
 					var content = fileRead(path);
-					expect(content).toInclude("t.string(columnNames='title', allowNull=true, limit='50')");
+					expect(content).toInclude("t.string(columnNames='title', allowNull=false, limit='50')");
 					expect(content).notToInclude("limit='255'");
 				});
 
@@ -393,7 +393,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						properties = [{name: "price", type: "decimal"}]
 					);
 					var content = fileRead(path);
-					expect(content).toInclude("t.decimal(columnNames='price', allowNull=true, precision='10', scale='2')");
+					expect(content).toInclude("t.decimal(columnNames='price', allowNull=false, precision='10', scale='2')");
 				});
 
 				it("emits custom decimal precision and scale from price:decimal{10,2}", () => {
@@ -402,7 +402,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						properties = [{name: "price", type: "decimal", precision: "10", scale: "2"}]
 					);
 					var content = fileRead(path);
-					expect(content).toInclude("t.decimal(columnNames='price', allowNull=true, precision='10', scale='2')");
+					expect(content).toInclude("t.decimal(columnNames='price', allowNull=false, precision='10', scale='2')");
 				});
 
 				it("emits custom decimal precision and scale from amount:decimal{12,4}", () => {
@@ -411,7 +411,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						properties = [{name: "amount", type: "decimal", precision: "12", scale: "4"}]
 					);
 					var content = fileRead(path);
-					expect(content).toInclude("t.decimal(columnNames='amount', allowNull=true, precision='12', scale='4')");
+					expect(content).toInclude("t.decimal(columnNames='amount', allowNull=false, precision='12', scale='4')");
 					expect(content).notToInclude("precision='10'");
 				});
 
@@ -425,9 +425,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						]
 					);
 					var content = fileRead(path);
-					expect(content).toInclude("t.integer(columnNames='count', allowNull=true, limit='8')");
-					expect(content).toInclude("t.text(columnNames='body', allowNull=true, limit='1000')");
-					expect(content).toInclude("t.binary(columnNames='payload', allowNull=true, limit='4096')");
+					expect(content).toInclude("t.integer(columnNames='count', allowNull=false, limit='8')");
+					expect(content).toInclude("t.text(columnNames='body', allowNull=false, limit='1000')");
+					expect(content).toInclude("t.binary(columnNames='payload', allowNull=false, limit='4096')");
 				});
 
 				it("emits default integer limit 11 when no brace modifier is present", () => {
@@ -436,7 +436,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						properties = [{name: "count", type: "integer"}]
 					);
 					var content = fileRead(path);
-					expect(content).toInclude("t.integer(columnNames='count', allowNull=true, limit='11')");
+					expect(content).toInclude("t.integer(columnNames='count', allowNull=false, limit='11')");
 				});
 
 			});

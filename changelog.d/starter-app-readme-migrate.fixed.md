@@ -1,0 +1,1 @@
+- The starter app's README Quick Start works again: it creates the schema from the migrator page (`/wheels/migrator`) instead of `wheels migrate latest`, which needs a `wheels start` server, and restarts the server afterwards so the seeded settings load.

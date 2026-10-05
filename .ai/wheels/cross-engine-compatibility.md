@@ -100,6 +100,36 @@ var fn = obj["dynamicMethod"];
 var result = fn();
 ```
 
+### Quoted Named Argument in a Direct Call (Adobe CF 2023)
+
+A named argument whose *name* is a quoted string literal — `obj.method("name" = value)` — is a **compile error on Adobe CF 2023 only** (`MissingNameException: Invalid construct: Either argument or name is missing` / "each parameter must have a name"). Lucee 6/7, BoxLang, **and Adobe CF 2025** all accept it. This is the inverse footprint of the related invariants: the parenthesized-`new` receiver (invariant 16a) fails on both Adobe engines, the zero-arg `application`-scope call (16b/16b-ext) is Adobe 2025 only, and this one is the lone **Adobe 2023-only** shape — so an Adobe 2025 smoke, or Lucee-only local verification, does **not** cover it.
+
+**Context-independent (unlike the closure-sensitive 16b-ext).** Probe-verified on adobe2023/62023, the quoted named-arg call fails identically in every call context tested — a single-expression arrow (`(x) => obj.method("n" = x)`), a block-bodied arrow, a regular `function()` closure, and a plain statement in a non-closure method body all throw the same `MissingNameException`. There is no "safe" context; only changing the call shape (below) helps.
+
+You only reach for a quoted argument name when the name is otherwise illegal as a bare token — a `$`-prefixed or hyphenated argument. Measured boundaries that compile on adobe2023 (do **not** "fix" these):
+- an *unquoted* named argument, `obj.method(name = value)`, compiles on every engine;
+- a quoted key in a *struct literal*, `{"$x" = 1}`, compiles everywhere — it is a struct key, not a function-argument name;
+- passing the same `$`-prefixed value via `argumentCollection` compiles everywhere.
+
+Adobe misattributes the error to the enclosing `describe(...)` / `function` line, and because the core suite compiles via `directory="wheels.tests.specs"`, a single occurrence zeroes the **entire adobe2023 leg** (`tests="0"` on every database) while Lucee/BoxLang/Adobe 2025 stay green.
+
+```cfm
+// WRONG — MissingNameException on adobe2023 (compiles on Lucee/BoxLang/adobe2025)
+var out = c.URLFor(controller = "posts", action = "index", "$argsResolved" = true);
+
+// RIGHT — the $-prefixed name lives on a struct key, not an argument name
+var args = {controller = "posts", action = "index"};
+args["$argsResolved"] = true;
+var out = c.URLFor(argumentCollection = args);
+```
+
+**Reference**: `vendor/wheels/tests/specs/view/linkToUrlForDifferentialSpec.cfc` ([#4192](https://github.com/wheels-dev/wheels/pull/4192)). It was pre-existing and only the adobe2023 matrix legs caught it. Bisect against a running container (~13s vs ~19min), using the Adobe 2023 port `62023`:
+
+```bash
+curl -s "http://localhost:62023/wheels/core/tests?db=sqlite&format=json&cli=true" | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('totalPass','COMPILE FAIL'), d.get('RootCause',{}).get('snippet',''))"
+```
+
 ### Method Reference Extraction Loses Receiver (BoxLang)
 
 BoxLang implements method dispatch with JavaScript-style semantics: pulling a method off an object into a local variable produces a bare function reference with no bound receiver. Calling that local then runs the function in an empty context, and any in-component call inside (helpers prefixed with `$`, `this.x()`, etc.) fails to resolve. The lookup-and-call **must** stay in a single expression for BoxLang to bind the receiver.
@@ -229,6 +259,58 @@ try {
 **Why**: Lucee 7's bytecode generation for `finally` blocks mishandles the `local` scope frame for loop constructs. Adobe CF and BoxLang are unaffected.
 
 **Reference example**: `$restoreEmailViewVariables()` in [`vendor/wheels/controller/miscellaneous.cfc`](../../vendor/wheels/controller/miscellaneous.cfc) — the `sendEmail` variables-scope restore runs from `finally` via a `public` `$`-prefixed helper (mixin invariant: helpers must be public). Found while addressing review on [#2922](https://github.com/wheels-dev/wheels/pull/2922).
+
+### `continue` and `break` in One `try`/`catch` Inside a Loop: `continue` Exits the Loop (Lucee 6/7)
+
+Inside a loop, a `try`/`catch` that contains **both** a `continue` and a `break` makes the `continue` leave the loop, as if it were a `break`. The `break` doesn't have to run: an `if (false) break;` in the `catch` is enough. Where the two keywords sit doesn't matter either: `continue` in the `try` and `break` in the `catch`, or both in the `catch`.
+
+```cfm
+// WRONG: on Lucee 6/7 this returns "first", not "first,second,third"
+local.trace = "";
+for (local.item in ["first", "second", "third"]) {
+    local.trace = ListAppend(local.trace, local.item);
+    try {
+        if (true) {
+            continue;
+        }
+    } catch (any e) {
+        break;
+    }
+}
+
+// RIGHT: no continue; let if/else carry control to the end of the iteration
+for (local.item in local.items) {
+    try {
+        if (skip(local.item)) {
+            recordSkip(local.item);
+        } else {
+            process(local.item);
+        }
+    } catch (any e) {
+        if (stopOnError) break;
+    }
+}
+```
+
+**Measured** with the same probe spec (compat-matrix dispatch, SQLite):
+
+| Engine (build) | `continue` + `break` in one `try`/`catch` inside a loop |
+|---|---|
+| Lucee 6.2.5.48 | **`continue` exits the loop** |
+| Lucee 7.0.1.100 (the CI pin) | **`continue` exits the loop** |
+| Lucee 7.0.0.395 (local) | **`continue` exits the loop** |
+| Adobe CF 2023.0.11, 2025.0.06 | correct |
+| BoxLang 1.11.0+52 | correct |
+
+The RustCFML v0.693.0 lane reported no failures in the same run; its per-spec result wasn't checked individually.
+
+**Measured as correct on every engine above:**
+- the same `try`/`catch` with a `continue` but no `break`;
+- a loop **inside** a `try` that uses both `continue` and `break` for that loop. This covers a `for`-in loop that continues and then breaks, a `while` with `break` around a nested `for` with `continue`, and one loop with both.
+
+The failing shape reproduces with `for`-in and index loops, with or without an outer `try`/`finally`.
+
+**Where it bit:** `TenantMigrator.migrateAll()`. A `continue` in the inner `try` (after recording a failed tenant), next to `if (arguments.stopOnError) break;` in its `catch`, recorded only the first failed tenant with `stopOnError = false`. The fix uses `if`/`else` ([#4169](https://github.com/wheels-dev/wheels/pull/4169)). A source sweep of `vendor/wheels/` when this was found turned up no other occurrence of the failing shape.
 
 ### `DirectoryCreate()` Second Argument Is Lucee-Only
 

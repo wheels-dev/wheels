@@ -1,0 +1,177 @@
+/**
+ * A TestClient created inside a test-runner request sends the test context
+ * by default, however it is constructed: $testClient(), `new
+ * wheels.wheelstest.TestClient()`, or an app subclass. Its requests then reach
+ * the same isolated test application (and datasource) as the spec code.
+ * testContext=false addresses the live application.
+ */
+component extends="wheels.WheelsTest" {
+
+	function run() {
+
+		describe("TestClient test context", () => {
+
+			it("a directly constructed TestClient reaches the spec's application and datasource", () => {
+				if (!$isolated()) {
+					skip("this run is not in the isolated test application (set WHEELS_ENV to development or testing)");
+				}
+				var payload = $infoVia(new wheels.wheelstest.TestClient(baseUrl = $getTestBaseUrl()));
+				expect(payload.application.name).toBe(
+					application.applicationName,
+					"new TestClient() must reach the test application, saw `#payload.application.name#`"
+				);
+				expect(payload.database.datasourceName).toBe(application.wheels.dataSourceName);
+			});
+
+			it("a TestClient subclass that calls super.init() does too", () => {
+				if (!$isolated()) {
+					skip("this run is not in the isolated test application (set WHEELS_ENV to development or testing)");
+				}
+				var payload = $infoVia(new wheels.tests._assets.wheelstest.SubclassedTestClient(baseUrl = $getTestBaseUrl()));
+				expect(payload.application.name).toBe(
+					application.applicationName,
+					"a TestClient subclass must reach the test application, saw `#payload.application.name#`"
+				);
+			});
+
+			it("testContext=false addresses the live application", () => {
+				if (!$isolated()) {
+					skip("this run is not in the isolated test application (set WHEELS_ENV to development or testing)");
+				}
+				var ctx = new wheels.events.TestContext();
+				var payload = $infoVia(new wheels.wheelstest.TestClient(baseUrl = $getTestBaseUrl(), testContext = false));
+				expect(ctx.isIsolatedApplicationName(payload.application.name)).toBeFalse(
+					"testContext=false must reach the live application, saw `#payload.application.name#`"
+				);
+			});
+
+			it("sends neither the header nor the cookie to a host other than the test server", () => {
+				if (!$isolated()) {
+					skip("this run is not in the isolated test application (set WHEELS_ENV to development or testing)");
+				}
+				var ctx = new wheels.events.TestContext();
+				// No request is made: the defaults are inspected right after init().
+				var external = new wheels.tests._assets.wheelstest.InspectableTestClient(baseUrl = "https://external-service.example").capturedDefaults();
+				expect(StructKeyExists(external.headers, ctx.headerName())).toBeFalse("an external baseUrl must not get the test-context header");
+				expect(StructKeyExists(external.cookies, ctx.cookieName())).toBeFalse("an external baseUrl must not get the test-context cookie");
+				// Control: a loopback client in the same run does carry both.
+				var loopback = new wheels.tests._assets.wheelstest.InspectableTestClient(baseUrl = "http://127.0.0.1:8080").capturedDefaults();
+				expect(StructKeyExists(loopback.headers, ctx.headerName())).toBeTrue();
+				expect(StructKeyExists(loopback.cookies, ctx.cookieName())).toBeTrue();
+			});
+
+			it("treats only loopback hosts and the configured test base URL as the test server", () => {
+				var c = new wheels.wheelstest.TestClient(baseUrl = "https://external-service.example", testContext = false);
+				for (var candidate in ["http://localhost:8080/x", "http://LOCALHOST", "http://127.0.0.1", "https://127.1.2.3:60007", "http://[::1]:8080/"]) {
+					expect(c.$isTestHost(candidate)).toBeTrue(candidate);
+				}
+				for (var candidate in [
+					"https://external-service.example",
+					"http://localhost.example.com",
+					"http://127.0.0.1.example.com",
+					"http://example.com/localhost",
+					"http://example.com/?host=127.0.0.1",
+					"http://localhost@example.com",
+					"http://127.0.0.256",
+					"not a url",
+					""
+				]) {
+					expect(c.$isTestHost(candidate)).toBeFalse(candidate);
+				}
+			});
+
+			it("treats the configured testClientBaseUrl host as the test server", () => {
+				var c = new wheels.wheelstest.TestClient(baseUrl = "http://127.0.0.1", testContext = false);
+				var saved = {exists = StructKeyExists(application.wheels, "testClientBaseUrl"), value = ""};
+				if (saved.exists) {
+					saved.value = application.wheels.testClientBaseUrl;
+				}
+				var result = {configured = false, other = true};
+				application.wheels.testClientBaseUrl = "https://myapp.test:8443";
+				try {
+					result.configured = c.$isTestHost("https://myapp.test:8443/users");
+					result.other = c.$isTestHost("https://otherapp.test");
+				} finally {
+					// Restore the setting even if a check throws, so later specs see the original.
+					if (saved.exists) {
+						application.wheels.testClientBaseUrl = saved.value;
+					} else {
+						StructDelete(application.wheels, "testClientBaseUrl");
+					}
+				}
+				expect(result.configured).toBeTrue();
+				expect(result.other).toBeFalse();
+			});
+
+			it("parses hosts without java.net.URI the same way on every engine", () => {
+				var c = new wheels.wheelstest.TestClient(baseUrl = "http://127.0.0.1", testContext = false);
+				for (var row in $hostCorpus()) {
+					expect(c.$lexicalUrlHost(row.input)).toBe(row.host, "lexical host of [#row.input#]");
+				}
+			});
+
+			it("agrees with java.net.URI wherever the JVM provides it", () => {
+				var c = new wheels.wheelstest.TestClient(baseUrl = "http://127.0.0.1", testContext = false);
+				if (!c.$uriAvailable()) {
+					skip("java.net.URI is not available on this engine; the lexical parser is the only path");
+				}
+				for (var row in $hostCorpus()) {
+					expect(c.$urlHost(row.input)).toBe(row.host, "URI host of [#row.input#]");
+				}
+			});
+
+			it("currentRequestIsIsolated() reflects the current application and environment", () => {
+				var ctx = new wheels.events.TestContext();
+				var expected = $isolated() && ListFindNoCase("development,testing", application.wheels.environment) > 0;
+				expect(ctx.currentRequestIsIsolated()).toBe(expected);
+			});
+
+		});
+
+	}
+
+	/** Host-rule corpus: each input with the host both parsers must return ("" = refused). */
+	private array function $hostCorpus() {
+		return [
+			{input = "http://localhost:8080/x", host = "localhost"},
+			{input = "http://LOCALHOST", host = "localhost"},
+			{input = "http://127.0.0.1", host = "127.0.0.1"},
+			{input = "https://127.1.2.3:60007", host = "127.1.2.3"},
+			{input = "http://[::1]:8080/", host = "[::1]"},
+			{input = "http://user:pw@localhost:8080/", host = "localhost"},
+			{input = "https://external-service.example", host = "external-service.example"},
+			{input = "http://localhost.example.com", host = "localhost.example.com"},
+			{input = "http://127.0.0.1.example.com", host = "127.0.0.1.example.com"},
+			{input = "http://example.com/localhost", host = "example.com"},
+			{input = "http://example.com/?host=127.0.0.1", host = "example.com"},
+			{input = "http://example.com##@localhost", host = "example.com"},
+			{input = "http://localhost@example.com", host = "example.com"},
+			{input = "http://127.0.0.256", host = ""},
+			{input = "http://1234", host = ""},
+			{input = "http://example.123", host = ""},
+			{input = "http://a..b", host = ""},
+			{input = "http://localhost\@example.com", host = ""},
+			{input = "http://127.0.0.1%2e.example.com", host = ""},
+			{input = "http://local" & Chr(9) & "host", host = ""},
+			{input = "ftp://localhost", host = ""},
+			{input = "http://localhost:80a/", host = ""},
+			{input = "http://[::1", host = ""},
+			{input = "http://", host = ""},
+			{input = "not a url", host = ""},
+			{input = "", host = ""}
+		];
+	}
+
+	private boolean function $isolated() {
+		return new wheels.events.TestContext().isIsolatedApplicationName(application.applicationName);
+	}
+
+	private struct function $infoVia(required any httpClient) {
+		arguments.httpClient.get(path = "/wheels/info", params = {format = "json"});
+		expect(arguments.httpClient.statusCode()).toBe(200, "/wheels/info?format=json must be reachable");
+		var payload = arguments.httpClient.json();
+		expect(IsStruct(payload) && StructKeyExists(payload, "application") && StructKeyExists(payload.application, "name")).toBeTrue();
+		return payload;
+	}
+
+}

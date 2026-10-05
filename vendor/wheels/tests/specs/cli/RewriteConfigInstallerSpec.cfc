@@ -31,6 +31,7 @@ component extends="wheels.WheelsTest" {
 			ctx.templatePath = ctx.repoRoot & "/cli/lucli/templates/app/rewrite.config";
 
 			it("writes the project-level rewrite.config when the project doesn't have one", () => {
+				$requireRepoPath("cli/lucli/services/RewriteConfigInstaller.cfc");
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
 				var projectRoot = $tempPath("wheels-rewriteinstaller-#createUUID()#");
 				directoryCreate(projectRoot);
@@ -53,6 +54,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("is a no-op when the project already ships its own rewrite.config (idempotent)", () => {
+				$requireRepoPath("cli/lucli/services/RewriteConfigInstaller.cfc");
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
 				var projectRoot = $tempPath("wheels-rewriteinstaller-#createUUID()#");
 				directoryCreate(projectRoot);
@@ -81,6 +83,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("emits a rewrite.config that passes 3.x-convention static-asset dirs through to the default servlet", () => {
+				$requireRepoPath("cli/lucli/services/RewriteConfigInstaller.cfc");
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
 				var projectRoot = $tempPath("wheels-rewriteinstaller-#createUUID()#");
 				directoryCreate(projectRoot);
@@ -110,6 +113,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("emits a rewrite.config using positive-match [L]-flagged passthrough rules, not negated RewriteCond chains", () => {
+				$requireRepoPath("cli/lucli/services/RewriteConfigInstaller.cfc");
 				// Tomcat 9/11's RewriteValve does NOT honour stacked
 				// `RewriteCond %{REQUEST_URI} !pattern` entries before a
 				// single rewriting RewriteRule the way Apache mod_rewrite
@@ -146,6 +150,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("returns installed=false with a reason when the source template can't be read", () => {
+				$requireRepoPath("cli/lucli/services/RewriteConfigInstaller.cfc");
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
 				var projectRoot = $tempPath("wheels-rewriteinstaller-#createUUID()#");
 				directoryCreate(projectRoot);

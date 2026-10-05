@@ -555,9 +555,13 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		if (!Len(Trim(arguments.output))) {
 			return "";
 		}
+		local.guard = new wheels.PathGuard();
 		try {
 			local.canonicalRoot = CreateObject("java", "java.io.File").init(ExpandPath("/")).getCanonicalPath();
-			local.separator = CreateObject("java", "java.io.File").separator;
+			// Route the separator through PathGuard so it stays defined on the JVM-free
+			// RustCFML runtime (whose java.io.File shim may not expose `.separator`); it
+			// falls back to the OS name, then "/".
+			local.separator = local.guard.$nativeSeparator();
 			// Join in CFML instead of the java.io.File(parent, child)
 			// constructor: RustCFML's java.io.File shim ignores the child
 			// argument, so the two-argument form resolves to the parent
@@ -582,7 +586,6 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		// Exact, separator-qualified containment (both sides already canonicalised +
 		// normalized the same way). CompareNoCase folded a case-distinct sibling
 		// (/srv/app vs /srv/App) into the root on a case-sensitive filesystem.
-		local.guard = new wheels.PathGuard();
 		if (!local.guard.pathWithinExact(root = local.normalizedRoot, candidate = local.normalizedTarget)) {
 			return "";
 		}
@@ -841,10 +844,47 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		// because `wheels new` doesn't scaffold one.
 		var projectRunner = ExpandPath("/tests/runner.cfm");
 		if (FileExists(projectRunner)) {
-			include "/tests/runner.cfm";
+			$runProjectTestRunner();
 			return;
 		}
 		include "/wheels/tests/app-runner.cfm";
+	}
+
+	/**
+	 * Runs the project's own tests/runner.cfm under the same datasource rule as the
+	 * built-in runner: on `<datasource>_test`, or on the primary datasource only when
+	 * asked to (useTestDB=false, or the allowTestsAgainstPrimaryDatasource setting),
+	 * otherwise refused. Runners copied from older Wheels releases pick their
+	 * datasource from coreTestDataSourceName, which is pointed at the test datasource
+	 * for the run. Holds the app-runner's lock; a re-entrant request carrying the
+	 * in-progress run's token is included as-is (app-runner.cfm handles it).
+	 */
+	private void function $runProjectTestRunner() {
+		if (application.wo.$isTestRunReentry(requestUrl = url)) {
+			include "/tests/runner.cfm";
+			return;
+		}
+		lock name="wheelsTestRunner_#application.applicationName#" type="exclusive" timeout="1800" throwontimeout="true" {
+			// Holding the lock means no run is in progress: settings a killed run left
+			// switched are restored before this run reads them.
+			application.wo.$recoverStrandedTestRun(force = true);
+			var decision = application.wo.$testDataSourceDecision(primary = application.wheels.dataSourceName, requestUrl = url);
+			if (decision.action == "refuse") {
+				cfheader(statuscode = 409);
+				cfcontent(type = "application/json");
+				WriteOutput(SerializeJSON(application.wo.$testDataSourceRefusal(decision = decision)));
+				abort;
+			}
+			if (decision.warn) {
+				application.wo.$warnTestsOnPrimaryDataSource(decision = decision);
+			}
+			var saved = application.wo.$beginTestRunDataSource(decision = decision);
+			try {
+				include "/tests/runner.cfm";
+			} finally {
+				application.wo.$endTestRunDataSource(saved = saved);
+			}
+		}
 	}
 
 	public function tests_testbox() {
@@ -1235,11 +1275,14 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		} catch (any e) {
 			return "";
 		}
-		var separator = CreateObject("java", "java.io.File").separator;
+		var guard = new wheels.PathGuard();
+		// Route the separator through PathGuard so it stays defined on the JVM-free
+		// RustCFML runtime (whose java.io.File shim may not expose `.separator`); it
+		// falls back to the OS name, then "/".
+		var separator = guard.$nativeSeparator();
 		if (Right(canonicalAssets, 1) != separator) {
 			canonicalAssets &= separator;
 		}
-		var guard = new wheels.PathGuard();
 		if (!guard.pathWithinExact(root = canonicalAssets, candidate = canonicalPath)) {
 			return "";
 		}
@@ -1387,11 +1430,14 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		} catch (any e) {
 			return "";
 		}
-		var separator = CreateObject("java", "java.io.File").separator;
+		var guard = new wheels.PathGuard();
+		// Route the separator through PathGuard so it stays defined on the JVM-free
+		// RustCFML runtime (whose java.io.File shim may not expose `.separator`); it
+		// falls back to the OS name, then "/".
+		var separator = guard.$nativeSeparator();
 		if (Right(canonicalSite, 1) != separator) {
 			canonicalSite &= separator;
 		}
-		var guard = new wheels.PathGuard();
 		if (!guard.pathWithinExact(root = canonicalSite, candidate = canonicalTarget)) {
 			return "";
 		}

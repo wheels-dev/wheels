@@ -34,6 +34,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileExists(templateRoot & ".ai/README.md")).toBeTrue();
 			});
 
+			it("puts the root route before the wildcard, and the wildcard last", () => {
+				// Routes match first to last; the app's CLAUDE.md says root, then
+				// the wildcard last. generate auth's fallback anchor inserts
+				// before .root(), which only precedes the wildcard in this order.
+				var routes = fileRead(templateRoot & "config/routes.cfm");
+				var rootAt = find(".root(", routes);
+				var wildcardAt = find(".wildcard()", routes);
+				expect(rootAt).toBeGT(0);
+				expect(wildcardAt).toBeGT(rootAt);
+				var afterWildcard = mid(routes, wildcardAt + len(".wildcard()"), len(routes));
+				expect(reFind("\.[a-zA-Z]+\(", reReplace(afterWildcard, "\.end\(\)", "", "all"))).toBe(0);
+			});
+
 			it("ships app/views/helpers.cfm (used by layout rendering)", () => {
 				expect(fileExists(templateRoot & "app/views/helpers.cfm")).toBeTrue();
 			});
@@ -144,6 +157,21 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(arrayToList(directoryList(templateRoot & "app/snippets", false, "name", "*.txt"))).toBe("");
 			});
 
+			it("doesn't show an empty-string default in the dbmigrate templates", () => {
+				// Since 4.1.0 the migrator rejects default='' on string, text and
+				// char columns (Wheels.InvalidDefault), and every generated
+				// migration copies these headers, so they must not teach it.
+				var offenders = [];
+				for (var dir in [templateRoot & "app/snippets/dbmigrate/", expandPath("/cli/lucli/templates/codegen/dbmigrate/")]) {
+					for (var name in directoryList(dir, false, "name", "*.txt")) {
+						if (reFind("default\s*=\s*(''|"""")", fileRead(dir & name))) {
+							arrayAppend(offenders, name);
+						}
+					}
+				}
+				expect(arrayToList(offenders)).toBe("");
+			});
+
 			it("writes a lucee.json SQLite DSN with the ##project:path## placeholder LuCLI resolves", () => {
 				var m = new cli.lucli.Module(cwd = expandPath("/"));
 				makePublic(m, "buildSQLiteDatasourcesBlock");
@@ -153,10 +181,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(block).notToInclude("{project}");
 			});
 
-			it("links the template's comments to the current (v4-1-0) guides", () => {
+			it("links the template's comments to the current (v4-2-0) guides", () => {
 				var stale = [];
 				for (var path in directoryList(templateRoot, true, "path", "*.cfm|*.md|*.cfc")) {
-					if (findNoCase("guides.wheels.dev/v4-0-0/", fileRead(path))) {
+					var content = fileRead(path);
+					if (findNoCase("guides.wheels.dev/v4-0-0/", content) || findNoCase("guides.wheels.dev/v4-1-0/", content)) {
 						arrayAppend(stale, replace(path, templateRoot, ""));
 					}
 				}

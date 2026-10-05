@@ -2,12 +2,17 @@ component extends="wheels.databaseAdapters.Abstract" {
 
 	// SQLite type mapping (simpler type system)
 	variables.sqlTypes = {};
-	variables.sqlTypes['biginteger'] = { name = 'INTEGER' };
+	// BIGINT has INTEGER affinity (64-bit storage) and is typed cf_sql_bigint; INTEGER was
+	// typed cf_sql_integer, which truncates or rejects values above 2^31 (#4089).
+	variables.sqlTypes['biginteger'] = { name = 'BIGINT' };
 	variables.sqlTypes['binary'] = { name = 'BLOB' };
 	variables.sqlTypes['boolean'] = { name = 'BOOLEAN' }; // NUMERIC affinity, stores 0/1; declared name lets SQLiteModel.$getType map it to cf_sql_bit
 	variables.sqlTypes['char'] = { name = 'CHAR', limit = 1 }; // TEXT affinity; declared name lets SQLiteModel.$getType map it
-	variables.sqlTypes['date'] = { name = 'TEXT' };
-	variables.sqlTypes['datetime'] = { name = 'TEXT' };
+	// Date types declare their own names so the model can tell them from plain text and
+	// validate them as dates (#4093). The names give NUMERIC affinity, but Wheels writes
+	// ISO-8601 strings, which aren't numeric, so SQLite still stores them as TEXT.
+	variables.sqlTypes['date'] = { name = 'DATE' };
+	variables.sqlTypes['datetime'] = { name = 'DATETIME' };
 	// NUMERIC keeps the declared type distinct from REAL so the model layer binds
 	// decimal values via cf_sql_decimal (BigDecimal) instead of cf_sql_float.
 	// REAL is SQLite's 8-byte floating point storage: Lucee binds it as a 32-bit
@@ -21,8 +26,8 @@ component extends="wheels.databaseAdapters.Abstract" {
 	variables.sqlTypes['text'] = { name = 'TEXT' };
 	variables.sqlTypes['mediumtext'] = { name = 'TEXT' };
 	variables.sqlTypes['longtext'] = { name = 'TEXT' };
-	variables.sqlTypes['time'] = { name = 'TEXT' };
-	variables.sqlTypes['timestamp'] = { name = 'TEXT' };
+	variables.sqlTypes['time'] = { name = 'TIME' };
+	variables.sqlTypes['timestamp'] = { name = 'TIMESTAMP' };
 	variables.sqlTypes['uuid'] = { name = 'TEXT', limit = 36 };
 	variables.sqlTypes['uniqueidentifier'] = { name = 'CHAR', limit = 36 };
 	// SQLite has no UUID function; this builds a version 4 UUID from random bytes (#4094).
@@ -58,6 +63,10 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * In SQLite, only INTEGER PRIMARY KEY is auto-incrementable.
 	 */
 	public string function addPrimaryKeyOptions(required string sql, struct options = {}) {
+		// Only a column declared exactly INTEGER PRIMARY KEY is the rowid alias, which
+		// auto-generates ids and may carry AUTOINCREMENT, so a biginteger key stays INTEGER
+		// (the rowid is 64-bit already) (#4089).
+		arguments.sql = ReReplaceNoCase(arguments.sql, " BIGINT$", " INTEGER");
 		arguments.sql &= " PRIMARY KEY";
 		if (
 			StructKeyExists(arguments.options, "autoIncrement") &&
@@ -212,8 +221,14 @@ component extends="wheels.databaseAdapters.Abstract" {
 
 		// Build the column list for INSERT ... SELECT data copy.
 		local.quotedColList = [];
+		local.selectList = [];
 		for (local.colName in local.allColumnNames) {
 			ArrayAppend(local.quotedColList, quoteColumnName(local.colName));
+			if (local.colName == local.changedColumnName && ListFindNoCase("date,datetime,time,timestamp", arguments.column.type)) {
+				ArrayAppend(local.selectList, $sqliteOdbcDateLiteralToText(quoteColumnName(local.colName)));
+			} else {
+				ArrayAppend(local.selectList, quoteColumnName(local.colName));
+			}
 		}
 		local.columnList = ArrayToList(local.quotedColList, ", ");
 
@@ -243,7 +258,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 		ArrayAppend(local.statements, local.createSQL);
 		ArrayAppend(
 			local.statements,
-			"INSERT INTO #local.quotedTempTable# (#local.columnList#) SELECT #local.columnList# FROM #local.quotedTable#"
+			"INSERT INTO #local.quotedTempTable# (#local.columnList#) SELECT #ArrayToList(local.selectList, ", ")# FROM #local.quotedTable#"
 		);
 		ArrayAppend(local.statements, "DROP TABLE #local.quotedTable#");
 		ArrayAppend(local.statements, "ALTER TABLE #local.quotedTempTable# RENAME TO #quoteTableName(local.tableName)#");
@@ -259,6 +274,23 @@ component extends="wheels.databaseAdapters.Abstract" {
 			ArrayAppend(local.statements, "PRAGMA foreign_keys = ON");
 		}
 		return local.statements;
+	}
+
+	/**
+	 * Internal function. SQL that converts a CFML ODBC date literal stored as text
+	 * ({ts 'yyyy-mm-dd HH:mm:ss'}, {d 'yyyy-mm-dd'} or {t 'HH:mm:ss'}), or bare date-only /
+	 * time-only text, to the full yyyy-mm-dd HH:mm:ss text save() writes, and leaves every
+	 * other value unchanged. Earlier versions could store such
+	 * literals in a TEXT date column (#4147); a DATETIME column fails to read them, so a
+	 * changeColumn() to a date type converts them while copying the table.
+	 */
+	public string function $sqliteOdbcDateLiteralToText(required string quotedColumn) {
+		local.c = arguments.quotedColumn;
+		// char(123) / char(125) are { and }: a literal brace in the SQL text is read by the JDBC
+		// driver as an escape sequence ({ts ...}, {d ...}, {t ...}) and rewritten. Values become
+		// the full yyyy-mm-dd HH:mm:ss form save() writes; the driver can't read date-only or
+		// time-only text from a date column.
+		return "CASE WHEN #local.c# LIKE char(123) || 'ts ''%''' || char(125) THEN substr(#local.c#, instr(#local.c#, '''') + 1, length(#local.c#) - instr(#local.c#, '''') - 2) WHEN #local.c# LIKE char(123) || 'd ''%''' || char(125) THEN substr(#local.c#, instr(#local.c#, '''') + 1, length(#local.c#) - instr(#local.c#, '''') - 2) || ' 00:00:00' WHEN #local.c# LIKE char(123) || 't ''%''' || char(125) THEN '1899-12-30 ' || substr(#local.c#, instr(#local.c#, '''') + 1, length(#local.c#) - instr(#local.c#, '''') - 2) WHEN #local.c# GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' THEN #local.c# || ' 00:00:00' WHEN #local.c# GLOB '[0-9][0-9]:[0-9][0-9]:[0-9][0-9]' THEN '1899-12-30 ' || #local.c# ELSE #local.c# END";
 	}
 
 	/**

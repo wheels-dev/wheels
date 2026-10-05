@@ -21,6 +21,11 @@ component {
 			variables.$datasource = application.wheels.dataSourceName;
 		}
 		variables.tableVerified = false;
+		// The column poll() orders by to break createdAt ties, resolved per database
+		// by $ensureEventsTable(): a DB-native monotonic "seq" identity column where
+		// one can be created, SQLite's built-in "rowid", or "id" (UUID — stable
+		// within a run but not time-ordered) as a last resort.
+		variables.$orderColumn = "id";
 		// Start the throttle clock at instance creation so a fresh instance does
 		// not run a retention sweep on its very first publish()
 		variables.lastCleanup = GetTickCount() / 1000;
@@ -93,8 +98,21 @@ component {
 	/**
 	 * Poll for events on a channel since a given event ID or timestamp.
 	 *
+	 * Ordering is by the monotonic, insert-assigned sequence (seq / rowid) where one
+	 * exists — the database's own cross-server serialization point — NOT by createdAt,
+	 * which is each publisher's wall clock and so re-orders (and, combined with a
+	 * sequence-based resume, re-delivers) events under multi-server clock skew. The
+	 * since window still filters on createdAt; it just doesn't decide order. An
+	 * unrecognised dialect with no sequence falls back to createdAt then id.
+	 *
+	 * NOTE (insert-vs-commit gap): the sequence is assigned at INSERT, so under
+	 * concurrent transactions a higher sequence can become visible before a lower one
+	 * commits, and a consumer resuming by sequence could skip the lower one once it
+	 * lands. publish() inserts autocommit one row at a time, so the window is a single
+	 * statement; callers that wrap publish() in a longer transaction should be aware.
+	 *
 	 * @channel The channel name to poll.
-	 * @lastEventId If provided, return events after this ID (by createdAt of the referenced event).
+	 * @lastEventId If provided, return events after this event, ordered by the monotonic sequence.
 	 * @since If provided (and no lastEventId), return events created after this timestamp.
 	 * @return Query of events with columns: id, channel, event, data, createdAt.
 	 */
@@ -105,30 +123,72 @@ component {
 	) {
 		$assertChannelName(arguments.channel);
 		$ensureEventsTable();
+		local.orderCol = variables.$orderColumn;
+		local.hasSeq = (local.orderCol != "id");
+		// Order by the monotonic key alone where it exists; only the id fallback (no
+		// monotonic key) tie-breaks on createdAt then id.
+		local.orderBy = local.hasSeq ? "#local.orderCol# ASC" : "createdAt ASC, id ASC";
 
-		// If lastEventId is provided, find its timestamp and get events at or after it,
-		// excluding the event itself. Uses >= instead of > because MySQL and Oracle
-		// DATETIME/TIMESTAMP have only second-level precision — events within the same
-		// second would be missed with a strict > comparison.
 		if (Len(arguments.lastEventId)) {
-			return queryExecute(
-				"SELECT e.id, e.channel, e.event, e.data, e.createdAt
-				FROM wheels_events e
-				WHERE e.channel = :channel
-				AND e.id != :lastEventId
-				AND e.createdAt >= (
-					SELECT COALESCE(MAX(r.createdAt), :fallback)
-					FROM wheels_events r
-					WHERE r.id = :lastEventId
-				)
-				ORDER BY e.createdAt ASC",
-				{
-					channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"},
-					lastEventId: {value: arguments.lastEventId, cfsqltype: "cf_sql_varchar"},
-					fallback: {value: arguments.since, cfsqltype: "cf_sql_timestamp"}
-				},
-				{datasource: variables.$datasource}
-			);
+			// Resume strictly AFTER the referenced event by the monotonic order column
+			// (seq / rowid), so no event is missed and a same-tick event published
+			// BEFORE lastEventId is never re-delivered. If the referenced row is gone
+			// (already cleaned up), degrade to the since window below rather than
+			// returning nothing. The "id" fallback dialect has no monotonic key, so it
+			// keeps the timestamp-based resume.
+			if (local.hasSeq) {
+				// IS NOT NULL so a reference row whose seq hasn't been populated yet (a row
+				// that slipped in during a staged upgrade's no-default window) is treated as
+				// "no usable cursor" and falls through to the since window below, rather than
+				// producing `seq > NULL`, which matches nothing and would return empty forever.
+				local.ref = queryExecute(
+					"SELECT #local.orderCol# AS ord
+					FROM wheels_events
+					WHERE id = :lastEventId AND channel = :channel AND #local.orderCol# IS NOT NULL",
+					{
+						lastEventId: {value: arguments.lastEventId, cfsqltype: "cf_sql_varchar"},
+						channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"}
+					},
+					{datasource: variables.$datasource}
+				);
+				if (local.ref.recordCount) {
+					return queryExecute(
+						"SELECT id, channel, event, data, createdAt
+						FROM wheels_events
+						WHERE channel = :channel
+						AND #local.orderCol# > :ord
+						ORDER BY #local.orderCol# ASC",
+						{
+							channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"},
+							ord: {value: local.ref.ord[1], cfsqltype: "cf_sql_bigint"}
+						},
+						{datasource: variables.$datasource}
+					);
+				}
+				// Referenced row gone — fall through to the since window below.
+			} else {
+				// No monotonic key available (unknown dialect): resume by timestamp.
+				// >= (not >) because the fallback dialect's createdAt may be
+				// second-precision; id != excludes the event itself.
+				return queryExecute(
+					"SELECT e.id, e.channel, e.event, e.data, e.createdAt
+					FROM wheels_events e
+					WHERE e.channel = :channel
+					AND e.id != :lastEventId
+					AND e.createdAt >= (
+						SELECT COALESCE(MAX(r.createdAt), :fallback)
+						FROM wheels_events r
+						WHERE r.id = :lastEventId
+					)
+					ORDER BY e.createdAt ASC, e.id ASC",
+					{
+						channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"},
+						lastEventId: {value: arguments.lastEventId, cfsqltype: "cf_sql_varchar"},
+						fallback: {value: arguments.since, cfsqltype: "cf_sql_timestamp"}
+					},
+					{datasource: variables.$datasource}
+				);
+			}
 		}
 
 		return queryExecute(
@@ -136,7 +196,7 @@ component {
 			FROM wheels_events
 			WHERE channel = :channel
 			AND createdAt > :since
-			ORDER BY createdAt ASC",
+			ORDER BY #local.orderBy#",
 			{
 				channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"},
 				since: {value: arguments.since, cfsqltype: "cf_sql_timestamp"}
@@ -261,83 +321,293 @@ component {
 			return true;
 		}
 
+		local.dbType = $detectDatabaseType();
+
+		// Probe for the table. Any SELECT error is treated as "missing" and falls
+		// through to the CREATE below — the catch must not return or throw (hardened,
+		// ChannelHardenerSpec S3). A catch body cannot persist a local. write on
+		// BoxLang (cross-engine invariant), so the existence flag lives in a bare
+		// struct read and written WITHOUT the local. prefix.
+		var probe = {tableExists = true};
 		try {
 			queryExecute(
 				"SELECT COUNT(*) AS cnt FROM wheels_events WHERE 1=0",
 				{},
 				{datasource: variables.$datasource}
 			);
-			variables.tableVerified = true;
-			return true;
 		} catch (any e) {
-			// Table doesn't exist — create it
+			probe.tableExists = false;
 		}
 
-		try {
-			local.dbType = $detectDatabaseType();
+		if (!probe.tableExists) {
+			try {
+				if (local.dbType == "oracle") {
+					local.varcharType = "VARCHAR2";
+					local.textType = "CLOB";
+					local.datetimeType = "TIMESTAMP";
+				} else if (local.dbType == "postgresql") {
+					local.varcharType = "VARCHAR";
+					local.textType = "TEXT";
+					local.datetimeType = "TIMESTAMP";
+				} else if (local.dbType == "h2") {
+					local.varcharType = "VARCHAR";
+					local.textType = "CLOB";
+					local.datetimeType = "TIMESTAMP";
+				} else if (local.dbType == "sqlserver") {
+					local.varcharType = "VARCHAR";
+					local.textType = "TEXT";
+					local.datetimeType = "DATETIME2";
+				} else {
+					local.varcharType = "VARCHAR";
+					local.textType = "TEXT";
+					// DATETIME(6): sub-second precision narrows how often two publishes
+					// tie. The seq tiebreaker is what guarantees order within a tie.
+					local.datetimeType = "DATETIME(6)";
+				}
 
-			if (local.dbType == "oracle") {
-				local.varcharType = "VARCHAR2";
-				local.textType = "CLOB";
-				local.datetimeType = "TIMESTAMP";
-			} else if (local.dbType == "postgresql") {
-				local.varcharType = "VARCHAR";
-				local.textType = "TEXT";
-				local.datetimeType = "TIMESTAMP";
-			} else if (local.dbType == "h2") {
-				local.varcharType = "VARCHAR";
-				local.textType = "CLOB";
-				local.datetimeType = "TIMESTAMP";
-			} else if (local.dbType == "sqlserver") {
-				local.varcharType = "VARCHAR";
-				local.textType = "TEXT";
-				local.datetimeType = "DATETIME2";
-			} else {
-				local.varcharType = "VARCHAR";
-				local.textType = "TEXT";
-				// DATETIME(6): sub-second precision so poll() can order events
-				// by createdAt deterministically. Plain DATETIME keeps only
-				// second precision — two publishes within the same second tie,
-				// and the (channel, createdAt) index then falls back to
-				// primary-key (UUID) order, which is arbitrary (BoxLang legs
-				// observed the reversal; Lucee/Adobe were just lucky).
-				local.datetimeType = "DATETIME(6)";
+				// Monotonic identity column where the dialect can declare one inline.
+				// SQLite (rowid) and unknown dialects (id) get none here and are
+				// resolved by $ensureOrderColumn().
+				local.seqDDL = $seqColumnDDL(local.dbType);
+				local.seqLine = Len(local.seqDDL) ? (local.seqDDL & ",") : "";
+
+				queryExecute("
+					CREATE TABLE wheels_events (
+						#local.seqLine#
+						id #local.varcharType#(255) NOT NULL PRIMARY KEY,
+						channel #local.varcharType#(255) NOT NULL,
+						event #local.varcharType#(255) NOT NULL,
+						data #local.textType#,
+						createdAt #local.datetimeType# NOT NULL
+					)
+				", {}, {datasource: variables.$datasource});
+
+				try {
+					queryExecute(
+						"CREATE INDEX idx_wevents_channel ON wheels_events (channel, createdAt)",
+						{},
+						{datasource: variables.$datasource}
+					);
+					queryExecute(
+						"CREATE INDEX idx_wevents_cleanup ON wheels_events (createdAt)",
+						{},
+						{datasource: variables.$datasource}
+					);
+				} catch (any indexError) {
+					// Indexes are optional
+				}
+
+				writeLog(text="Auto-created wheels_events table", type="information", file="wheels_channels");
+			} catch (any createError) {
+				writeLog(
+					text="Failed to auto-create wheels_events table: #createError.message#",
+					type="error",
+					file="wheels_channels"
+				);
+				return false;
 			}
+		}
 
-			queryExecute("
-				CREATE TABLE wheels_events (
-					id #local.varcharType#(255) NOT NULL PRIMARY KEY,
-					channel #local.varcharType#(255) NOT NULL,
-					event #local.varcharType#(255) NOT NULL,
-					data #local.textType#,
-					createdAt #local.datetimeType# NOT NULL
-				)
-			", {}, {datasource: variables.$datasource});
+		// Resolve (and, for a pre-existing table, upgrade to) the monotonic order
+		// column. Re-probed on every fresh instance rather than trusting a permanent
+		// did-this flag, so a table created before this column existed still gains it.
+		variables.$orderColumn = $ensureOrderColumn(local.dbType);
+		variables.tableVerified = true;
+		return true;
+	}
 
+	/**
+	 * The DB-native identity column definition used to break createdAt ties, or ""
+	 * when the dialect has no inline-declarable identity column (SQLite — uses rowid —
+	 * and any unknown dialect — falls back to id). There is no portable identity
+	 * syntax, so each engine spells it differently. CockroachDB reports as PostgreSQL
+	 * over the pg wire, so it shares that branch; its SERIAL default is unique_rowid()
+	 * (NOT monotonic), which is exactly why this uses GENERATED AS IDENTITY — a real
+	 * sequence — rather than SERIAL.
+	 */
+	private string function $seqColumnDDL(required string dbType) {
+		switch (arguments.dbType) {
+			case "sqlserver":
+				return "seq BIGINT IDENTITY(1,1) NOT NULL";
+			case "mysql":
+				// AUTO_INCREMENT must be a key; id holds the PK, so make seq UNIQUE.
+				return "seq BIGINT NOT NULL AUTO_INCREMENT UNIQUE";
+			case "postgresql":
+				return "seq BIGINT GENERATED BY DEFAULT AS IDENTITY";
+			case "oracle":
+				return "seq NUMBER GENERATED BY DEFAULT AS IDENTITY";
+			case "h2":
+				return "seq BIGINT AUTO_INCREMENT";
+			default:
+				return "";
+		}
+	}
+
+	/**
+	 * Resolve the column poll() orders by to break createdAt ties, upgrading a
+	 * pre-existing table in place when necessary:
+	 *   - sqlite -> "rowid" (built-in, insertion-monotonic; no schema change). NOTE:
+	 *     without AUTOINCREMENT, SQLite may REUSE the highest rowid after the newest
+	 *     row is deleted, and restarts numbering if the table empties. poll() guards
+	 *     the resume path against a vanished lastEventId, and events are retained only
+	 *     briefly, so a reused rowid can only ever affect ordering within one createdAt
+	 *     tick — never cross-tick order.
+	 *   - seq dialects -> "seq", adding the column to an existing table via ALTER when
+	 *     missing (existing rows back-fill in physical order and are <= the retention
+	 *     window old). If the ALTER is rejected, log clearly and fall back to "id"
+	 *     rather than leave poll() ordering by a column that does not exist.
+	 *   - unknown dialect -> "id" (stable within a run, not time-ordered).
+	 */
+	private string function $ensureOrderColumn(required string dbType) {
+		if (arguments.dbType == "sqlite") {
+			return "rowid";
+		}
+		local.seqDDL = $seqColumnDDL(arguments.dbType);
+		if (!Len(local.seqDDL)) {
+			return "id";
+		}
+		// "Ready" means more than "the column exists": on the pg-family staged path the
+		// column is briefly present with no default, and treating that as done would let a
+		// concurrent publish insert a NULL seq. $seqColumnReady() requires a default/identity
+		// there, so a half-finished upgrade is re-entered and completed below.
+		if ($seqColumnReady(arguments.dbType)) {
+			return "seq";
+		}
+
+		// Capability-based, not engine-name-based: $detectDatabaseType() reports CockroachDB
+		// as "postgresql" (pg wire), so rather than sniff the version we try each ADD shape
+		// and keep whichever produces a READY column. The re-check after each attempt is
+		// authoritative over the ALTER's own result (concurrent instances race the add).
+		var errs = {identity = "", sequence = ""};
+
+		// Attempt 1: the standard identity ALTER (atomic — column + identity together).
+		// Works on SQL Server, MySQL, Oracle, H2 and real PostgreSQL. Oracle spells ADD
+		// with the column def in parentheses.
+		local.alter = (arguments.dbType == "oracle")
+			? "ALTER TABLE wheels_events ADD (#local.seqDDL#)"
+			: "ALTER TABLE wheels_events ADD #local.seqDDL#";
+		try {
+			queryExecute(local.alter, {}, {datasource: variables.$datasource});
+		} catch (any identityError) {
+			errs.identity = identityError.message;
+		}
+		if ($seqColumnReady(arguments.dbType)) {
+			return "seq";
+		}
+
+		// Attempt 2: a Postgres-wire sequence-backed column, for a pg-wire engine that
+		// implements sequences but NOT ALTER ADD ... GENERATED AS IDENTITY on an existing
+		// table (CockroachDB). CockroachDB also cannot ADD a column whose DEFAULT is a
+		// sequence to a POPULATED table in one step — nextval() can't be evaluated during a
+		// schema backfill (crdb #42508) — so build it in idempotent stages, each of which
+		// completes a partial prior run and avoids a backfill-time sequence call:
+		//   1. create the sequence (default CACHE 1 -> monotonic across nodes),
+		//   2. add the column nullable, ONLY if a prior run didn't already add it,
+		//   3. point its DEFAULT at the sequence — this is what makes the column READY, so a
+		//      concurrent probe never treats a default-less column as done,
+		//   4. backfill existing rows in createdAt,id order with a plain UPDATE (DML, not a
+		//      schema backfill), touching only WHERE seq IS NULL.
+		// Step 3 precedes step 4 so new publishes are covered before the backfill runs.
+		// Gated to the postgresql family because nextval('name') is pg-specific. Fresh
+		// CockroachDB CREATE already succeeds with GENERATED AS IDENTITY (no rows to
+		// backfill); both yield a monotonic INT8 seq, so fresh and upgraded tables order
+		// identically.
+		if (arguments.dbType == "postgresql") {
 			try {
 				queryExecute(
-					"CREATE INDEX idx_wevents_channel ON wheels_events (channel, createdAt)",
+					"CREATE SEQUENCE IF NOT EXISTS wheels_events_seq",
+					{},
+					{datasource: variables.$datasource}
+				);
+				if (!$seqColumnExists()) {
+					queryExecute(
+						"ALTER TABLE wheels_events ADD COLUMN seq INT8",
+						{},
+						{datasource: variables.$datasource}
+					);
+				}
+				queryExecute(
+					"ALTER TABLE wheels_events ALTER COLUMN seq SET DEFAULT nextval('wheels_events_seq')",
 					{},
 					{datasource: variables.$datasource}
 				);
 				queryExecute(
-					"CREATE INDEX idx_wevents_cleanup ON wheels_events (createdAt)",
+					"UPDATE wheels_events AS w
+					SET seq = s.rn
+					FROM (
+						SELECT id, nextval('wheels_events_seq') AS rn
+						FROM (
+							SELECT id FROM wheels_events WHERE seq IS NULL ORDER BY createdAt ASC, id ASC
+						) AS ordered
+					) AS s
+					WHERE w.id = s.id",
 					{},
 					{datasource: variables.$datasource}
 				);
-			} catch (any indexError) {
-				// Indexes are optional
+			} catch (any sequenceError) {
+				errs.sequence = sequenceError.message;
 			}
+			if ($seqColumnReady(arguments.dbType)) {
+				return "seq";
+			}
+		}
 
-			writeLog(text="Auto-created wheels_events table", type="information", file="wheels_channels");
-			variables.tableVerified = true;
+		// Both shapes failed: degrade to createdAt+id ordering, recording the real reason
+		// from each attempt (not the generic probe error) so the limitation is diagnosable.
+		local.identityReason = Len(errs.identity) ? errs.identity : "n/a";
+		local.sequenceReason = Len(errs.sequence) ? errs.sequence : "n/a";
+		writeLog(
+			text="Could not add a usable seq column to wheels_events on #arguments.dbType# (identity ALTER: #local.identityReason#; sequence ALTER: #local.sequenceReason#); ordering falls back to createdAt+id, so events sharing a timestamp tick may order arbitrarily.",
+			type="warning",
+			file="wheels_channels"
+		);
+		return "id";
+	}
+
+	/**
+	 * True when the wheels_events table currently has a seq column. A cheap WHERE 1=0
+	 * probe used to decide whether the monotonic column needs adding and, after an ALTER,
+	 * whether the column now exists at all.
+	 */
+	private boolean function $seqColumnExists() {
+		try {
+			queryExecute("SELECT seq FROM wheels_events WHERE 1=0", {}, {datasource: variables.$datasource});
 			return true;
-		} catch (any createError) {
-			writeLog(
-				text="Failed to auto-create wheels_events table: #createError.message#",
-				type="error",
-				file="wheels_channels"
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * True when wheels_events has a seq column that is actually USABLE for ordering, not
+	 * merely present. On engines whose identity ALTER is atomic (SQL Server, MySQL, Oracle,
+	 * H2, real PostgreSQL) column existence is enough. On the postgresql family the column
+	 * is built in stages and is briefly present with no default; there, "ready" also
+	 * requires a column default or identity — so a concurrent probe never treats a
+	 * default-less column as done (which would let new rows insert a NULL seq and silently
+	 * break the seq-based resume), and a half-finished upgrade is re-entered and completed.
+	 */
+	private boolean function $seqColumnReady(required string dbType) {
+		if (!$seqColumnExists()) {
+			return false;
+		}
+		if (arguments.dbType != "postgresql") {
+			return true;
+		}
+		try {
+			local.q = queryExecute(
+				"SELECT 1 AS ready
+				FROM information_schema.columns
+				WHERE table_name = 'wheels_events'
+				AND table_schema = current_schema()
+				AND column_name = 'seq'
+				AND (column_default IS NOT NULL OR is_identity = 'YES')",
+				{},
+				{datasource: variables.$datasource}
 			);
+			return local.q.recordCount GT 0;
+		} catch (any e) {
+			// Can't introspect — treat as not ready so the idempotent staged steps run.
 			return false;
 		}
 	}

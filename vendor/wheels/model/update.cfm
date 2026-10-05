@@ -120,6 +120,7 @@
 					scale = variables.wheels.class.properties[local.key].scale,
 					null = !Len(arguments.properties[local.key])
 				};
+				local.param.value = $sqliteDateParamValue(value = local.param.value, type = local.param.type, isNull = local.param.null, property = local.key);
 				ArrayAppend(arguments.sql, local.param);
 				if (StructCount(arguments.properties) > local.pos) {
 					ArrayAppend(arguments.sql, ",");

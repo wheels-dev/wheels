@@ -270,16 +270,17 @@ Now wire URLs to those actions.
 
    ```cfm {test:compile}
    mapper()
+       .get(name="up", to="up##index")
        .resources(name="posts", only="index,show")
        .get(name="hello", pattern="/hello", to="main##hello")
-       .wildcard()
        .root(to="posts##index", method="get")
+       .wildcard()
    .end();
    ```
 
 </Steps>
 
-`.resources(name="posts", only="index,show")` declares the two RESTful routes you need: `GET /posts` → `posts##index`, `GET /posts/:key` → `posts##show`. Route order matters — `.resources` before `.wildcard()`, and `.root(...)` last. The root now points at `posts##index` instead of `main##index`, so `/` lists posts.
+`.resources(name="posts", only="index,show")` declares the two RESTful routes you need: `GET /posts` → `posts##index`, `GET /posts/:key` → `posts##show`. Route order matters: routes match first to last, so `.resources` and the other specific routes go first, then `.root(...)`, and `.wildcard()` last. The root now points at `posts##index` instead of `main##index`, so `/` lists posts.
 
 ## Write the views
 

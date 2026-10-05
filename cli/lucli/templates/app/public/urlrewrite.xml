@@ -25,10 +25,4 @@ If you do not use Tuckey, CommandBox, or LuCLI, this file can be safely deleted.
     <from>^/(.*)$</from>
     <to type="passthrough">/index.cfm/$1</to>
   </rule>
-
-  <rule enabled="true">
-    <name>Convert dot to format parameter</name>
-    <from>^/(.*)\\.(\\w+)$</from>
-    <to>/$1?format=$2</to>
-  </rule>
 </urlrewrite>

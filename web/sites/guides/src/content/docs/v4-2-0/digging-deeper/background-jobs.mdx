@@ -36,7 +36,7 @@ component extends="wheels.Job" {
         this.maxRetries = 5;
     }
 
-    public void function perform(required struct data) {
+    public void function perform(struct data = {}) {
         user = model("User").findByKey(arguments.data.userId);
         new app.mailers.UserMailer().sendWelcome(user);
     }
@@ -88,6 +88,48 @@ component extends="Controller" {
 
 `enqueue()`, `enqueueIn()`, and `enqueueAt()` all return a struct with the persisted row's `id`. The controller keeps responding fast — the actual email send happens when the next `processQueue()` poll picks the row up.
 
+### Enqueueing inside a transaction
+
+`enqueue()` writes its `wheels_jobs` row through the app's datasource, so a job enqueued inside a transaction commits or rolls back with the rest of it. That makes a transactional outbox simple: save the data and enqueue the work in one model method, and run it with `invokeWithTransaction()`.
+
+```cfm {test:compile} title="app/models/User.cfc (fragment)"
+component extends="Model" {
+    public boolean function signupWithWelcome(required string email, required string firstName) {
+        var user = model("User").create(email = arguments.email, firstName = arguments.firstName);
+        var job = new app.jobs.SendWelcomeEmailJob();
+        job.enqueue(data = {userId: user.id});
+        return true;
+    }
+}
+```
+
+```cfm {test:compile} title="app/controllers/Signups.cfc (fragment)"
+component extends="Controller" {
+    function create() {
+        // If signupWithWelcome() throws, neither the user nor the job is saved.
+        model("User").new().invokeWithTransaction(
+            method = "signupWithWelcome",
+            email = params.email,
+            firstName = params.firstName
+        );
+        redirectTo(route = "root");
+    }
+}
+```
+
+The other side of this: work that must happen even when the transaction rolls back, such as a failure notice, can't be enqueued inside it. Enqueue it after the transaction ends.
+
+#### With a tenant datasource
+
+Under `wheels.middleware.TenantResolver`, the tenant's work runs on the tenant datasource while the job store stays on the application's. A job enqueued inside a Wheels-managed transaction (a model save, or `invokeWithTransaction()`) then is written when that transaction commits, and dropped if it rolls back.
+
+- `enqueue()` returns `{status: "deferred", deferred: true, persisted: false}`, with the job's `id`.
+- The job still runs against the tenant's datasource.
+- The same applies to a model with its own `dataSource()` that isn't the application's.
+- A raw `transaction {}` block isn't tracked by Wheels. Under a tenant datasource, enqueue after the block ends, or do the work through a model save or `invokeWithTransaction()`.
+
+When a job can't be written, the enqueue methods throw `Wheels.Job.EnqueueFailed`. If an enqueue is best-effort, catch that type.
+
 ## Process the queue
 
 The simplest way to drain the queue is the bundled worker — a long-lived CLI process that polls the `wheels_jobs` table, claims one `pending` job per cycle, and runs it. It talks to your running app server, so start that first (`wheels start`):
@@ -96,7 +138,8 @@ The simplest way to drain the queue is the bundled worker — a long-lived CLI p
 wheels jobs work                               # process all queues; loops until Ctrl-C
 wheels jobs work --queue=mailers               # only drain the mailers queue
 wheels jobs work --queue=mailers --interval=3  # poll every 3 seconds when idle (default 5)
-wheels jobs work --max-jobs=100                # stop after 100 jobs — one-shot batches from cron or CI
+wheels jobs work --stop-when-empty              # exit once no job is ready to run — one-shot batches from cron or CI
+wheels jobs work --max-jobs=100                # stop after 100 jobs (combine with --stop-when-empty to cap a batch)
 wheels jobs work --quiet                       # suppress per-job output; failures still print
 ```
 
@@ -160,7 +203,7 @@ component extends="wheels.Job" {
         this.maxDelay = 3600;     // cap at one hour
     }
 
-    public void function perform(required struct data) {
+    public void function perform(struct data = {}) {
         order = model("Order").findByKey(arguments.data.orderId);
         order.chargeCard();  // may throw on transient network errors
     }
@@ -254,30 +297,33 @@ component extends="Controller" {
 
 ## Testing jobs
 
-`perform()` is a plain public method that takes a struct. Don't exercise the queue in a test — instantiate the job, call `perform()` with fixture data, and assert on the side effects.
+`perform()` is a plain public method that takes a struct. Don't exercise the queue in a test — instantiate the job, call `perform()` with fixture data, and assert on what it does. `SendWelcomeEmailJob` returns nothing and sends mail, so build the email without delivering it (`deliver = false`, restored afterwards) and check that the job runs to the end:
 
 ```cfm {test:compile} title="tests/specs/jobs/SendWelcomeEmailJobSpec.cfc"
 component extends="wheels.WheelsTest" {
     function run() {
         describe("SendWelcomeEmailJob", () => {
-            it("sends a welcome email to the user", () => {
-                testUser = model("User").create(
-                    email="new@example.com",
-                    firstName="New"
-                );
-
-                job = new app.jobs.SendWelcomeEmailJob();
-                job.perform(data={userId: testUser.id});
-
-                // Assert your email spy or outbox captured the send.
-                // The pattern depends on how you stub sendEmail() —
-                // see the Testing guide for the email-fake approach.
-                expect(true).toBeTrue();
+            it("finds the user and builds the welcome email", () => {
+                // Build emails without sending them; restore the default afterwards.
+                var defaults = application.wheels.functions.sendEmail;
+                var original = StructKeyExists(defaults, "deliver") ? defaults.deliver : true;
+                defaults.deliver = false;
+                try {
+                    var testUser = model("User").create(email = "new@example.com", firstName = "New");
+                    var job = new app.jobs.SendWelcomeEmailJob();
+                    expect(() => job.perform(data = {userId: testUser.id})).notToThrow();
+                } finally {
+                    defaults.deliver = original;
+                }
             });
         });
     }
 }
 ```
+
+If the job can't find the user or build the email, `perform()` throws and the spec fails. To check what the email says, test the mailer itself: with `deliver = false`, `sendEmail()` returns the email as a struct (`to`, `subject`, `html` or `text`).
+
+App specs run in the environment your `.env` sets (`WHEELS_ENV=development` in a new app), not `testing`, so `config/testing/settings.cfm` doesn't apply to them. To keep every spec from sending mail, set `deliver = false` for `sendEmail` in `config/development/settings.cfm`; that also stops your development server from sending mail (see [Per-environment SMTP](/v4-2-0/digging-deeper/sending-email/#per-environment-smtp)).
 
 Testing `perform()` in isolation keeps the spec fast and avoids the complexity of polling a live queue. The queue itself is framework code — trust it.
 

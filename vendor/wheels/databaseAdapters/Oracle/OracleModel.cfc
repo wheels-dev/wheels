@@ -19,25 +19,32 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Map database types to the ones used in CFML.
-	 */
-	/**
-	 * Internal function. The cf_sql type for an Oracle NUMBER column. NUMBER(11..19, 0) holds
-	 * 64-bit integers, so it binds as BIGINT (#4086).
-	 * NUMBER(10) and an unknown precision stay INTEGER, and so does NUMBER(38) (Oracle's
-	 * INTEGER, used for identity ids), so existing integer columns keep their binding.
+	 * Internal function. The cf_sql type for an Oracle NUMBER column. A whole-number column with
+	 * precision 11 or more (NUMBER(11..38, 0), including Oracle's INTEGER, which is NUMBER(38) and
+	 * common for identity ids) holds values beyond 32 bits, so it binds as BIGINT (#4086, #4089).
+	 * As INTEGER, an id above 2,147,483,647 was clamped on bind and a find, update or delete by it
+	 * acted on a different row. NUMBER(1..10, 0) and an unknown precision stay INTEGER; a
+	 * fractional scale is NUMERIC.
 	 */
 	public string function $numberType(string scale = "", string precision = "") {
 		if (arguments.scale NEQ 0) {
 			return "cf_sql_numeric";
 		}
-		if (IsNumeric(arguments.precision) && arguments.precision > 10 && arguments.precision <= 19) {
+		if (IsNumeric(arguments.precision) && arguments.precision > 10) {
 			return "cf_sql_bigint";
 		}
 		return "cf_sql_integer";
 	}
 
+	/**
+	 * Map database types to the ones used in CFML.
+	 */
 	public string function $getType(required string type, string scale, string details, string precision = "") {
+		// Oracle has no BIGINT column type, but a calculated property's dataType is a portable
+		// name, which every other adapter maps (#4089).
+		if (ListFindNoCase("bigint,int8", arguments.type)) {
+			return "cf_sql_bigint";
+		}
 		switch (arguments.type) {
 			case "blob":
 			case "bfile":

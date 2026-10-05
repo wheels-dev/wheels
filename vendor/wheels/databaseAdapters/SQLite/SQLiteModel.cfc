@@ -5,16 +5,17 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public string function $getType(required string type, string scale, string details) {
 		switch (LCase(arguments.type)) {
-			// A column declared BIGINT / INT8 holds 64-bit values, so bind it as one (#4086).
-			// Wheels' own migrator declares biginteger columns as INTEGER, which stays
-			// cf_sql_integer here: SQLite reports only the declared type.
+			// SQLite stores every integer in up to 64 bits, and an INTEGER PRIMARY KEY id is the
+			// 64-bit rowid, so INTEGER binds as cf_sql_bigint (#4142). As cf_sql_integer, a value
+			// above 2^31 was rejected (Adobe), clamped (Lucee) or wrapped (BoxLang), and a
+			// lookup by such an id could hit a different row. Columns declared smaller stay 32-bit.
 			case "bigint":
 			case "int8":
+			case "integer":
+			case "int":
 				local.rv = "cf_sql_bigint";
 				break;
 
-			case "integer":
-			case "int":
 			case "mediumint":
 			case "smallint":
 			case "tinyint":
@@ -49,20 +50,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				break;
 
 			case "date":
-				local.rv = "cf_sql_date";
-				break;
-
 			case "datetime":
 			case "timestamp":
-				// SQLite stores datetimes as TEXT (see SQLiteMigrator's
-				// sqlTypes mapping). Bind as varchar; date objects are
-				// pre-formatted to ISO-8601 in $buildQueryParamValues
-				// before they reach the bind layer.
-				local.rv = "cf_sql_varchar";
-				break;
-
 			case "time":
-				local.rv = "cf_sql_time";
+				// SQLite stores all date types as TEXT. Bind as varchar; date values are
+				// pre-formatted to ISO-8601 in $buildQueryParamValues before they reach the bind layer.
+				// Binding DATE / TIME as cf_sql_date / cf_sql_time made the driver store them
+				// as epoch milliseconds (#4093).
+				local.rv = "cf_sql_varchar";
 				break;
 
 			default:
@@ -71,6 +66,53 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		}
 
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. A cf_sql_bigint param whose values all fit in 32 bits binds as
+	 * cf_sql_integer (#4089). BoxLang binds cf_sql_bigint to SQLite as TEXT
+	 * (https://github.com/ortus-boxlang/BoxLang/issues/642), and SQLite only
+	 * converts text back to a number when it is compared with a column, so `HAVING SUM(col) > ?`
+	 * and other expression comparisons went wrong. Small values bind exactly as before; a value
+	 * outside the 32-bit range keeps cf_sql_bigint, and one out-of-range element keeps a whole
+	 * IN list cf_sql_bigint. Nulls and non-integer values are left unchanged.
+	 */
+	public struct function $queryParams(required struct settings) {
+		local.rv = super.$queryParams(argumentCollection = arguments);
+		if (
+			local.rv.cfsqltype == "cf_sql_bigint"
+			&& !(StructKeyExists(local.rv, "null") && local.rv.null)
+			&& $valuesFitIntegerRange(local.rv)
+		) {
+			local.rv.cfsqltype = "cf_sql_integer";
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. True when every value of a query param (one value, or each element of
+	 * an IN list) is an integer literal within the cf_sql_integer range. Compared as digit
+	 * strings, never through a double.
+	 */
+	public boolean function $valuesFitIntegerRange(required struct param) {
+		local.range = $integerKeyRange(sqlType = "cf_sql_integer");
+		local.values = StructKeyExists(arguments.param, "list") && arguments.param.list
+			? ListToArray(arguments.param.value, arguments.param.separator)
+			: [arguments.param.value];
+		if (!ArrayLen(local.values)) {
+			return false;
+		}
+		for (local.value in local.values) {
+			local.digits = IsSimpleValue(local.value) ? $canonicalIntegerString(local.value) : "";
+			if (
+				!Len(local.digits)
+				|| $compareIntegerStrings(local.digits, local.range.min) < 0
+				|| $compareIntegerStrings(local.digits, local.range.max) > 0
+			) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**

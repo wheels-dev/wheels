@@ -11,18 +11,22 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 Upgrading from any 4.1.x to 4.2 is the same `vendor/wheels/` swap as a patch upgrade (see [Manual upgrades](/v4-2-0/upgrading/manual-upgrades/)). What the swap does **not** do for you is update the files `wheels new` created once and then handed to you: `public/Application.cfc`, `config/environment.cfm`, `config/settings.cfm` and the `app/events/*.cfm` templates. Framework updates never reach them. This page lists each of those edits with the issue it came from and whether skipping it fails safe, then the behaviour changes worth checking in your code.
 
 <Aside type="tip" title="The fastest way to find the drift">
-Run `wheels upgrade check --to=4.2.0` on a workstation. It diffs `public/Application.cfc` and `public/index.cfm` against the bundled template and flags known code patterns. For the other app-owned files, compare against a fresh `wheels new` app. The template is the authority; keep your local customizations.
+Upgrade the CLI first (step 1 below), then run `wheels upgrade check --to=4.2.0` on a workstation. It diffs `public/Application.cfc` and `public/index.cfm` against the template bundled with the CLI, names each `public/Application.cfc` edit on this page (and in the 4.0 to 4.1 guide) that your copy is missing, and flags known code patterns. A 4.1 CLI compares against its own 4.1 template, so it reports no drift even when the 4.2 edits below are missing. For the other app-owned files, compare against a fresh `wheels new` app made with the 4.2 CLI. The template is the authority; keep your local customizations.
 </Aside>
 
 ## Swap the framework
 
 <Steps>
 
-1. **Back up the current framework.** Move (don't delete) `vendor/wheels/` aside, e.g. to `vendor/wheels-4.1.x.bak/` outside version control. Moving it back is the whole rollback.
+1. **Upgrade the `wheels` CLI to 4.2.** See [Upgrading](/v4-2-0/start-here/installing/#upgrading) (`brew upgrade wheels`, `scoop update wheels`, `apt upgrade wheels` or `dnf upgrade wheels`). The steps below rely on it: `wheels upgrade check --to=4.2.0` and a fresh `wheels new` app only show the 4.2 files when the CLI is 4.2, and the dev-server changes under [CLI and deployment changes](#cli-and-deployment-changes) come with the CLI, not with `vendor/wheels/`.
 
-2. **Install 4.2.x.** Extract the 4.2 `vendor/wheels/` in its place (or `git checkout` the tag if you vendor the framework).
+2. **Swap the framework: `wheels upgrade apply` does steps 2 and 3 for you.** Run it from the app root (after `wheels upgrade check --to=4.2.0`): it moves the current `vendor/wheels/` to `.wheels/backups/wheels.bak-<timestamp>/`, outside `vendor/`, copies in the framework bundled with your 4.2 CLI, updates `box.json`'s `wheels-core` version if the app has one, and prints the one-line command that rolls it back. Then continue with step 4. To do it by hand instead:
 
-3. **Reload and run your suite.** Use `?reload=true&password=…` and `/wheels/app/tests`. Then apply the edits below.
+   **Back up the current framework outside `vendor/`.** Move (don't delete) `vendor/wheels/` out of the project, e.g. to `../wheels-4.1.x.bak/`. Moving it back is the whole rollback. Don't leave the backup inside `vendor/`: 4.2 loads every folder there as a package, so a `vendor/wheels-4.1.x.bak/` logs a "skipped: unsafe directory name" error on every start, and [committing `vendor/`](#commit-vendor-420) would commit it.
+
+3. **Install 4.2.x.** Extract the 4.2 `vendor/wheels/` in its place (or `git checkout` the tag if you vendor the framework). If the app is managed with CommandBox (its `box.json` lists `wheels-core` under `dependencies`), set that version to 4.2 as well, for example `"wheels-core": "^4.2.0"`: left at 4.1, the next `box install` copies the 4.1 framework back over `vendor/wheels/` without clearing it. `wheels upgrade apply` updates it for you.
+
+4. **Restart the server and run your suite.** Use `wheels stop` then `wheels start`, and `/wheels/app/tests`. The suite now runs against a separate `<datasource>_test` datasource and refuses to run without one; see [App tests use the test database](#app-tests-use-the-test-database-and-test-application). Then apply the edits below, and restart again after them: `?reload=true` rebuilds the application but doesn't recompile changed `app/events/*.cfm` or `public/Application.cfc` files on a running dev server.
 
 </Steps>
 
@@ -32,9 +36,17 @@ Run `wheels upgrade check --to=4.2.0` on a workstation. It diffs `public/Applica
 
 ### `config/environment.cfm` reads `WHEELS_ENV` (4.2.0)
 
-Apps generated before 4.2 hardcode the environment: `config/environment.cfm` contains `set(environment="development")`, so a `WHEELS_ENV=production` set by a Docker image, systemd unit or host has no effect ([#3946](https://github.com/wheels-dev/wheels/issues/3946)). The 4.2 template reads `WHEELS_ENV` through `env()` (`.env` first, then the process environment). Unset or empty means `development`. Any value other than `development`, `testing`, `maintenance` or `production` stops the app at startup with `Wheels.InvalidEnvironment`, because Wheels shows error details in any environment that isn't `production`. The template's `config/settings.cfm` likewise reads `set(dataSourceName=env("WHEELS_DATASOURCE", "<app name>"))`.
+Apps generated before 4.2 hardcode the environment: `config/environment.cfm` contains `set(environment="development")`, so a `WHEELS_ENV=production` set by a Docker image, systemd unit or host has no effect ([#3946](https://github.com/wheels-dev/wheels/issues/3946)). The 4.2 template reads `WHEELS_ENV` through `env()` (`.env` first, then the process environment). Unset or empty means `development`. Any value other than `development`, `testing`, `maintenance` or `production` stops the app at startup with `Wheels.InvalidEnvironment`, because Wheels shows error details in any environment that isn't `production`.
 
-Replace `config/environment.cfm` with the one from a fresh `wheels new` app (see [Environments and Configuration](/v4-2-0/core-concepts/environments-and-configuration/)), or keep yours and hardcode `set(environment="production");` on production servers. A `WHEELS_ENV` line in `.env` wins over the process environment, so make sure a production server's `.env` doesn't say `development`.
+If your `config/environment.cfm` chooses the environment some other way (for example `set(environment=application.env.environment)`, or a lookup by host name), keep that selection when you adopt the template: set `WHEELS_ENV` on every server before replacing the file, or carry your selection logic into the new file. Replacing the file outright drops your selection, and a server without `WHEELS_ENV` then starts in `development`.
+
+Replace `config/environment.cfm` with the one from a fresh `wheels new` app (see [Environments and Configuration](/v4-2-0/core-concepts/environments-and-configuration/)), or keep yours and hardcode `set(environment="production");` on production servers.
+
+A `WHEELS_ENV` line in `.env` wins over the process environment, and `wheels new` writes `WHEELS_ENV=development` into `.env` (and `.env.example`). So on a production server, or in an image that carries the app's `.env`, remove that line or set it to `production`; otherwise `WHEELS_ENV=production` from the host has no effect.
+
+Two related template changes are optional:
+- The template's `config/settings.cfm` reads the datasource name the same way: `set(dataSourceName=env("WHEELS_DATASOURCE", "<app name>"))`. Copy it if you want to choose the datasource per server; an app that keeps `set(dataSourceName="…")` works as before.
+- New apps ship `config/development/settings.cfm`, `config/testing/settings.cfm`, `config/maintenance/settings.cfm` and `config/production/settings.cfm` with only comments. They run after `config/settings.cfm` in that environment; add them only when you have per-environment settings.
 
 **Does not fail safe:** an app deployed with only `WHEELS_ENV=production` set keeps running in development mode, with full error details shown to visitors.
 
@@ -50,17 +62,80 @@ The `onError` minimal fallback now tells an error raised once the application is
 
 **Fails safe:** without it, `wheels reload` against a RustCFML server fails every other run; Lucee, Adobe CF and BoxLang are unaffected. Copy the header-mapping block from the template.
 
+### Reload redirect keeps the subfolder (4.2.0)
+
+When an app runs under a subfolder (`set(subpath="/app1")`, or an IIS application at `/app1`), `?reload=true` on a running app restarts it and redirects from `public/Application.cfc`'s `$buildRedirectUrl()`. That function built the target from `cgi.path_info` alone, so `/app1/widgets?reload=true` came back to `/widgets`, outside the app ([#3948](https://github.com/wheels-dev/wheels/issues/3948)). The 4.2 template passes the path through the framework's `$reloadRedirectPath()`, which puts the subfolder back. The same function is used by the framework's own reload redirect.
+
+Replace the `return local.redirectPath;` at the end of `$buildRedirectUrl()` with the block below, and add `$normaliseRedirectPath()` after it. The fallback keeps the function working with a `vendor/wheels/` that doesn't have the helper yet.
+
+```cfm title="public/Application.cfc"
+		local.redirectPathResolved = false;
+		try {
+			if (StructKeyExists(application, "wo")) {
+				local.redirectPath = application.wo.$reloadRedirectPath(path = local.redirectPath);
+				local.redirectPathResolved = true;
+			}
+		} catch (any e) {
+			// No such helper (an older vendor/wheels): use the fallback below.
+		}
+		if (!local.redirectPathResolved) {
+			local.redirectPath = this.$normaliseRedirectPath(local.redirectPath);
+		}
+
+		return local.redirectPath;
+	}
+
+	public string function $normaliseRedirectPath(required string path) {
+		local.len = Len(arguments.path);
+		local.i = 1;
+		while (local.i <= local.len) {
+			local.code = Asc(Mid(arguments.path, local.i, 1));
+			if (local.code == 47 || local.code == 92 || local.code <= 32 || local.code == 127) {
+				local.i++;
+			} else {
+				break;
+			}
+		}
+		if (local.i == 1) {
+			return arguments.path;
+		}
+		if (local.i > local.len) {
+			return "/";
+		}
+		return "/" & Mid(arguments.path, local.i, local.len - local.i + 1);
+	}
+```
+
+**Fails safe at the site root:** nothing changes for an app served at `/`. **Does not fail safe under a subfolder:** the app restarts, but the browser is redirected to a path outside it.
+
 ### Event templates without leading whitespace (4.2.0)
 
 The `app/events/*.cfm` templates (`onrequeststart.cfm`, `onrequestend.cfm`, `onsessionstart.cfm` and their siblings) are included straight into the response buffer, where a bare `cfscript` block and a trailing newline put blank lines before every response ([#3882](https://github.com/wheels-dev/wheels/issues/3882)). New apps wrap them in `cfsilent` with no trailing newline.
 
-**Fails safe** for HTML pages. It does not for byte-exact responses: a `renderText()` of an XML document is ill-formed when blank lines come before `<?xml …?>`. Wrap each `app/events/*.cfm` file in `<cfsilent>…</cfsilent>` with no trailing newline, or delete the empty placeholders you don't use. `cfsilent` suppresses only output, so event code (including `cfheader`) still runs.
+**Fails safe** for HTML pages. It does not for byte-exact responses: a `renderText()` of an XML document is ill-formed when blank lines come before `<?xml …?>`.
+
+Wrap these seven files in `<cfsilent>…</cfsilent>` with no trailing newline, or delete the empty placeholders you don't use:
+- `onabort.cfm`
+- `onapplicationend.cfm`
+- `onapplicationstart.cfm`
+- `onrequestend.cfm`
+- `onrequeststart.cfm`
+- `onsessionend.cfm`
+- `onsessionstart.cfm`
+
+`cfsilent` suppresses only output, so event code (including `cfheader`) still runs. **Leave the output templates alone:** `onerror.cfm`, `onerror.json.cfm`, `onerror.xml.cfm`, `onmaintenance.cfm` and `onmissingtemplate.cfm` are the pages Wheels shows for errors, maintenance and missing files, and wrapping them in `cfsilent` would make those pages blank. Restart the server after the edit; a reload keeps serving the old templates.
 
 ### Commit `vendor/` (4.2.0)
 
 `wheels new` apps now commit `vendor/`: the generated `.gitignore` no longer ignores it, so a clone, CI run or image build has the framework and every package added with `wheels packages add`.
 
-**Fails safe** on the machine that has `vendor/`. A fresh clone of an app that ignores it has no framework and nothing to restore it from. Remove the `/vendor/` line from `.gitignore` and commit `vendor/`.
+**Fails safe** on the machine that has `vendor/`. A fresh clone of an app that ignores it has no framework and nothing to restore it from. Remove the `/vendor/` line from `.gitignore` and commit `vendor/`. Check `git status` first: `vendor/` should hold `wheels/` and your packages, not a backup of the old framework.
+
+### Dead format rule in `public/urlrewrite.xml` (optional)
+
+The "Convert dot to format parameter" rule is gone from the shipped `urlrewrite.xml` ([#4132](https://github.com/wheels-dev/wheels/issues/4132)). Its regex had doubled backslashes, so it never matched a normal URL, and format suffixes such as `/posts.json` work because the router reads them from the path.
+
+**Fails safe:** the rule does nothing. Delete it from your `public/urlrewrite.xml` if you like.
 
 ### AI coding docs (optional)
 
@@ -71,6 +146,46 @@ The `CLAUDE.md` that ships with apps is now under 8 KB, with its reference topic
 ## Behaviour changes to check
 
 These need no file edits, but code that relied on the old behaviour changes.
+
+### App tests use the test database and test application
+
+`/wheels/app/tests` and `wheels test` now default to the `<datasource>_test` datasource. If it doesn't exist, they refuse to run rather than using your primary datasource. Create it, or run against the primary datasource on purpose with `wheels test --no-test-db` (URL: `useTestDB=false`). Specs run in a separate test application (`<app name>_wheelsTest`), which needs `WHEELS_ENV` set to `development` or `testing`.
+
+For a SQLite app, `wheels new` already adds the test datasource to `config/app.cfm`, next to the main one:
+
+```cfm title="config/app.cfm"
+this.datasources["myapp_test"] = {
+	class: "org.sqlite.JDBC",
+	connectionString: "jdbc:sqlite:" & expandPath("../db/test.sqlite")
+};
+```
+
+For another database, add a `myapp_test` entry with the same settings as `myapp`, pointing at a separate, empty database. The `tests/populate.cfm` that `wheels new` creates runs your migrations against it before each run.
+
+A CLI too old to send `useTestDB=false` can still run the suite against the primary datasource with `set(allowTestsAgainstPrimaryDatasource=true)` in `config/settings.cfm`. Specs then write to that database, and each run logs a warning to `wheels.log`. The setting only applies when the request has no `useTestDB` parameter: `wheels test`, which sends `useTestDB=true`, still requires `<datasource>_test`.
+
+The same rule applies to a `tests/runner.cfm` of your own: the run uses `<datasource>_test`, or it is refused unless you ask for the primary datasource as above. A runner copied from an older Wheels release (it sets `dataSourceName` from `coreTestDataSourceName` and includes its own `populate.cfm`) keeps working: for the duration of the run, both settings point at `<datasource>_test`. Replace it with the runner `wheels new` creates, a single include of `wheels/tests/app-runner.cfm`, so your app gets the built-in runner's behaviour, including running `tests/populate.cfm` against the test database. The legacy RocketUnit app runner (`set(testFramework="rocketunit")`) does not apply this rule; run app tests with WheelsTest, the default, to get it.
+
+HTTP requests your specs make reach that same test application, so they see the same datasource as the spec code, when they come from:
+- `$testClient()`;
+- a `wheels.wheelstest.TestClient` you create inside the spec run (including in a thread started during the run) whose `baseUrl` points at the test server: a loopback host (`localhost`, `127.x.x.x`, `[::1]`) or the host of a configured `testClientBaseUrl`;
+- a subclass of `TestClient` whose `init()` calls `super.init()`, under the same conditions.
+
+Some clients send their requests to the live application:
+- a client created outside a test run, such as in a scheduled task or a script;
+- a client pointed at another host.
+
+For a test server on another host name, set `testClientBaseUrl` or use `$testClient()`. If your suite runs in a Docker container that publishes the server on a different port (`-p 8080:60007`), set `testClientBaseUrl` to the address inside the container; see [Setting the test client's base URL](/v4-2-0/testing/controller-tests/#setting-the-test-clients-base-url). To address the live application from a spec on purpose, pass `testContext=false` to `$testClient()` or to `new wheels.wheelstest.TestClient()`.
+
+If a `TestClient` subclass or a test helper in your app sets the `X-Wheels-Test-Context` header or the `WHEELS_TEST_CONTEXT` cookie itself (a pattern from 4.1), delete those lines. `TestClient` and `$testClient()` now send the test context for you, and a value set by hand replaces theirs, so the requests reach the live application and its primary datasource (errors such as a missing table).
+
+The framework's own suite (`/wheels/core/tests`) is stricter when a run would use the app's primary datasource: it ignores `allowTestsAgainstPrimaryDatasource` ([#4254](https://github.com/wheels-dev/wheels/pull/4254)). Without `<datasource>_test` such a run is refused and the log notes that the setting was ignored; only an explicit `useTestDB=false` runs it against the primary datasource. Its `populate.cfm` drops and recreates tables, so it never reaches your real data through the setting. Runs that pick another datasource (`?db=`, or a `coreTestDataSourceName` that isn't the primary) are unchanged, except that a `coreTestDataSourceName` naming a datasource that doesn't exist now gets a 409 response explaining the fix.
+
+If `config/settings.cfm` sets `dataSourceName` but not `coreTestDataSourceName`, `coreTestDataSourceName` now defaults to that `dataSourceName`, so the framework's suite takes the `<datasource>_test` rule above. It used to default to a datasource named after the folder of the app's front controller (`public` in a `wheels new` app), which failed with `Datasource [public] doesn't exist`. If you ran the suite on a datasource with that name, set `coreTestDataSourceName` to it.
+
+A test run keeps the runner's 30-minute request timeout ([#4263](https://github.com/wheels-dev/wheels/pull/4263)). The `tests/populate.cfm` that 4.1's `wheels new` created starts with `<cfsetting requestTimeOut="300">`; the 4.2 runner restores its own limit after your `populate.cfm` runs, so you can leave the line or delete it. A run that is stopped before it finishes is now reported as an error, and says when the request timeout stopped it, instead of 0 passed, 0 failed, 0 errors.
+
+Browser specs that don't run no longer count as passed. Without Playwright (or in CI without `WHEELS_BROWSER_CI_ENABLE`), each `browserDescribe()` spec is reported as skipped, with the reason, and `wheels test` reports the skips (`2 passed, 1 skipped`) instead of a clean pass. When Playwright is installed but the browser can't start, each one is an error unless `WHEELS_BROWSER_SKIP_LAUNCH_FAILURES=true`. A CI job that ran browser specs without a browser now shows them; see [Browser tests](/v4-2-0/testing/browser-tests/).
 
 ### `findAll(returnAs="structs")` returns an array
 
@@ -103,9 +218,19 @@ A bare property or method name in a `condition` or `unless` expression now means
 
 `joinType` accepts `inner`, `outer`, `left` and `left outer` (the last three all emit `LEFT OUTER JOIN`). Any other value throws `Wheels.InvalidJoinType` when the association is registered, at application start ([#3936](https://github.com/wheels-dev/wheels/issues/3936)). Before, `joinType="left"` emitted a `LEFT JOIN` that the nested-include grouping didn't recognise, so a nested include under it was silently dropped.
 
+### Production error pages return 404, 403 or 406 for Wheels errors
+
+With `showErrorInformation` off (the default outside development), the error page now returns the HTTP status that fits the Wheels error instead of `500` for every error ([#4238](https://github.com/wheels-dev/wheels/pull/4238)): `404` for an unknown route, record, view, file or action (`Wheels.RouteNotFound`, `RecordNotFound`, `ViewNotFound`, `FileNotFound`, `ActionNotAllowed`, `ActionParameterMissing`), `403` for `Wheels.NotAuthorized` or an invalid CSRF token, and `406` for `Wheels.FormatNotAcceptable`. Other `Wheels.*NotFound` errors, such as a missing table, datasource or model, still return `500`, so monitoring still sees server faults. Development already returned these statuses. Monitoring, alerts or log searches that count production `500`s will see fewer of them; if one keys on `500` for these cases, update it to the new statuses.
+
 ### `renderNotFound` is a framework helper
 
 `renderNotFound(message, type, extendedInfo)` is a new public controller helper that produces a 404 from app code ([#3900](https://github.com/wheels-dev/wheels/issues/3900)). Because it is public, it is now a reserved action name: an existing controller **action** literally named `renderNotFound` gets `Wheels.ActionNotAllowed` instead of dispatching. Rename such an action. A controller that already defines its own `renderNotFound` helper overrides the framework one, and that keeps working.
+
+### A failed `verifies()` without a handler returns 400
+
+A `verifies()` that fails and declares no `handler` and no redirect arguments now ends the request with **HTTP 400** ([#4296](https://github.com/wheels-dev/wheels/pull/4296)). In 4.1 it returned a silent `200` with an empty body, although the declared precondition wasn't met. A JSON request gets `{"error":"Verification failed"}`; other formats get an empty body. A `verifies()` with a `handler` or redirect arguments is unchanged.
+
+If a client relied on the old `200`, handle the `400` there, or give the `verifies()` call a `handler=` (or redirect arguments) so your code owns the failure response.
 
 ### MySQL boolean columns are `BIT(1)`
 
@@ -127,6 +252,85 @@ t.bigInteger(columnNames = "accountId", unsigned = true);
 
 On Oracle, new `t.integer()`, `t.references()` and `id` columns are `NUMBER(10)`, new `t.bigInteger()` columns are `NUMBER(19)`, and new `t.boolean()` columns before Oracle 23ai are `NUMBER(1)` ([#4097](https://github.com/wheels-dev/wheels/issues/4097)). Earlier releases created a bare `NUMBER`, which binds as a decimal and validates as a float. The new columns validate as integers, so a fractional value such as `1.5` now fails automatic validation instead of being stored. Existing columns are unchanged and keep their current typing, and `changeColumn()` without a `precision` argument keeps a column's current precision, so it never re-types one. To convert one, see [Integer columns on Oracle](/v4-2-0/basics/migrations/).
 
+On Oracle 23ai and later, new `t.boolean()` columns are a native `BOOLEAN` ([#4057](https://github.com/wheels-dev/wheels/pull/4057)), which the model maps to `cf_sql_bit`; earlier Oracle releases get `NUMBER(1)` as above. Existing numeric boolean columns are unchanged.
+
+### SQLite date columns are validated as dates
+
+On SQLite, new `t.date()`, `t.datetime()`, `t.time()` and `t.timestamp()` columns are declared `DATE`, `DATETIME` and `TIME` instead of `TEXT` ([#4093](https://github.com/wheels-dev/wheels/issues/4093)). The model validates them as dates, so automatic validations now reject a value such as `"not a date"` that earlier releases stored. Values are still stored as ISO-8601 text, exactly as before. Existing `TEXT` date columns are unchanged: they keep the old check, which treats a `TEXT` column as a date only when its name is a word such as `created`, `updated` or `date`, so a column like `publishedAt` gets no date check. To give an existing column the new behaviour, convert it in a migration with `changeColumn(columnType="datetime")` (or `"date"`). ISO-8601 text is kept as it is. Converting to any date type also rewrites older values in that column: the CFML date literals `{ts 'X'}`, `{d 'D'}` and `{t 'T'}` become `X`, `D 00:00:00` and `1899-12-30 T`, and bare text that is exactly `YYYY-MM-DD` or `HH:MM:SS` becomes `YYYY-MM-DD 00:00:00` or `1899-12-30 HH:MM:SS`. Any other value is copied unchanged.
+
+**Columns declared `DATE` or `TIME` by raw SQL or another tool.** Before 4.2, Wheels bound a SQLite column *declared* `DATE` as `cf_sql_date` and one declared `TIME` as `cf_sql_time`, and the driver stored those values as epoch-millisecond integers. Wheels now writes ISO-8601 text to them, so a column with old rows would mix integers and text, which breaks comparisons and sorting. Migrator-created columns aren't affected: they were `TEXT` before 4.2. To check a table, run `SELECT typeof(col), count(*) FROM tbl GROUP BY 1;`. If any rows are `integer`, convert them before writing with 4.2:
+
+```sql
+UPDATE tbl SET dateCol = strftime('%Y-%m-%d', dateCol / 1000, 'unixepoch', 'localtime') WHERE typeof(dateCol) = 'integer';
+UPDATE tbl SET timeCol = strftime('%H:%M:%S', timeCol / 1000, 'unixepoch', 'localtime') WHERE typeof(timeCol) = 'integer';
+```
+
+Keep `'localtime'`: the old values are midnight (or the time of day) in the server's timezone, and without it a server east of UTC converts each date to the previous day. Run the conversion with the same timezone as the app server.
+
+**Convert before you upgrade.** If you don't, what happens depends on the engine. On BoxLang, a record holding an unconverted value fails validation on that column ("is invalid") even when the save doesn't touch it, so the record can't be saved. On Lucee and Adobe ColdFusion the record saves and keeps its integers, because Wheels updates only the columns that changed, but the first new value the app writes to such a column is stored as text, and the column mixes formats until you convert. The recipe changes only `integer` rows, so it's safe to run more than once. Run it again after every app process is on 4.2: processes still on 4.1 keep writing integers.
+
+**Date literals written by `updateAll()`.** Before 4.2, `updateAll()` on SQLite wrote CFML date literals such as `{ts '2026-10-03 04:31:00'}` into date columns instead of ISO-8601 text ([#4147](https://github.com/wheels-dev/wheels/issues/4147)); `save()` wasn't affected. In a `TEXT` column these values read back as plain strings, but once the column is declared `DATETIME` they fail to read. `changeColumn()` to a date type repairs them for you (see above). If you convert a column with your own SQL, or keep it `TEXT`, check for these rows and repair them first:
+
+```sql
+-- Check: rows holding a CFML ODBC date literal ({ts '...'}, {d '...'}, {t '...'}).
+-- char(123) and char(125) are { and }: written as literal braces, a JDBC driver (and so
+-- Wheels' execute()) reads them as an escape sequence and rewrites the SQL.
+SELECT COUNT(*) AS n FROM <table> WHERE <column> LIKE char(123) || 'ts ''%''' || char(125) OR <column> LIKE char(123) || 'd ''%''' || char(125) OR <column> LIKE char(123) || 't ''%''' || char(125);
+
+-- Repair: {ts 'X'} -> X, {d 'D'} -> 'D 00:00:00', {t 'T'} -> '1899-12-30 T' (what save() writes).
+UPDATE <table> SET <column> = CASE WHEN <column> LIKE char(123) || 'ts ''%''' || char(125) THEN substr(<column>, instr(<column>, '''') + 1, length(<column>) - instr(<column>, '''') - 2) WHEN <column> LIKE char(123) || 'd ''%''' || char(125) THEN substr(<column>, instr(<column>, '''') + 1, length(<column>) - instr(<column>, '''') - 2) || ' 00:00:00' WHEN <column> LIKE char(123) || 't ''%''' || char(125) THEN '1899-12-30 ' || substr(<column>, instr(<column>, '''') + 1, length(<column>) - instr(<column>, '''') - 2) ELSE <column> END WHERE <column> LIKE char(123) || 'ts ''%''' || char(125) OR <column> LIKE char(123) || 'd ''%''' || char(125) OR <column> LIKE char(123) || 't ''%''' || char(125);
+```
+
+The repair writes what `save()` writes: `{ts 'X'}` becomes `X`, `{d 'D'}` becomes `D 00:00:00` and `{t 'T'}` becomes `1899-12-30 T`. It changes only rows holding a literal, so it's safe to run more than once.
+
+### An empty string in `where` matches empty strings
+
+An empty-string value in a `where` condition now binds as a real `''` ([#4055](https://github.com/wheels-dev/wheels/issues/4055)). Through 4.1 it bound as SQL NULL after your operator, so `col = ''`, `col <> ''` and `col != ''` all compared against NULL and matched no rows.
+
+**What changes:**
+
+- `count(where="brand = ''")` and `findAll(where="brand = ''")` return the rows that store an empty string.
+- `col <> ''` and `col != ''` return every row whose value is neither empty nor NULL.
+- The same applies to an interpolated value that happens to be empty: `where="col = '#x#'"` with `x = ""`.
+- It applies everywhere a `where` string is used: the finders and `count()`, dynamic finders such as `findOneByBrand("")`, the query builder's `where("brand", "")`, and `updateAll()` / `deleteAll()`. **`updateAll()` and `deleteAll()` with such a condition now change or delete those rows, where in 4.1 they touched nothing.**
+- A lookup such as `findOne(where="token = ''")` now matches rows that store an empty string. The same goes for a lookup keyed on a request value that turns out empty, such as `findOne(where="token = '#params.token#'")` or `findOneByToken(params.token)`: in 4.1 it found nothing. Reject empty input before looking it up, or store cleared values as NULL rather than `''`.
+
+**What doesn't change:**
+
+- The unquoted `NULL` keyword: `col IS NULL` and `col IS NOT NULL` work as before. To match NULL, use them or `whereNull()` / `whereNotNull()`.
+- An empty value whose column binds as a number, date, time or boolean still matches nothing, since such a column can't hold `''`. What counts is the type Wheels binds the column with: SQLite stores date and time values as text and binds every date and time column as a string, so on SQLite an empty value compared with a date, datetime or time column follows the new behaviour (`createdAt <> ''` matches every non-empty, non-NULL datetime).
+- On Oracle, which stores `''` as NULL, an empty-string comparison still matches no rows.
+
+To find affected code, search `app/` for `= ''`, `<> ''`, `!= ''`, for `where` strings that interpolate a value that may be empty (especially `params.*` values and `updateAll()` / `deleteAll()` calls), and for dynamic finders (`findOneBy…`, `findAllBy…`) called with request values.
+
+### Date values in `where()` and dynamic finders match on SQLite
+
+On SQLite, a date passed to the query builder (`where()`, `whereBetween()`, `whereIn()`) or to a dynamic finder (`findOneByPublishedAt(date)`) now compares as a date ([#4281](https://github.com/wheels-dev/wheels/pull/4281)). It used to reach the SQL as its CFML literal (`{ts '...'}`), which never matched a stored date, so the query returned no rows. Code that relied on such a query finding nothing now gets the matching rows. Other databases already matched; they now receive the plain date text.
+
+### `enqueue()` throws `Wheels.Job.EnqueueFailed`
+
+`enqueue()`, `enqueueIn()` and `enqueueAt()` throw `Wheels.Job.EnqueueFailed` when the job can't be written to the job store ([#4266](https://github.com/wheels-dev/wheels/pull/4266)). In 4.1 they returned a struct with `persisted: false`, which was easy to miss, so failed enqueues went unnoticed. Don't read `persisted: false` as a failure any more: a job deferred to a commit (next section) also returns it. Replace `persisted` checks with a check of `status` (`"pending"` once written, `"deferred"` until the commit) where you need one, and where an enqueue is best-effort, wrap it in `try` / `catch (Wheels.Job.EnqueueFailed e)`.
+
+### A job enqueued in a transaction on another datasource waits for the commit
+
+Inside a Wheels-managed transaction (a model save or `invokeWithTransaction()`) on another datasource than the job store's, the job is now written when the transaction commits, and dropped if it rolls back ([#4282](https://github.com/wheels-dev/wheels/pull/4282)). That's a tenant datasource under `TenantResolver`, or a model with its own `dataSource()`. In 4.1, depending on the engine, such a job could survive a rollback, land in the tenant's database where no worker reads it, or not be written at all. `enqueue()` then returns `{status: "deferred", deferred: true, persisted: false}`. That `persisted: false` is not a failure; check `status` instead. A write that fails after the commit throws `Wheels.Job.EnqueueFailed`, and the saved record stays committed. A raw `transaction {}` block isn't tracked, so enqueue after it ends. See [Background jobs: with a tenant datasource](/v4-2-0/digging-deeper/background-jobs/#with-a-tenant-datasource).
+
+### The job table gains a `claimTimeout` column
+
+A worker now records the `timeout` it claimed a job with, and a stale job is reaped on the claiming worker's timeout rather than the polling worker's, so workers with different timeouts can share a queue ([#3989](https://github.com/wheels-dev/wheels/issues/3989)). The `wheels_jobs.claimTimeout` column is added for you on first use, including to tables created by 4.1. If the database user can't run `ALTER TABLE`, the worker falls back to the polling worker's timeout and retries the change after a back-off; grant the privilege once (or add the column yourself) to get the new behaviour.
+
+### CSRF accepts the `X-CSRF-Token` header on any request
+
+A valid `X-CSRF-Token` header now passes CSRF protection on any non-GET request ([#3959](https://github.com/wheels-dev/wheels/issues/3959)). In 4.1 the header was read only when the request also sent `X-Requested-With: XMLHttpRequest`, which Turbo and `fetch()` don't send. Nothing breaks: clients that send both keep working, and a request passes when either the form field or the header holds a valid token. `startFormTag()` and `buttonTo()` gain `authenticityToken=false` to leave the hidden field out of markup that is cached and shared.
+
+### An empty `default` on a non-string column means no default
+
+In a migration, `default=""` on a column that isn't string-like (`bigInteger`, `binary`, `uniqueidentifier`, `integer`, `decimal`, `float`, `date` and so on) now means "no default" ([#4248](https://github.com/wheels-dev/wheels/pull/4248)). It renders as `DEFAULT NULL` when the column allows null and as no `DEFAULT` clause on a `NOT NULL` column. In 4.1, `bigInteger` and `uniqueidentifier` emitted a bare `DEFAULT`, `binary` emitted `DEFAULT ''`, and a `NOT NULL` column got `DEFAULT NULL NOT NULL`, which MySQL rejects; those migrations failed. They now run. Migrations that already worked produce the same schema.
+
+### `withAdvisoryLock()` can throw `Wheels.AdvisoryLockReleaseFailed`
+
+On MySQL and PostgreSQL, `withAdvisoryLock()` now checks that the lock was released ([#4197](https://github.com/wheels-dev/wheels/issues/4197)). These locks belong to the pooled database session that took them, and on Lucee and BoxLang a busy pool can run the release on a different session, which frees nothing. Wheels retries the release for up to 5 seconds and then throws `Wheels.AdvisoryLockReleaseFailed`, naming the lock, if our session still holds it. The callback has already finished when this is thrown. If the callback itself threw, the failed release is logged instead and the callback's error is what you get. A lock left held stays held until that pooled connection closes, so other callers wait or time out on it. Before 4.2 this went unnoticed. The case is rare, but a scheduled job that relies on the lock should catch the exception and alert. Callers in the same application now also wait for each other, within `timeout`, before taking the database lock. Holding one connection for the whole call, which removes the case, is planned for 4.3 ([#4198](https://github.com/wheels-dev/wheels/issues/4198)).
+
 ### `LocalDisk` storage keys are checked per segment
 
 `LocalDisk` now validates an object key one path segment at a time ([#3912](https://github.com/wheels-dev/wheels/issues/3912)):
@@ -146,6 +350,10 @@ If your app builds storage keys from user input or file names, check that none o
 ### `wheels generate` and `wheels destroy` need a project
 
 Both refuse to run outside a Wheels project (`Wheels.NotAWheelsProject`, non-zero exit) instead of writing or deleting files in the current directory ([#3909](https://github.com/wheels-dev/wheels/issues/3909)). `wheels generate app` still works anywhere.
+
+### Generated model columns are required by default
+
+`wheels generate model` and `wheels generate scaffold` now create each unmarked `name:type` column as `allowNull=false` and add it to `validatesPresenceOf`, so the model and its migration agree ([#4285](https://github.com/wheels-dev/wheels/pull/4285)). In 4.1 every column was validated for presence while the migration made it nullable. Mark a column nullable with `name:type:optional`, or give it a default with `name:type=value`; neither is added to `validatesPresenceOf`. Models you already generated are unchanged. Update scripts that generate models if some of their columns should stay nullable.
 
 ### App creation is CLI-only over MCP
 
@@ -169,7 +377,7 @@ From [#3914](https://github.com/wheels-dev/wheels/issues/3914), [#3925](https://
 
 <Steps>
 
-1. Reload (`?reload=true&password=…`) and confirm the app starts clean; check `wheels.log` for warnings.
+1. Restart the server (`wheels stop`, then `wheels start`) and confirm the app starts clean; check `wheels.log` for warnings.
 2. Run your suite (`/wheels/app/tests`), including the model specs that cover conditional validations.
 3. On a production server, confirm the app runs in production mode: an error must not show a stack trace.
 4. Behind a reverse proxy, confirm absolute URLs (for example in emails or redirects) still start with `https://`.

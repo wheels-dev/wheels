@@ -139,6 +139,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("the demo app and the wheels new template grant through the framework, not application.wheels", () => {
+				$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 				for (var relative in ["/public/Application.cfc", "/cli/lucli/templates/app/public/Application.cfc"]) {
 					var source = FileRead(ExpandPath("/wheels/../..") & relative);
 					expect(source).toInclude("application.wo.$applyIPDebugAccess()");

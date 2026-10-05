@@ -10,17 +10,17 @@
 
     EXAMPLE:
       t = createTable(name='employees', force=false, id=true, primaryKey='empId');
-			t.string(columnNames='firstName,lastName', default='', allowNull=true, limit='255');
-			t.text(columnNames='bio', default='', allowNull=true);
+			t.string(columnNames='firstName,lastName', allowNull=true, limit='255');
+			t.text(columnNames='bio', allowNull=true);
 			t.binary(columnNames='credentials');
-			t.biginteger(columnNames='sinsCommitted', default='', allowNull=true, limit='1');
-			t.char(columnNames='code', default='', allowNull=true, limit='8');
-			t.decimal(columnNames='hourlyWage', default='', allowNull=true, precision='1', scale='2');
-			t.date(columnNames='dateOfBirth', default='', allowNull=true);
-			t.datetime(columnNames='employmentStarted', default='', allowNull=true);
-			t.float(columnNames='height', default='', allowNull=true);
-			t.integer(columnNames='age', default='', allowNull=true, limit='1');
-      t.time(columnNames='lunchStarts', default='', allowNull=true);
+			t.biginteger(columnNames='sinsCommitted', allowNull=true, limit='1');
+			t.char(columnNames='code', allowNull=true, limit='8');
+			t.decimal(columnNames='hourlyWage', allowNull=true, precision='1', scale='2');
+			t.date(columnNames='dateOfBirth', allowNull=true);
+			t.datetime(columnNames='employmentStarted', allowNull=true);
+			t.float(columnNames='height', allowNull=true);
+			t.integer(columnNames='age', allowNull=true, limit='1');
+      t.time(columnNames='lunchStarts', allowNull=true);
 			t.uniqueidentifier(columnNames='uid', default='newid()', allowNull=false);
 			t.references(referenceNames="vacation");
 			t.timestamps();
@@ -32,7 +32,7 @@ component extends="wheels.migrator.Migration" hint="Creates Permissions Table" {
 		transaction {
 			try {
 				t = createTable(name='permissions');
-				t.string(columnNames="name,description", default='', allowNull=true);
+				t.string(columnNames="name,description", allowNull=true);
 				t.string(columnNames="type", default='controller', allowNull=false); // One of controller | named
 				t.create();
 			} catch (any e) {

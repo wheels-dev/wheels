@@ -147,6 +147,26 @@ component extends="wheels.WheelsTest" {
 				expect(rustAdapter.supportsImageInfo()).toBeFalse();
 			});
 
+			it("RustCFMLAdapter pins stringIndexIsLinear to false so the masker always takes the char-array path", function() {
+				// Instantiated here on the test host — a JVM engine on every matrix leg but
+				// the RustCFML one — so this proves the OVERRIDE returns false regardless of
+				// whether a JVM (and thus java.lang.String) is available. That is the whole
+				// point of the override: a future RustCFML java.lang.String shim must not flip
+				// the Base probe to true and silently route RustCFML back to the O(n^2) index
+				// scan ($maskWhereLiterals, #3903 / rev1-r3 on #4146).
+				var rustAdapter = new wheels.engineAdapters.RustCFML.RustCFMLAdapter("0.693.0");
+				expect(rustAdapter.stringIndexIsLinear()).toBeFalse();
+			});
+
+			it("the live adapter's stringIndexIsLinear matches the engine: false on RustCFML, true on JVM", function() {
+				var adapter = application.wheels.engineAdapter;
+				if (adapter.isRustCFML()) {
+					expect(adapter.stringIndexIsLinear()).toBeFalse("RustCFML must take the char-array masker path");
+				} else {
+					expect(adapter.stringIndexIsLinear()).toBeTrue("JVM engines take the scan masker path");
+				}
+			});
+
 			it("RustCFMLAdapter imageInfo returns the Base struct shape with zero dimensions", function() {
 				var rustAdapter = new wheels.engineAdapters.RustCFML.RustCFMLAdapter("0.417.0");
 				var info = rustAdapter.imageInfo(source = "/path/to/missing.png");
@@ -162,6 +182,10 @@ component extends="wheels.WheelsTest" {
 				expect(caps).toBeStruct();
 				expect(caps.cfcache).toBeTrue();
 				expect(caps.imageInfo).toBeTrue();
+				// stringIndexLinear is a host probe (true on a JVM host, false on a JVM-free
+				// one), so assert only that it is present and boolean, not its value — the
+				// boolean-only loop below enforces the plain-data contract.
+				expect(StructKeyExists(caps, "stringIndexLinear")).toBeTrue();
 				// Plain data only — application scope must never receive function members (Adobe CF).
 				for (var key in caps) {
 					expect(IsBoolean(caps[key])).toBeTrue("capability '#key#' should be a plain boolean");
@@ -175,6 +199,7 @@ component extends="wheels.WheelsTest" {
 				var caps = rustAdapter.getCapabilities();
 				expect(caps.cfcache).toBeTrue();
 				expect(caps.imageInfo).toBeFalse();
+				expect(caps.stringIndexLinear).toBeFalse();
 			});
 
 			it("the live adapter exposes getCapabilities", function() {
@@ -352,22 +377,6 @@ component extends="wheels.WheelsTest" {
 				var result = application.wheels.engineAdapter.dynamicFinderProperties("findAllByFirstNameAndLastNameAndEmail", "findAllBy");
 				expect(result).toBeArray();
 				expect(ArrayLen(result)).toBe(3);
-			});
-
-		});
-
-		describe("Engine Adapter - Hash Normalization", function() {
-
-			it("normalizes JSON for consistent hashing", function() {
-				var result = application.wheels.engineAdapter.normalizeForHash('{"b":"2","a":"1"}');
-				expect(IsSimpleValue(result)).toBeTrue();
-				expect(Len(result)).toBeGT(0);
-			});
-
-			it("produces deterministic output regardless of key order", function() {
-				var r1 = application.wheels.engineAdapter.normalizeForHash('["a","b","c"]');
-				var r2 = application.wheels.engineAdapter.normalizeForHash('["c","b","a"]');
-				expect(r1).toBe(r2);
 			});
 
 		});

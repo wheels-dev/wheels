@@ -1,0 +1,4 @@
+- A `wheels.wheelstest.TestClient` created inside a test run and pointed at the test server now sends its requests to the test application, as `$testClient()` already did. Before, a client built with `new wheels.wheelstest.TestClient()` or an app subclass reached the live application and its primary datasource while the spec code used `<datasource>_test`.
+  - The test server is a loopback host (`localhost`, `127.x.x.x`, `[::1]`) or the host of a configured `testClientBaseUrl`.
+  - A client aimed at any other host is unchanged, and so is one created outside a test run, such as in a scheduled task or a script.
+  - Pass `testContext=false` to address the live application.

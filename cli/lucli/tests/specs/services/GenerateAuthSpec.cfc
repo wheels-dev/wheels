@@ -116,9 +116,35 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(content).toInclude('t.string(columnNames="passwordHash"');
 				expect(content).toInclude('t.string(columnNames="resetTokenDigest"');
 				expect(content).toInclude('t.datetime(columnNames="resetTokenExpiresAt"');
+				// Nullable, so a cleared digest (set to "") is stored as NULL, never as an empty string.
+				expect(content).toInclude('t.string(columnNames="resetTokenDigest", allowNull=true');
+				expect(content).toInclude('t.datetime(columnNames="resetTokenExpiresAt", allowNull=true');
 				expect(content).toInclude("t.timestamps();");
 				expect(content).toInclude('addIndex(table="users", columnNames="email", unique=true)');
 				expect(content).notToInclude("apiTokenDigest");
+			});
+
+			it("indexes the api token digest for the token strategy (looked up on every request)", () => {
+				var files = directoryList(fixtures.token.root & "/app/migrator/migrations", false, "name", "*_create_users_table.cfc");
+				expect(arrayLen(files)).toBe(1);
+				var content = fileRead(fixtures.token.root & "/app/migrator/migrations/" & files[1]);
+				expect(content).toInclude('t.string(columnNames="apiTokenDigest", allowNull=true, limit=64);');
+				expect(content).toInclude('addIndex(table="users", columnNames="apiTokenDigest");');
+				expect(content).notToInclude('columnNames="apiTokenDigest", unique=true');
+			});
+
+			it("the auth guide new apps get shows how to require a token and create the first account", () => {
+				// The app template's copy; ship-consumer-docs.sh check keeps it
+				// identical to docs/consumer-ai/.ai/auth.md.
+				var guide = fileRead(expandPath("/cli/lucli/templates/app/.ai/auth.md"));
+				expect(guide).toInclude("## Token APIs (`--strategy=token`)");
+				expect(guide).toInclude('service("authenticator").authenticate(');
+				expect(guide).toInclude("GetHttpRequestData(false).headers");
+				expect(guide).toInclude('seedOnce(modelName="User"');
+				// Shared with the action through variables. (a bare name would stay
+				// local to the filter under localMode="modern").
+				expect(guide).toInclude("variables.currentUser = ");
+				expect(guide).notToInclude("        currentUser = ");
 			});
 
 			it("injects the marked auth route block before the wildcard route", () => {
@@ -228,6 +254,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(reFindNoCase("new\s+wheels\.auth\.[A-Za-z]+\([^)]*=\s*function", bootstrap)).toBe(0);
 			});
 
+			it("looks a reset token up only by its digest, after rejecting an empty token", () => {
+				var stripped = $strippedFile(fixtures.session.root & "/app/controllers/Passwords.cfc");
+				var guardPos = find("if (!Len(arguments.token))", stripped);
+				var lookupPos = find('.where("resetTokenDigest", digest)', stripped);
+				expect(guardPos).toBeGT(0);
+				expect(lookupPos).toBeGT(guardPos);
+				expect(stripped).toInclude('Hash(arguments.token, "SHA-256")');
+				expect(stripped).notToInclude('.where("resetTokenDigest", arguments.token');
+			});
+
 			it("rejects a blank password on reset instead of burning the token (Passwords##update)", () => {
 				var stripped = $strippedFile(fixtures.session.root & "/app/controllers/Passwords.cfc");
 				// Presence is only validated onCreate and the hash callback
@@ -288,6 +324,35 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("generateAuth() — the API session controller answers in JSON", () => {
+
+			// provides("json") alone leaves a request with no .json extension
+			// and no Accept header on the html format, and renderWith() then
+			// looks for app/views/api/sessions/*.cfm, which doesn't exist.
+			it("token: forces the json format before the action runs", () => {
+				$expectForcesJson("token");
+			});
+
+			it("jwt: forces the json format before the action runs", () => {
+				$expectForcesJson("jwt");
+			});
+
+			it("token: quotes every renderWith() key so the JSON keys keep their case", () => {
+				$expectQuotedKeys("token");
+			});
+
+			it("jwt: quotes every renderWith() key so the JSON keys keep their case", () => {
+				$expectQuotedKeys("jwt");
+			});
+
+			it("emits a controller spec that doesn't pass the format itself", () => {
+				var spec = $stripComments(fileRead(fixtures.token.root & "/tests/specs/controllers/ApiSessionsControllerSpec.cfc"));
+				expect(spec).notToInclude('format: "json"');
+				expect(spec).toInclude('DeserializeJSON(result.body)');
+			});
+
+		});
+
 		describe("generateAuth() — --no-registration", () => {
 
 			it("omits the Registrations controller, its view, and its routes", () => {
@@ -325,6 +390,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(arrayLen(files)).toBe(1);
 				var content = fileRead(fixtures.token.root & "/app/migrator/migrations/" & files[1]);
 				expect(content).toInclude('t.string(columnNames="apiTokenDigest"');
+				// Nullable, so a revoked token's digest (set to "") is stored as NULL.
+				expect(content).toInclude('t.string(columnNames="apiTokenDigest", allowNull=true');
+			});
+
+			it("looks a bearer token up only by its digest", () => {
+				var bootstrap = $stripComments(fileRead(fixtures.token.root & "/app/events/onapplicationstart.cfm"));
+				expect(bootstrap).toInclude('Hash(arguments.token, "SHA-256")');
+				expect(bootstrap).toInclude('.where("apiTokenDigest", digest)');
+				expect(bootstrap).notToInclude('.where("apiTokenDigest", arguments.token');
 			});
 
 			it("stores only the SHA-256 digest and returns the plaintext token once", () => {
@@ -572,6 +646,21 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+	}
+
+	private void function $expectForcesJson(required string strategy) {
+		var ctrl = $stripComments(fileRead(variables.fixtures[arguments.strategy].root & "/app/controllers/api/Sessions.cfc"));
+		expect(ctrl).toInclude('filters(through="setJsonResponse")');
+		expect(ctrl).toInclude('params.format = "json"');
+	}
+
+	private void function $expectQuotedKeys(required string strategy) {
+		var ctrl = $stripComments(fileRead(variables.fixtures[arguments.strategy].root & "/app/controllers/api/Sessions.cfc"));
+		var unquoted = reMatch("renderWith\(data=\{\s*[A-Za-z]+\s*:", ctrl);
+		ArrayAppend(unquoted, reMatch("renderWith\(data=\{[^}]*,\s*[A-Za-z]+\s*:", ctrl), true);
+		expect(unquoted).toBeEmpty();
+		expect(ctrl).toInclude('"token": token');
+		expect(ctrl).toInclude('"error": "Invalid email or password."');
 	}
 
 }

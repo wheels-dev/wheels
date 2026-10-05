@@ -35,6 +35,12 @@ component {
 	/**
 	 * Run migrations against all tenant datasources.
 	 *
+	 * Returns `{success, failed, total}`. A tenant whose migration step failed is
+	 * listed under `failed` as `{tenant, dataSource, error, version, direction, output}`
+	 * (the migrator reports a failed step in its output instead of throwing); a tenant
+	 * that threw, or has no `dataSource`, is listed as `{tenant, dataSource, error}`.
+	 * `success` entries are `{tenant, dataSource, output}`.
+	 *
 	 * @action Migration action: "latest", "up", "down", or "info".
 	 * @tenants Array of tenant structs, each with at minimum a `dataSource` key. Optional: `id`.
 	 * @tenantProvider Closure that returns an array of tenant structs. Used when tenants is empty.
@@ -107,7 +113,7 @@ component {
 					};
 
 					// Run the standard migrator against the tenant's datasource
-					local.output = $runForTenant(
+					local.run = $runTenantAction(
 						action = arguments.action,
 						dataSource = local.tenant.dataSource,
 						migratePath = arguments.migratePath,
@@ -116,11 +122,26 @@ component {
 						password = StructKeyExists(local.tenant, "password") ? local.tenant.password : ""
 					);
 
-					ArrayAppend(local.results.success, {
-						tenant = local.tenantId,
-						dataSource = local.tenant.dataSource,
-						output = local.output
-					});
+					// The migrator catches a failed up()/down() and reports it in its
+					// output instead of throwing, so a failed step never reaches the
+					// catch below. Classify the tenant by the migrator's own record.
+					if (local.run.failure.failed) {
+						ArrayAppend(local.results.failed, {
+							tenant = local.tenantId,
+							dataSource = local.tenant.dataSource,
+							error = local.run.failure.error,
+							version = local.run.failure.version,
+							direction = local.run.failure.direction,
+							output = local.run.output
+						});
+						if (arguments.stopOnError) break;
+					} else {
+						ArrayAppend(local.results.success, {
+							tenant = local.tenantId,
+							dataSource = local.tenant.dataSource,
+							output = local.run.output
+						});
+					}
 				} catch (any e) {
 					ArrayAppend(local.results.failed, {
 						tenant = local.tenantId,
@@ -143,14 +164,32 @@ component {
 	}
 
 	/**
-	 * Runs a single migration action against one tenant datasource.
+	 * Runs a single migration action against one tenant datasource and returns
+	 * the migrator's output text. A failed step is in that text but doesn't throw;
+	 * use `$runTenantAction()` to get the failure as data.
+	 */
+	public any function $runForTenant(
+		required string action,
+		required string dataSource,
+		required string migratePath,
+		required string sqlPath,
+		string userName = "",
+		string password = ""
+	) {
+		return $runTenantAction(argumentCollection = arguments).output;
+	}
+
+	/**
+	 * Runs a single migration action against one tenant datasource and returns
+	 * `{output, failure}`, where `failure` is the migrator's `$lastStepFailure()`
+	 * (`{failed, version, direction, error}`).
 	 * Isolates the tenant DS on the request (`request.wheels.migratorDataSource`)
 	 * instead of mutating `application.wheels.dataSourceName`. Concurrent
 	 * requests read the application key without this lock, so swapping it
 	 * would route their queries at the tenant. Per-datasource lock serializes
 	 * two runs against the same tenant without blocking other tenants.
 	 */
-	public any function $runForTenant(
+	public struct function $runTenantAction(
 		required string action,
 		required string dataSource,
 		required string migratePath,
@@ -188,7 +227,12 @@ component {
 		try {
 			lock name="wheels_tenant_migrator_#arguments.dataSource#" type="exclusive" timeout="300" {
 				local.migrator = $newMigrator(migratePath = arguments.migratePath, sqlPath = arguments.sqlPath);
-				return $executeAction(migrator = local.migrator, action = arguments.action);
+				local.output = $executeAction(migrator = local.migrator, action = arguments.action);
+				local.failure = {failed = false, version = "", direction = "", error = ""};
+				if (IsObject(local.migrator) && StructKeyExists(local.migrator, "$lastStepFailure")) {
+					local.failure = local.migrator.$lastStepFailure();
+				}
+				return {output = local.output, failure = local.failure};
 			}
 		} finally {
 			if (local.hadOverride) {

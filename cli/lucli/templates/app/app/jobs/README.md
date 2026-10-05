@@ -46,4 +46,4 @@ wheels jobs status                        # per-queue breakdown
 The `wheels_jobs` table is created automatically on first use; there is no
 migration to run.
 
-See [Background Jobs](https://guides.wheels.dev/v4-1-0/digging-deeper/background-jobs/) in the guides for retries, backoff, priority queues, and the monitoring dashboard.
+See [Background Jobs](https://guides.wheels.dev/v4-2-0/digging-deeper/background-jobs/) in the guides for retries, backoff, priority queues, and the monitoring dashboard.

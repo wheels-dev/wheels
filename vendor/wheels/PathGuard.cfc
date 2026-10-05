@@ -11,6 +11,15 @@
  * Some sites also omitted the trailing-separator qualifier, so a prefix sibling
  * (`/srv/App-extra`) passed too.
  *
+ * KEEP IN SYNC: the Wheels CLI carries its own copy of this logic in
+ * `cli/lucli/Module.cfc` ($pathWithinExact / $nativeSeparator, #4090/#4130) because
+ * the CLI runtime does not load this component. That copy is deliberately NOT identical:
+ * (1) $pathWithinExact takes an optional `separator` argument so its specs can exercise
+ * Windows behaviour on any host, and (2) its $nativeSeparator is public for the same
+ * reason. Mirror behavioural changes here into that copy, preserving those two
+ * differences. (The Global mixin `$nativePathSeparator` in global/util.cfm is NOT a
+ * separate copy — it delegates to this component's $nativeSeparator.)
+ *
  * [section: Internal]
  * [category: Security]
  */
@@ -55,8 +64,12 @@ component output="false" {
 	 * back to the OS name when no JVM is present (the JVM-free RustCFML); defaults to the
 	 * POSIX "/". It is NEVER inferred from seeing a backslash in a path — a backslash is a
 	 * legal filename byte on POSIX, not evidence of a Windows separator.
+	 *
+	 * Public (with the `$` internal-prefix) so the Global mixin `$nativePathSeparator`
+	 * (global/util.cfm) can delegate to it rather than duplicate the logic — this is the
+	 * single source of the separator detection for the framework runtime.
 	 */
-	private string function $nativeSeparator() {
+	public string function $nativeSeparator() {
 		try {
 			local.sep = CreateObject("java", "java.io.File").separator;
 			if (local.sep == "\" || local.sep == "/") {

@@ -227,27 +227,15 @@
 	// ======================================================================
 
 	/**
-	 * The platform's native path separator. Prefers java.io.File.separator (JVM); falls
-	 * back to the OS name when no JVM is present (the JVM-free RustCFML); defaults to the
-	 * POSIX "/". NEVER inferred from seeing a backslash in a path — a backslash is a legal
-	 * filename byte on POSIX, not evidence of a Windows separator. Used by path-containment
-	 * normalisation so it folds only real native separators.
+	 * The platform's native path separator, for path-containment normalisation (folds only
+	 * real native separators, never a backslash seen in a POSIX filename). This Global mixin
+	 * is reachable from mixed-in code (tags.cfm, Public.cfc); it delegates to
+	 * wheels.PathGuard.$nativeSeparator() so the detection lives in exactly one place rather
+	 * than being duplicated here. (PathGuard is a standalone component with no Global mixins,
+	 * so the dependency only goes this direction.)
 	 */
 	public string function $nativePathSeparator() {
-		try {
-			local.sep = CreateObject("java", "java.io.File").separator;
-			if (local.sep == "\" || local.sep == "/") {
-				return local.sep;
-			}
-		} catch (any e) {
-		}
-		try {
-			if (StructKeyExists(server, "os") && StructKeyExists(server.os, "name") && FindNoCase("windows", server.os.name)) {
-				return "\";
-			}
-		} catch (any e) {
-		}
-		return "/";
+		return new wheels.PathGuard().$nativeSeparator();
 	}
 
 	/**
@@ -947,6 +935,46 @@
 	}
 
 
+	// Integer-literal helpers shared by models (nested-property keys, #4128) and database
+	// adapters (SQLite bind width, #4089): compared as digit strings, never through a double.
+
+	/**
+	 * Internal function. "<sign><digits>" with no leading zeros for an integer literal, or ""
+	 * when the value is not one.
+	 */
+	public string function $canonicalIntegerString(required string value) {
+		local.value = Trim(arguments.value);
+		if (!ReFind("^[+-]?[0-9]+$", local.value)) {
+			return "";
+		}
+		local.sign = Left(local.value, 1) == "-" ? "-" : "";
+		local.digits = ReReplace(local.value, "^[+-]?0*", "");
+		if (!Len(local.digits)) {
+			return "0";
+		}
+		return local.sign & local.digits;
+	}
+
+	/**
+	 * Internal function. -1, 0 or 1 as canonical integer string a is below, equal to or above b,
+	 * compared by sign, then length, then digits.
+	 */
+	public numeric function $compareIntegerStrings(required string a, required string b) {
+		local.aNegative = Left(arguments.a, 1) == "-";
+		local.bNegative = Left(arguments.b, 1) == "-";
+		if (local.aNegative != local.bNegative) {
+			return local.aNegative ? -1 : 1;
+		}
+		local.aDigits = ReReplace(arguments.a, "^-", "");
+		local.bDigits = ReReplace(arguments.b, "^-", "");
+		if (Len(local.aDigits) != Len(local.bDigits)) {
+			local.rv = Len(local.aDigits) > Len(local.bDigits) ? 1 : -1;
+		} else {
+			local.rv = Sgn(Compare(local.aDigits, local.bDigits));
+		}
+		return local.aNegative ? -local.rv : local.rv;
+	}
+
 	/**
 	 * Generates a 36-character UUID compatible with SQL Server's uniqueidentifier.
 	 *
@@ -1072,5 +1100,369 @@ public boolean function $dataSourceIsReachable(required string name) {
 		state.reachable = false;
 	}
 	return state.reachable;
+}
+
+/**
+ * Internal. Which datasource an app test run may use, by the same rules as the
+ * built-in runner (`vendor/wheels/tests/app-runner.cfm`):
+ * - an explicit, valid `useTestDB=false` runs on the primary datasource (intentional);
+ * - otherwise `<primary>_test` is used when it is registered or reachable ("swap");
+ * - otherwise an omitted `useTestDB` with `allowTestsAgainstPrimaryDatasource=true`
+ *   runs on the primary datasource with a warning;
+ * - anything else is refused.
+ * Returns `{action: swap|primary|refuse, primary, candidate, target, warn}`.
+ * `candidateRegistered` is probed when not passed (passed by specs).
+ */
+public struct function $testDataSourceDecision(
+	required string primary,
+	required struct requestUrl,
+	candidateRegistered
+) {
+	local.rv = {
+		action = "refuse",
+		primary = arguments.primary,
+		candidate = arguments.primary & "_test",
+		target = "",
+		warn = false
+	};
+	local.paramPresent = StructKeyExists(arguments.requestUrl, "useTestDB");
+	local.validBoolean = local.paramPresent && IsBoolean(arguments.requestUrl.useTestDB);
+	if (local.validBoolean && !arguments.requestUrl.useTestDB) {
+		local.rv.action = "primary";
+		local.rv.target = arguments.primary;
+		return local.rv;
+	}
+	if (!StructKeyExists(arguments, "candidateRegistered") || IsNull(arguments.candidateRegistered)) {
+		arguments.candidateRegistered = $testDataSourceRegistered(local.rv.candidate);
+	}
+	if (arguments.candidateRegistered) {
+		local.rv.action = "swap";
+		local.rv.target = local.rv.candidate;
+		return local.rv;
+	}
+	local.allowPrimary = StructKeyExists(application.wheels, "allowTestsAgainstPrimaryDatasource")
+		&& IsBoolean(application.wheels.allowTestsAgainstPrimaryDatasource)
+		&& application.wheels.allowTestsAgainstPrimaryDatasource;
+	if (!local.paramPresent && local.allowPrimary) {
+		local.rv.action = "primary";
+		local.rv.target = arguments.primary;
+		local.rv.warn = true;
+	}
+	return local.rv;
+}
+
+/**
+ * Internal. True when this request belongs to the app test run in progress: it carries
+ * that run's token (`wheelsTestRun`). Such a request runs inside the run, so it must not
+ * wait on the runner lock the run holds, nor swap or restore the datasource again.
+ */
+public boolean function $isTestRunReentry(required struct requestUrl) {
+	local.activeRunToken = StructKeyExists(application, "$$$appTestRunToken") ? application["$$$appTestRunToken"] : "";
+	local.requestRunToken = (StructKeyExists(arguments.requestUrl, "wheelsTestRun") && IsSimpleValue(arguments.requestUrl.wheelsTestRun))
+		? arguments.requestUrl.wheelsTestRun
+		: "";
+	return Len(local.activeRunToken) > 0 && Compare(local.requestRunToken, local.activeRunToken) == 0;
+}
+
+/**
+ * Internal. Defaults `coreTestDataSourceName` to `dataSourceName` when the settings did not
+ * set it. onApplicationStart calls it after the settings files load, so the default follows
+ * the dataSourceName they set rather than the one derived from the app's folder before them.
+ */
+public void function $defaultCoreTestDataSourceName(required struct settings) {
+	if (!StructKeyExists(arguments.settings, "coreTestDataSourceName")) {
+		arguments.settings.coreTestDataSourceName = arguments.settings.dataSourceName;
+	}
+}
+
+/**
+ * Internal. Which datasource the framework's own test runners (the core runner and the
+ * RocketUnit runner) use. `?db=` naming one of `testDbList` selects `wheelstestdb_<db>`, and
+ * the `|datasourceName|` placeholder selects `wheelstestdb`, as before. A
+ * `coreTestDataSourceName` other than the app's primary datasource is used as it is when it
+ * exists, and refused when it does not. Only
+ * when the run would otherwise use the app's primary datasource does the app-test rule apply
+ * ($testDataSourceDecision): `<primary>_test`, the primary datasource only for an explicit
+ * useTestDB=false (never through allowTestsAgainstPrimaryDatasource), or refused.
+ * Returns `{action: use|swap|primary|refuse, target, decision, message}`; `message` explains a
+ * refusal.
+ */
+public struct function $coreTestDataSource(
+	required string primary,
+	required string coreName,
+	required struct requestUrl,
+	string testDbList = "mysql,sqlserver,sqlserver_cicd,postgres,h2,oracle,sqlite,cockroachdb",
+	candidateRegistered,
+	targetRegistered
+) {
+	local.rv = {action = "use", target = "", decision = {}, ignoredAllowPrimary = false, message = ""};
+	if (
+		StructKeyExists(arguments.requestUrl, "db")
+		&& IsSimpleValue(arguments.requestUrl.db)
+		&& ListFind(arguments.testDbList, arguments.requestUrl.db)
+	) {
+		local.rv.target = ListFind("sqlserver,sqlserver_cicd", arguments.requestUrl.db) ? "wheelstestdb_sqlserver" : "wheelstestdb_" & arguments.requestUrl.db;
+		return local.rv;
+	}
+	if (arguments.coreName == "|datasourceName|") {
+		local.rv.target = "wheelstestdb";
+		return local.rv;
+	}
+	// Datasource names are case-insensitive: 'App' is the primary 'app', not another datasource.
+	if (CompareNoCase(arguments.coreName, arguments.primary) != 0) {
+		local.registered = (StructKeyExists(arguments, "targetRegistered") && !IsNull(arguments.targetRegistered))
+			? arguments.targetRegistered
+			: $testDataSourceRegistered(name = arguments.coreName);
+		if (!local.registered) {
+			local.rv.action = "refuse";
+			local.rv.decision = {primary = arguments.primary, candidate = arguments.coreName};
+			local.rv.message = "The framework test suite is set to use the datasource '" & arguments.coreName
+				& "' (coreTestDataSourceName), which does not exist. Set coreTestDataSourceName in config/settings.cfm, create '"
+				& arguments.coreName & "', or pass ?db= to use a wheelstestdb_<db> datasource.";
+			return local.rv;
+		}
+		local.rv.target = arguments.coreName;
+		return local.rv;
+	}
+	local.decisionArgs = {primary = arguments.primary, requestUrl = arguments.requestUrl};
+	if (StructKeyExists(arguments, "candidateRegistered") && !IsNull(arguments.candidateRegistered)) {
+		local.decisionArgs.candidateRegistered = arguments.candidateRegistered;
+	}
+	local.rv.decision = $testDataSourceDecision(argumentCollection = local.decisionArgs);
+	// allowTestsAgainstPrimaryDatasource is a compatibility setting for app tests from
+	// older CLIs. The framework's suite (and its populate.cfm, which drops and recreates
+	// tables) never uses it: only an explicit useTestDB=false reaches the primary.
+	if (local.rv.decision.action == "primary" && local.rv.decision.warn) {
+		local.rv.decision.action = "refuse";
+		local.rv.decision.warn = false;
+		local.rv.ignoredAllowPrimary = true;
+		try {
+			WriteLog(
+				file = "wheels",
+				type = "warning",
+				text = "The framework test suite ignores allowTestsAgainstPrimaryDatasource: it does not run on the primary datasource '" & arguments.primary & "' unless the request passes useTestDB=false."
+			);
+		} catch (any e) {
+		}
+	}
+	local.rv.action = local.rv.decision.action;
+	local.rv.target = local.rv.decision.action == "refuse" ? "" : local.rv.decision.target;
+	if (local.rv.action == "refuse") {
+		local.rv.message = "The framework test suite would run on this app's primary datasource '" & local.rv.decision.primary
+			& "'. Pass ?db= to use a wheelstestdb_<db> datasource, create '" & local.rv.decision.candidate
+			& "', or run against the primary datasource intentionally with useTestDB=false.";
+	}
+	return local.rv;
+}
+
+/**
+ * Internal. True when `name` is in the application's datasources or the engine can
+ * open it (a datasource registered at server level is not in the application metadata).
+ */
+public boolean function $testDataSourceRegistered(required string name) {
+	local.meta = GetApplicationMetaData();
+	if (
+		StructKeyExists(local.meta, "datasources")
+		&& IsStruct(local.meta.datasources)
+		&& StructKeyExists(local.meta.datasources, arguments.name)
+	) {
+		return true;
+	}
+	return $dataSourceIsReachable(name = arguments.name);
+}
+
+/**
+ * Internal. Points a project test runner (`tests/runner.cfm`) at the datasource
+ * `decision` chose and returns what to restore with `$endTestRunDataSource()`.
+ * Runners copied from older Wheels releases set `dataSourceName` from
+ * `coreTestDataSourceName`, so both are pointed at the test datasource. Records the
+ * run's token (so re-entrant requests from the run skip the runner lock) and the swap
+ * markers $recoverStrandedTestRun() uses if the run dies before it restores.
+ */
+public struct function $beginTestRunDataSource(required struct decision) {
+	local.saved = {
+		dataSourceName = application.wheels.dataSourceName,
+		hasCoreTestDataSourceName = StructKeyExists(application.wheels, "coreTestDataSourceName"),
+		coreTestDataSourceName = StructKeyExists(application.wheels, "coreTestDataSourceName") ? application.wheels.coreTestDataSourceName : ""
+	};
+	if (!StructKeyExists(request, "wheels")) {
+		request.wheels = {};
+	}
+	request.wheels.$testRunnerOuter = true;
+	request.wheels.$testDataSourceDecision = arguments.decision;
+	application["$$$appTestRunToken"] = CreateUUID();
+	$markTestRunSwap(original = local.saved.dataSourceName);
+	if (arguments.decision.action == "swap") {
+		application.wheels.dataSourceName = arguments.decision.target;
+		application.wheels.coreTestDataSourceName = arguments.decision.target;
+		if (StructKeyExists(application.wheels, "models")) {
+			StructClear(application.wheels.models);
+		}
+		request.wheels.$testRunPreSwap = {original = arguments.decision.primary, target = arguments.decision.target};
+	}
+	return local.saved;
+}
+
+/**
+ * Internal. Restores what `$beginTestRunDataSource()` changed. Called from a
+ * `finally` block, so it does all of its own work (no loops in the caller).
+ */
+public void function $endTestRunDataSource(required struct saved) {
+	if (Compare(application.wheels.dataSourceName, arguments.saved.dataSourceName) != 0) {
+		application.wheels.dataSourceName = arguments.saved.dataSourceName;
+		if (StructKeyExists(application.wheels, "models")) {
+			StructClear(application.wheels.models);
+		}
+	}
+	if (arguments.saved.hasCoreTestDataSourceName) {
+		application.wheels.coreTestDataSourceName = arguments.saved.coreTestDataSourceName;
+	} else {
+		StructDelete(application.wheels, "coreTestDataSourceName");
+	}
+	$clearTestRunSwapMarkers();
+	if (StructKeyExists(request, "wheels")) {
+		StructDelete(request.wheels, "$testRunnerOuter");
+		StructDelete(request.wheels, "$testDataSourceDecision");
+		StructDelete(request.wheels, "$testRunPreSwap");
+	}
+}
+
+/**
+ * Internal. Records, before a test run changes the datasource settings, what they were and
+ * when the run must have ended: the run's request timeout plus a margin, after which a
+ * request that still finds the markers knows the run died before restoring them.
+ */
+public void function $markTestRunSwap(required string original) {
+	application.$$$appTestOriginalDataSource = arguments.original;
+	application.$$$appTestOriginalCoreDataSource = {
+		exists = StructKeyExists(application.wheels, "coreTestDataSourceName"),
+		value = StructKeyExists(application.wheels, "coreTestDataSourceName") ? application.wheels.coreTestDataSourceName : ""
+	};
+	application.$$$appTestRunDeadline = DateAdd("s", Max(1800, $getRequestTimeout()) + 300, Now());
+}
+
+/**
+ * Internal. Moves a running test run's deadline forward (from `from`, normally Now()).
+ * WheelsTest calls this as it builds each spec bundle, so a run that is still building
+ * bundles is never taken for a dead one and restored to the primary datasource mid-run.
+ */
+public void function $extendTestRunDeadline(required date from) {
+	if (StructKeyExists(application, "$$$appTestRunDeadline")) {
+		application.$$$appTestRunDeadline = DateAdd("s", Max(1800, $getRequestTimeout()) + 300, arguments.from);
+	}
+}
+
+/**
+ * Internal. Removes the markers a test run set, once it has restored the settings.
+ */
+public void function $clearTestRunSwapMarkers() {
+	StructDelete(application, "$$$appTestOriginalDataSource");
+	StructDelete(application, "$$$appTestOriginalCoreDataSource");
+	StructDelete(application, "$$$appTestRunDeadline");
+	StructDelete(application, "$$$appTestRunToken");
+}
+
+/**
+ * Internal. Restores the datasource settings a test run changed when that run died
+ * before restoring them (its request was killed, so its finally block never ran).
+ * `force` is for a caller that holds the test-runner lock, which proves no run is in
+ * progress; otherwise the markers count as stranded only after the run's deadline.
+ * Returns true when it restored something.
+ */
+public boolean function $recoverStrandedTestRun(boolean force = false) {
+	if (!StructKeyExists(application, "$$$appTestOriginalDataSource")) {
+		return false;
+	}
+	if (
+		!arguments.force
+		&& (!StructKeyExists(application, "$$$appTestRunDeadline") || DateCompare(Now(), application.$$$appTestRunDeadline) <= 0)
+	) {
+		return false;
+	}
+	local.original = application.$$$appTestOriginalDataSource;
+	if (Compare(application.wheels.dataSourceName, local.original) != 0) {
+		application.wheels.dataSourceName = local.original;
+		if (StructKeyExists(application.wheels, "models")) {
+			StructClear(application.wheels.models);
+		}
+	}
+	if (StructKeyExists(application, "$$$appTestOriginalCoreDataSource")) {
+		if (application.$$$appTestOriginalCoreDataSource.exists) {
+			application.wheels.coreTestDataSourceName = application.$$$appTestOriginalCoreDataSource.value;
+		} else {
+			StructDelete(application.wheels, "coreTestDataSourceName");
+		}
+	}
+	$clearTestRunSwapMarkers();
+	try {
+		WriteLog(
+			file = "wheels",
+			type = "warning",
+			text = "Restored the datasource '" & local.original & "' left switched by a test run that did not finish."
+		);
+	} catch (any e) {
+	}
+	return true;
+}
+
+/**
+ * Internal. Marks a test run that uses the app's primary datasource because
+ * allowTestsAgainstPrimaryDatasource allows it: a response header and a warning in wheels.log.
+ */
+public void function $warnTestsOnPrimaryDataSource(required struct decision) {
+	cfheader(name = "X-Wheels-Test-Database", value = "primary");
+	try {
+		WriteLog(
+			file = "wheels",
+			type = "warning",
+			text = "App tests are running against the PRIMARY datasource '" & arguments.decision.primary & "' because allowTestsAgainstPrimaryDatasource=true and '" & arguments.decision.candidate & "' is not registered. Test writes reach the real database."
+		);
+	} catch (any e) {
+	}
+}
+
+/**
+ * Internal. The JSON body for a refused framework test run (`$coreTestDataSource()` chose
+ * `refuse`). Quoted keys keep their case when serialized.
+ */
+public struct function $coreTestDataSourceRefusal(required struct choice) {
+	return {
+		"success" = false,
+		"error" = "Test database not available",
+		"message" = arguments.choice.message,
+		"datasource" = arguments.choice.decision.primary,
+		"candidate" = arguments.choice.decision.candidate
+	};
+}
+
+/**
+ * Internal. The JSON body for a refused app test run. Quoted keys keep their case when
+ * serialized.
+ */
+public struct function $testDataSourceRefusal(required struct decision) {
+	return {
+		"success" = false,
+		"error" = "Test database not available",
+		"message" = "App tests default to the '" & arguments.decision.candidate & "' datasource, which is not registered. Create it; or run against '"
+			& arguments.decision.primary & "' intentionally with `wheels test --no-test-db` (URL: useTestDB=false); or, for older CLIs that cannot send useTestDB=false, "
+			& "set(allowTestsAgainstPrimaryDatasource=true) in config/settings.cfm. "
+			& "If tests/runner.cfm was copied from an older Wheels release, replace it with the runner `wheels new` creates (it includes wheels/tests/app-runner.cfm).",
+		"datasource" = arguments.decision.primary,
+		"candidate" = arguments.decision.candidate
+	};
+}
+
+/**
+ * Internal. The message an app test run reports when TestBox did not finish. A run
+ * stopped by the request timeout says so, with the limit, so it is not read as a
+ * failure of the specs themselves.
+ */
+public string function $testRunFailureMessage(required any runErr) {
+	local.message = StructKeyExists(arguments.runErr, "message") ? arguments.runErr.message : "";
+	local.type = StructKeyExists(arguments.runErr, "type") ? arguments.runErr.type : "";
+	if (FindNoCase("timeout", local.message & " " & local.type)) {
+		return "The test run hit the request timeout (" & $getRequestTimeout() & " seconds) and was stopped before it finished. " & local.message;
+	}
+	return local.message;
 }
 </cfscript>

@@ -1,41 +1,37 @@
-# wheels-base-template
+# Tweet: a small Wheels example app
 
-This is a blank application written in Wheels.dev
+A Twitter-style demo built with [Wheels](https://wheels.dev): sign up, log in, post short messages, like them, and follow other users. It shows the everyday Wheels pieces working together:
 
-## As an Application
+- models with associations and validations (`User`, `Tweet`, `Like`, `Follow`);
+- RESTful resources plus a few named routes (`config/routes.cfm`);
+- session-based sign-in (`Sessions` / `Users` controllers);
+- migrations for the whole schema (`app/migrator/migrations/`);
+- views styled with Tailwind CSS and Alpine.js, loaded from a CDN in `app/views/layout.cfm`.
 
-As an application, this is a starting point for a modern Wheels application with Bootstrap integration.
+The app runs on an embedded H2 database, so there's no database server to set up.
 
-## As a ForgeBox Package
+## Run it
 
-As a ForgeBox package there is some interesting things going on here. Although this package doesn't contain much custom code, it does have a dependency which pulls in the core folder the framework needs to function. This folder is pulled in via this dependency:
+You need [CommandBox](https://www.ortussolutions.com/products/commandbox).
 
-```
-"Dependencies":{
-  "wheels-core":"^3.1.0"
-}
-```
+1. Install the framework into `vendor/wheels/`:
 
-The core files are put into the `vendor/wheels/` folder according to these settings.
+   ```bash
+   box install
+   ```
 
-```
-"installPaths":{
-  "wheels-core":"vendor/wheels/"
-}
-```
+2. Start the server:
 
-## To Install
+   ```bash
+   box server start
+   ```
 
-To install this package you'll need to have a running CommandBox installation. Then you can install this package with the following:
+   `server.json` declares the H2 Lucee extension, so CommandBox installs it on first start. The database files are created under `db/h2/`.
 
-```
-box
-mkdir myapp --cd
-install wheels-base-template
-```
+3. Create the schema. Open `/wheels/migrator` on the running site (the development-mode migrator) and click **Migrate To Latest**. That creates the `users`, `tweets`, `likes` and `follows` tables.
 
-This could be shortened to a single command run in an empty directory:
+   `wheels migrate latest` from the Wheels CLI only works against a server started with `wheels start`, not against a CommandBox server, so use the browser migrator here.
 
-```
-box install wheels-base-template
-```
+4. Open the site, choose **Sign up**, create an account, and post your first tweet.
+
+5. Run the tests. With the server running, open `/wheels/app/tests` to run the app's specs (`tests/specs/`). They run against a separate `tweet_test` H2 database (also under `db/h2/`), so your data in `tweet` isn't touched.

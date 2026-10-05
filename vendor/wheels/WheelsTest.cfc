@@ -11,6 +11,37 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     // Pseudo-constructor (runs automatically). Kept so specs that EXTEND
     // WheelsTest get their helpers bound during child compilation.
     $bindApplicationHelpers();
+    $guardTestRunDataSource();
+
+    /**
+     * Refuses to build a spec bundle when this run was meant to use the test
+     * datasource but the app's primary datasource is active, e.g. a project
+     * tests/runner.cfm that sets the datasource itself. Only acts inside a run
+     * started through Public.cfc's project-runner path (which records its
+     * datasource decision for the request); a no-op everywhere else.
+     */
+    public void function $guardTestRunDataSource() {
+        // A run that is still building bundles is alive: keep its deadline ahead, so
+        // the stranded-run recovery never restores the primary datasource mid-run.
+        if (StructKeyExists(application, "$$$appTestRunDeadline") && StructKeyExists(application, "wo")) {
+            application.wo.$extendTestRunDeadline(from = Now());
+        }
+        if (!StructKeyExists(request, "wheels") || !StructKeyExists(request.wheels, "$testDataSourceDecision")) {
+            return;
+        }
+        local.decision = request.wheels.$testDataSourceDecision;
+        if (
+            local.decision.action == "swap"
+            && StructKeyExists(application, "wheels")
+            && Compare(application.wheels.dataSourceName, local.decision.primary) == 0
+        ) {
+            Throw(
+                type = "Wheels.TestDatabaseNotAvailable",
+                message = "This test run uses the '#local.decision.target#' datasource, but the app's primary datasource '#local.decision.primary#' is active.",
+                extendedInfo = "Something in the run set the datasource back to the primary one; a tests/runner.cfm copied from an older Wheels release can do this. Replace it with the runner `wheels new` creates (it includes wheels/tests/app-runner.cfm)."
+            );
+        }
+    }
 
     /**
      * Bind application.wo's helpers into this instance (both variables and
@@ -61,6 +92,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
      */
     remote WheelsTest function init() {
         $bindApplicationHelpers();
+        $guardTestRunDataSource();
         return this;
     }
 
@@ -93,6 +125,78 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             local.tmp &= "/";
         }
         return local.tmp & arguments.suffix;
+    }
+
+    /**
+     * MockBox, with its stub directory in place. MockBox writes a generated stub for
+     * each mocked method under its generation path (`/testbox/system/stubs` by
+     * default, relative to the webroot) and fails when that directory is missing, as
+     * it is in an app made with `wheels new`. Every mock helper (createMock,
+     * createEmptyMock, createStub, prepareMock, querySim) goes through here.
+     *
+     * @generationPath Where MockBox writes its stubs; empty keeps the current path.
+     */
+    public any function getMockBox(string generationPath = "") {
+        local.mockBox = super.getMockBox(argumentCollection = arguments);
+        $ensureMockStubDirectory(local.mockBox);
+        return local.mockBox;
+    }
+
+    /**
+     * Creates `mockBox`'s stub directory, and any missing parents, when it does not
+     * exist. One level at a time with DirectoryCreate(): its create-parents argument
+     * is Lucee-only (issue #2567) and java.io.File is not available on every engine.
+     *
+     * @mockBox A wheels.wheelstest.system.MockBox.
+     */
+    public void function $ensureMockStubDirectory(required any mockBox) {
+        local.dir = ReReplace(ExpandPath(arguments.mockBox.getGenerationPath()), "[/\\]+$", "");
+        local.missing = [];
+        while (Len(local.dir) && !DirectoryExists(local.dir)) {
+            ArrayPrepend(local.missing, local.dir);
+            local.parent = ReReplace(GetDirectoryFromPath(local.dir), "[/\\]+$", "");
+            if (local.parent == local.dir) {
+                break;
+            }
+            local.dir = local.parent;
+        }
+        for (local.path in local.missing) {
+            try {
+                DirectoryCreate(local.path);
+            } catch (any e) {
+                // Another request may have created it meanwhile.
+                if (!DirectoryExists(local.path)) {
+                    rethrow;
+                }
+            }
+        }
+    }
+
+    /**
+     * The Wheels repository root, with a trailing slash, derived from the `/wheels`
+     * mapping (`vendor/wheels`).
+     */
+    public string function $frameworkRepoRoot() {
+        return ExpandPath("/wheels/../..") & "/";
+    }
+
+    /**
+     * Skips the calling spec when the run is not inside the Wheels framework
+     * repository. The framework suite run from an app (`/wheels/core/tests`) has
+     * no `cli/`, `tools/`, `.github/`, `web/` or demo app, so a spec that reads
+     * them reports as skipped there, naming the path it needs, instead of
+     * erroring. Call it first in the spec, before any try/catch. Returns the
+     * absolute path.
+     *
+     * @relativePath The path the spec reads, relative to the repository root.
+     */
+    public string function $requireRepoPath(required string relativePath) {
+        local.relative = ReReplace(arguments.relativePath, "^[/\\]+", "");
+        local.root = $frameworkRepoRoot();
+        if (!DirectoryExists(local.root & "cli/lucli/templates")) {
+            skip("Needs '" & local.relative & "' from the Wheels framework repository, which an app does not have.");
+        }
+        return local.root & local.relative;
     }
 
     /**
@@ -159,7 +263,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     public any function $testClient(boolean testContext = true) {
         // Do not name this local `client` — that is a reserved CFML scope
         // and Lucee throws "client scope is not enabled" (anti-pattern 11).
-        var httpClient = new wheels.wheelstest.TestClient(baseUrl = $getTestBaseUrl());
+        var httpClient = new wheels.wheelstest.TestClient(baseUrl = $getTestBaseUrl(), testContext = arguments.testContext);
         if (arguments.testContext) {
             var ctx = new wheels.events.TestContext();
             // Send the per-process runner secret (not a fixed "1").

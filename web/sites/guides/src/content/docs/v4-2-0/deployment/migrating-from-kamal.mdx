@@ -22,7 +22,7 @@ This page is for teams already running Ruby Kamal who want to replace `kamal` wi
 </Aside>
 
 <Aside type="caution" title="Unimplemented Kamal keys are rejected">
-The validator only accepts the top-level keys `wheels deploy` actually implements: `service`, `image`, `servers`, `registry`, `builder`, `env`, `ssh`, `proxy`, `accessories`. Kamal keys the port doesn't implement yet — `boot`, top-level `healthcheck`, `hooks`, `volumes`, `labels`, `logging`, `retain_containers`, `minimum_version`, `asset_path`, `require_destination`, `allow_empty_roles`, `run_directory`, `readiness_delay` — make every command fail with `unknown top-level key: '<name>'`. A typical Kamal config needs those keys deleted (or `healthcheck` moved under `proxy:`) before it loads. See [Divergence 2: rejected top-level keys](#divergence-2-rejected-top-level-keys) below.
+The validator only accepts the top-level keys `wheels deploy` actually implements: `service`, `image`, `servers`, `registry`, `builder`, `env`, `ssh`, `proxy`, `boot`, `accessories`, `volumes`. Kamal keys the port doesn't implement yet — top-level `healthcheck`, `hooks`, `labels`, `logging`, `retain_containers`, `minimum_version`, `asset_path`, `require_destination`, `allow_empty_roles`, `run_directory`, `readiness_delay` — make every command fail with `unknown top-level key: '<name>'`. A typical Kamal config needs those keys deleted (or `healthcheck` moved under `proxy:`) before it loads. See [Divergence 2: rejected top-level keys](#divergence-2-rejected-top-level-keys) below.
 </Aside>
 
 ## What's byte-compatible
@@ -82,12 +82,11 @@ If your existing config uses ERB logic — `<%= "blue" if ENV["ROLE"] == "stagin
 
 Kamal accepts a number of top-level `deploy.yml` keys that `wheels deploy` has not implemented. Rather than accepting them and silently doing nothing, the validator **rejects** them — any unimplemented key makes every command fail with `unknown top-level key: '<name>'` ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 
-The accepted top-level keys are `service`, `image`, `servers`, `registry`, `builder`, `env`, `ssh`, `proxy`, and `accessories`. Everything else must come out of the file before it loads, including:
+The accepted top-level keys are `service`, `image`, `servers`, `registry`, `builder`, `env`, `ssh`, `proxy`, `boot`, `accessories`, and `volumes`. Everything else must come out of the file before it loads, including:
 
-- `boot` — hosts always deploy one at a time, sequentially ([#2957](https://github.com/wheels-dev/wheels/issues/2957))
 - top-level `healthcheck` — move it under `proxy.healthcheck:` instead
 - `hooks` — the hooks *feature* works (scripts are always loaded from `.kamal/hooks/`); only the path-override key is rejected
-- `volumes`, `labels`, `logging` — no app-container mounts, extra labels, or logging flags are emitted
+- `labels`, `logging` — no extra labels or logging flags are emitted
 - `retain_containers` — pass `--keep=<n>` to [`wheels deploy prune`](/v4-2-0/command-line-tools/commands/deploy/prune/) instead (default keeps the 5 most recent)
 - `minimum_version`, `asset_path`, `require_destination`, `allow_empty_roles`, `run_directory`, `readiness_delay`
 

@@ -153,7 +153,7 @@ component extends="wheels.Job" {
         this.maxRetries = 5;
     }
 
-    public void function perform(required struct data) {
+    public void function perform(struct data = {}) {
         user = model("User").findByKey(arguments.data.userId);
         new app.mailers.UserMailer().sendWelcome(user);
     }

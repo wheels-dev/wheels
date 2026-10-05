@@ -38,6 +38,23 @@ component extends="wheels.engineAdapters.Base" output="false" {
 	}
 
 	/**
+	 * RustCFML's String indexing (Mid()/Find() by position) is O(index), not O(1),
+	 * so a per-index scan over a long value is O(n^2); callers such as
+	 * $maskWhereLiterals must take the single-pass char-array path instead (#3903).
+	 *
+	 * Base.cfc detects this by probing for a JVM class (CreateObject("java",
+	 * "java.lang.String")), which RustCFML currently rejects. But RustCFML already
+	 * shims part of the java.* surface (java.lang.StringBuilder resolves today), so a
+	 * future build that shims java.lang.String would flip the Base probe to true and
+	 * silently route RustCFML back to the O(n^2) scan. Pin the capability to false
+	 * here so that cannot happen — RustCFML's string indexing is O(index) regardless
+	 * of which java classes it exposes (rev1-r3 on #4146).
+	 */
+	public boolean function stringIndexIsLinear() {
+		return false;
+	}
+
+	/**
 	 * Defensive fallback for callers that reach imageInfo() despite
 	 * supportsImageInfo() being false: returns the same struct shape
 	 * Base.cfc's cfimage action="info" produces, with width/height 0

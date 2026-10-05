@@ -224,7 +224,7 @@
 				local.null = true;
 			}
 			local.param = {
-				value = local.value,
+				value = $sqliteDateParamValue(value = local.value, type = variables.wheels.class.properties[local.key].type, isNull = local.null, property = local.key),
 				type = variables.wheels.class.properties[local.key].type,
 				dataType = variables.wheels.class.properties[local.key].dataType,
 				scale = variables.wheels.class.properties[local.key].scale,
@@ -979,9 +979,6 @@
 	}
 
 	/**
-	 * Internal function.
-	 */
-	/**
 	 * Replace every single-quoted string literal in a WHERE string with a
 	 * masked placeholder whose content is a sentinel prefix plus the literal's
 	 * hex-encoded, un-escaped value. Masked literals contain no quote, comma
@@ -995,6 +992,155 @@
 	 * ($unmaskParameterValue on the adapter). An unbalanced quote is rejected.
 	 */
 	public string function $maskWhereLiterals(required string where) {
+		if (Find("'", arguments.where) == 0) {
+			return arguments.where;
+		}
+		// Path selection is by CAPABILITY, not engine name. On a JVM-backed engine Mid()/Find()
+		// index in O(1), so the single-pass index scan ($maskWhereLiteralsByScan) is linear AND
+		// carries a much lower constant factor than building a per-character array — measured
+		// ~3x faster on finderValueBindingSpec. The char-array path only helps a JVM-free runtime
+		// (RustCFML), where Mid()/Find() are O(index) and a per-index scan is O(n^2) (#3903). The
+		// engine adapter probes the capability (stringIndexIsLinear) once per application.
+		if ($engineAdapter().stringIndexIsLinear()) {
+			return $maskWhereLiteralsByScan(arguments.where);
+		}
+		// JVM-free runtime: read the string into a one-pass char array (REMatch) and walk it with
+		// O(1) indexing. REMatch("[\s\S]") is NOT lossless on every engine (BoxLang drops
+		// whitespace matches), so take the char-array path ONLY when the array rejoins to the
+		// exact input. The test is CONTENT, not length: a JVM engine returns a supplementary
+		// character as ONE code-point match while Len() counts two UTF-16 units, so a length
+		// check would needlessly reject a faithful array. If the array is not faithful, fall back
+		// to the scan — correct on every engine (any future JVM-free engine with an unfaithful
+		// REMatch still degrades safely, just not linearly).
+		local.chars = REMatch("[\s\S]", arguments.where);
+		if (Compare(ArrayToList(local.chars, ""), arguments.where) == 0) {
+			return $maskWhereLiteralsFromChars(local.chars);
+		}
+		return $maskWhereLiteralsByScan(arguments.where);
+	}
+
+	/**
+	 * Fast path for $maskWhereLiterals: a forward single pass over `chars`, a one-indexed
+	 * array of the input's characters that the caller has verified rejoins to the input.
+	 * Output and each literal value accumulate in CFML arrays (ArrayAppend O(1) on every
+	 * engine), joined once. Avoids three primitives that are O(n) on RustCFML and would
+	 * make this O(n^2): Mid()/Find() by index, java StringBuilder.append (O(length) there),
+	 * and ArraySlice (O(start) there). Must stay byte-identical to $maskWhereLiteralsByScan.
+	 */
+	public string function $maskWhereLiteralsFromChars(required array chars) {
+		local.sentinel = $whereLiteralSentinel();
+		local.out = [];
+		local.chars = arguments.chars;
+		local.n = ArrayLen(local.chars);
+		local.i = 1;
+		while (local.i <= local.n) {
+			local.ch = local.chars[local.i];
+			// A CFML date interpolated into the string renders as an ODBC escape,
+			// {ts '2020-01-01 00:00:00'} (or {d '...'} / {t '...'}), either bare or
+			// inside a quoted literal. Its inner quotes would otherwise end the
+			// surrounding literal early. Only the exact form with a date/time value
+			// (digits, - : . and spaces) is recognised; it is masked as one literal
+			// holding the inner value. The escape always opens with a brace ("{" bare,
+			// or "'{" quoted), so the matcher is only consulted at a brace — a plain
+			// quote never pays for it, which keeps a long run of quotes linear.
+			if (local.ch == "{" || (local.ch == "'" && local.i < local.n && local.chars[local.i + 1] == "{")) {
+				// Build the <=60-char lookahead window inline. Passing the (potentially
+				// very large) char array to a helper copies it by value on every call on
+				// Adobe CF — ArgumentCollection deep-copies array arguments (cross-engine
+				// invariant #6) — so a call at every brace turns the whole scan O(n^2)
+				// (measured: a maskGrowth probe burned >400s of CPU and never returned on
+				// Adobe 2023, while staying linear on Lucee/BoxLang/RustCFML). Reading
+				// local.chars[k] directly is O(1) per element on every engine, so the
+				// window stays O(60) regardless of how many braces the value holds.
+				local.windowChars = [];
+				local.windowStop = Min(local.i + 59, local.n);
+				local.w = local.i;
+				while (local.w <= local.windowStop) {
+					ArrayAppend(local.windowChars, local.chars[local.w]);
+					local.w += 1;
+				}
+				local.window = ArrayToList(local.windowChars, "");
+				// The matcher reads a <=60-char window (start 1), so matching is O(1)
+				// in the string length, not O(index).
+				local.odbc = $matchOdbcDateLiteral(local.window, 1, local.ch == "'");
+				if (local.odbc.matched) {
+					ArrayAppend(local.out, "'");
+					ArrayAppend(local.out, local.sentinel);
+					// The escape kind rides in front of the hex ("ts:", "d:", "t:"), so a
+					// position that isn't bound can write the escape back (see
+					// $restoreMaskedLiterals); a bound position takes the plain value.
+					ArrayAppend(local.out, local.odbc.kind & ":");
+					ArrayAppend(local.out, LCase(BinaryEncode(CharsetDecode(local.odbc.value, "utf-8"), "hex")));
+					ArrayAppend(local.out, "'");
+					local.i += local.odbc.length;
+					continue;
+				}
+			}
+			if (local.ch != "'") {
+				// Ordinary text (including a brace that doesn't start an ODBC date).
+				ArrayAppend(local.out, local.ch);
+				local.i += 1;
+				continue;
+			}
+			// A string literal: consume to its closing quote, treating a doubled
+			// quote ('') as one escaped quote that stays in the value.
+			local.value = [];
+			local.i += 1;
+			local.closed = false;
+			while (local.i <= local.n) {
+				if (local.chars[local.i] != "'") {
+					ArrayAppend(local.value, local.chars[local.i]);
+					local.i += 1;
+				} else if (local.i < local.n && local.chars[local.i + 1] == "'") {
+					ArrayAppend(local.value, "'");
+					local.i += 2;
+				} else {
+					local.i += 1;
+					local.closed = true;
+					break;
+				}
+			}
+			if (!local.closed) {
+				Throw(
+					type = "Wheels.InvalidWhereClause",
+					message = "The where clause contains an unbalanced quote.",
+					extendedInfo = "A string literal in the `where` argument was opened with a single quote that is never closed. Escape a literal quote by doubling it ('')."
+				);
+			}
+			local.literalValue = ArrayToList(local.value, "");
+			// The IN-list binder joins decoded elements with Chr(7); a value
+			// carrying Chr(7) (or the Chr(2) sentinel) would re-split or be
+			// mis-decoded, so reject those control characters outright — they
+			// are never part of legitimate SQL string data (GHSA-96rm).
+			if (Find(Chr(7), local.literalValue) > 0 || Find(Chr(2), local.literalValue) > 0) {
+				Throw(
+					type = "Wheels.InvalidWhereClause",
+					message = "A where-clause value contains a control character that cannot be bound safely.",
+					extendedInfo = "Remove the Chr(2)/Chr(7) control character from the value, or bind it through a parameter."
+				);
+			}
+			if (!Len(local.literalValue)) {
+				// An empty string literal carries nothing to mask; leaving it as
+				// `''` keeps the runner's existing empty-string / NULL handling.
+				ArrayAppend(local.out, "''");
+			} else {
+				ArrayAppend(local.out, "'");
+				ArrayAppend(local.out, local.sentinel);
+				ArrayAppend(local.out, LCase(BinaryEncode(CharsetDecode(local.literalValue, "utf-8"), "hex")));
+				ArrayAppend(local.out, "'");
+			}
+		}
+		return ArrayToList(local.out, "");
+	}
+
+	/**
+	 * Fallback for $maskWhereLiterals when the char array is not faithful to the input
+	 * (e.g. BoxLang, whose REMatch("[\s\S]") drops whitespace matches). The develop
+	 * Find-jump scan: correct on every engine and linear on the JVM engines that take
+	 * this path (Mid()/Find() are O(1) there). Must stay byte-identical to
+	 * $maskWhereLiteralsFromChars.
+	 */
+	public string function $maskWhereLiteralsByScan(required string where) {
 		if (Find("'", arguments.where) == 0) {
 			return arguments.where;
 		}
@@ -1233,6 +1379,9 @@
 		return arguments.idx == 2 || !ReFind("[A-Za-z0-9_$]", Mid(arguments.sql, arguments.idx - 2, 1));
 	}
 
+	/**
+	 * Internal function.
+	 */
 	public array function $whereClause(required string where, string include = "", boolean includeSoftDeletes = "false", sql = "", boolean softDelete = "true", useIndex = {}) {
 		arguments.where = $maskWhereLiterals(arguments.where);
 		local.rv = [];
@@ -1300,9 +1449,11 @@
 			}
 			local.wherePos = ArrayLen(local.rv) + 1;
 			local.params = [];
-			// split on AND/OR only where they stand as keywords: `_` and `$` are identifier
-			// characters, so `ORDER_AND_ITEMS.id` / `X$OR_Y.id` must not be cut in two (#3675)
-			local.where = ReReplace(
+			local.useTableAlias = (StructKeyExists(arguments, "useIndex") && !StructIsEmpty(arguments.useIndex)) && !($softDeletion() && arguments.softDelete);
+			// split on AND/OR (in any case) only where they stand as keywords: `_` and `$` are
+			// identifier characters, so `ORDER_AND_ITEMS.id` / `X$OR_Y.id` must not be cut in two
+			// (#3675). Literals are masked at this point, so none of their text can split.
+			local.where = ReReplaceNoCase(
 				ReReplace(arguments.where, variables.wheels.class.RESQLWhere, "\1?\8", "all"),
 				"([^a-zA-Z0-9_$])(AND|OR)([^a-zA-Z0-9_$])",
 				"\1#Chr(7)#\2\3",
@@ -1323,13 +1474,21 @@
 					local.elementDataPart = local.element;
 				}
 				// strip a leading AND/OR keyword only, never the start of an identifier like ORDERS (#3675)
-				local.elementDataPart = Trim(ReReplace(local.elementDataPart, "^(AND|OR)([^a-zA-Z0-9_$]|$)", "\2"));
+				local.elementDataPart = Trim(ReReplaceNoCase(local.elementDataPart, "^(AND|OR)([^a-zA-Z0-9_$]|$)", "\2"));
+				// the condition ends at its placeholder; anything after it (a LIKE ... ESCAPE
+				// clause) stays in the SQL as written
+				if (Find("?", local.elementDataPart)) {
+					local.elementDataPart = Left(local.elementDataPart, Find("?", local.elementDataPart));
+				}
 				local.temp = ReFind(
 					"^([a-zA-Z0-9-_\.$]*) ?#variables.wheels.class.RESQLOperators#",
 					local.elementDataPart,
 					1,
 					true
 				);
+				// A condition whose value is a function call is not a bound parameter: the part
+				// read above is the call's argument. Under include its column is qualified (the
+				// else branch below) so a column name the joined tables share is not ambiguous.
 				if (ArrayLen(local.temp.len) > 1) {
 					local.where = Replace(local.where, local.element, Replace(local.element, local.elementDataPart, "?", "one"));
 					local.param.property = Mid(local.elementDataPart, local.temp.pos[2], local.temp.len[2]);
@@ -1393,9 +1552,20 @@
 						local.param.list = true;
 					}
 					ArrayAppend(local.params, local.param);
+				} else {
+					// A function call compared with a bound value (ABS(id) = 1) binds that value
+					// with the call as its column; otherwise, under include, a condition whose
+					// value is a function call gets its column qualified.
+					local.leftExpression = Find("?", local.element) ? $leftExpressionParam(where = arguments.where, element = local.element, index = ArrayLen(local.params) + 1) : {};
+					if (!StructIsEmpty(local.leftExpression)) {
+						local.where = Replace(local.where, local.element, Replace(local.element, local.leftExpression.dataPart, "?", "one"));
+						ArrayAppend(local.params, local.leftExpression.param);
+					} else if (ArrayLen(local.classes) > 1) {
+						local.where = $qualifyUnboundConditionColumn(where = local.where, element = local.element, classes = local.classes, useTableAlias = local.useTableAlias);
+					}
 				}
 			}
-			local.where = ReplaceList(local.where, "#Chr(7)#AND,#Chr(7)#OR", "AND,OR");
+			local.where = Replace(local.where, Chr(7), "", "all");
 
 			// add to sql array
 			local.where = " " & local.where & " ";
@@ -1455,6 +1625,195 @@
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			if (IsSimpleValue(local.rv[local.i])) {
 				local.rv[local.i] = $restoreMaskedLiterals(local.rv[local.i]);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. For a WHERE condition whose value is a function call (so not a
+	 * bound parameter), qualifies the property it starts with by its
+	 * table, as a bound condition's column is, so a column name shared by the included
+	 * tables is not ambiguous. Leaves the condition alone when it doesn't start with a
+	 * property of the model or an included one.
+	 */
+	public string function $qualifyUnboundConditionColumn(
+		required string where,
+		required string element,
+		required array classes,
+		required boolean useTableAlias
+	) {
+		local.match = ReFindNoCase(
+			"^(\s*(?:(?:AND|OR)\s+)?[\s(]*)([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)?)( ?#variables.wheels.class.RESQLOperators#)",
+			arguments.element,
+			1,
+			true
+		);
+		if (ArrayLen(local.match.len) < 4 || local.match.len[3] == 0) {
+			return arguments.where;
+		}
+		local.column = $whereConditionColumn(
+			property = Mid(arguments.element, local.match.pos[3], local.match.len[3]),
+			classes = arguments.classes,
+			useTableAlias = arguments.useTableAlias
+		);
+		if (!Len(local.column)) {
+			return arguments.where;
+		}
+		// Left() with a length of 0 throws on Lucee 7
+		local.prefix = local.match.len[2] > 0 ? Left(arguments.element, local.match.len[2]) : "";
+		local.qualified = local.prefix & local.column & Mid(arguments.element, local.match.pos[3] + local.match.len[3], Len(arguments.element));
+		return Replace(arguments.where, arguments.element, local.qualified, "one");
+	}
+
+	/**
+	 * Internal function. The SQL for a WHERE property: the first of the model and its
+	 * included classes that has it, as quoted table.column (or tbl.column under useIndex),
+	 * or a calculated property's SQL. Empty when no class has it.
+	 */
+	public string function $whereConditionColumn(required string property, required array classes, required boolean useTableAlias) {
+		local.table = ListFirst(arguments.property, ".");
+		local.name = ListLast(arguments.property, ".");
+		for (local.classData in arguments.classes) {
+			if (Find(".", arguments.property) && local.table != local.classData.tableName) {
+				continue;
+			}
+			if (StructKeyExists(local.classData.propertyStruct, local.name)) {
+				local.columnName = variables.wheels.class.adapter.$quoteIdentifier(local.classData.properties[local.name].column);
+				if (arguments.useTableAlias) {
+					return "tbl." & local.columnName;
+				}
+				return variables.wheels.class.adapter.$quoteIdentifier(local.classData.tableName) & "." & local.columnName;
+			}
+			if (StructKeyExists(local.classData.calculatedProperties, local.name)) {
+				return "(" & local.classData.calculatedProperties[local.name].sql & ")";
+			}
+		}
+		return "";
+	}
+
+	/**
+	 * Internal function. For a WHERE condition whose left side is a function call and
+	 * whose value the WHERE regex bound (`ABS(id) = ?`, `UPPER(title) IS ?`), returns the
+	 * text to replace (dataPart) and the parameter, with the call as its column. The
+	 * value's SQL type comes from the bound value's shape, since there is no column to
+	 * take it from. Empty when the condition is not that shape.
+	 */
+	public struct function $leftExpressionParam(required string where, required string element, required numeric index) {
+		local.qpos = Find("?", arguments.element);
+		local.before = Left(arguments.element, local.qpos - 1);
+		local.operator = $trailingWhereOperator(local.before);
+		if (!Len(local.operator)) {
+			return {};
+		}
+		local.expressionEnd = Len(RTrim(local.before)) - Len(local.operator);
+		local.expressionStart = $callExpressionStart(arguments.element, local.expressionEnd);
+		if (local.expressionStart == 0) {
+			return {};
+		}
+		local.lead = local.expressionStart > 1 ? Left(arguments.element, local.expressionStart - 1) : "";
+		// ReFind never matches an empty string, so only check a lead that is there
+		if (Len(local.lead) && !ReFindNoCase("^\s*((AND|OR)\s+)?[\s(]*$", local.lead)) {
+			return {};
+		}
+		local.expression = Trim(Mid(arguments.element, local.expressionStart, local.expressionEnd - local.expressionStart + 1));
+		local.param = $boundValueType($boundWhereValue(where = arguments.where, index = arguments.index));
+		local.param.property = local.expression;
+		local.param.column = local.expression;
+		local.param.operator = Trim(local.operator);
+		return {dataPart: Mid(arguments.element, local.expressionStart, local.qpos - local.expressionStart + 1), param: local.param};
+	}
+
+	/**
+	 * Internal function. The comparison operator that ends `text` (ignoring trailing
+	 * whitespace), as written, or "" when it doesn't end in one. Longest operators first.
+	 */
+	public string function $trailingWhereOperator(required string text) {
+		local.text = RTrim(arguments.text);
+		local.match = ReFindNoCase("(\s(NOT\s+LIKE|LIKE|NOT\s+IN|IN|IS\s+NOT|IS)|<>|<=|>=|!=|!<|!>|=|<|>)$", local.text, 1, true);
+		if (ArrayLen(local.match.len) < 2 || local.match.len[1] == 0) {
+			return "";
+		}
+		return Mid(local.text, local.match.pos[1], local.match.len[1]);
+	}
+
+	/**
+	 * Internal function. When the text of `element` up to position `endPos` (ignoring
+	 * trailing whitespace) is a function call (a name, then balanced parentheses),
+	 * returns the position the call starts at; otherwise 0.
+	 */
+	public numeric function $callExpressionStart(required string element, required numeric endPos) {
+		local.i = arguments.endPos;
+		while (local.i >= 1 && ReFind("\s", Mid(arguments.element, local.i, 1))) {
+			local.i--;
+		}
+		if (local.i < 1 || Mid(arguments.element, local.i, 1) != ")") {
+			return 0;
+		}
+		local.depth = 0;
+		while (local.i >= 1) {
+			local.char = Mid(arguments.element, local.i, 1);
+			if (local.char == ")") {
+				local.depth++;
+			} else if (local.char == "(") {
+				local.depth--;
+				if (local.depth == 0) {
+					break;
+				}
+			}
+			local.i--;
+		}
+		if (local.i < 1) {
+			return 0;
+		}
+		local.nameEnd = local.i - 1;
+		local.i = local.nameEnd;
+		while (local.i >= 1 && ReFind("[A-Za-z0-9_$.]", Mid(arguments.element, local.i, 1))) {
+			local.i--;
+		}
+		return local.i < local.nameEnd ? local.i + 1 : 0;
+	}
+
+	/**
+	 * Internal function. The text of the index-th value the WHERE regex binds in `where`
+	 * (already masked), or "" when there are fewer.
+	 */
+	public string function $boundWhereValue(required string where, required numeric index) {
+		local.start = 1;
+		for (local.n = 1; local.n <= arguments.index; local.n++) {
+			local.match = ReFind(variables.wheels.class.RESQLWhere, arguments.where, local.start, true);
+			if (ArrayLen(local.match.len) < 5) {
+				return "";
+			}
+			local.start = local.match.pos[4] + local.match.len[4];
+		}
+		return Mid(arguments.where, local.match.pos[4], local.match.len[4]);
+	}
+
+	/**
+	 * Internal function. Parameter type settings for a bound value with no column to take
+	 * them from: a 64-bit integer or a decimal for a number, 1/0 for TRUE/FALSE, string otherwise
+	 * (a quoted value, or NULL, which binds as a null).
+	 */
+	public struct function $boundValueType(required string value) {
+		local.value = Trim(arguments.value);
+		local.rv = {dataType: "string", type: "CF_SQL_VARCHAR", scale: 0, list: false};
+		if (ReFind("^[+-]?[0-9]+$", local.value)) {
+			// 64-bit: ids and other whole numbers can exceed 32 bits (CockroachDB SERIAL ids do)
+			local.rv.dataType = "integer";
+			local.rv.type = "CF_SQL_BIGINT";
+		} else if (ReFindNoCase("^(true|false)$", local.value)) {
+			local.rv.dataType = "integer";
+			local.rv.type = "CF_SQL_INTEGER";
+		} else if (ReFind("^[+-]?[0-9]*\.[0-9]+$", local.value)) {
+			local.rv.dataType = "float";
+			local.rv.type = "CF_SQL_DECIMAL";
+			local.rv.scale = Len(ListLast(local.value, "."));
+		} else if (Left(local.value, 1) == "(") {
+			local.rv.list = true;
+			if (!Find("'", local.value)) {
+				local.rv.dataType = "integer";
+				local.rv.type = "CF_SQL_BIGINT";
 			}
 		}
 		return local.rv;
@@ -1546,7 +1905,13 @@
 						structDelete(arguments.sql[local.i], 'property');
 					}
 					arguments.sql[local.i].value = local.originalValues[local.pos];
-					if (local.originalValues[local.pos] == "" || local.sqlNullFlags[local.pos]) {
+					if (
+						$whereValueBindsNull(
+							value = local.originalValues[local.pos],
+							nullKeyword = local.sqlNullFlags[local.pos],
+							type = StructKeyExists(arguments.sql[local.i], "type") ? arguments.sql[local.i].type : ""
+						)
+					) {
 						arguments.sql[local.i].null = true;
 						// Dummy value so integer cfqueryparam does not try to cast
 						// the keyword string "NULL" / "[NULL]" to a number.
@@ -1628,6 +1993,24 @@
 			ArrayAppend(local.rv, ArrayToList(local.group, ","));
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. True when a `where` value binds as SQL NULL: the unquoted NULL
+	 * keyword, or an empty value whose parameter does not bind as a string (a number, date,
+	 * time or boolean cf_sql type). An empty value that binds as a string binds as a real ''
+	 * (#4055). The bind type decides, not the column: SQLite stores datetimes as text and
+	 * binds them as cf_sql_varchar, so they take the string path there. Oracle stores and
+	 * compares '' as NULL anyway.
+	 */
+	public boolean function $whereValueBindsNull(required string value, required boolean nullKeyword, string type = "") {
+		if (arguments.nullKeyword) {
+			return true;
+		}
+		if (Len(arguments.value)) {
+			return false;
+		}
+		return !ListFindNoCase("string,text", variables.wheels.class.adapter.$getValidationType(UCase(arguments.type)));
 	}
 
 	/**
@@ -1794,9 +2177,6 @@
 
 	/**
 	 * Internal function.
-	 */
-	/**
-	 * Internal function.
 	 * Whether an association contributes an INNER JOIN.
 	 *
 	 * Reads the association's declared `joinType` — the same value `$expandedAssociations`
@@ -1815,6 +2195,9 @@
 		return FindNoCase("INNER", arguments.join) > 0;
 	}
 
+	/**
+	 * Internal function.
+	 */
 	public array function $expandedAssociations(required string include, boolean includeSoftDeletes = "false") {
 		local.rv = [];
 
