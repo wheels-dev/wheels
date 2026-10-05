@@ -77,7 +77,7 @@ component {
             container: arguments.opts.container ?: ""
         };
         var n = $forEachHost(arguments.opts, function(cmds, role, version) {
-            return cmds.logs(logOpts);
+            return cmds.logs(logOpts, role);
         }, {versionOptional: true, collect: true});
         return $renderResult(arguments.opts, "Tailed app logs on " & n & " host(s)");
     }
