@@ -104,10 +104,12 @@ component extends="wheels.WheelsTest" {
 		}
 	}
 
-	private void function $rawPostTitle(required numeric id, required string title) {
+	// id is untyped and bound as cf_sql_bigint: CockroachDB ids are 64-bit, which overflow
+	// cf_sql_integer (and lose precision through a `numeric` arg) on Adobe (#4437 review).
+	private void function $rawPostTitle(required any id, required string title) {
 		queryExecute(
 			"UPDATE c_o_r_e_posts SET title = :title WHERE id = :id",
-			{title = {value = arguments.title}, id = {value = arguments.id, cfsqltype = "cf_sql_integer"}},
+			{title = {value = arguments.title}, id = {value = arguments.id, cfsqltype = "cf_sql_bigint"}},
 			{datasource = application.wheels.dataSourceName}
 		);
 	}
