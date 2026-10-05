@@ -10,7 +10,7 @@ component extends="wheels.WheelsTest" {
 	 */
 	function beforeAll() {
 		// The tag class's validations as configured, to check nothing below leaves one behind.
-		variables.tagValidationsAtStart = SerializeJSON(application.wo.model("tag").$classData().validations);
+		variables.tagValidationsAtStart = SerializeJSON(application.wo.$canonicalCacheValue(value = application.wo.model("tag").$classData().validations));
 		variables.pinnedFormSettings = {includeFormErrorMessages = application.wheels.includeFormErrorMessages, labelPlacement = {}};
 		application.wheels.includeFormErrorMessages = false;
 		for (var helperName in ListToArray("textField,textArea,passwordField,select,fileField,emailField,urlField,numberField,telField,dateField,searchField,colorField,rangeField")) {
@@ -563,7 +563,7 @@ component extends="wheels.WheelsTest" {
 		describe("The tag class after the label specs", () => {
 
 			it("keeps only the validations it was configured with", () => {
-				expect(SerializeJSON(g.model("tag").$classData().validations)).toBe(variables.tagValidationsAtStart)
+				expect(SerializeJSON(application.wo.$canonicalCacheValue(value = g.model("tag").$classData().validations))).toBe(variables.tagValidationsAtStart)
 			})
 		})
 
