@@ -9,17 +9,21 @@ component extends="wheels.WheelsTest" {
 			beforeEach(() => {
 				config = {path = "wheels", fileName = "Mapper", method = "$init"}
 				_params = {controller = "test", action = "index"}
-				_originalRoutes = Duplicate(application.wheels.routes)
-				_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
-				_originalNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
+				// urlForCache is a lazily-created, persistent app-scope memo (see
+				// routing.cfm). Ensure it exists before the full-state snapshot so
+				// $restoreRoutes() preserves the key rather than deleting it when it
+				// happens to be absent — otherwise the issue-2955 tests, which assert
+				// the memo survives across requests, see it removed by the restore.
+				if (!StructKeyExists(application.wheels, "urlForCache")) {
+					application.wheels.urlForCache = {}
+				}
+				_routeSnapshot = $snapshotRoutes()
 				_originalUrlRewriting = application.wheels.URLRewriting
 				_originalObfuscateUrls = application.wheels.obfuscateUrls
 			})
 
 			afterEach(() => {
-				application.wheels.routes = _originalRoutes
-				application.wheels.staticRoutes = _originalStaticRoutes
-				application.wheels.namedRoutePositions = _originalNamedRoutePositions
+				$restoreRoutes(_routeSnapshot)
 				application.wheels.URLRewriting = _originalUrlRewriting
 				application.wheels.obfuscateUrls = _originalObfuscateUrls
 			})
@@ -322,8 +326,4 @@ component extends="wheels.WheelsTest" {
 		return g.$createObjectFromRoot(argumentCollection = local.args)
 	}
 
-	public void function $clearRoutes() {
-		application.wheels.routes = []
-		application.wheels.staticRoutes = {}
-	}
 }
