@@ -36,9 +36,11 @@ component extends="wheels.WheelsTest" {
 				expect(counts.raw).toBe(2);
 			});
 
-			it("treats [ as a literal (a character-class wildcard on SQL Server)", () => {
-				// The escaped '\[' matches a literal '[' on every engine; on SQL Server it also stops
-				// '[x]' being read as a one-character class. Asserted as a universal positive match.
+			it("matches a literal [ on every engine", () => {
+				// On SQL Server escapeForLike escapes '[' (it opens a character class there), so the
+				// pattern matches the literal '[x]'. On every other engine '[' is already a literal, so
+				// the unescaped term matches it too — and '\[' is NOT emitted there (it is illegal on
+				// Oracle, ORA-01424). Either way the literal-bracket row matches and the plain row does not.
 				var counts = $countsFor(
 					literalRow = "size [x] large",
 					wildcardRow = "size y large",

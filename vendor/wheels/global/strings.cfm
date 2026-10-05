@@ -187,16 +187,18 @@
 	/**
 	 * Escapes the `LIKE` wildcards in a string so it can be used as a literal search term in a
 	 * `LIKE` comparison that declares `ESCAPE '\'`. The escape character `\` is escaped first, then
-	 * `%`, `_` and `[` (the last is a wildcard on SQL Server). Add your own surrounding wildcards and
-	 * place the result in a quoted literal whose `LIKE` declares `ESCAPE '\'`:
+	 * `%` and `_`; `[` is escaped only when the application's default adapter is SQL Server (where `[`
+	 * opens a character class — on Oracle `\[` is an illegal escape sequence, ORA-01424). Add your own
+	 * surrounding wildcards and place the result in a quoted literal whose `LIKE` declares `ESCAPE '\'`:
 	 *
 	 * `model("post").findAll(where="title LIKE '%#escapeForLike(params.q)#%' ESCAPE '\'")`
 	 *
 	 * Wheels binds the quoted literal as a query parameter (`parameterize` is on by default), and the
 	 * explicit `ESCAPE '\'` makes the escaped wildcards literal on every supported database — MySQL,
-	 * PostgreSQL, SQL Server, SQLite, Oracle, H2 and CockroachDB. The clause is required: a plain
-	 * `LIKE` has no escape character on most engines, and the three-argument query builder
-	 * (`where("title", "LIKE", ...)`) does not emit one, so `\` would be matched literally there.
+	 * PostgreSQL, SQL Server, SQLite, Oracle, H2 and CockroachDB. Always declare the clause: MySQL,
+	 * PostgreSQL, CockroachDB and H2 default the `LIKE` escape character to `\`, but SQLite, Oracle and
+	 * SQL Server have none, and the three-argument query builder (`where("title", "LIKE", ...)`) emits no
+	 * `ESCAPE` either, so without the clause `\` is matched literally.
 	 *
 	 * This escapes `LIKE` metacharacters only, not SQL quotes; quote the value the same way you would
 	 * any other `where`-string literal.
@@ -210,7 +212,13 @@
 		local.rv = Replace(arguments.value, "\", "\\", "all");
 		local.rv = Replace(local.rv, "%", "\%", "all");
 		local.rv = Replace(local.rv, "_", "\_", "all");
-		local.rv = Replace(local.rv, "[", "\[", "all");
+		// `[` opens a character class in a LIKE pattern only on SQL Server. Escaping it is needed there,
+		// redundant on MySQL / PostgreSQL / SQLite / H2 / CockroachDB (where `[` is literal), and on
+		// Oracle `\[` is an illegal escape sequence (ORA-01424), so escape it only when the application's
+		// default adapter is SQL Server.
+		if ($get("adapterName") == "MicrosoftSQLServerModel") {
+			local.rv = Replace(local.rv, "[", "\[", "all");
+		}
 		return local.rv;
 	}
 
