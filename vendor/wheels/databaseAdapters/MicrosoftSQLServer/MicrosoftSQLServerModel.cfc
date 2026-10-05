@@ -140,8 +140,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Internal function. A time value as SQL Server TIME text: `HH:mm[:ss[.fffffff]]` as written, the
-	 * time of a `yyyy-mm-dd HH:mm:ss[.f]` string, or a CFML date's time to the millisecond. Any other
-	 * text is returned unchanged, so the CAST reports it.
+	 * time of a `yyyy-mm-dd HH:mm:ss.f` string (up to 7 fraction digits), or any other date's time to
+	 * the millisecond. A date-time without a fraction goes through Millisecond(): RustCFML treats a
+	 * date object as a simple value whose text drops the milliseconds. Any other text is returned
+	 * unchanged, so the CAST reports it.
 	 */
 	public string function $timeText(required any value) {
 		if (IsSimpleValue(arguments.value)) {
@@ -149,12 +151,9 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			if (ReFind("^\d{1,2}:\d{2}(:\d{2}(\.\d{1,7})?)?$", local.text)) {
 				return local.text;
 			}
-			local.match = ReFind("^\d{4}-\d{2}-\d{2}[ T](\d{1,2}:\d{2}(:\d{2}(\.\d{1,7})?)?)$", local.text, 1, true);
+			local.match = ReFind("^\d{4}-\d{2}-\d{2}[ T](\d{1,2}:\d{2}:\d{2}\.\d{1,7})$", local.text, 1, true);
 			if (local.match.pos[1]) {
 				return Mid(local.text, local.match.pos[2], local.match.len[2]);
-			}
-			if (!IsDate(local.text)) {
-				return local.text;
 			}
 		}
 		if (IsDate(arguments.value)) {

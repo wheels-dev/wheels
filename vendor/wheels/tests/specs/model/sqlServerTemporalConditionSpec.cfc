@@ -94,6 +94,12 @@ component extends="wheels.WheelsTest" {
 				expect(adapter.$timeText("9:05")).toBe("9:05");
 				expect(adapter.$timeText("2026-01-02 10:00:00.1234567")).toBe("10:00:00.1234567");
 				expect(adapter.$timeText(CreateDateTime(2026, 1, 2, 10, 0, 0))).toBe("10:00:00.000");
+				expect(adapter.$timeText("2026-01-02 10:00:00")).toBe("10:00:00.000");
+				// A date's milliseconds survive. RustCFML's date values carry no milliseconds at all
+				// (DateAdd("l"), ParseDateTime and Millisecond() all give 0), so that engine is left out.
+				if (!variables.g.$engineAdapter().isRustCFML()) {
+					expect(adapter.$timeText(DateAdd("l", 250, CreateDateTime(2026, 1, 2, 10, 0, 0)))).toBe("10:00:00.250");
+				}
 				expect(adapter.$timeText("noon")).toBe("noon");
 			});
 
