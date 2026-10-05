@@ -17,9 +17,12 @@ component extends="wheels.WheelsTest" {
 		describe("wheels new template: session cookie secure flag", () => {
 
 			var repoRoot = expandPath("/wheels/../..");
-			var content = fileRead(repoRoot & "/cli/lucli/templates/app/public/Application.cfc");
+			// Read only when present: in an app the template is absent and each spec skips.
+			var templatePath = repoRoot & "/cli/lucli/templates/app/public/Application.cfc";
+			var content = fileExists(templatePath) ? fileRead(templatePath) : "";
 
 			it("turns Secure on for an HTTPS request, direct or through a TLS-terminating proxy", () => {
+				$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 				var block = mid(content, findNoCase("this.sessionCookie = {", content), 700);
 				expect(findNoCase("cgi.server_port_secure", block) > 0).toBeTrue("direct HTTPS (server_port_secure)");
 				expect(findNoCase("cgi.https", block) > 0).toBeTrue("direct HTTPS (cgi.https)");
@@ -27,6 +30,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("still turns Secure on for WHEELS_ENV=production", () => {
+				$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 				var block = mid(content, findNoCase("this.sessionCookie = {", content), 700);
 				expect(reFindNoCase("currentEnv\s*==\s*""production""", block) > 0).toBeTrue();
 			});
@@ -36,6 +40,7 @@ component extends="wheels.WheelsTest" {
 		describe("wheels generate auth: generated sessions spec", () => {
 
 			it("includes a behavioural GET-logout case", () => {
+				$requireRepoPath("cli/lucli/templates/auth/spec-sessions-controller.txt");
 				var spec = fileRead(expandPath("/wheels/../..") & "/cli/lucli/templates/auth/spec-sessions-controller.txt");
 				expect(findNoCase("does not log out on a GET to the delete action", spec) > 0).toBeTrue();
 			});

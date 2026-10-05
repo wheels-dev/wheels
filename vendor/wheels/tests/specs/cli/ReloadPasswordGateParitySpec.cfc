@@ -62,6 +62,7 @@ component extends="wheels.WheelsTest" {
 				(function(relPath) {
 
 					it("fails closed when reloadPassword is empty or missing in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);
@@ -109,6 +110,7 @@ component extends="wheels.WheelsTest" {
 					});
 
 					it("compares the reload password in constant time in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);
@@ -130,6 +132,7 @@ component extends="wheels.WheelsTest" {
 					});
 
 					it("logs and rate-limits warm-path reload attempts per IP in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);
@@ -176,6 +179,7 @@ component extends="wheels.WheelsTest" {
 					});
 
 					it("accepts the reload password from the X-Wheels-Reload-Password header in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);
@@ -202,6 +206,7 @@ component extends="wheels.WheelsTest" {
 					});
 
 					it("falls back to the raw request headers when cgi lost the reload header in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						var content = fileRead(absolute);
 

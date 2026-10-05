@@ -1,5 +1,31 @@
 component extends="wheels.WheelsTest" {
 
+	/**
+	 * These specs assert the framework's default form-helper output. An app
+	 * built with `wheels new` changes it in config/settings.cfm
+	 * (includeFormErrorMessages=true, and labelPlacement="before" for the
+	 * text-like helpers), and the core suite runs with the host app's
+	 * settings. So pin the framework defaults for this bundle and put the
+	 * app's values back afterwards.
+	 */
+	function beforeAll() {
+		variables.pinnedFormSettings = {includeFormErrorMessages = application.wheels.includeFormErrorMessages, labelPlacement = {}};
+		application.wheels.includeFormErrorMessages = false;
+		for (var helperName in ListToArray("textField,textArea,passwordField,select,fileField,emailField,urlField,numberField,telField,dateField,searchField,colorField,rangeField")) {
+			if (StructKeyExists(application.wheels.functions, helperName) && StructKeyExists(application.wheels.functions[helperName], "labelPlacement")) {
+				variables.pinnedFormSettings.labelPlacement[helperName] = application.wheels.functions[helperName].labelPlacement;
+				application.wheels.functions[helperName].labelPlacement = "around";
+			}
+		}
+	}
+
+	function afterAll() {
+		application.wheels.includeFormErrorMessages = variables.pinnedFormSettings.includeFormErrorMessages;
+		for (var helperName in variables.pinnedFormSettings.labelPlacement) {
+			application.wheels.functions[helperName].labelPlacement = variables.pinnedFormSettings.labelPlacement[helperName];
+		}
+	}
+
 	function run() {
 
 		g = application.wo

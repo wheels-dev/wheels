@@ -58,7 +58,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		var reader = createObject("java", "java.io.BufferedReader").init(
 			createObject("java", "java.io.InputStreamReader").init(proc.getInputStream())
 		);
-		var line = reader.readLine();
+		// Bounded: wait up to 10 s for the port line instead of blocking on readLine().
+		var deadline = getTickCount() + 10000;
+		while (!reader.ready() && proc.isAlive() && getTickCount() < deadline) sleep(20);
+		var line = reader.ready() ? reader.readLine() : "";
+		if (!len(line)) {
+			proc.destroyForcibly();
+			throw(type = "ServerRegistrySpec.ListenerNotReady", message = "The python3 test listener printed no port within 10 s.");
+		}
 		return {process: proc, pid: proc.pid(), port: val(line)};
 	}
 

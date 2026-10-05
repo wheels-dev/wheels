@@ -1,0 +1,1 @@
+- Cache keys from `$hashedKey()` now keep argument names and the order of array elements and query rows, while still ignoring struct key order. Cached partials, and other cached output keyed on queries or arrays, are no longer reused for inputs that hold the same values in a different order. The unused `normalizeForHash()` engine-adapter method is removed.

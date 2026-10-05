@@ -191,6 +191,10 @@
 				local.plan = $buildComponentIntegrationPlan(arguments.path);
 				lock name="wheels.integrationPlans.#application.applicationName#" type="exclusive" timeout="10" {
 					application.wheels.integrationPlans[arguments.path] = local.plan;
+					// Cached controller integration results hold refs from the old plan (#4149).
+					if (StructKeyExists(application.wheels, "controllerIntegration")) {
+						StructClear(application.wheels.controllerIntegration);
+					}
 				}
 				$warnNullIntegrationPlanRefs(arguments.path);
 			}
@@ -446,18 +450,107 @@
 			local.controllerPath = local.controllerPathsArray[local.i];
 			local.fileName = $objectFileName(name = arguments.name, objectPath = local.controllerPath, type = arguments.type);
 			if (local.fileName != "Controller" || local.i == ArrayLen(local.controllerPathsArray)) {
-				application.wheels.controllers[arguments.name] = $createObjectFromRoot(
-					path = local.controllerPath,
-					fileName = local.fileName,
-					method = "$initControllerClass",
-					name = arguments.name
-				);
+				try {
+					application.wheels.controllers[arguments.name] = $createObjectFromRoot(
+						path = local.controllerPath,
+						fileName = local.fileName,
+						method = "$initControllerClass",
+						name = arguments.name
+					);
+				} catch (any e) {
+					// A nested controller that writes extends="Controller" cannot find
+					// its base class. Carry a fix hint on the request and log it to
+					// wheels.log (the hint is log-only — the app's minimal error page
+					// template is deliberately not touched), then rethrow the ORIGINAL
+					// exception unchanged, so its type, tag context, cause and stack survive.
+					local.hint = $missingBaseControllerHint(exception = e, name = arguments.name);
+					if (Len(local.hint)) {
+						if (!StructKeyExists(request, "wheels")) {
+							request.wheels = {};
+						}
+						request.wheels.errorHint = local.hint;
+						// Surface the hint from framework code (wheels.log) so it
+						// appears even though the app's minimal error page lives in the
+						// app template, which this fix deliberately does not touch.
+						try {
+							WriteLog(
+								file = "wheels",
+								type = "error",
+								text = "Controller '#arguments.name#' failed to instantiate — #local.hint#"
+							);
+						} catch (any logErr) {
+							// Logging must never mask the original error.
+						}
+					}
+					rethrow;
+				}
 
 				local.rv = application.wheels.controllers[arguments.name];
 				break;
 			}
 		}
 		return local.rv;
+	}
+
+
+	/**
+	 * Returns a hint to append to a controller-instantiation error when it looks
+	 * like a NESTED controller declared extends="Controller" and the engine could
+	 * not find its base class. A bare extends name resolves relative to the
+	 * controller's own package, so a nested controller (app/controllers/<pkg>/X.cfc)
+	 * must extend "app.controllers.Controller". Returns "" when the error is
+	 * unrelated or the controller is top-level. Additive message text only — it
+	 * does not change the error type, status, or control flow.
+	 *
+	 * Lucee and Adobe name the missing component in the error ("... component
+	 * [Controller]" / "... component or interface Controller"), so the operand can
+	 * be parsed. BoxLang reports a generic "Could not initialize class <child>"
+	 * (the cause chain repeats the same text) with no operand, so this returns ""
+	 * there — no hint rather than a guessed one.
+	 */
+	public string function $missingBaseControllerHint(required any exception, required string name) {
+		// Only nested controllers (a dot in the name, e.g. "admin.users") hit
+		// this; a top-level controller resolves "Controller" from its own path.
+		if (!Find(".", arguments.name)) {
+			return "";
+		}
+		local.text = (StructKeyExists(arguments.exception, "message") ? arguments.exception.message : "")
+			& " "
+			& (StructKeyExists(arguments.exception, "detail") ? arguments.exception.detail : "");
+		// Must look like a component-resolution failure.
+		if (!ReFindNoCase("(can'?t find|could not find|unable to (find|locate)|invalid component definition)", local.text)) {
+			return "";
+		}
+		// Hint ONLY when the base "Controller" is the MISSING-COMPONENT OPERAND —
+		// not merely when the word "Controller" appears somewhere (a different
+		// missing component whose detail mentions "Controller" must not match).
+		// Parse the operand from each engine's phrasing:
+		//   Lucee / BoxLang: "... component [Controller]"
+		//   Adobe:           "... component or interface Controller"
+		local.missing = "";
+		local.m = ReFindNoCase("component\s*\[([A-Za-z0-9_.$]+)\]", local.text, 1, true);
+		if (ArrayLen(local.m.len) GTE 2 && local.m.len[2] GT 0) {
+			local.missing = Mid(local.text, local.m.pos[2], local.m.len[2]);
+		} else {
+			local.m = ReFindNoCase("component\s+or\s+interface\s+([A-Za-z0-9_.$]+)", local.text, 1, true);
+			if (ArrayLen(local.m.len) GTE 2 && local.m.len[2] GT 0) {
+				local.missing = Mid(local.text, local.m.pos[2], local.m.len[2]);
+			}
+		}
+		// Adobe appends a period after the name ("... interface Controller."); drop
+		// any trailing dots before comparing.
+		local.missing = ReReplace(local.missing, "\.+$", "");
+		// Hint ONLY for the BARE base "Controller" (the nested-extends mistake). An
+		// already-qualified operand such as "app.controllers.Controller" that still
+		// failed is a different problem, and "use app.controllers.Controller" would
+		// be wrong advice, so it gets no hint.
+		if (CompareNoCase(local.missing, "Controller") == 0) {
+			return "a nested controller must extend ""app.controllers.Controller"", not ""Controller"" "
+				& "(a bare extends name resolves relative to the controller's own package), so '"
+				& arguments.name
+				& "' cannot find its base controller";
+		}
+		return "";
 	}
 
 
@@ -504,6 +597,9 @@
 	 */
 	public void function $clearControllerInitializationCache() {
 		StructClear(application.wheels.controllers);
+		if (StructKeyExists(application.wheels, "controllerIntegration")) {
+			StructClear(application.wheels.controllerIntegration);
+		}
 	}
 
 

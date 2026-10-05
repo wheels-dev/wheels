@@ -172,16 +172,24 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * forever).
 	 */
 	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
+		$acquireAdvisoryLockSession(name = arguments.name, timeout = arguments.timeout);
+	}
+
+	/**
+	 * Internal function. Acquires the lock as $acquireAdvisoryLock() does and returns the holding
+	 * backend's pid, read in the same statement so it is the session that took the lock (#4197).
+	 */
+	public string function $acquireAdvisoryLockSession(required string name, numeric timeout = 10) {
 		local.startedAt = GetTickCount();
 		local.timeoutMs = arguments.timeout * 1000;
 		while (true) {
 			local.result = queryExecute(
-				"SELECT pg_try_advisory_lock(hashtext(?)) AS lockresult",
+				"SELECT pg_try_advisory_lock(hashtext(?)) AS lockresult, pg_backend_pid() AS sessionid",
 				[arguments.name],
 				{datasource: variables.dataSource, username: variables.username, password: variables.password}
 			);
 			if (IsQuery(local.result) && IsBoolean(local.result.lockresult) && local.result.lockresult) {
-				return;
+				return local.result.sessionid;
 			}
 			if (GetTickCount() - local.startedAt >= local.timeoutMs) {
 				Throw(
@@ -203,6 +211,43 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			[arguments.name],
 			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);
+	}
+
+	/**
+	 * Internal function. pg_advisory_unlock returns true only on the session holding the lock (#4197).
+	 */
+	public boolean function $tryReleaseAdvisoryLock(required string name) {
+		local.result = queryExecute(
+			"SELECT pg_advisory_unlock(hashtext(?)) AS released",
+			[arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+		);
+		return IsQuery(local.result) && IsBoolean(local.result.released) && local.result.released;
+	}
+
+	/**
+	 * Internal function. True while the backend `holder` holds the lock, or any session in this
+	 * database when no session is given (#4197). The key is
+	 * hashtext(name) as a bigint, which pg_locks splits into classid (high 32 bits) and objid (low).
+	 * CAST, not `::`: Lucee reads `:name` in queryExecute SQL as a named parameter.
+	 */
+	public boolean function $isAdvisoryLockHeld(required string name, string holder = "") {
+		local.sql = "SELECT COUNT(*) AS holders FROM pg_locks WHERE locktype = 'advisory' AND granted"
+			& " AND database = (SELECT oid FROM pg_database WHERE datname = current_database())"
+			& " AND classid = CAST(((CAST(hashtext(?) AS bigint) >> 32) & 4294967295) AS oid)"
+			& " AND objid = CAST((CAST(hashtext(?) AS bigint) & 4294967295) AS oid)"
+			& " AND objsubid = 1";
+		local.params = [arguments.name, arguments.name];
+		if (Len(arguments.holder)) {
+			local.sql &= " AND pid = ?";
+			ArrayAppend(local.params, {value = arguments.holder, cfsqltype = "cf_sql_integer"});
+		}
+		local.result = queryExecute(
+			local.sql,
+			local.params,
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+		);
+		return IsQuery(local.result) && Val(local.result.holders) > 0;
 	}
 
 	/**

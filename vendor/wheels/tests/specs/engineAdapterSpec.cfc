@@ -381,22 +381,6 @@ component extends="wheels.WheelsTest" {
 
 		});
 
-		describe("Engine Adapter - Hash Normalization", function() {
-
-			it("normalizes JSON for consistent hashing", function() {
-				var result = application.wheels.engineAdapter.normalizeForHash('{"b":"2","a":"1"}');
-				expect(IsSimpleValue(result)).toBeTrue();
-				expect(Len(result)).toBeGT(0);
-			});
-
-			it("produces deterministic output regardless of key order", function() {
-				var r1 = application.wheels.engineAdapter.normalizeForHash('["a","b","c"]');
-				var r2 = application.wheels.engineAdapter.normalizeForHash('["c","b","a"]');
-				expect(r1).toBe(r2);
-			});
-
-		});
-
 		describe("Engine Adapter - Struct Defaults", function() {
 
 			it("appends missing keys from defaults", function() {
