@@ -84,6 +84,20 @@ component extends="wheels.WheelsTest" {
 				expect(enqueue({job = "wheels.tests._assets.jobs.NoPerformStub"}).success).toBeFalse();
 			});
 
+			it("refuses a component whose only extends text is inside another attribute's value, without loading it", () => {
+				StructDelete(application, "$wheelsHintExtendsInstantiated");
+				var rv = enqueue({job = "wheels.tests._assets.jobs.HintExtendsSideEffect", queue = variables.queue});
+				expect(rv.success).toBeFalse();
+				expect(rv.message).toInclude("doesn't extend wheels.Job");
+				expect(StructKeyExists(application, "$wheelsHintExtendsInstantiated")).toBeFalse();
+			});
+
+			it("enqueues a job whose declaration has { and > inside a quoted value", () => {
+				var rv = enqueue({job = "wheels.tests._assets.jobs.QuotedPunctuationJob", queue = variables.queue});
+				expect(rv.success).toBeTrue();
+				expect(rv.job.jobClass).toBe("wheels.tests._assets.jobs.QuotedPunctuationJob");
+			});
+
 			it("follows an extends chain through a sibling parent", () => {
 				var rv = enqueue({job = "wheels.tests._assets.jobs.ChildOfProbeJob", queue = variables.queue});
 				expect(rv.success).toBeTrue();
@@ -137,6 +151,18 @@ component extends="wheels.WheelsTest" {
 				var block = Chr(47) & Chr(42) & ' component extends="wheels.Job" ' & Chr(42) & Chr(47);
 				expect(bridge.$sourceExtends(block & Chr(10) & "component {}")).toBe("");
 				expect(bridge.$sourceExtends('// component extends="wheels.Job" {' & Chr(10) & "component {}")).toBe("");
+			});
+
+			it("reads extends only as an attribute, never inside another attribute's quoted value", () => {
+				expect(bridge.$sourceExtends('component hint="extends=wheels.Job" {}')).toBe("");
+				expect(bridge.$sourceExtends("component hint='extends=wheels.Job' {}")).toBe("");
+				expect(bridge.$sourceExtends('component hint="extends=wheels.Job" extends="ProbeJob" {}')).toBe("ProbeJob");
+				expect(bridge.$sourceExtends('component displayname="a{b>c" extends="wheels.Job" {}')).toBe("wheels.Job");
+				expect(bridge.$sourceExtends('component myextends="wheels.Job" {}')).toBe("");
+				expect(bridge.$sourceExtends('component extends=wheels.Job {}')).toBe("wheels.Job");
+				expect(bridge.$sourceExtends('component hint="say ""extends=wheels.Job"" here" {}')).toBe("");
+				expect(bridge.$sourceExtends('component // extends="wheels.Job"' & Chr(10) & '{}')).toBe("");
+				expect(bridge.$sourceExtends('component output=false // a note' & Chr(10) & 'extends="wheels.Job" {}')).toBe("wheels.Job");
 			});
 
 			it("doesn't count an extends outside the declaration", () => {

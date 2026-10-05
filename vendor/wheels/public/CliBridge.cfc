@@ -1053,20 +1053,75 @@ component output="false" displayName="CLI Bridge" {
 		if (local.found.pos[1] == 0) {
 			return "";
 		}
-		local.headerStart = local.found.pos[1];
-		local.headerEnd = Len(local.code);
-		for (local.closer in ["{", ">"]) {
-			local.at = Find(local.closer, local.code, local.headerStart);
-			if (local.at > 0 && local.at < local.headerEnd) {
-				local.headerEnd = local.at;
+		return $declarationAttribute(local.code, local.found.pos[1], "extends");
+	}
+
+	/**
+	 * The value of one attribute in a component declaration starting at `start`, read
+	 * outside quoted values: the declaration ends at the first `{` or `>` that isn't
+	 * inside quotes, and a name only counts where an attribute name can stand (not
+	 * inside another attribute's value, not as the tail of a longer name). "" when the
+	 * attribute isn't there.
+	 */
+	public string function $declarationAttribute(required string code, required numeric start, required string attribute) {
+		local.text = arguments.code;
+		local.length = Len(local.text);
+		local.name = LCase(arguments.attribute);
+		local.quote = "";
+		local.i = arguments.start;
+		while (local.i <= local.length) {
+			local.char = Mid(local.text, local.i, 1);
+			if (Len(local.quote)) {
+				if (local.char == local.quote) {
+					local.quote = "";
+				}
+				local.i++;
+				continue;
 			}
+			if (local.char == """" || local.char == "'") {
+				local.quote = local.char;
+				local.i++;
+				continue;
+			}
+			if (local.char == "{" || local.char == ">") {
+				return "";
+			}
+			// A line comment inside the declaration: skip to the end of the line.
+			if (local.char == "/" && Mid(local.text, local.i + 1, 1) == "/") {
+				local.newline = Find(Chr(10), local.text, local.i);
+				if (local.newline == 0) {
+					return "";
+				}
+				local.i = local.newline + 1;
+				continue;
+			}
+			local.before = local.i > 1 ? Mid(local.text, local.i - 1, 1) : " ";
+			if (
+				!ReFind("[A-Za-z0-9_.-]", local.before)
+				&& LCase(Mid(local.text, local.i, Len(local.name))) == local.name
+			) {
+				local.value = $attributeValueAt(local.text, local.i + Len(local.name));
+				if (local.value.matched) {
+					return local.value.value;
+				}
+			}
+			local.i++;
 		}
-		local.header = Mid(local.code, local.headerStart, local.headerEnd - local.headerStart + 1);
-		local.match = ReFindNoCase("extends[[:space:]]*=[[:space:]]*[""']?([A-Za-z0-9_.]+)", local.header, 1, true);
-		if (local.match.pos[1] == 0 || ArrayLen(local.match.pos) < 2) {
-			return "";
+		return "";
+	}
+
+	/**
+	 * After an attribute name: optional spaces, `=`, optional spaces, then a quoted or
+	 * bare value made of identifier characters and dots. `matched` is false when no
+	 * `=` follows, so the name was a word, not an attribute.
+	 */
+	public struct function $attributeValueAt(required string text, required numeric position) {
+		local.rest = Mid(arguments.text, arguments.position, 300);
+		local.match = ReFind("^[[:space:]]*=[[:space:]]*([""']?)([A-Za-z0-9_.]*)", local.rest, 1, true);
+		if (local.match.pos[1] == 0) {
+			return {matched = false, value = ""};
 		}
-		return Mid(local.header, local.match.pos[2], local.match.len[2]);
+		return {matched = true, value = local.match.len[3] > 0 ? Mid(local.rest, local.match.pos[3], local.match.len[3]) : ""};
 	}
 
 	/**
