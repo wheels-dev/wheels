@@ -815,7 +815,7 @@ component extends="modules.BaseModule" {
 		help &= "  stats               Project statistics (lines of code, model counts, etc.)" & nl;
 		help &= "  notes               Find TODO / FIXME / OPTIMIZE comments (--annotations to customize)" & nl & nl;
 		help &= "Packages & Deployment:" & nl;
-		help &= "  packages            Add, update, search Wheels packages (verb is `add`, not `install`)" & nl;
+		help &= "  packages            Add (or install), update, search Wheels packages" & nl;
 		help &= "  upgrade             Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans, `apply` swaps" & nl;
 		help &= "  framework           Install the framework (vendor/wheels/) into an app that has none (e.g. moving off CommandBox)" & nl;
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
@@ -5209,20 +5209,19 @@ component extends="modules.BaseModule" {
 	//  packages — registry-backed package manager
 	// ─────────────────────────────────────────────────
 
-	// The verb is `add`, NOT `install`. Typing `wheels packages install <name>`
-	// is intercepted by LuCLI's built-in extension installer before dispatch
-	// reaches this module, and prints `[INFO] No git or extension dependencies
-	// to install` without actually installing anything. See chapter 8 of the
-	// tutorial for the explanation.
+	// `add` is the documented install verb and `install` is an alias for it
+	// (see the dispatch below). Older LuCLI runtimes intercepted the literal
+	// `install` verb before it reached this module (#2713); the runtime the
+	// CLI ships on now passes it through (#4206).
 	// Kept out of the docblock below: `wheels packages --help` prints it.
 	/**
-	 * hint: Add, update, and list Wheels packages (verb is `add`, not `install`)
+	 * hint: Add, update, and list Wheels packages (`install` is an alias of `add`)
 	 *
 	 * Usage:
 	 *   wheels packages list [--tag=<tag>]
 	 *   wheels packages search <query>
 	 *   wheels packages show <name>
-	 *   wheels packages add <name>[@<version>] [--force]    ← install verb
+	 *   wheels packages add <name>[@<version>] [--force]    (alias: install)
 	 *   wheels packages update <name> --yes
 	 *   wheels packages update --all --yes
 	 *   wheels packages remove <name>
@@ -5255,8 +5254,7 @@ component extends="modules.BaseModule" {
 
 		// `--help` / `-h` short-circuits to a deterministic help string the
 		// module owns directly. LuCLI's auto-introspected help previously
-		// drifted from the real CLI surface — advertising the dead `install`
-		// verb that LuCLI itself intercepts (#2713). Owning the text here
+		// drifted from the real CLI surface (#2713). Owning the text here
 		// guarantees `wheels packages help`, `wheels packages --help`, and
 		// `wheels packages -h` all reach $packagesHelp().
 		//
@@ -5294,19 +5292,13 @@ component extends="modules.BaseModule" {
 				arguments.opts.name = $packagesRequireArg(arguments.positional, "show requires a name: wheels packages show <name>");
 				return $packagesMainCli().show(arguments.opts);
 			case "install":
-				// LuCLI's built-in extension installer intercepts the
-				// literal verb `install` on the user-facing CLI surface
-				// — same trap that bit `wheels browser install` (renamed
-				// to `wheels browser setup` in #2345). But every other
-				// caller path reaches this dispatch directly: the
-				// stdio MCP server (`wheels mcp wheels`), scripted
-				// in-process clients, and the bundle's own spec suite.
-				// `PackagesMainCli.install()` has been a transparent
-				// alias for `add()` since #2729, so the dispatch layer
-				// must match — otherwise `install <name>` silently
-				// no-ops on the only paths LuCLI does NOT intercept.
-				// Fall through to the `add` branch (same validation,
-				// same error shape, same install behavior).
+				// `install` is an alias of `add` on every path: the CLI
+				// (older LuCLI runtimes intercepted the literal verb
+				// before dispatch; #2713, #4206), the stdio MCP server
+				// (`wheels mcp wheels`), scripted in-process clients and
+				// the spec suite. `PackagesMainCli.install()` is the same
+				// alias (#2729). Fall through to the `add` branch (same
+				// validation, same error shape, same install behavior).
 			case "add":
 				arguments.opts.target = $packagesRequireArg(arguments.positional, "add requires a name: wheels packages add <name>[@<version>]");
 				return $packagesMainCli().add(arguments.opts);
@@ -5319,7 +5311,7 @@ component extends="modules.BaseModule" {
 			case "registry":
 				return $dispatchPackagesRegistry(arguments.positional, arguments.opts);
 			default:
-				throw(message="Unknown packages subcommand: #arguments.sub#. The install verb is `add` (not `install`): wheels packages add <name>");
+				throw(message="Unknown packages subcommand: #arguments.sub#. To install a package: wheels packages add <name>");
 		}
 	}
 
@@ -5357,10 +5349,7 @@ component extends="modules.BaseModule" {
 
 	// Hand-written help for `wheels packages`. Owned by the module rather than
 	// auto-derived from picocli introspection because the auto-help drifted
-	// from the real CLI surface (#2713 — advertised `install <name> [--force]`
-	// even though LuCLI's built-in extension installer intercepts the literal
-	// `install` verb before dispatch reaches this module). Same trap that hit
-	// `wheels browser install` (renamed to `setup` in #2345).
+	// from the real CLI surface (#2713).
 	private string function $packagesHelp() {
 		var nl = chr(10);
 		var help = "Usage: wheels packages <subcommand> [options]" & nl;
@@ -5376,12 +5365,8 @@ component extends="modules.BaseModule" {
 		help &= "  registry refresh                        Bust the 24-hour registry cache" & nl;
 		help &= "  registry info                           Show the registry URL and cache state" & nl;
 		help &= "  help, --help, -h                        Show this help" & nl & nl;
-		help &= "Note: the install verb is `add`, NOT `install`." & nl;
-		help &= "  Typing `wheels packages install <name>` is intercepted by LuCLI's built-in" & nl;
-		help &= "  extension installer before dispatch reaches this module, and prints" & nl;
-		help &= "  '[INFO] No git or extension dependencies to install' without installing" & nl;
-		help &= "  anything. Use `wheels packages add <name>` instead. Same trap that bit" & nl;
-		help &= "  `wheels browser install` (renamed to `wheels browser setup` in ##2345)." & nl & nl;
+		help &= "Note: `install` is an alias of `add`, so `wheels packages install <name>`" & nl;
+		help &= "  works the same way." & nl & nl;
 		help &= "Examples:" & nl;
 		help &= "  wheels packages list" & nl;
 		help &= "  wheels packages search ui" & nl;
