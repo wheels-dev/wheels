@@ -1299,6 +1299,7 @@ public struct function $beginTestRunDataSource(required struct decision) {
 			StructClear(application.wheels.models);
 		}
 		request.wheels.$testRunPreSwap = {original = arguments.decision.primary, target = arguments.decision.target};
+		$warnLiveScopeTestSwap(primary = arguments.decision.primary, target = arguments.decision.target);
 	}
 	return local.saved;
 }
@@ -1417,6 +1418,48 @@ public void function $warnTestsOnPrimaryDataSource(required struct decision) {
 			type = "warning",
 			text = "App tests are running against the PRIMARY datasource '" & arguments.decision.primary & "' because allowTestsAgainstPrimaryDatasource=true and '" & arguments.decision.candidate & "' is not registered. Test writes reach the real database."
 		);
+	} catch (any e) {
+	}
+}
+
+/**
+ * Internal. The warning for a test run that switches the datasource in the LIVE application
+ * scope, or "" when there's nothing to warn about: the run is the isolated `<name>_wheelsTest`
+ * application, or it doesn't switch the datasource. Without the isolated application (the app's
+ * public/Application.cfc lacks the test-context include, or WHEELS_ENV isn't development or
+ * testing), the switch applies to the whole live app until the run ends, so other requests read
+ * and write the test datasource meanwhile.
+ */
+public string function $liveScopeTestSwapWarning(
+	required string applicationName,
+	required string primary,
+	required string target
+) {
+	local.suffix = "_wheelsTest";
+	if (Len(arguments.applicationName) >= Len(local.suffix) && Right(arguments.applicationName, Len(local.suffix)) == local.suffix) {
+		return "";
+	}
+	if (!Len(arguments.target) || Compare(arguments.target, arguments.primary) == 0) {
+		return "";
+	}
+	return "This test run switched the live application's datasource from '" & arguments.primary & "' to '" & arguments.target & "' until it ends, so other requests to this app read and write '" & arguments.target & "' meanwhile. To run tests in their own application instead, include ""../vendor/wheels/events/testcontext.cfm"" in public/Application.cfc after config/app.cfm (as wheels new does) and run with WHEELS_ENV=development or testing.";
+}
+
+/**
+ * Internal. Writes $liveScopeTestSwapWarning() to the wheels log, once: both callers switch the
+ * datasource once per test run (re-entrant requests of the same run don't switch it again).
+ */
+public void function $warnLiveScopeTestSwap(required string primary, required string target) {
+	local.message = $liveScopeTestSwapWarning(
+		applicationName = application.applicationName,
+		primary = arguments.primary,
+		target = arguments.target
+	);
+	if (!Len(local.message)) {
+		return;
+	}
+	try {
+		WriteLog(file = "wheels", type = "warning", text = local.message);
 	} catch (any e) {
 	}
 }
