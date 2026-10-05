@@ -32,8 +32,10 @@ wheels deploy app logs [--tail=<N>] [--follow] [--container=<name>] [--role=<nam
 Without `--container`, each host in the targeted role(s) reads the role's newest running container:
 
 ```txt
-docker ps --latest --quiet --filter label=service=<service> --filter label=role=<role> --filter label=destination=<destination> | xargs -r docker logs --tail <N> [--follow]
+docker ps --latest --quiet --filter 'label=service=<service>' [--filter 'label=role=<role>' --filter 'label=destination=<destination>'] | xargs -r docker logs --tail <N> [--follow]
 ```
+
+The role and destination filters are added for each role the command runs for, which is every targeted role. Without `--destination`, the destination filter is empty (`label=destination=`) and matches containers deployed without one.
 
 With `--container=<name>`, it runs `docker logs --tail <N> [--follow] <name>`, with the name shell-quoted. Output is line-buffered and prefixed with `[<host>]`.
 
