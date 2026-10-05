@@ -63,6 +63,8 @@ Settings cascade: framework defaults load first, then `config/settings.cfm`, the
 
 One development-only default worth noting: `reloadOnGlobalChange` (defaults `true` in development) makes bare `?reload=true` re-include `app/global/*.cfm` when any tracked file's mtime changes, so new helpers added to `app/global/functions.cfm` are picked up immediately without the password-gated full reload. Opt out with `set(reloadOnGlobalChange=false)` in `config/settings.cfm`. The setting defaults to `false` in all other environments, so there is no `DirectoryList` overhead in production.
 
+Another: `strictArguments` (defaults `"warn"` in development, `"off"` elsewhere) logs an argument that an association, validation, finder or migration column doesn't know, such as `foreign_key` or `null`, instead of ignoring it. `set(strictArguments="throw")` makes it an error. See [Strict Arguments](/v4-2-0/digging-deeper/strict-arguments/).
+
 ## Environment detection
 
 The active environment is whatever `config/environment.cfm` sets. A generated app reads it from `WHEELS_ENV`:

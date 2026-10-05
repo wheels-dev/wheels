@@ -78,6 +78,7 @@
 		string dataType = "char",
 		boolean automaticValidations
 	) {
+		$checkArguments(args = arguments, name = "property");
 		// validate setup
 		if (Len(arguments.column) && Len(arguments.sql)) {
 			Throw(

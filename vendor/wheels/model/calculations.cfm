@@ -267,6 +267,8 @@
 		StructDelete(arguments, "type");
 		StructDelete(arguments, "property");
 		StructDelete(arguments, "distinct");
+		local.ifNull = StructKeyExists(arguments, "ifNull") ? arguments.ifNull : "";
+		StructDelete(arguments, "ifNull");
 
 		// Since we don't return any records for calculation methods we want to skip the callbacks.
 		arguments.callbacks = false;
@@ -276,8 +278,8 @@
 		// If not grouping by something we just return the value itself.
 		if (!StructKeyExists(arguments, "group")) {
 			local.rv = local.rv[local.alias];
-			if (!Len(local.rv) && Len(arguments.ifNull)) {
-				local.rv = arguments.ifNull;
+			if (!Len(local.rv) && Len(local.ifNull)) {
+				local.rv = local.ifNull;
 			}
 		}
 

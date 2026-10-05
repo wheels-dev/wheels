@@ -133,6 +133,13 @@ component extends="Base" {
 	 */
 	private any function $addTypedColumns(required string columnType, required struct args) {
 		$combineArguments(args = arguments.args, combine = "columnNames,columnName", required = true);
+		// The options column() and ColumnDefinition read; anything else (`null`, `limits`) is ignored.
+		$checkArguments(
+			args = arguments.args,
+			name = arguments.columnType,
+			declared = "columnNames,columnName,columnType,default,allowNull,limit,precision,scale,unsigned,size,autoIncrement,afterColumn",
+			label = arguments.columnType == "biginteger" ? "bigInteger" : arguments.columnType
+		);
 		arguments.args.columnType = arguments.columnType;
 		local.columnNamesArray = ListToArray(arguments.args.columnNames);
 		local.iEnd = ArrayLen(local.columnNamesArray);

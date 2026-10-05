@@ -2,6 +2,8 @@
 
 Part of the Wheels application guide; start with `../CLAUDE.md`.
 
+In development, `strictArguments` (default `"warn"`) logs any argument a declaration or finder doesn't know (`foreign_key`, `orderby`) to `wheels.log`; `set(strictArguments="throw")` makes it an error. A logged argument was ignored: fix the call.
+
 ```cfm
 component extends="Model" {
     function config() {
