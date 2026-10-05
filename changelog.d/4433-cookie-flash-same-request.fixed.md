@@ -1,0 +1,1 @@
+- On RustCFML, with `flashStorage="cookie"`, a flash message stored with `flashInsert()` can be read with `flash()` in the same request. RustCFML reads the flash cookie back as the attribute struct it was assigned, rather than its value; the flash reader now uses the value (#4433)

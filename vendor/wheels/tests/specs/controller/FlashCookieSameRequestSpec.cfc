@@ -16,6 +16,29 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("$flashCookieScopeValue", () => {
+
+			beforeEach(() => {
+				_controller = application.wo.controller("dummy", {});
+			});
+
+			it("returns a cookie read as a string unchanged", () => {
+				expect(_controller.$flashCookieScopeValue('{"notice":"saved"}')).toBe('{"notice":"saved"}');
+			});
+
+			it("returns the value of a cookie read back as its attribute struct", () => {
+				var assigned = {value = '{"notice":"saved"}', httpOnly = true, secure = false, path = "/"};
+				expect(_controller.$flashCookieScopeValue(assigned)).toBe('{"notice":"saved"}');
+			});
+
+			it("reads a struct without a value, or a value that isn't simple, as no cookie", () => {
+				expect(_controller.$flashCookieScopeValue({httpOnly = true})).toBe("");
+				expect(_controller.$flashCookieScopeValue({value = {nested = true}})).toBe("");
+				expect(_controller.$flashCookieScopeValue(["x"])).toBe("");
+			});
+
+		});
+
 	}
 
 }
