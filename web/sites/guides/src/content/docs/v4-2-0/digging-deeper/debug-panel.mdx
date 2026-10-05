@@ -206,7 +206,7 @@ curl "http://localhost:8080/posts/999?format=md"
 `app/controllers/Posts.cfc:12`
 ```
 
-This is development only, and it follows the environment setting, not `showErrorInformation`. In `testing`, `maintenance` and `production` the error responses are unchanged; production still renders your `app/events/onerror.cfm` (or `onerror.json.cfm`), with no exception details. `md` is a format for error responses only: it isn't added to the `formats` setting, so it doesn't change how your controllers negotiate content.
+This is development only: it needs the `development` environment and `showErrorInformation` on (its development default). With `showErrorInformation` off, development errors render as they did before. In `testing`, `maintenance` and `production` the error responses are unchanged; production still renders your `app/events/onerror.cfm` (or `onerror.json.cfm`), with no exception details. `md` is a format for error responses only: it isn't added to the `formats` setting, so it doesn't change how your controllers negotiate content.
 
 ## Tools tab
 

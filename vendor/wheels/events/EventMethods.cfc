@@ -7,9 +7,9 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			}
 			// Fire registered onError callbacks (packages like Sentry hook in here).
 			$fireOnErrorCallbacks(arguments.exception);
-			// Development only: an error asked for as JSON or Markdown gets the
-			// structured error-page payload (agent-readable), whatever
-			// showErrorInformation says. Testing and production are unchanged.
+			// Development only, and only while showErrorInformation is on: an error
+			// asked for as JSON or Markdown gets the structured error-page payload
+			// (agent-readable). Testing and production are unchanged.
 			local.agentFormat = $agentErrorFormat();
 			if (Len(local.agentFormat)) {
 				local.rv = $runOnErrorRenderAgentError(arguments.exception, local.agentFormat);
@@ -257,14 +257,15 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 
 	/**
 	 * "json", "md" or "" (not an agent-readable error response). Only in the
-	 * development environment. An explicit ?format= decides first (json or md; any
+	 * development environment with showErrorInformation on; with it off the
+	 * response is today's. An explicit ?format= decides first (json or md; any
 	 * other value keeps today's handling); otherwise JSON when the request asks for
 	 * it, and Markdown when the Accept header lists text/markdown without
 	 * application/json. "md" is a format for error responses only, never added to
 	 * the formats setting, so controller content negotiation is unaffected.
 	 */
 	public string function $agentErrorFormat() {
-		if ($get("environment") != "development") {
+		if ($get("environment") != "development" || !$get("showErrorInformation")) {
 			return "";
 		}
 		local.param = $errorFormatParam();

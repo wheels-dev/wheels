@@ -78,11 +78,15 @@ component extends="wheels.WheelsTest" {
 				expect(DeserializeJSON(body).source).toBe("wheels-error-page");
 			});
 
-			it("is gated on the environment, not on showErrorInformation", () => {
+			it("needs showErrorInformation on too: with it off, development keeps today's response", () => {
 				application.wheels.showErrorInformation = false;
 				var em = $double();
 				em.formatOverride = "json";
-				expect(DeserializeJSON(em.$runOnError(exception = $plainException(), eventName = "onRequest")).source).toBe("wheels-error-page");
+				em.acceptHeader = "application/json";
+				var plain = $plainException();
+				var body = em.$runOnError(exception = plain, eventName = "onRequest");
+				expect(body).toBe($double().$runOnErrorRenderTemplate(plain, "onRequest"));
+				expect(body).notToInclude("wheels-error-page");
 			});
 
 			it("leaves an HTML request on the error page", () => {
