@@ -45,7 +45,7 @@ permissions:
 jobs:
   changes:
     name: "Detect CLI changes"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       relevant: ${{ steps.diff.outputs.relevant }}
     steps:
@@ -110,7 +110,7 @@ jobs:
     name: "Deploy CLI tests + verb smoke"
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       WHEELS_CI: "true"
@@ -197,7 +197,7 @@ jobs:
     name: "CLI suite"
     needs: [changes, deploy-gate]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Report the CLI suite verdict
         env:
