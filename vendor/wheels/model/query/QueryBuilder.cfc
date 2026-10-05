@@ -168,7 +168,7 @@ component output="false" {
 	public any function orderBy(required string property, string direction = "ASC") {
 		$validatePropertyName(arguments.property);
 		$validateDirection(arguments.direction);
-		ArrayAppend(variables.orderClauses, "#arguments.property# #arguments.direction#");
+		ArrayAppend(variables.orderClauses, "#arguments.property# #UCase(arguments.direction)#");
 		return this;
 	}
 

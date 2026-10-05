@@ -306,6 +306,7 @@ component extends="modules.BaseModule" {
 			"destroy" = destroyArgSpec().toInputSchema(),
 			"doctor"  = verboseFlagSpec().toInputSchema(),
 			"generate" = generateArgSpec().toInputSchema(),
+			"lookup"  = lookupArgSpec().toInputSchema(),
 			"migrate" = migrateArgSpec().toInputSchema(),
 			"notes"   = notesArgSpec().toInputSchema(),
 			"packages" = packagesArgSpec().toInputSchema(),
@@ -822,6 +823,7 @@ component extends="modules.BaseModule" {
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
 		help &= "  setup               Configure this app for external tools (setup agents: AI assistants)" & nl;
+		help &= "  lookup              Look up the Wheels API and guides offline (a function name or a phrase)" & nl;
 		help &= "  version             Show Wheels CLI version" & nl;
 		help &= "  help                Show this help" & nl & nl;
 		help &= "For command-specific help: wheels <command> --help" & nl & nl;
@@ -951,7 +953,8 @@ component extends="modules.BaseModule" {
 				return [
 					"  wheels new myapp                              SQLite, port 8080",
 					"  wheels new myapp --port=3000 --setup-h2       H2 instead of SQLite",
-					"  wheels new myapp --datasource=mydb --no-sqlite  Your own datasource"
+					"  wheels new myapp --datasource=mydb --no-sqlite  Your own datasource",
+					"  wheels new myapp --no-agents                  No .mcp.json / .opencode.json"
 				];
 			case "test":
 				return [
@@ -1997,6 +2000,136 @@ component extends="modules.BaseModule" {
 		return "/";
 	}
 
+
+	// ─────────────────────────────────────────────────
+	//  lookup — Offline API and guides lookup
+	// ─────────────────────────────────────────────────
+
+	private any function lookupArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "query", required = true, description = "A function name (findAll, model.findAll), a phrase (nested resources), or an id from an earlier result (api:model.findAll)")
+			.option(name = "kind", default = "all", choices = "all,api,guides", description = "Search the API reference, the guides, or both")
+			.option(name = "limit", default = 5, type = "numeric", description = "Most results to return (1-20)")
+			.option(name = "format", default = "text", choices = "text,json", description = "Output format");
+	}
+
+	/**
+	 * hint: Look up the Wheels API and guides offline: a function name, a phrase, or an id from an earlier result
+	 */
+	public string function lookup() {
+		var usage = "Usage: wheels lookup <query> [--kind=all|api|guides] [--limit=5] [--format=text|json]";
+		var opts = {};
+		try {
+			opts = lookupArgSpec().parse(structuredArgs(arguments));
+		} catch (Wheels.CLI.MissingArgument e) {
+			$refuse("Missing a query: a function name (findAll), a phrase (nested resources), or an id from an earlier result. " & usage);
+		}
+
+		var index = new services.DocsIndex($docsIndexPath());
+		if (!index.exists()) {
+			// Self-contained: an MCP client sees only the message (it drops what was printed).
+			throw(
+				type = "Wheels.DocsIndexMissing",
+				message = "This Wheels CLI has no docs index (#$docsIndexPath()#). Release and snapshot builds include it; "
+					& "from a source checkout, build it with: node tools/build/scripts/build-docs-index.mjs"
+			);
+		}
+
+		var result = index.lookup(opts.query, opts.kind, opts.limit);
+		result["index"] = index.meta();
+		var note = $docsIndexVersionNote(result.index.frameworkVersion);
+
+		if (opts.format == "json") {
+			if (len(note)) {
+				result["note"] = note;
+			}
+			out(serializeJSON(result));
+			return "";
+		}
+
+		if (result.mode != "search") {
+			if (!arrayLen(result.entries)) {
+				out("No entry with id ""#result.query#"".");
+			}
+			for (var entry in result.entries) {
+				$printDocsEntry(entry);
+			}
+		} else if (!arrayLen(result.results)) {
+			out("No matches for ""#result.query#"". Try fewer or different words, or search https://guides.wheels.dev/");
+		} else {
+			for (var i = 1; i <= arrayLen(result.results); i++) {
+				var hit = result.results[i];
+				out("#i#. [#hit.kind#] #hit.title#", "bold");
+				if (len(hit.snippet)) {
+					out("   " & hit.snippet);
+				}
+				out("   " & hit.url);
+				out("   id: " & hit.id);
+			}
+			out("");
+			out("For a whole entry: wheels lookup <id>");
+		}
+		if (len(note)) {
+			out(note, "yellow");
+		}
+		return "";
+	}
+
+	/**
+	 * The docs index the CLI module ships (built at release and snapshot time).
+	 * Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public string function $docsIndexPath() {
+		return getDirectoryFromPath(getCurrentTemplatePath()) & "data/docs-index.json";
+	}
+
+	/**
+	 * A note when the index describes another framework version than this CLI
+	 * (a stale index in a source checkout). Pre-release suffixes are ignored:
+	 * a 4.2.0-snapshot.N CLI reads a 4.2.0 snapshot index.
+	 */
+	private string function $docsIndexVersionNote(required string indexVersion) {
+		var cliBase = reMatch("^\d+\.\d+\.\d+", $displayVersion());
+		var indexBase = reMatch("^\d+\.\d+\.\d+", arguments.indexVersion);
+		if (!arrayLen(cliBase) || !arrayLen(indexBase) || cliBase[1] == indexBase[1]) {
+			return "";
+		}
+		return "This docs index is for Wheels #arguments.indexVersion#; this CLI is #$displayVersion()#.";
+	}
+
+	private void function $printDocsEntry(required struct entry) {
+		var e = arguments.entry;
+		if (e.kind == "api") {
+			var names = [];
+			for (var p in e.params) {
+				arrayAppend(names, p.name);
+			}
+			out("#e.name#(#arrayToList(names, ", ")#) returns #e.returns#", "bold");
+			out("Available in: #arrayToList(e.scopes, ", ")#   Section: #e.section#");
+			out("");
+			out(e.hint);
+			if (arrayLen(e.params)) {
+				out("");
+				out("Parameters:", "bold");
+				for (var p in e.params) {
+					var detail = p.type & (p.required ? ", required" : "") & (len(p["default"]) ? ", default " & p["default"] : "");
+					out("  #p.name# (#detail#)" & (len(p.hint) ? ": " & p.hint : ""));
+				}
+			}
+			if (len(e.example)) {
+				out("");
+				out("Example:", "bold");
+				out(e.example);
+			}
+		} else {
+			out(compare(e.page, e.heading) == 0 ? e.page : e.page & " › " & e.heading, "bold");
+			out("");
+			out(e.text);
+		}
+		out("");
+		out(e.url);
+		out("");
+	}
 
 	// ─────────────────────────────────────────────────
 	//  docs — Local offline documentation bundle
@@ -3105,7 +3238,8 @@ component extends="modules.BaseModule" {
 			.option(name = "reload-password", default = "", description = "Reload password (default: random)")
 			.flag(name = "setup-h2", default = false, description = "Use the H2 embedded database instead of SQLite")
 			.flag(name = "sqlite", default = true, description = "Set up the zero-config SQLite database")
-			.flag(name = "open-browser", default = true, description = "Open the browser when the server starts");
+			.flag(name = "open-browser", default = true, description = "Open the browser when the server starts")
+			.flag(name = "agents", default = true, description = "Write .mcp.json and .opencode.json so AI assistants find the Wheels MCP server; skip with --no-agents");
 	}
 
 	/**
@@ -3128,6 +3262,7 @@ component extends="modules.BaseModule" {
 			setupH2 = parsed["setup-h2"],
 			noSQLite = !parsed.sqlite,
 			openBrowser = parsed["open-browser"],
+			agents = parsed.agents,
 			isEmpty = structIsEmpty(arguments.coll)
 		};
 	}
@@ -3168,7 +3303,8 @@ component extends="modules.BaseModule" {
 			reloadPassword: opts.reloadPassword,
 			setupH2: opts.setupH2,
 			noSQLite: opts.noSQLite,
-			openBrowser: opts.openBrowser
+			openBrowser: opts.openBrowser,
+			agents: opts.agents
 		};
 
 		if (!len(appName)) {
@@ -3595,61 +3731,7 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		// Two clients, two shapes. Claude Code reads `.mcp.json` (mcpServers +
-		// separate command/args); OpenCode reads `.opencode.json` (an `mcp` key,
-		// `type: "local"`, and command+args as ONE array). Both are written —
-		// that is what the wrapper's own `wheels mcp` help has always promised.
-		var targets = [
-			{
-				file: ".mcp.json",
-				label: "Claude Code",
-				rootKey: "mcpServers",
-				entry: {command: "wheels", args: ["mcp", "wheels"]},
-				schema: ""
-			},
-			{
-				file: ".opencode.json",
-				label: "OpenCode",
-				rootKey: "mcp",
-				entry: {type: "local", command: ["wheels", "mcp", "wheels"], enabled: true},
-				schema: "https://opencode.ai/config.json"
-			}
-		];
-
-		// Load and validate everything BEFORE writing anything: a bad
-		// .opencode.json must not leave a half-applied setup with .mcp.json
-		// already rewritten.
-		var loaded = [];
-		for (var t in targets) {
-			arrayAppend(loaded, $loadMcpConfig(variables.projectRoot & "/" & t.file, t));
-		}
-
-		var changed = [];
-		for (var i = 1; i <= arrayLen(targets); i++) {
-			var t = targets[i];
-			var state = loaded[i];
-			var config = state.config;
-			if (!structKeyExists(config, t.rootKey) || !IsStruct(config[t.rootKey])) {
-				config[t.rootKey] = {};
-			}
-			if (len(t.schema) && !structKeyExists(config, "$schema")) {
-				config["$schema"] = t.schema;
-			}
-			var existing = config[t.rootKey].wheels ?: {};
-			var correct = $mcpEntryMatches(existing, t.entry);
-			if (!correct || force) {
-				config[t.rootKey].wheels = t.entry;
-				fileWrite(state.path, serializeJSON(config));
-				arrayAppend(changed, {
-					file: t.file,
-					path: state.path,
-					verb: !state.existed ? "Created" : (correct ? "Rewrote" : (structCount(existing) ? "Updated" : "Added")),
-					others: structCount(config[t.rootKey]) - 1
-				});
-			} else {
-				arrayAppend(changed, {file: t.file, path: state.path, verb: "", others: structCount(config[t.rootKey]) - 1});
-			}
-		}
+		var changed = $writeAgentConfigs(variables.projectRoot, force);
 
 		var wrote = [];
 		for (var c in changed) {
@@ -3680,6 +3762,91 @@ component extends="modules.BaseModule" {
 		out("  Restart your AI assistant so it picks up the new server,");
 		out("  then ask it to run `wheels routes` to confirm the connection.");
 		return "";
+	}
+
+	/**
+	 * Write the wheels entry into `.mcp.json` and `.opencode.json` under `root`,
+	 * merging into whatever else those files list. Returns one {file, path, verb,
+	 * others} per file; `verb` is "" when the file already had the right entry.
+	 * Prints nothing, so `setup agents` and `wheels new` each report it their own
+	 * way. Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public array function $writeAgentConfigs(required string root, boolean force = false) {
+		// Two clients, two shapes. Claude Code reads `.mcp.json` (mcpServers +
+		// separate command/args); OpenCode reads `.opencode.json` (an `mcp` key,
+		// `type: "local"`, and command+args as ONE array). Both are written —
+		// that is what the wrapper's own `wheels mcp` help has always promised.
+		var targets = [
+			{
+				file: ".mcp.json",
+				label: "Claude Code",
+				rootKey: "mcpServers",
+				entry: {command: "wheels", args: ["mcp", "wheels"]},
+				schema: ""
+			},
+			{
+				file: ".opencode.json",
+				label: "OpenCode",
+				rootKey: "mcp",
+				entry: {type: "local", command: ["wheels", "mcp", "wheels"], enabled: true},
+				schema: "https://opencode.ai/config.json"
+			}
+		];
+
+		// Load and validate everything BEFORE writing anything: a bad
+		// .opencode.json must not leave a half-applied setup with .mcp.json
+		// already rewritten.
+		var loaded = [];
+		for (var t in targets) {
+			arrayAppend(loaded, $loadMcpConfig(arguments.root & "/" & t.file, t));
+		}
+
+		var changed = [];
+		for (var i = 1; i <= arrayLen(targets); i++) {
+			var t = targets[i];
+			var state = loaded[i];
+			var config = state.config;
+			if (!structKeyExists(config, t.rootKey) || !IsStruct(config[t.rootKey])) {
+				config[t.rootKey] = {};
+			}
+			if (len(t.schema) && !structKeyExists(config, "$schema")) {
+				config["$schema"] = t.schema;
+			}
+			var existing = config[t.rootKey].wheels ?: {};
+			var correct = $mcpEntryMatches(existing, t.entry);
+			if (!correct || arguments.force) {
+				config[t.rootKey].wheels = t.entry;
+				fileWrite(state.path, serializeJSON(config));
+				arrayAppend(changed, {
+					file: t.file,
+					path: state.path,
+					verb: !state.existed ? "Created" : (correct ? "Rewrote" : (structCount(existing) ? "Updated" : "Added")),
+					others: structCount(config[t.rootKey]) - 1
+				});
+			} else {
+				arrayAppend(changed, {file: t.file, path: state.path, verb: "", others: structCount(config[t.rootKey]) - 1});
+			}
+		}
+
+		return changed;
+	}
+
+	/**
+	 * `wheels new`'s AI-assistant configs: the files `setup agents` writes, in the
+	 * new app's root. Never fails the scaffold, since the app works without them:
+	 * returns a warning to print instead, or "" when they were written.
+	 */
+	private string function $writeNewAppAgentConfigs(required string targetDir, required string appName) {
+		try {
+			for (var written in $writeAgentConfigs(arguments.targetDir)) {
+				if (len(written.verb)) {
+					printCreated(arguments.appName & "/" & written.file);
+				}
+			}
+			return "";
+		} catch (any e) {
+			return "Couldn't write the AI-assistant configs (#e.message#). Add them later with: cd #arguments.appName# && wheels setup agents";
+		}
 	}
 
 	/**
@@ -7605,11 +7772,11 @@ component extends="modules.BaseModule" {
 			out("The next migration takes it over, so there is nothing to clear.");
 			return "";
 		}
-		out("The migration lock is held by #$migrationLockDescription(lock)#; its lease expires in #lock.expiresInSeconds# seconds.", "yellow");
+		// One self-contained message: an MCP client sees only the thrown message.
 		$refuse(
-			"The migration lock is held by another instance; nothing was removed.",
-			"Wheels.MigrationLocked",
-			["If that instance is gone, remove the lock with:", "  wheels migrate unlock --force"]
+			"The migration lock is held by #$migrationLockDescription(lock)#; its lease expires in #lock.expiresInSeconds# seconds. "
+				& "Nothing was removed. If that instance is gone, remove the lock with: wheels migrate unlock --force",
+			"Wheels.MigrationLocked"
 		);
 		return "";
 	}
@@ -9052,7 +9219,7 @@ component extends="modules.BaseModule" {
 				fix: "On Adobe ColdFusion, session cleanup can call onSessionEnd() after the application scope is gone, and a bare application.wo then throws. Route it through arguments.applicationScope.wo, guarded with StructKeyExists. #adopt# Guide: ""Adobe teardown guards in onError / onSessionEnd"", #guide41#"},
 			{since: "4.0.6", severity: "advisory", pattern: "testcontext\.cfm",
 				description: "public/Application.cfc doesn't include the isolated test context",
-				fix: "Without it the test suites run against your live application scope. #adopt# Guide: ""Isolated test-application include"", #guide41#"},
+				fix: "Without it the test suites run against your live application scope: a run that uses the test database switches the live application's datasource for the whole run, so other requests to the app read and write the test database meanwhile. #adopt# Guide: ""Isolated test-application include"", #guide41#"},
 			{since: "4.1.0", severity: "advisory", pattern: "resources/java",
 				description: "public/Application.cfc doesn't put the bundled jBCrypt jar on the Java load path",
 				fix: "Without it bcryptHash()/bcryptVerify() use the slow pure-CFML fallback, and code that loads a BCrypt class can fail. #adopt# Guide: ""jBCrypt load path"", #guide41#"},
@@ -11107,7 +11274,8 @@ component extends="modules.BaseModule" {
 			luceeAdminPassword: generateRandomPassword(),
 			setupH2: structKeyExists(options, "setupH2") ? options.setupH2 : false,
 			noSQLite: structKeyExists(options, "noSQLite") ? options.noSQLite : false,
-			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true
+			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true,
+			agents: structKeyExists(options, "agents") ? options.agents : true
 		};
 
 		// Resolve the Wheels framework source BEFORE creating any files. A
@@ -11182,6 +11350,10 @@ component extends="modules.BaseModule" {
 		// a reviewable file rather than an inline string means an edit to it
 		// cannot live only in a working tree and vanish without a trace.
 
+		// The AI-assistant configs `wheels setup agents` writes, so the new app's
+		// assistant finds the Wheels MCP server without a second command.
+		var agentsWarning = opts.agents ? $writeNewAppAgentConfigs(targetDir, appName) : "";
+
 		out("");
 		out("Application created!", "green");
 		out("");
@@ -11194,6 +11366,12 @@ component extends="modules.BaseModule" {
 			out("  Database:        H2 embedded (db/h2/)", "green");
 		} else if (!opts.noSQLite) {
 			out("  Database:        SQLite (db/development.sqlite)", "green");
+		}
+		if (opts.agents && !len(agentsWarning)) {
+			out("  AI assistants:   .mcp.json and .opencode.json (skip with --no-agents)");
+		}
+		if (len(agentsWarning)) {
+			out("  " & agentsWarning, "yellow");
 		}
 		out("");
 		out("Next steps:", "bold");

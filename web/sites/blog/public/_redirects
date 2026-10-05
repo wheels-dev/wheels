@@ -1,0 +1,4 @@
+# Old blog URLs (/blog/<slug>) predate the /posts/<slug>/ layout. Older posts still link them, and
+# so may other sites. Cloudflare Pages applies these before serving files.
+/blog          /               301
+/blog/*        /posts/:splat   301

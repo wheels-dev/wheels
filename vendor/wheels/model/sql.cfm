@@ -239,6 +239,21 @@
 	}
 
 	/**
+	 * Internal function. One `order` item as `<item> ASC` or `<item> DESC`: whitespace runs (spaces,
+	 * tabs) become single spaces, and a trailing direction is read whatever its case and emitted in
+	 * upper case. An item with no direction sorts ascending. A lowercase direction used to be
+	 * missed, so `order="id desc"` sorted ascending.
+	 */
+	public string function $normalizeOrderItem(required string item) {
+		local.text = Trim(ReReplace(arguments.item, "\s+", " ", "all"));
+		local.last = ListLast(local.text, " ");
+		if (ListLen(local.text, " ") > 1 && ListFindNoCase("ASC,DESC", local.last)) {
+			return Left(local.text, Len(local.text) - Len(local.last) - 1) & " " & UCase(local.last);
+		}
+		return local.text & " ASC";
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public string function $orderByClause(required string order, required string include) {
@@ -258,10 +273,7 @@
 				local.orderArray = ListToArray(arguments.order);
 				local.iEnd = ArrayLen(local.orderArray);
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.iItem = Trim(local.orderArray[local.i]);
-					if (!Find(" ASC", local.iItem) && !Find(" DESC", local.iItem)) {
-						local.iItem &= " ASC";
-					}
+					local.iItem = $normalizeOrderItem(local.orderArray[local.i]);
 					if (Find("(", local.iItem)) {
 						// Reject raw SQL expressions — calculated properties should be referenced by name
 						local.property = Trim(SpanExcluding(local.iItem, " "));

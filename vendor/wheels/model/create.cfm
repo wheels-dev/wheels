@@ -165,7 +165,10 @@
 						local.rollback = true;
 					}
 
+					// What this save writes, from the write on (F49); put back if the save fails.
+					local.savedBefore = $savedChangesState();
 					$create(parameterize = arguments.parameterize, reload = arguments.reload);
+					$captureSavedChanges();
 					if (
 						$saveAssociations(argumentCollection = arguments)
 						&& $callback("afterCreate", arguments.callbacks)
@@ -173,17 +176,17 @@
 					) {
 						$updatePersistedProperties();
 						if (arguments.reload) {
-							this.reload();
+							$reloadKeepingSavedChanges();
 						}
 						local.rv = true;
 						// v4.2.0: queue afterCommit/afterRollback (fires at the outermost
 						// transaction resolve, or immediately in none/false mode).
-						// callbacks = false skips the commit callbacks too, like every other callback.
-						if (arguments.callbacks) {
-							$enqueueTransactionCallbacks(operation = "create");
+						$enqueueTransactionCallbacks(operation = "create", savedBefore = local.savedBefore, callbacks = arguments.callbacks);
+					} else {
+						$restoreSavedChanges(local.savedBefore);
+						if (local.rollback) {
+							$resetToNew();
 						}
-					} else if (local.rollback) {
-						$resetToNew();
 					}
 				} else {
 					$validateAssociations(callbacks = arguments.callbacks);
@@ -197,7 +200,9 @@
 					&& $callback("beforeSave", arguments.callbacks)
 					&& $callback("beforeUpdate", arguments.callbacks)
 				) {
+					local.savedBefore = $savedChangesState();
 					$update(parameterize = arguments.parameterize, reload = arguments.reload);
+					$captureSavedChanges();
 					if (
 						$saveAssociations(argumentCollection = arguments)
 						&& $callback("afterUpdate", arguments.callbacks)
@@ -205,14 +210,13 @@
 					) {
 						$updatePersistedProperties();
 						if (arguments.reload) {
-							this.reload();
+							$reloadKeepingSavedChanges();
 						}
 						local.rv = true;
 						// v4.2.0: queue afterCommit/afterRollback (see create branch).
-						// callbacks = false skips the commit callbacks too, like every other callback.
-						if (arguments.callbacks) {
-							$enqueueTransactionCallbacks(operation = "update");
-						}
+						$enqueueTransactionCallbacks(operation = "update", savedBefore = local.savedBefore, callbacks = arguments.callbacks);
+					} else {
+						$restoreSavedChanges(local.savedBefore);
 					}
 				} else {
 					$validateAssociations(callbacks = arguments.callbacks);
