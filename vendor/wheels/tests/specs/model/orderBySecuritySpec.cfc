@@ -89,18 +89,60 @@ component extends="wheels.WheelsTest" {
 
 			})
 
+			describe("dot-notation quoting (4374)", () => {
+
+				it("quotes table.column exactly as it quotes the bare column", () => {
+					var author = g.model("author");
+					expect(author.$orderByClause(order="c_o_r_e_authors.lastName DESC", include=""))
+						.toBe(author.$orderByClause(order="lastName DESC", include=""));
+					expect(author.$orderByClause(order="c_o_r_e_authors.firstName ASC, c_o_r_e_authors.lastName", include=""))
+						.toBe(author.$orderByClause(order="firstName ASC, lastName", include=""));
+				})
+
+				it("resolves the table and column case-insensitively to their real names", () => {
+					var author = g.model("author");
+					expect(author.$orderByClause(order="C_O_R_E_AUTHORS.LASTNAME desc", include=""))
+						.toBe(author.$orderByClause(order="lastName DESC", include=""));
+				})
+
+				it("quotes a column of an included association's table", () => {
+					var author = g.model("author");
+					var posts = g.model("post");
+					var expected = "ORDER BY " & posts.$quotedTableColumn(posts.tableName(), "title") & " ASC";
+					expect(author.$orderByClause(order="#posts.tableName()#.title", include="posts")).toBe(expected);
+				})
+
+				it("resolves a mapped property, by property or column name, to its real column", () => {
+					var photo = g.model("photo");
+					// Photo maps the DESCRIPTION1 property to the description column.
+					var expected = "ORDER BY " & photo.$quotedTableColumn(photo.tableName(), "description") & " DESC";
+					expect(photo.$orderByClause(order="#photo.tableName()#.DESCRIPTION1 DESC", include="")).toBe(expected);
+					expect(photo.$orderByClause(order="#photo.tableName()#.description DESC", include="")).toBe(expected);
+				})
+
+				it("leaves a qualifier it can't resolve (an alias) as written", () => {
+					expect(g.model("author").$orderByClause(order="a.id DESC", include="")).toBe("ORDER BY a.id DESC");
+				})
+
+				it("runs on the database", () => {
+					var rows = g.model("author").findAll(order="c_o_r_e_authors.lastName DESC", returnAs="query");
+					var bare = g.model("author").findAll(order="lastName DESC", returnAs="query");
+					expect(rows.recordCount).toBe(bare.recordCount);
+					expect(ValueList(rows.id)).toBe(ValueList(bare.id));
+				})
+
+			})
+
 			describe("dot-notation validation", () => {
 
 				it("allows valid table.column dot notation", () => {
 					var result = g.model("author").$orderByClause(order="c_o_r_e_authors.id ASC", include="");
-					expect(result).toInclude("ORDER BY");
-					expect(result).toInclude("c_o_r_e_authors.id");
+					expect(result).toBe(g.model("author").$orderByClause(order="id ASC", include=""));
 				})
 
 				it("allows valid table.column without explicit direction", () => {
 					var result = g.model("author").$orderByClause(order="c_o_r_e_authors.id", include="");
-					expect(result).toInclude("ORDER BY");
-					expect(result).toInclude("c_o_r_e_authors.id");
+					expect(result).toBe(g.model("author").$orderByClause(order="id", include=""));
 				})
 
 				it("rejects SQL injection in dot-notation with semicolon", () => {
