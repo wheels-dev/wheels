@@ -49,6 +49,11 @@ jobs:
       - name: Test the engine download verification (no engine)
         run: python3 tools/rustcfml/test_resolve_engine.py
 
+      # Engine-free: the daily version check skips a release listed in
+      # tools/rustcfml/KNOWN_BAD, and every entry carries a tag, a link and a reason.
+      - name: Test the known-bad release list (no engine)
+        run: python3 tools/rustcfml/test_check_version.py
+
       - name: Read pinned engine version
         id: engine
         run: echo "version=$(tr -d '[:space:]' < tools/rustcfml/ENGINE_VERSION)" >> $GITHUB_OUTPUT

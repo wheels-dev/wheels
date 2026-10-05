@@ -359,11 +359,18 @@ component {
 	public struct function $csrfCookieAttributeCollection(required string value) {
 		local.cookieStruct = {
 			value = arguments.value,
-			encodeValue = application.wheels.csrfCookieEncodeValue,
 			httpOnly = application.wheels.csrfCookieHttpOnly,
-			preserveCase = application.wheels.csrfCookiePreserveCase,
 			secure = application.wheels.csrfCookieSecure
 		};
+		// encodeValue and preserveCase default to "" (the engine's own default).
+		// Only set them when configured: Adobe CF rejects "" for these boolean
+		// cookie attributes, so the first cookie-store token was an HTTP 500.
+		if (Len(application.wheels.csrfCookieEncodeValue)) {
+			local.cookieStruct.encodeValue = application.wheels.csrfCookieEncodeValue;
+		}
+		if (Len(application.wheels.csrfCookiePreserveCase)) {
+			local.cookieStruct.preserveCase = application.wheels.csrfCookiePreserveCase;
+		}
 		if (Len(application.wheels.csrfCookieSameSite)) {
 			local.cookieStruct.sameSite = application.wheels.csrfCookieSameSite;
 		}

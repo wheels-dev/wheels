@@ -181,7 +181,7 @@
 						local.rv = true;
 						// v4.2.0: queue afterCommit/afterRollback (fires at the outermost
 						// transaction resolve, or immediately in none/false mode).
-						$enqueueTransactionCallbacks(operation = "create", savedBefore = local.savedBefore);
+						$enqueueTransactionCallbacks(operation = "create", savedBefore = local.savedBefore, callbacks = arguments.callbacks);
 					} else {
 						$restoreSavedChanges(local.savedBefore);
 						if (local.rollback) {
@@ -214,7 +214,7 @@
 						}
 						local.rv = true;
 						// v4.2.0: queue afterCommit/afterRollback (see create branch).
-						$enqueueTransactionCallbacks(operation = "update", savedBefore = local.savedBefore);
+						$enqueueTransactionCallbacks(operation = "update", savedBefore = local.savedBefore, callbacks = arguments.callbacks);
 					} else {
 						$restoreSavedChanges(local.savedBefore);
 					}
