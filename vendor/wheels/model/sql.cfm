@@ -1584,6 +1584,7 @@
 						dataType = local.params[local.i].dataType,
 						scale = local.params[local.i].scale,
 						list = local.params[local.i].list,
+						operator = local.params[local.i].operator,
 						property = local.column
 					};
 					ArrayAppend(local.rv, local.param);

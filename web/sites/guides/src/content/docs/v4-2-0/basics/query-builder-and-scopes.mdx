@@ -71,8 +71,8 @@ The two-argument form of `where` means equality. The three-argument form takes a
 - **Oracle** 19c and earlier accept at most 1000 values per list. Wheels splits a longer list into groups for you.
 - **SQL Server** accepts about 2,100 parameters per statement.
   - On SQL Server 2016 and later (database compatibility level 130 or higher), a statement over the limit runs its largest lists of integers, plain decimals (up to 38 digits), strings and uniqueidentifiers as one parameter each, expanded on the server with `STRING_SPLIT`.
-  - Date and timestamp lists run the same way when every value is written as `yyyy-mm-dd`, optionally followed by `HH:mm`, `:ss` and `.SSS` (or is a CFML date). Each value is converted to the type the database driver binds it as, so a long list matches exactly the rows a short one would.
-  - Any other long list (times, dates written another way, float, real, bit, text or binary values, or numbers written as `+5`, `.5` or `1E5`), or a database below level 130, fails before it runs with `Wheels.TooManyParameters`. Query those values in batches, or use a join or subquery instead of a long list.
+  - Date and timestamp lists run the same way when every value is written as `yyyy-mm-dd`, optionally followed by `HH:mm`, `:ss` and `.SSS` (or is a CFML date). So do time lists written as `HH:mm`, optionally followed by `:ss` and a fraction (or CFML times). Each value is compared the way a short list compares it: in the column's own type on a `DATETIME`, `SMALLDATETIME` or `TIME` column, otherwise as the database driver binds it. A long list therefore matches exactly the rows a short one would.
+  - Any other long list (dates written another way, float, real, bit, text or binary values, or numbers written as `+5`, `.5` or `1E5`), or a database below level 130, fails before it runs with `Wheels.TooManyParameters`. Query those values in batches, or use a join or subquery instead of a long list.
 
 Every builder method can start the chain directly on the model class — you don't have to lead with `where()`. Starting with `select()` reads naturally when you only need a few columns:
 

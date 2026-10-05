@@ -251,7 +251,8 @@ component extends="wheels.WheelsTest" {
 				expect(variables.g.model("dtSplit").whereNotIn("dt2", values).count()).toBe(ArrayLen(variables.stored) - 1);
 			});
 
-			it("keeps Wheels.TooManyParameters for a time list, or dates in another form, past the limit", () => {
+			// A time list splits as TIME(7) since #4327; dates in a locale form still have no split form.
+			it("runs a time list past the limit, and keeps Wheels.TooManyParameters for dates in another form", () => {
 				if (!variables.isSqlServer) {
 					skip("SQL Server's parameter limit.");
 				}
@@ -273,7 +274,7 @@ component extends="wheels.WheelsTest" {
 				} catch (any e) {
 					dateError = e.type;
 				}
-				expect(timeError).toBe("Wheels.TooManyParameters");
+				expect(timeError).toBe("");
 				expect(dateError).toBe("Wheels.TooManyParameters");
 			});
 

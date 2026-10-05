@@ -18,7 +18,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Internal function. Splits IN lists that would exceed the parameter limit into one parameter
-	 * each (#4103), then casts high-precision decimal params exactly (#4172), before running the query.
+	 * each (#4103), casts date and time conditions to their column's type (#4326, #4327), then casts
+	 * high-precision decimal params exactly (#4172), before running the query.
 	 */
 	public struct function $performQuery(
 		required array sql,
@@ -31,8 +32,134 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		boolean $captureResult = true
 	) {
 		$splitLargeInLists(args = arguments);
+		$castTemporalParams(args = arguments);
 		$castWideDecimalParams(args = arguments);
 		return super.$performQuery(argumentCollection = arguments);
+	}
+
+	/**
+	 * Internal function. The SQL Server type a condition on a column of `dataType` compares in, or
+	 * "" to keep the bind as it is (#4326, #4327). Every engine binds cf_sql_timestamp as
+	 * DATETIME2(7), and SQL Server then converts a DATETIME or SMALLDATETIME column exactly, so a
+	 * value with a fraction never equals what the column stored in 1/300-second (or one-minute)
+	 * steps; compared as DATETIME / SMALLDATETIME, the value rounds the way the stored value did.
+	 * cf_sql_time binds as DATETIME on Lucee, not at all on BoxLang and without its fraction on
+	 * Adobe, so a TIME column compares as TIME(7), which holds any TIME(n) value exactly.
+	 */
+	public string function $temporalComparisonType(required string dataType) {
+		switch (LCase(arguments.dataType)) {
+			case "datetime":
+				return "DATETIME";
+			case "smalldatetime":
+				return "SMALLDATETIME";
+			case "time":
+				return "TIME(7)";
+		}
+		return "";
+	}
+
+	/**
+	 * Internal function. Rewrites each date or time condition param that $isTemporalCastParam()
+	 * selects into `CAST(? AS <column type>)`, an IN list into one CAST per value (#4326, #4327).
+	 * The number of bound parameters is unchanged.
+	 */
+	public void function $castTemporalParams(required struct args) {
+		if (!arguments.args.parameterize) {
+			return;
+		}
+		local.rv = [];
+		for (local.part in arguments.args.sql) {
+			// Adobe CF passes arrays by value, so the parts are returned and appended here.
+			if ($isTemporalCastParam(local.part)) {
+				local.parts = $castTemporalParts(local.part);
+			} else {
+				local.parts = [local.part];
+			}
+			for (local.item in local.parts) {
+				ArrayAppend(local.rv, local.item);
+			}
+		}
+		arguments.args.sql = local.rv;
+	}
+
+	/**
+	 * Internal function. True for a WHERE condition param on a DATETIME or SMALLDATETIME column
+	 * compared with =, <>, !=, IN or NOT IN, or on a TIME column with any comparison. A range on a
+	 * DATETIME column keeps the exact comparison: rounding its bound could move a row across it.
+	 */
+	public boolean function $isTemporalCastParam(required any part) {
+		if (
+			!IsStruct(arguments.part)
+			|| !StructKeyExists(arguments.part, "dataType")
+			|| !StructKeyExists(arguments.part, "operator")
+			|| !StructKeyExists(arguments.part, "type")
+			|| !StructKeyExists(arguments.part, "value")
+			|| !ListFindNoCase("cf_sql_timestamp,cf_sql_time,cf_sql_date", arguments.part.type)
+			|| (StructKeyExists(arguments.part, "null") && arguments.part.null)
+		) {
+			return false;
+		}
+		local.castType = $temporalComparisonType(arguments.part.dataType);
+		if (!Len(local.castType)) {
+			return false;
+		}
+		local.operator = UCase(ReReplace(Trim(arguments.part.operator), "\s+", " ", "all"));
+		if (local.castType == "TIME(7)") {
+			return ListFind("=,<>,!=,<,<=,>,>=,IN,NOT IN", local.operator) > 0;
+		}
+		return ListFind("=,<>,!=,IN,NOT IN", local.operator) > 0;
+	}
+
+	/**
+	 * Internal function. The SQL parts for a date or time condition param as `CAST(? AS <type>)`,
+	 * or for an IN list as `(CAST(...), CAST(...))` with one param per value. A TIME value binds as
+	 * text (HH:mm:ss.fffffff), which every engine sends as it is.
+	 */
+	public array function $castTemporalParts(required struct part) {
+		local.castType = $temporalComparisonType(arguments.part.dataType);
+		// $queryParams() unmasks an IN list's values and joins them with Chr(7).
+		local.qp = $queryParams(arguments.part);
+		local.isList = StructKeyExists(local.qp, "list") && local.qp.list;
+		local.values = local.isList ? ListToArray(local.qp.value, Chr(7)) : [local.qp.value];
+		local.rv = [];
+		local.iEnd = ArrayLen(local.values);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.param = StructCopy(arguments.part);
+			StructDelete(local.param, "list");
+			local.param.value = local.values[local.i];
+			if (local.castType == "TIME(7)") {
+				local.param.value = $timeText(local.values[local.i]);
+				local.param.type = "cf_sql_varchar";
+			}
+			ArrayAppend(local.rv, (local.i == 1 ? (local.isList ? "(" : "") : ", ") & "CAST(");
+			ArrayAppend(local.rv, local.param);
+			ArrayAppend(local.rv, " AS #local.castType#)" & (local.isList && local.i == local.iEnd ? ")" : ""));
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. A time value as SQL Server TIME text: `HH:mm[:ss[.fffffff]]` as written, the
+	 * time of a `yyyy-mm-dd HH:mm:ss.f` string (up to 7 fraction digits), or any other date's time to
+	 * the millisecond. A date-time without a fraction goes through Millisecond(): RustCFML treats a
+	 * date object as a simple value whose text drops the milliseconds. Any other text is returned
+	 * unchanged, so the CAST reports it.
+	 */
+	public string function $timeText(required any value) {
+		if (IsSimpleValue(arguments.value)) {
+			local.text = Trim(arguments.value);
+			if (ReFind("^\d{1,2}:\d{2}(:\d{2}(\.\d{1,7})?)?$", local.text)) {
+				return local.text;
+			}
+			local.match = ReFind("^\d{4}-\d{2}-\d{2}[ T](\d{1,2}:\d{2}:\d{2}\.\d{1,7})$", local.text, 1, true);
+			if (local.match.pos[1]) {
+				return Mid(local.text, local.match.pos[2], local.match.len[2]);
+			}
+		}
+		if (IsDate(arguments.value)) {
+			return TimeFormat(arguments.value, "HH:mm:ss") & "." & NumberFormat(Millisecond(arguments.value), "000");
+		}
+		return arguments.value;
 	}
 
 	/**
@@ -115,8 +242,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * Internal function. For an IN list STRING_SPLIT can carry, its values and the expression that
 	 * turns each split value back into the list's type: integers and decimals are validated here
 	 * and CAST (never TRY_CAST, which turns '' into 0), strings are compared as they are. Dates and
-	 * timestamps are cast to the type the driver binds them as, given in `dateCasts` (#4318). An
-	 * empty struct for any other list, including times, or one with a value that doesn't validate.
+	 * timestamps are cast to the type the driver binds them as, given in `dateCasts` (#4318), except
+	 * on a DATETIME / SMALLDATETIME column, which compares in its own type as the normal path does,
+	 * and times are cast to TIME(7) ($temporalComparisonType(), #4326, #4327). An empty struct for
+	 * any other list, or one with a value that doesn't validate.
 	 */
 	public struct function $stringSplitList(required any part, struct dateCasts = {}) {
 		if (
@@ -139,14 +268,35 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		if (ListFindNoCase("cf_sql_varchar,cf_sql_char", arguments.part.type)) {
 			return $stringSplitStrings(local.values);
 		}
+		// The split compares in the same type the normal path does (#4326, #4327).
+		local.columnCast = StructKeyExists(arguments.part, "dataType") ? $temporalComparisonType(arguments.part.dataType) : "";
+		if (CompareNoCase(arguments.part.type, "cf_sql_time") == 0 && local.columnCast == "TIME(7)") {
+			return $stringSplitTimes(local.values);
+		}
 		if (StructKeyExists(arguments.dateCasts, arguments.part.type)) {
 			return $stringSplitDates(
 				values = local.values,
-				sqlType = arguments.dateCasts[arguments.part.type],
+				sqlType = (Len(local.columnCast) && CompareNoCase(arguments.part.type, "cf_sql_timestamp") == 0) ? local.columnCast : arguments.dateCasts[arguments.part.type],
 				dateOnly = CompareNoCase(arguments.part.type, "cf_sql_date") == 0
 			);
 		}
 		return {};
+	}
+
+	/**
+	 * Internal function. Time values as TIME text ($timeText()), cast to TIME(7) like a time
+	 * condition on the normal path; empty when a value isn't `HH:mm[:ss[.fffffff]]` once converted.
+	 */
+	public struct function $stringSplitTimes(required array values) {
+		local.rv = [];
+		for (local.value in arguments.values) {
+			local.text = $timeText(local.value);
+			if (!ReFind("^[0-9]{1,2}:[0-9]{2}(:[0-9]{2}(\.[0-9]{1,7})?)?$", local.text)) {
+				return {};
+			}
+			ArrayAppend(local.rv, local.text);
+		}
+		return {expression = "CAST(value AS TIME(7))", values = local.rv};
 	}
 
 	/**
@@ -323,7 +473,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public string function $tooManyParametersAdvice(required numeric limit) {
 		return super.$tooManyParametersAdvice(limit = arguments.limit)
-			& " On SQL Server 2016 and later (database compatibility level 130 or higher), Wheels runs a long list of integers, plain decimals (up to 38 digits), strings or uniqueidentifiers as one parameter, and also a list of dates or timestamps written as yyyy-mm-dd with an optional HH:nn, :ss and .lll. Any other list (times, dates written another way, float, real, bit, text or binary values, or numbers written another way, such as +5, .5 or 1E5), or a database below level 130, still needs batching.";
+			& " On SQL Server 2016 and later (database compatibility level 130 or higher), Wheels runs a long list of integers, plain decimals (up to 38 digits), strings or uniqueidentifiers as one parameter, and also a list of dates or timestamps written as yyyy-mm-dd with an optional HH:nn, :ss and .lll, or of times written as HH:mm with an optional :ss and fraction. Any other list (dates written another way, float, real, bit, text or binary values, or numbers written another way, such as +5, .5 or 1E5), or a database below level 130, still needs batching.";
 	}
 
 	/**
