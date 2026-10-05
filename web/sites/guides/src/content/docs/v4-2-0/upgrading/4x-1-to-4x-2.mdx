@@ -323,6 +323,10 @@ A worker now records the `timeout` it claimed a job with, and a stale job is rea
 
 A valid `X-CSRF-Token` header now passes CSRF protection on any non-GET request ([#3959](https://github.com/wheels-dev/wheels/issues/3959)). In 4.1 the header was read only when the request also sent `X-Requested-With: XMLHttpRequest`, which Turbo and `fetch()` don't send. Nothing breaks: clients that send both keep working, and a request passes when either the form field or the header holds a valid token. `startFormTag()` and `buttonTo()` gain `authenticityToken=false` to leave the hidden field out of markup that is cached and shared.
 
+### Migrations run under a cross-process lock
+
+Instances that share a database now take turns running migrations ([#4134](https://github.com/wheels-dev/wheels/issues/4134)). The first `migrateTo()` creates a `wheels_migrator_locks` table, unless `createMigratorTable` is off, in which case there's no lock until you create the table. An instance that finds another one migrating waits up to `migrationLockTimeout` seconds (default 300), then fails with `Wheels.MigrationLockTimeout`. A long-running single migration step needs `migrationLockLease` (default 3600 seconds) set above its duration. If an instance died holding the lock, delete its row from `wheels_migrator_locks`, or wait for its lease to run out.
+
 ### An empty `default` on a non-string column means no default
 
 In a migration, `default=""` on a column that isn't string-like (`bigInteger`, `binary`, `uniqueidentifier`, `integer`, `decimal`, `float`, `date` and so on) now means "no default" ([#4248](https://github.com/wheels-dev/wheels/pull/4248)). It renders as `DEFAULT NULL` when the column allows null and as no `DEFAULT` clause on a `NOT NULL` column. In 4.1, `bigInteger` and `uniqueidentifier` emitted a bare `DEFAULT`, `binary` emitted `DEFAULT ''`, and a `NOT NULL` column got `DEFAULT NULL NOT NULL`, which MySQL rejects; those migrations failed. They now run. Migrations that already worked produce the same schema.
