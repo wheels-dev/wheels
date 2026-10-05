@@ -712,6 +712,23 @@ component output="false" extends="wheels.Global"{
 				cgi = $buildMiddlewareCgiScope()
 			};
 
+			// F23: in the isolated test context (development/testing only), honour a test-supplied
+			// client address so RateLimiter / IP rules can be exercised per client. The override
+			// reaches middleware through the request context's `remoteAddr` field — the field
+			// RateLimiter already reads — and never mutates the cgi scope. The header-present guard
+			// keeps every normal request off this path; the TestContext gate (isolated AND
+			// development/testing) means it is impossible to honour outside the isolated test app.
+			if (StructKeyExists(local.requestContext.cgi, "http_x_wheels_test_remote_addr")) {
+				local.testContext = new wheels.events.TestContext();
+				local.testRemoteAddr = local.testContext.$testClientRemoteAddr(
+					cgiScope = local.requestContext.cgi,
+					isolated = local.testContext.currentRequestIsIsolated()
+				);
+				if (Len(local.testRemoteAddr)) {
+					local.requestContext.remoteAddr = local.testRemoteAddr;
+				}
+			}
+
 			// The core handler that middleware wraps around.
 			local.coreHandler = function(required struct request) {
 				// What middleware attached to the context (the AuthMiddleware result, ...)

@@ -206,6 +206,26 @@ component {
 	}
 
 	/**
+	 * F23 — the test-supplied client address (the X-Wheels-Test-Remote-Addr header, as the mapped
+	 * `http_x_wheels_test_remote_addr` CGI key) when the request is bound to the isolated test
+	 * context, or "" otherwise. `isolated` is passed by the caller (Dispatch) from
+	 * currentRequestIsIsolated(), which is true only inside the isolated test application AND when the
+	 * environment is development/testing — so production can never pass this gate, and the header is
+	 * silently ignored outside the isolated test context. The caller sets it on the middleware request
+	 * context's `remoteAddr` field; this never mutates the cgi scope.
+	 */
+	public string function $testClientRemoteAddr(required struct cgiScope, required boolean isolated) {
+		if (!arguments.isolated) {
+			return "";
+		}
+		var headerKey = "http_x_wheels_test_remote_addr";
+		if (!StructKeyExists(arguments.cgiScope, headerKey)) {
+			return "";
+		}
+		return Trim(ToString(arguments.cgiScope[headerKey]));
+	}
+
+	/**
 	 * The per-process test-runner secret. Lazily generated into the server
 	 * scope the first time a runner (or TestClient/BrowserTest) needs it, so
 	 * only server-side code in an already-running test process can learn it.
