@@ -250,10 +250,11 @@
 				}
 				cb.done = true;
 			} finally {
-				// This inner finally holds the lock RELEASE and contains NO transaction-action statement,
-				// so BoxLang runs it even when the callback ends the request with `abort`: a `transaction
-				// action="…"` inside a finally is skipped by BoxLang when an abort leaves the surrounding
-				// cftransaction (#4219 — Lucee/Adobe run it either way). On an abnormal exit (abort or a
+				// This inner finally holds the lock RELEASE, and its try has NO catch clause, so BoxLang
+				// runs it even when the callback ends the request with `abort`. On BoxLang, abort skips a
+				// finally whose try has a catch clause, even an unreached catch (any) { rethrow; };
+				// transaction actions make no difference (cross-engine invariant 22; #4219). Lucee/Adobe
+				// run it either way. Keep this inner try CATCH-FREE. On an abnormal exit (abort or a
 				// throw -> cb.done stays false) the lock is released HERE; on the normal path cb.done is
 				// true and the commit-then-release below runs instead, preserving commit-before-release so
 				// the next holder reads committed state. Unscoped struct writes persist past the catch on
@@ -287,11 +288,11 @@
 			rethrow;
 		} finally {
 			// Roll back ONLY on the ABORT path — not committed, and not a caught throw. An aborting
-			// callback is never caught, so invokeWithTransaction's catch never runs and the engine would
-			// otherwise decide the open transaction's fate at block exit. This rollback is a
-			// transaction-action, and BoxLang skips a finally that contains one when an abort leaves the
-			// cftransaction; the LOCK release above sits in a separate finally with no transaction-action,
-			// so it still runs on every engine on abort. Lucee/Adobe run this finally normally.
+			// callback is never caught, so invokeWithTransaction's catch never runs. This outer try has a
+			// catch clause, so BoxLang skips this finally on abort (cross-engine invariant 22); there the
+			// rollback comes from $invokeTransactionMethod(), whose catch-free finally runs this method
+			// through invokeWithTransaction(), and the LOCK release above sits in a separate catch-free
+			// try/finally. Lucee/Adobe run this finally normally.
 			if (!local.committed.flag && !threw.flag) {
 				try {
 					transaction action="rollback";
