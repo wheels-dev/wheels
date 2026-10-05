@@ -40,7 +40,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * rewrites IN lists, largest first until it fits, to one parameter each (#4103):
 	 * `(SELECT CAST(value AS <type>) FROM STRING_SPLIT(?, NCHAR(31)))`. A statement that fits keeps
 	 * its SQL. STRING_SPLIT needs compatibility level 130; below it, and for lists of other types
-	 * (dates and times among them), the statement is left for $assertBoundParameterCount() to refuse.
+	 * (times among them), the statement is left for $assertBoundParameterCount() to refuse. Date and
+	 * timestamp lists are split only when the driver's bind type is known (#4318).
 	 */
 	public void function $splitLargeInLists(required struct args) {
 		local.limit = $inListSplitLimit();
@@ -50,13 +51,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		if (!$supportsStringSplit(arguments.args.dataSource)) {
 			return;
 		}
-		local.convert = $inListsToSplit(sql = arguments.args.sql, limit = local.limit);
+		local.dateCasts = $stringSplitDateCasts(arguments.args.dataSource);
+		local.convert = $inListsToSplit(sql = arguments.args.sql, limit = local.limit, dateCasts = local.dateCasts);
 		local.rv = [];
 		local.iEnd = ArrayLen(arguments.args.sql);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			// Adobe CF passes arrays by value, so the parts are returned and appended here.
 			if (StructKeyExists(local.convert, local.i)) {
-				local.parts = $stringSplitParts(arguments.args.sql[local.i]);
+				local.parts = $stringSplitParts(part = arguments.args.sql[local.i], dateCasts = local.dateCasts);
 			} else {
 				local.parts = [arguments.args.sql[local.i]];
 			}
@@ -69,13 +71,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Internal function. The positions of the IN lists to split, largest first, until the statement
-	 * binds no more than `limit` parameters (as a struct keyed by position).
+	 * binds no more than `limit` parameters (as a struct keyed by position). `dateCasts` is
+	 * $stringSplitDateCasts()'s result; without it, date and timestamp lists aren't split.
 	 */
-	public struct function $inListsToSplit(required array sql, required numeric limit) {
+	public struct function $inListsToSplit(required array sql, required numeric limit, struct dateCasts = {}) {
 		local.sizes = {};
 		local.iEnd = ArrayLen(arguments.sql);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.split = $stringSplitList(arguments.sql[local.i]);
+			local.split = $stringSplitList(part = arguments.sql[local.i], dateCasts = arguments.dateCasts);
 			if (!StructIsEmpty(local.split) && ArrayLen(local.split.values) > 1) {
 				local.sizes[local.i] = ArrayLen(local.split.values);
 			}
@@ -99,8 +102,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	/**
 	 * Internal function. The SQL parts for an IN list bound as one STRING_SPLIT parameter.
 	 */
-	public array function $stringSplitParts(required struct part) {
-		local.split = $stringSplitList(arguments.part);
+	public array function $stringSplitParts(required struct part, struct dateCasts = {}) {
+		local.split = $stringSplitList(part = arguments.part, dateCasts = arguments.dateCasts);
 		return [
 			"(SELECT " & local.split.expression & " FROM STRING_SPLIT(",
 			{type = "cf_sql_nvarchar", value = ArrayToList(local.split.values, Chr(31))},
@@ -111,11 +114,11 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	/**
 	 * Internal function. For an IN list STRING_SPLIT can carry, its values and the expression that
 	 * turns each split value back into the list's type: integers and decimals are validated here
-	 * and CAST (never TRY_CAST, which turns '' into 0), strings are compared as they are. An empty
-	 * struct for any other list, including dates and times, or one with a value that doesn't
-	 * validate.
+	 * and CAST (never TRY_CAST, which turns '' into 0), strings are compared as they are. Dates and
+	 * timestamps are cast to the type the driver binds them as, given in `dateCasts` (#4318). An
+	 * empty struct for any other list, including times, or one with a value that doesn't validate.
 	 */
-	public struct function $stringSplitList(required any part) {
+	public struct function $stringSplitList(required any part, struct dateCasts = {}) {
 		if (
 			!IsStruct(arguments.part)
 			|| !StructKeyExists(arguments.part, "list")
@@ -136,7 +139,99 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		if (ListFindNoCase("cf_sql_varchar,cf_sql_char", arguments.part.type)) {
 			return $stringSplitStrings(local.values);
 		}
+		if (StructKeyExists(arguments.dateCasts, arguments.part.type)) {
+			return $stringSplitDates(
+				values = local.values,
+				sqlType = arguments.dateCasts[arguments.part.type],
+				dateOnly = CompareNoCase(arguments.part.type, "cf_sql_date") == 0
+			);
+		}
 		return {};
+	}
+
+	/**
+	 * Internal function. Date or timestamp values written in a form SQL Server reads the same way
+	 * under every language and DATEFORMAT setting, cast to `sqlType`; empty when a value isn't in a
+	 * form $isoDateTimeValue() accepts.
+	 */
+	public struct function $stringSplitDates(required array values, required string sqlType, required boolean dateOnly) {
+		local.rv = [];
+		for (local.value in arguments.values) {
+			local.iso = $isoDateTimeValue(value = local.value, dateOnly = arguments.dateOnly);
+			if (!Len(local.iso)) {
+				return {};
+			}
+			ArrayAppend(local.rv, local.iso);
+		}
+		return {expression = "CAST(value AS #arguments.sqlType#)", values = local.rv};
+	}
+
+	/**
+	 * Internal function. `value` as `yyyy-mm-ddTHH:nn:ss.lll` (or `yyyy-mm-dd` when `dateOnly`), or ""
+	 * when it isn't a valid date written as `yyyy-mm-dd` with an optional ` HH:nn`, `:ss` and
+	 * `.lll`, or CFML's `{ts '...'}` / `{d '...'}` form of one. Other forms (locale dates, time
+	 * zones, other fractions) are left to the one-parameter-per-value path, whose parsing they need.
+	 */
+	public string function $isoDateTimeValue(required string value, required boolean dateOnly) {
+		local.text = Trim(arguments.value);
+		local.wrapped = ReFind("^\{(ts|d) '([^']*)'\}$", local.text, 1, true);
+		if (local.wrapped.pos[1]) {
+			local.text = Mid(local.text, local.wrapped.pos[3], local.wrapped.len[3]);
+		}
+		local.pattern = arguments.dateOnly ? "^([0-9]{4})-([0-9]{2})-([0-9]{2})$" : "^([0-9]{4})-([0-9]{2})-([0-9]{2})([ T]([0-9]{2}):([0-9]{2})(:([0-9]{2})(\.([0-9]{3}))?)?)?$";
+		local.parts = $regexGroups(pattern = local.pattern, text = local.text, count = 10);
+		if (!ArrayLen(local.parts)) {
+			return "";
+		}
+		local.date = Left(local.text, 10);
+		if (!$isCalendarDate(local.date)) {
+			return "";
+		}
+		if (arguments.dateOnly) {
+			return local.date;
+		}
+		local.hour = Len(local.parts[5]) ? local.parts[5] : "00";
+		local.minute = Len(local.parts[6]) ? local.parts[6] : "00";
+		local.second = Len(local.parts[8]) ? local.parts[8] : "00";
+		local.fraction = Len(local.parts[10]) ? local.parts[10] : "000";
+		if (Val(local.hour) > 23 || Val(local.minute) > 59 || Val(local.second) > 59) {
+			return "";
+		}
+		return local.date & "T" & local.hour & ":" & local.minute & ":" & local.second & "." & local.fraction;
+	}
+
+	/**
+	 * Internal function. The text of groups 1 to `count` when `pattern` matches `text` ("" for a
+	 * group that took no part), or an empty array when it doesn't match. Engines differ in how
+	 * they report a group that took no part (0 or -1, or a shorter array), so any of those is "".
+	 */
+	public array function $regexGroups(required string pattern, required string text, required numeric count) {
+		local.match = ReFind(arguments.pattern, arguments.text, 1, true);
+		if (local.match.pos[1] < 1) {
+			return [];
+		}
+		local.rv = [];
+		for (local.i = 2; local.i <= arguments.count + 1; local.i++) {
+			if (local.i <= ArrayLen(local.match.pos) && local.match.pos[local.i] > 0 && local.match.len[local.i] > 0) {
+				ArrayAppend(local.rv, Mid(arguments.text, local.match.pos[local.i], local.match.len[local.i]));
+			} else {
+				ArrayAppend(local.rv, "");
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. True when `yyyy-mm-dd` names a real calendar day.
+	 */
+	public boolean function $isCalendarDate(required string ymd) {
+		local.year = Val(ListGetAt(arguments.ymd, 1, "-"));
+		local.month = Val(ListGetAt(arguments.ymd, 2, "-"));
+		local.day = Val(ListGetAt(arguments.ymd, 3, "-"));
+		if (local.year < 1 || local.month < 1 || local.month > 12 || local.day < 1) {
+			return false;
+		}
+		return local.day <= DaysInMonth(CreateDate(local.year, local.month, 1));
 	}
 
 	/**
@@ -228,7 +323,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public string function $tooManyParametersAdvice(required numeric limit) {
 		return super.$tooManyParametersAdvice(limit = arguments.limit)
-			& " On SQL Server 2016 and later (database compatibility level 130 or higher), Wheels runs a long list of integers, plain decimals (up to 38 digits), strings or uniqueidentifiers as one parameter. Any other list (dates, times, float, real, bit, text or binary values, or numbers written another way, such as +5, .5 or 1E5), or a database below level 130, still needs batching.";
+			& " On SQL Server 2016 and later (database compatibility level 130 or higher), Wheels runs a long list of integers, plain decimals (up to 38 digits), strings or uniqueidentifiers as one parameter, and also a list of dates or timestamps written as yyyy-mm-dd with an optional HH:nn, :ss and .lll. Any other list (times, dates written another way, float, real, bit, text or binary values, or numbers written another way, such as +5, .5 or 1E5), or a database below level 130, still needs batching.";
 	}
 
 	/**
@@ -265,6 +360,69 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			return local.query.recordCount ? Val(local.query.lvl) : 0;
 		} catch (any e) {
 			return 0;
+		}
+	}
+
+	/**
+	 * Internal function. The CAST each date or timestamp IN list is split with, keyed by cf_sql type:
+	 * the type the datasource's driver binds that cf_sql type as, so a split list matches exactly
+	 * the rows a list bound one parameter per value matches (#4318). Read once per datasource and
+	 * kept in the application's Wheels settings, like the compatibility level.
+	 */
+	public struct function $stringSplitDateCasts(required string dataSource) {
+		local.appKey = $appKey();
+		local.dataSource = $effectiveDataSource(arguments.dataSource);
+		if (!StructKeyExists(application[local.appKey], "sqlServerDateBindTypes")) {
+			application[local.appKey].sqlServerDateBindTypes = {};
+		}
+		local.bindTypes = application[local.appKey].sqlServerDateBindTypes;
+		if (!StructKeyExists(local.bindTypes, local.dataSource)) {
+			local.bindTypes[local.dataSource] = $readDateBindTypes(local.dataSource);
+		}
+		return $dateCastsFor(local.bindTypes[local.dataSource]);
+	}
+
+	/**
+	 * Internal function. Casts for the bind types $readDateBindTypes() found. Only the bind types the
+	 * split form is proven to mirror get one: a timestamp bound as datetime2(7) and a date bound as
+	 * date. Any other driver behaviour leaves those lists to Wheels.TooManyParameters.
+	 */
+	public struct function $dateCastsFor(required struct bindTypes) {
+		local.rv = {};
+		if (StructKeyExists(arguments.bindTypes, "cf_sql_timestamp") && Compare(arguments.bindTypes.cf_sql_timestamp, "datetime2/7") == 0) {
+			local.rv.cf_sql_timestamp = "DATETIME2(7)";
+		}
+		if (StructKeyExists(arguments.bindTypes, "cf_sql_date") && Compare(arguments.bindTypes.cf_sql_date, "date/0") == 0) {
+			local.rv.cf_sql_date = "DATE";
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. The SQL Server base type and scale (`datetime2/7`) the driver binds a
+	 * cf_sql_timestamp and a cf_sql_date parameter as, or an empty struct when it can't be read.
+	 */
+	public struct function $readDateBindTypes(required string dataSource) {
+		local.options = {datasource = arguments.dataSource};
+		if (Len(variables.username)) {
+			local.options.username = variables.username;
+		}
+		if (Len(variables.password)) {
+			local.options.password = variables.password;
+		}
+		local.property = "CAST(SQL_VARIANT_PROPERTY(CAST(? AS SQL_VARIANT), '%s') AS VARCHAR(30))";
+		local.sql = "SELECT " & Replace(local.property, "%s", "BaseType") & " AS tsType, " & Replace(local.property, "%s", "Scale") & " AS tsScale, "
+			& Replace(local.property, "%s", "BaseType") & " AS dType, " & Replace(local.property, "%s", "Scale") & " AS dScale";
+		local.ts = {value = "2026-01-02 10:00:00", cfsqltype = "cf_sql_timestamp"};
+		local.d = {value = "2026-01-02", cfsqltype = "cf_sql_date"};
+		try {
+			local.query = QueryExecute(local.sql, [local.ts, local.ts, local.d, local.d], local.options);
+			return {
+				cf_sql_timestamp = LCase(local.query.tsType) & "/" & local.query.tsScale,
+				cf_sql_date = LCase(local.query.dType) & "/" & local.query.dScale
+			};
+		} catch (any e) {
+			return {};
 		}
 	}
 
