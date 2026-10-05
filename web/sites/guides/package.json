@@ -11,7 +11,7 @@
 		"check": "astro check",
 		"test": "vitest run --passWithNoTests",
 		"verify:docs": "node scripts/verify-docs/verify-docs.mjs",
-		"test:docs-harness": "node --test --test-concurrency=1 scripts/verify-docs/test/*.test.mjs"
+		"test:docs-harness": "node --import ./scripts/verify-docs/test/isolated-home-setup.mjs --test --test-concurrency=1 scripts/verify-docs/test/*.test.mjs"
 	},
 	"dependencies": {
 		"astro": "^6.3.1",

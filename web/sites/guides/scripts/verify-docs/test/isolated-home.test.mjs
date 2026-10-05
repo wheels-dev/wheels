@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, lstatSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createIsolatedHome, isolatedEnv, sourceHome } from '../lib/isolated-home.mjs';
+import { createIsolatedHome, enterIsolatedHome, isolatedEnv, sourceHome } from '../lib/isolated-home.mjs';
 
 // verify:docs runs every {test:cli} block with a real `wheels` binary. Against the
 // developer's own CLI home those blocks change it: `wheels packages registry refresh`
@@ -61,4 +61,25 @@ test('the CLI is pointed at the isolated home through LUCLI_JAVA_ARGS and LUCLI_
 test('the real home defaults to LUCLI_HOME, then ~/.wheels', () => {
   assert.equal(sourceHome({ LUCLI_HOME: '/x/home' }), '/x/home');
   assert.match(sourceHome({}), /[\\/]\.wheels$/);
+});
+
+test('a process that inherits an isolated home keeps it', () => {
+  const prev = { ...process.env };
+  process.env.WHEELS_VERIFY_DOCS_HOME = '/tmp/parent-home';
+  process.env.WHEELS_VERIFY_DOCS_SOURCE_HOME = '/x/source';
+  try {
+    assert.deepEqual(enterIsolatedHome(), { home: '/tmp/parent-home', source: '/x/source' });
+  } finally {
+    for (const k of ['WHEELS_VERIFY_DOCS_HOME', 'WHEELS_VERIFY_DOCS_SOURCE_HOME']) {
+      if (prev[k] === undefined) delete process.env[k];
+      else process.env[k] = prev[k];
+    }
+  }
+});
+
+test('harness test processes run in the isolated home', () => {
+  // test:docs-harness preloads test/isolated-home-setup.mjs.
+  assert.ok(process.env.WHEELS_VERIFY_DOCS_HOME, 'WHEELS_VERIFY_DOCS_HOME is not set');
+  assert.equal(process.env.LUCLI_HOME, process.env.WHEELS_VERIFY_DOCS_HOME);
+  assert.match(process.env.LUCLI_JAVA_ARGS, /-Dlucli\.home=/);
 });
