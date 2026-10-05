@@ -230,6 +230,10 @@ Outside development, Wheels now works out once per controller class which framew
 
 `renderNotFound(message, type, extendedInfo)` is a new public controller helper that produces a 404 from app code ([#3900](https://github.com/wheels-dev/wheels/issues/3900)). Because it is public, it is now a reserved action name: an existing controller **action** literally named `renderNotFound` gets `Wheels.ActionNotAllowed` instead of dispatching. Rename such an action. A controller that already defines its own `renderNotFound` helper overrides the framework one, and that keeps working.
 
+### `isSafeRedirectUrl` is a framework helper
+
+`isSafeRedirectUrl(redirectUrl)` is a new public controller helper that reports whether a URL stays on this site, by the same rule `redirectTo(url=…)` applies ([#4217](https://github.com/wheels-dev/wheels/issues/4217)). Like `renderNotFound` above, it is now a reserved action name: an existing controller **action** named `isSafeRedirectUrl` gets `Wheels.ActionNotAllowed` instead of dispatching. Rename such an action.
+
 ### A failed `verifies()` without a handler returns 400
 
 A `verifies()` that fails and declares no `handler` and no redirect arguments now ends the request with **HTTP 400** ([#4296](https://github.com/wheels-dev/wheels/pull/4296)). In 4.1 it returned a silent `200` with an empty body, although the declared precondition wasn't met. A JSON request gets `{"error":"Verification failed"}`; other formats get an empty body. A `verifies()` with a `handler` or redirect arguments is unchanged.
