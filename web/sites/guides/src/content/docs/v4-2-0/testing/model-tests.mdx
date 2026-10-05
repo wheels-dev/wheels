@@ -201,6 +201,46 @@ describe("Post scopes", () => {
 
 `published()` and `draft()` above are auto-generated from `enum(property="status", values="draft,published,archived")`. Named scopes declared with `scope(name="active", where="...")` work identically.
 
+## Counting queries
+
+From Wheels 4.2, a spec can assert how many SQL statements a call sends, which makes N+1 queries, missing caches and unexpected writes testable:
+
+| Function | Fails unless |
+|---|---|
+| `assertQueries(count, callback)` | `callback` sends exactly `count` statements |
+| `assertNoQueries(callback)` | `callback` sends none |
+| `assertQueriesMatch(pattern, callback, count)` | at least one statement (or exactly `count`) matches the regular expression `pattern`, case-insensitive |
+| `assertNoQueriesMatch(pattern, callback)` | no statement matches `pattern` |
+| `recordQueries(callback)` | never fails: returns the statements as an array of `{sql, dataSource}` |
+
+```cfm {test:compile}
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Post listing", () => {
+            it("loads authors in the same query", () => {
+                var posts = assertQueries(1, () => model("Post").findAll(include="author"));
+                expect(posts.recordCount).toBeGT(0);
+            });
+
+            it("doesn't touch the comments table", () => {
+                assertNoQueriesMatch("comments", () => model("Post").findAll());
+            });
+        });
+    }
+}
+```
+
+- The assertions return what `callback` returned, so a call can stay inline.
+- Every function takes an optional `dataSource` that counts only statements sent to that datasource, which is useful in a multi-tenant app.
+- A failure lists the statements that ran, with each bound value replaced by `?`, so a failure can't put bound data into a CI log. A value written into the SQL text itself (`parameterize=false`) appears as written.
+- Assertions can be nested: each counts its own callback's statements.
+- **What counts:** every statement the model layer sends, including finders, `count()`, `save()`, `create()`, `update()`, `delete()`, `updateAll()` and `deleteAll()`.
+- **What doesn't count:**
+  - a finder answered from the per-request query cache, because it sends no SQL (pass `reload=true` to force the query);
+  - raw `queryExecute()` / `cfquery`, including the framework features built on it: advisory locks, the migration lock, the job store and SQL Server's settings probes;
+  - transaction control;
+  - requests made through the test client, which run in a request of their own.
+
 ## Test isolation
 
 WheelsTest does not wrap each `it` in a transaction. The database state carries across specs within a run. Two mechanisms keep things predictable:
@@ -226,7 +266,7 @@ The default transaction mode in the test runner is `none` — writes persist acr
 - **Mixed positional and named args.** `hasMany("comments", dependent="delete")` looks natural but breaks — Wheels functions can't mix the two styles. Use all-named (`hasMany(name="comments", dependent="delete")`) or all-positional (`hasMany("comments")`). This is the single most common source of model spec failures.
 - **Treating `findAll()` as an array.** `model("Post").findAll()` returns a CFML query, not an array. `<cfloop query="posts">` works; `<cfloop array="#posts#">` raises a type error. Check `.recordCount` for size.
 - **Forgetting `.reload()` after a callback writes server-generated columns.** A `beforeCreate` that sets `slug` from a database `DEFAULT` expression, or an `afterSave` that updates a counter, may not be reflected on the in-memory instance. Call `post.reload()` before asserting.
-- **A cached finder can return stale rows.** Finders cache their results for the rest of the request (`cacheQueriesDuringRequest`, on by default), and a spec runs in one request. A save through a model clears *that model's* cached queries, so re-reading the same model after its own save is fine — but the cache stays stale when data changes another way: raw SQL, a write through a *different* model than the one you re-query (e.g. a `Comment` create vs a cached `model("Post").findAll(include="comments")`), or a change made in a separate test-client request. Pass `reload=true` to the finder, or clear the whole cache with `StructDelete(request.wheels, "$queryCache")`, to read fresh data.
+- **A cached finder can return stale rows.** Finders cache their results for the rest of the request (`cacheQueriesDuringRequest`, on by default), and a spec runs in one request. A save through a model clears *that model's* cached queries, so re-reading the same model after its own save is fine — but the cache stays stale when data changes another way: raw SQL, a write through a *different* model than the one you re-query (e.g. a `Comment` create vs a cached `model("Post").findAll(include="comments")`), or a change made in a separate test-client request. Pass `reload=true` to the finder, or clear the cache with `model("Post").forgetCachedQueries()` (one model) or `forgetCachedQueries(all=true)` (every model), to read fresh data.
 - **Reaching for matchers that don't exist.** `toEqual`, `toBeTruthy`, and `toBeFalsy` are not shipped — neither is in the matcher set. Use `toBe` for value equality (it wraps `isEqual`, which recurses into structs and arrays), `toBeTrue` or `toBeFalse` for booleans, and `toBeArray` / `toBeStruct` / `toBeQuery` for type checks.
 - **`toBeInstanceOf("component")` is not cross-engine.** `getMetadata(obj).type` returns `"component"` on Lucee and Adobe CF but the fully-qualified class name on BoxLang, so this assertion passes on two engines and silently fails on the third. When asserting that a finder returned a Wheels model instance, use `expect(found).toBeWheelsModel()` instead.
 

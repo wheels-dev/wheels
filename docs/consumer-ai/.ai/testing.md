@@ -37,10 +37,24 @@ expect(model("Post").findAll(reload = true).recordCount).toBe(3);
 - Clear the whole request cache when several later reads must not see anything cached earlier:
 
 ```cfm
-StructDelete(request.wheels, "$queryCache");
+model("Post").forgetCachedQueries();    // just that model's cached finder results
+forgetCachedQueries("Post");            // same, by name, from anywhere
+forgetCachedQueries(all = true);        // every model's cached results this request
 ```
 
-`$queryCache` is a reserved key under `request.wheels`; deleting it drops every model's cached finder results for the current request.
+`forgetCachedQueries()` drops the per-request finder cache (`cacheQueriesDuringRequest`). Called on a model it scopes to that model; from a controller/view/job pass a model name or `all = true` (a bare call outside a model throws rather than silently wiping everything). Prefer it over reaching into the reserved `request.wheels["$queryCache"]` key.
+
+## Counting the queries a call sends (4.2+)
+
+`assertQueries(count, callback)`, `assertNoQueries(callback)`, `assertQueriesMatch(pattern, callback, count = "")`, `assertNoQueriesMatch(pattern, callback)` and `recordQueries(callback)` (returns `[{sql, dataSource}]`) count the SQL statements the model layer sends while `callback` runs. They're in every `wheels.WheelsTest` spec. They return the callback's result, take an optional `dataSource` filter, nest, and list the statements on failure with each bound value as `?` (a value written into the SQL with `parameterize = false` appears as written).
+
+```cfm
+var post = assertQueries(1, () => model("Post").findByKey(1));
+assertNoQueries(() => post.title);
+assertNoQueriesMatch("comments", () => model("Post").findAll(include = "author"));
+```
+
+What isn't counted: a finder answered from the per-request query cache above (no SQL is sent; pass `reload = true`), raw `queryExecute` (including advisory locks, the migration lock, the job store and SQL Server's probes), transaction control, and test-client requests (a request of their own).
 
 ## Which environment app specs run in
 

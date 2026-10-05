@@ -20,4 +20,4 @@ Registry authentication on every host. `setup` and `remove` are aliases for `log
 
 ## Password resolution
 
-The `registry.password:` array in `deploy.yml` names secret keys. `wheels deploy` reads the first one via `SecretResolver` (which expands `$(...)` in `.kamal/secrets`) and pipes it into `docker login --password-stdin`. Passing `--password=<value>` on the CLI overrides the resolved secret.
+The `registry.password:` array in `deploy.yml` names secret keys. `wheels deploy` reads the first one via `SecretResolver` (which expands `$(...)` in `.kamal/secrets`) and sends it over the SSH session's stdin to `docker login --password-stdin`, so it never appears in a command line. There is no `--password` flag: the deploy parser ignores it. `registry login` fails with `DeployRegistryCli.MissingUsername` when `registry.username` is empty and with `DeployRegistryCli.MissingPassword` when no password resolves (except under `--dry-run`).

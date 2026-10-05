@@ -641,21 +641,23 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 * (version <= currentVersion → "applied") misclassified out-of-sequence
 	 * pending migrations as applied — the exact shared-dev-DB drift
 	 * `migrate doctor` exists to surface (2026-06-09 review P3).
+	 *
+	 * @appliedAt When each version was applied, from Migrator.$appliedAtByVersion() (4407).
 	 */
-	public struct function $cliFormatMigrationStatus(required array migrations) {
+	public struct function $cliFormatMigrationStatus(required array migrations, struct appliedAt = {}) {
 		local.rv = {migrations = [], summary = {total = 0, applied = 0, pending = 0}};
 		for (local.migration in arguments.migrations) {
 			local.isApplied = local.migration.status == "migrated";
-			// getAvailableMigrations() does not track per-row apply
-			// timestamps; keep the key for CLI display compatibility
-			// (the CLI prints "-" when empty).
+			// The CLI prints "-" when a version has no applied-at.
 			ArrayAppend(
 				local.rv.migrations,
 				{
 					version = local.migration.version,
 					description = local.migration.name,
 					status = local.isApplied ? "applied" : "pending",
-					appliedAt = ""
+					appliedAt = local.isApplied && StructKeyExists(arguments.appliedAt, local.migration.version)
+						? arguments.appliedAt[local.migration.version]
+						: ""
 				}
 			);
 			if (local.isApplied) {
@@ -836,6 +838,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 
 	function testbox() {
 		$blockInProduction();
+		$refuseUnisolatedTestRunIfNeeded(canonicalPath = "/wheels/app/tests");
 		// Prefer the project's own runner if it exists (advanced users who
 		// scaffolded a custom tests/runner.cfm). Otherwise fall back to a
 		// built-in app-test runner that scans tests.specs/ via TestBox and
@@ -887,8 +890,36 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		}
 	}
 
+	/**
+	 * Refuses a test-runner request that reached this action in an isolation-CONFIGURED app without
+	 * binding the isolated `<name>_wheelsTest` application — e.g. through a custom route the path trigger
+	 * does not cover. Running specs there would mutate the live application scope. Emits a 409 pointing at
+	 * the canonical runner path (which the path trigger isolates) and aborts. A no-op when isolation is
+	 * not configured for the app (it keeps the live-scope swap with the #4354 warning) or the request is
+	 * already in the isolated application.
+	 */
+	private void function $refuseUnisolatedTestRunIfNeeded(required string canonicalPath) {
+		var tc = new wheels.events.TestContext();
+		var isolationConfigured = StructKeyExists(request, "$wheelsTestContextConfigured");
+		if (!tc.testRunnerMustRefuse(isolationConfigured = isolationConfigured, applicationName = application.applicationName)) {
+			return;
+		}
+		cfheader(statuscode = 409);
+		cfcontent(type = "application/json");
+		WriteOutput(
+			SerializeJSON({
+				success = false,
+				error = "Test run refused: this request reached the test runner without the isolated test application, so running specs here would mutate the live application. Use "
+					& arguments.canonicalPath
+					& " (which binds the isolated _wheelsTest scope), or send the X-Wheels-Test-Context header (TestClient and BrowserTest do this)."
+			})
+		);
+		abort;
+	}
+
 	public function tests_testbox() {
 		$blockInProduction();
+		$refuseUnisolatedTestRunIfNeeded(canonicalPath = "/wheels/core/tests");
 		// Delegate to RocketUnit if testFramework setting says so
 		if (
 			StructKeyExists(application, "wheels")

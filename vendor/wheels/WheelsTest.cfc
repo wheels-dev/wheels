@@ -200,6 +200,167 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     }
 
     /**
+     * Runs `callback` and returns the SQL statements the model layer sent while it ran, as an array of
+     * `{sql, dataSource}`. Each `sql` has a `?` for every bound value; values are never recorded.
+     * Statements a request query cache answered aren't sent, so they aren't recorded; neither are raw
+     * `QueryExecute()` / `cfquery` calls, transaction control, or requests made through a TestClient.
+     *
+     * @callback A function to run.
+     * @dataSource Only record statements sent to this datasource.
+     */
+    public array function recordQueries(required any callback, string dataSource = "") {
+        return $runRecordingQueries(callback = arguments.callback, dataSource = arguments.dataSource).queries;
+    }
+
+    /**
+     * Fails the spec unless `callback` sends exactly `count` SQL statements (see `recordQueries()`), and
+     * returns what `callback` returned. The failure message lists the statements, with `?` for values.
+     *
+     * @count The number of statements expected.
+     * @callback A function to run.
+     * @dataSource Only count statements sent to this datasource.
+     */
+    public any function assertQueries(required numeric count, required any callback, string dataSource = "") {
+        local.run = $runRecordingQueries(callback = arguments.callback, dataSource = arguments.dataSource);
+        if (ArrayLen(local.run.queries) != arguments.count) {
+            fail("Expected #arguments.count# #$queryNoun(arguments.count)#, ran #ArrayLen(local.run.queries)#." & $describeQueries(local.run.queries));
+        }
+        if (StructKeyExists(local.run, "result")) {
+            return local.run.result;
+        }
+    }
+
+    /**
+     * Fails the spec if `callback` sends any SQL statement, and returns what `callback` returned.
+     *
+     * @callback A function to run.
+     * @dataSource Only count statements sent to this datasource.
+     */
+    public any function assertNoQueries(required any callback, string dataSource = "") {
+        return assertQueries(count = 0, callback = arguments.callback, dataSource = arguments.dataSource);
+    }
+
+    /**
+     * Fails the spec unless at least one statement `callback` sends matches `pattern` (a regular
+     * expression, case-insensitive), or exactly `count` statements do when `count` is given.
+     * Returns what `callback` returned.
+     *
+     * @pattern A regular expression matched against each statement's SQL.
+     * @callback A function to run.
+     * @count The number of matching statements expected; any number above zero when empty.
+     * @dataSource Only consider statements sent to this datasource.
+     */
+    public any function assertQueriesMatch(required string pattern, required any callback, string count = "", string dataSource = "") {
+        local.run = $runRecordingQueries(callback = arguments.callback, dataSource = arguments.dataSource);
+        local.matched = $matchingQueries(queries = local.run.queries, pattern = arguments.pattern);
+        if (Len(arguments.count) ? ArrayLen(local.matched) != Val(arguments.count) : !ArrayLen(local.matched)) {
+            fail(
+                "Expected " & (Len(arguments.count) ? Val(arguments.count) : "at least one") & " "
+                & $queryNoun(Len(arguments.count) ? Val(arguments.count) : 1) & " matching /#arguments.pattern#/, found #ArrayLen(local.matched)#."
+                & $describeQueries(local.run.queries)
+            );
+        }
+        if (StructKeyExists(local.run, "result")) {
+            return local.run.result;
+        }
+    }
+
+    /**
+     * Fails the spec if any statement `callback` sends matches `pattern` (a regular expression,
+     * case-insensitive), and returns what `callback` returned.
+     *
+     * @pattern A regular expression matched against each statement's SQL.
+     * @callback A function to run.
+     * @dataSource Only consider statements sent to this datasource.
+     */
+    public any function assertNoQueriesMatch(required string pattern, required any callback, string dataSource = "") {
+        return assertQueriesMatch(pattern = arguments.pattern, callback = arguments.callback, count = "0", dataSource = arguments.dataSource);
+    }
+
+    /**
+     * Internal. Runs `callback` with a query recorder of its own on the request's recorder stack and
+     * returns `{queries, result}` (`result` only when `callback` returned a value). A recorder nested in
+     * another sees only its own window; the outer one sees those statements too. The recorder is taken
+     * off in a catch-free finally (BoxLang skips a finally next to a catch when a request aborts), so a
+     * throwing callback can't leave it behind.
+     */
+    public struct function $runRecordingQueries(required any callback, string dataSource = "") {
+        local.recorder = {id = CreateUUID(), dataSource = arguments.dataSource, queries = []};
+        if (!StructKeyExists(request, "wheels")) {
+            request.wheels = {};
+        }
+        if (!StructKeyExists(request.wheels, "$queryRecorders")) {
+            request.wheels.$queryRecorders = [];
+        }
+        ArrayAppend(request.wheels.$queryRecorders, local.recorder);
+        local.run = {};
+        local.fn = arguments.callback;
+        try {
+            local.result = local.fn();
+            if (StructKeyExists(local, "result")) {
+                local.run.result = local.result;
+            }
+        } finally {
+            local.run.queries = $stopQueryRecorder(local.recorder.id);
+        }
+        return local.run;
+    }
+
+    /**
+     * Internal. Takes the recorder `id` off the request's stack and returns what it recorded. Read from
+     * the stack, not from a copy: Adobe CF can copy a struct's array by value.
+     */
+    public array function $stopQueryRecorder(required string id) {
+        local.rv = [];
+        if (!StructKeyExists(request, "wheels") || !StructKeyExists(request.wheels, "$queryRecorders")) {
+            return local.rv;
+        }
+        for (local.i = ArrayLen(request.wheels.$queryRecorders); local.i >= 1; local.i--) {
+            if (request.wheels.$queryRecorders[local.i].id == arguments.id) {
+                local.rv = request.wheels.$queryRecorders[local.i].queries;
+                ArrayDeleteAt(request.wheels.$queryRecorders, local.i);
+                break;
+            }
+        }
+        return local.rv;
+    }
+
+    /**
+     * Internal. The recorded statements whose SQL matches `pattern`, case-insensitive.
+     */
+    public array function $matchingQueries(required array queries, required string pattern) {
+        local.rv = [];
+        for (local.query in arguments.queries) {
+            if (ReFindNoCase(arguments.pattern, local.query.sql)) {
+                ArrayAppend(local.rv, local.query);
+            }
+        }
+        return local.rv;
+    }
+
+    /**
+     * Internal. The recorded statements for a failure message, one per line and numbered.
+     */
+    public string function $describeQueries(required array queries) {
+        if (!ArrayLen(arguments.queries)) {
+            return "";
+        }
+        local.rv = " Statements:";
+        local.iEnd = ArrayLen(arguments.queries);
+        for (local.i = 1; local.i <= local.iEnd; local.i++) {
+            local.rv &= Chr(10) & "[#local.i#] " & arguments.queries[local.i].sql;
+        }
+        return local.rv;
+    }
+
+    /**
+     * Internal. "query" or "queries".
+     */
+    public string function $queryNoun(required numeric count) {
+        return arguments.count == 1 ? "query" : "queries";
+    }
+
+    /**
      * Delete a directory and everything in it, symlink-safe.
      *
      * `DirectoryDelete(path, recurse=true)` leaves the directory behind on

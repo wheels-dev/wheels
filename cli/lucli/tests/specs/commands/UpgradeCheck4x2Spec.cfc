@@ -164,6 +164,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(has(runCheck().breaking, "renderNotFound")).toBeTrue();
 			});
 
+			it("is an error when a route targets an action named isSafeRedirectUrl", () => {
+				put("config/routes.cfm", lt & "cfscript>mapper().get(name=""back"", to=""sessions##isSafeRedirectUrl"").end();" & lt & "/cfscript>");
+				var report = runCheck();
+				expect(has(report.breaking, "isSafeRedirectUrl")).toBeTrue();
+			});
+
+			it("doesn't flag a controller's own isSafeRedirectUrl helper that no route targets", () => {
+				put("config/routes.cfm", lt & "cfscript>mapper().get(name=""home"", to=""main##index"").end();" & lt & "/cfscript>");
+				put("app/controllers/Spec4x2Safe.cfc", "component extends=""Controller"" { private boolean function isSafeRedirectUrl(required string u) { return true; } }");
+				expect(has(runCheck().breaking, "isSafeRedirectUrl")).toBeFalse();
+			});
+
 			it("is an error when a MySQL datasource sets tinyInt1isBit=false", () => {
 				put("config/app.cfm", lt & "cfscript>this.datasources[""a""] = {connectionString: ""jdbc:mysql://h/db?tinyInt1isBit=false""};" & lt & "/cfscript>");
 				expect(has(runCheck().breaking, "tinyInt1isBit=false")).toBeTrue();

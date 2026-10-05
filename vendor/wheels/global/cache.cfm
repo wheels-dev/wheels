@@ -367,4 +367,67 @@
 			}
 		}
 	}
+
+	/**
+	 * Clears the per-request finder cache that `cacheQueriesDuringRequest` fills, namespaced under the
+	 * reserved `request.wheels["$queryCache"]` key. Use this instead of reaching into that internal key.
+	 *
+	 *   model("Post").forgetCachedQueries()   clears just the Post model's slot (chainable — returns the model)
+	 *   forgetCachedQueries("Post")           clears just the Post model's slot, by name (works anywhere)
+	 *   forgetCachedQueries(all = true)        clears every model's cached results this request
+	 *
+	 * Called as a method on a model instance it scopes to that model automatically, because only a model
+	 * carries `variables.wheels.class.modelName` (Controller / view / job / base Global do not). Called
+	 * outside a model with neither a `modelName` nor `all`, it throws rather than silently wiping every
+	 * model's cache — clearing everything has to be asked for explicitly.
+	 *
+	 * This is a single global helper on purpose: it cannot also be declared on the model, because Adobe CF
+	 * forbids the same UDF name in both the Global mixin and a model fragment (both compile into the model
+	 * component). A no-op when nothing has been cached yet.
+	 *
+	 * As with every global helper, `forgetCachedQueries` is a reserved controller action name — a controller
+	 * cannot define an action called `forgetCachedQueries` (it is on the protected-method surface).
+	 *
+	 * [section: Miscellaneous Functions]
+	 * [category: General Functions]
+	 *
+	 * @modelName Clear only this model's slot. Defaults to the calling model's own name when invoked as
+	 *   `model("X").forgetCachedQueries()`.
+	 * @all Clear every model's cached queries for the request. Required (true) to wipe everything from
+	 *   outside a model.
+	 */
+	public any function forgetCachedQueries(string modelName = "", boolean all = false) {
+		// The cache is keyed by the model's bare name, ListLast(name, "/") (Model.cfc), so a namespaced
+		// argument like "admin/User" must be normalised the same way to hit its slot. The auto-scope path
+		// below already reads variables.wheels.class.modelName, which is stored normalised.
+		local.slot = ListLast(arguments.modelName, "/");
+		if (
+			!Len(local.slot)
+			&& StructKeyExists(variables, "wheels")
+			&& StructKeyExists(variables.wheels, "class")
+			&& IsStruct(variables.wheels.class)
+			&& StructKeyExists(variables.wheels.class, "modelName")
+		) {
+			local.slot = variables.wheels.class.modelName;
+		}
+
+		if (!arguments.all && !Len(local.slot)) {
+			Throw(
+				type = "Wheels.InvalidArgument",
+				message = "forgetCachedQueries() needs a model to clear, or all = true.",
+				detail = "Call it on a model (model(""Post"").forgetCachedQueries()), name a model (forgetCachedQueries(""Post"")), or pass all = true to clear every model's cached queries for this request."
+			);
+		}
+
+		if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "$queryCache")) {
+			if (arguments.all) {
+				StructDelete(request.wheels, "$queryCache");
+			} else {
+				// Empty just this model's slot, keeping the key — the same shape $clearRequestCache
+				// leaves behind, so a re-query repopulates it in place.
+				request.wheels["$queryCache"][local.slot] = {};
+			}
+		}
+		return this;
+	}
 </cfscript>

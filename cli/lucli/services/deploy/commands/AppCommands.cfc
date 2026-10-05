@@ -114,14 +114,24 @@ component extends="Base" {
         return docker("images", variables.config.image());
     }
 
-    public string function logs(struct opts = {}) {
-        var parts = ["logs"];
-        var tail = arguments.opts.tail ?: 100;
-        arrayAppend(parts, "--tail");
-        arrayAppend(parts, tail);
+    /**
+     * Tail a container's logs. Without `container`, the role's newest running container (by the
+     * service / role / destination labels `run` stamps on) is piped in, as Kamal does; a bare
+     * `docker logs` without a container name is an error (#4416).
+     */
+    public string function logs(struct opts = {}, any role) {
+        var parts = ["logs", "--tail", arguments.opts.tail ?: 100];
         if (arguments.opts.follow ?: false) arrayAppend(parts, "--follow");
-        if (len(arguments.opts.container ?: "")) arrayAppend(parts, arguments.opts.container);
-        return docker(parts);
+        if (len(arguments.opts.container ?: "")) {
+            arrayAppend(parts, shellEscape(arguments.opts.container));
+            return docker(parts);
+        }
+        var filters = ["ps", "--latest", "--quiet", "--filter", shellEscape("label=service=" & variables.config.service())];
+        if (!isNull(arguments.role)) {
+            arrayAppend(filters, ["--filter", shellEscape("label=role=" & arguments.role.name())], true);
+            arrayAppend(filters, ["--filter", shellEscape("label=destination=" & variables.config.destination())], true);
+        }
+        return pipe([docker(filters), "xargs -r " & docker(parts)]);
     }
 
     public string function container_name(required any role, required string version) {

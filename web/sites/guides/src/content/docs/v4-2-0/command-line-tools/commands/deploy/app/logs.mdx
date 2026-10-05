@@ -21,7 +21,7 @@ wheels deploy app logs [--tail=<N>] [--follow] [--container=<name>] [--role=<nam
 |------|-------------|
 | `--tail=<N>` | Trailing lines per host. Default 100. |
 | `--follow` | `docker logs --follow`. Leaves the connection open; Ctrl-C to stop. |
-| `--container=<name>` | Target one specific container name instead of every service-labelled container. |
+| `--container=<name>` | Container to read logs from. Pass it in practice: without it the emitted `docker logs` command has no container argument, and Docker rejects it. |
 | `--role=<name>` | Limit to one role. |
 | `--destination=<name>` | Overlay destination config. |
 
@@ -29,15 +29,14 @@ wheels deploy app logs [--tail=<N>] [--follow] [--container=<name>] [--role=<nam
 
 ## Behavior
 
-Emits `docker logs --tail <N> [--follow] [<container>]` per host. Output is line-buffered and prefixed with `[<host>]`.
+Emits `docker logs --tail <N> [--follow] [<container>]` per host in the targeted role(s). Output is line-buffered and prefixed with `[<host>]`.
 
 Under `--follow`, the command fans out in parallel and stays running until interrupted.
 
 ## Examples
 
 ```bash title="illustrative"
-wheels deploy app logs
-wheels deploy app logs --tail=500
-wheels deploy app logs --follow --role=web
 wheels deploy app logs --container=myapp-web-abc1234
+wheels deploy app logs --container=myapp-web-abc1234 --tail=500
+wheels deploy app logs --container=myapp-web-abc1234 --follow --role=web
 ```

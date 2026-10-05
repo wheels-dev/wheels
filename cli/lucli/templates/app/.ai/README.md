@@ -16,13 +16,14 @@ APPLICATION on Wheels — nothing about framework internals.
 - `middleware.md` — middleware and rate limiting.
 - `di.md` — the DI container.
 - `auth.md` — authentication and authorization.
-- `storage.md` — storage disks.
+- `storage.md` — storage disks, deleting files, files that belong to records.
 - `packages.md` — the package system.
 - `migrations.md` — migrations and seeding.
 - `jobs.md` — background jobs.
 - `mailers.md` — sending email: mailers, SMTP settings, testing a mailer.
-- `sse.md` — server-sent events.
+- `sse.md` — server-sent events and channels (publish/subscribe, authorising subscribers).
 - `testing.md` — changing framework settings inside a spec, and testing partial caching.
+- `upgrading.md` — `wheels upgrade check` and the APIs that changed in 4.x.
 
 ## Deeper content
 

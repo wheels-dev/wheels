@@ -20,7 +20,7 @@ jobs:
   #############################################
   fast-test:
     name: "Lucee 7 + SQLite (LuCLI)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       WHEELS_CI: "true"
       WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:30007"
@@ -229,7 +229,7 @@ jobs:
   # version on api.wheels.dev tracks the current framework state.
   deploy-api-snapshot:
     needs: fast-test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       deployments: write

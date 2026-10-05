@@ -185,6 +185,76 @@
 
 
 	/**
+	 * Escapes the `LIKE` wildcards in a string so it can be used as a literal search term in a
+	 * `LIKE` comparison that declares `ESCAPE '\'`. The escape character `\` is escaped first, then
+	 * `%` and `_`; `[` is escaped only when the application's default adapter is SQL Server (where `[`
+	 * opens a character class — on Oracle `\[` is an illegal escape sequence, ORA-01424). Add your own
+	 * surrounding wildcards and place the result in a quoted literal whose `LIKE` declares `ESCAPE '\'`:
+	 *
+	 * `model("post").findAll(where="title LIKE '%#escapeForLike(params.q)#%' ESCAPE '\'")`
+	 *
+	 * Wheels binds the quoted literal as a query parameter (`parameterize` is on by default), and the
+	 * explicit `ESCAPE '\'` makes the escaped wildcards literal on every supported database — MySQL,
+	 * PostgreSQL, SQL Server, SQLite, Oracle, H2 and CockroachDB. Always declare the clause: MySQL,
+	 * PostgreSQL, CockroachDB and H2 default the `LIKE` escape character to `\`, but SQLite, Oracle and
+	 * SQL Server have none, and the three-argument query builder (`where("title", "LIKE", ...)`) emits no
+	 * `ESCAPE` either, so without the clause `\` is matched literally.
+	 *
+	 * This escapes `LIKE` metacharacters only, not SQL quotes; quote the value the same way you would
+	 * any other `where`-string literal.
+	 *
+	 * On SQL Server, `[` is escaped only once a model has initialised the adapter. If you call
+	 * `escapeForLike()` before any `model()` call in a fresh or just-reloaded app, the adapter is not
+	 * known yet and `[` is left unescaped — call a `model()` finder first, or handle `[` yourself. Every
+	 * other database treats `[` as a literal, so this edge affects SQL Server only.
+	 *
+	 * [section: Global Helpers]
+	 * [category: String Functions]
+	 *
+	 * @value String whose `LIKE` wildcards should be treated as literals.
+	 */
+	public string function escapeForLike(required string value) {
+		local.rv = Replace(arguments.value, "\", "\\", "all");
+		local.rv = Replace(local.rv, "%", "\%", "all");
+		local.rv = Replace(local.rv, "_", "\_", "all");
+		// `[` opens a character class in a LIKE pattern only on SQL Server. Escaping it is needed there,
+		// redundant on MySQL / PostgreSQL / SQLite / H2 / CockroachDB (where `[` is literal), and on
+		// Oracle `\[` is an illegal escape sequence (ORA-01424), so escape it only when the adapter is
+		// SQL Server.
+		if ($adapterNameForLike() == "MicrosoftSQLServerModel") {
+			local.rv = Replace(local.rv, "[", "\[", "all");
+		}
+		return local.rv;
+	}
+
+	/**
+	 * The adapter class name escapeForLike() uses to decide whether to escape `[`. On a model instance
+	 * it is that model's own adapter, so a multi-datasource app escapes `[` per the database the query
+	 * actually runs against; otherwise it is the application default.
+	 *
+	 * The default is guarded against the case $timestamp() also guards for — no model class has set
+	 * `adapterName` on the application scope yet (a fresh app, or right after a reload) — where a bare
+	 * `$get("adapterName")` would throw. There is no database type to read here without a model
+	 * ($getDBType() lives on the migrator, not on this mixin's host), so it returns "", which
+	 * escapeForLike treats as "not SQL Server": `[` is left unescaped. That is correct on every database
+	 * except an as-yet-uninitialised SQL Server app (a rare edge — call `model()` first), and it never
+	 * risks Oracle's ORA-01424.
+	 */
+	public string function $adapterNameForLike() {
+		if (
+			StructKeyExists(variables, "wheels")
+			&& StructKeyExists(variables.wheels, "class")
+			&& StructKeyExists(variables.wheels.class, "adapterName")
+		) {
+			return variables.wheels.class.adapterName;
+		}
+		if (StructKeyExists(application[$appKey()], "adapterName")) {
+			return $get("adapterName");
+		}
+		return "";
+	}
+
+	/**
 	 * Capitalizes the first character of the supplied string.
 	 *
 	 * [section: Global Helpers]
