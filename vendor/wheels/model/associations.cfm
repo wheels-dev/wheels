@@ -242,12 +242,18 @@
 
 	/*
 	 * Called when a model object is deleted (e.g. post.delete()).
-	 * Deletes all associated records (or sets their foreign key values to NULL).
+	 * Deletes all associated records (or sets their foreign key values to NULL). When the object itself
+	 * was soft-deleted (`parentSoftDeleted`), nothing a restore would need is destroyed or unlinked:
+	 * dependents that can be soft-deleted are, and every other dependent is left alone.
 	 */
-	public void function $deleteDependents(boolean softDelete = true, boolean includeSoftDeletes = false) {
+	public void function $deleteDependents(boolean softDelete = true, boolean includeSoftDeletes = false, boolean parentSoftDeleted = false) {
 		for (local.key in variables.wheels.class.associations) {
 			local.association = variables.wheels.class.associations[local.key];
-			if (ListFindNoCase("hasMany,hasOne", local.association.type) && local.association.dependent != false) {
+			if (
+				ListFindNoCase("hasMany,hasOne", local.association.type)
+				&& local.association.dependent != false
+				&& !$dependentKeptBySoftDelete(association = local.association, parentSoftDeleted = arguments.parentSoftDeleted)
+			) {
 				local.all = "";
 				if (local.association.type == "hasMany") {
 					local.all = "All";
@@ -283,6 +289,21 @@
 				}
 			}
 		}
+	}
+
+	/**
+	 * Internal function. True when a soft-deleted parent leaves this dependent association alone:
+	 * `remove` / `removeAll` would unlink the children, and `delete` / `deleteAll` would destroy children
+	 * whose model has no soft-delete column.
+	 */
+	public boolean function $dependentKeptBySoftDelete(required struct association, required boolean parentSoftDeleted) {
+		if (!arguments.parentSoftDeleted) {
+			return false;
+		}
+		if (ListFindNoCase("remove,removeAll", arguments.association.dependent)) {
+			return true;
+		}
+		return !model(arguments.association.modelName).$softDeletion();
 	}
 
 	/**

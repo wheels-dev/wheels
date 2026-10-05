@@ -615,7 +615,15 @@
 	public void function reload() {
 		// A reloaded object reports no saved changes, as after clearChangeInformation() (F49).
 		StructDelete(variables, "$savedChanges");
-		local.query = findByKey(key = key(), reload = true, returnAs = "query");
+		// The row as it is now, soft-deleted or not; a row that is gone can't be reloaded.
+		local.query = findByKey(key = key(), reload = true, returnAs = "query", includeSoftDeletes = true);
+		if (!local.query.recordCount) {
+			Throw(
+				type = "Wheels.RecordNotFound",
+				message = "Can't reload this #variables.wheels.class.modelName# object: no row exists for its key (#key()#).",
+				extendedInfo = "The row was deleted after the object was loaded."
+			);
+		}
 		local.properties = propertyNames();
 		local.columnInfo = variables.wheels.class.properties;
 		local.iEnd = ListLen(local.properties);

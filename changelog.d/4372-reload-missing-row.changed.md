@@ -1,0 +1,1 @@
+- `reload()` throws `Wheels.RecordNotFound` when the object's row no longer exists, instead of silently blanking every property. Uncaught in a controller action, that renders the 404 page (#4372)

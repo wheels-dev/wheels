@@ -402,6 +402,22 @@ If your app builds storage keys from user input or file names, check that none o
 
 `insertAll()` and `upsertAll()` now honour their `transaction` argument, which defaults to your `transactionMode` setting (`commit` unless you changed it). Records are still written in batches of up to 1000 rows (fewer on SQL Server, to stay within its parameter limit), but all the batches now run in one transaction: a large import is all-or-nothing, and a failing batch rolls back the ones before it. In 4.1 each batch committed on its own. If you relied on that, for example to keep a partial import, pass `transaction="none"`. `transaction="rollback"` writes nothing, like `save(transaction="rollback")`. One transaction holds its locks until the end, so an import of many thousands of rows holds them for the whole call.
 
+### Soft-deleting a parent leaves non-soft-delete dependents alone
+
+On a model with a soft-delete column (`deletedAt`), a soft `delete()` no longer runs `dependent=` actions that a restore couldn't undo ([#4370](https://github.com/wheels-dev/wheels/issues/4370)). Children whose model also has a soft-delete column are soft-deleted, as before. Children without one are left alone: `dependent="delete"` / `"deleteAll"` no longer hard-deletes them, and `dependent="remove"` / `"removeAll"` no longer sets their foreign keys to `NULL`. On a soft delete, `dependent=` therefore applies only to a real delete. If an app counted on a soft delete removing such children, delete them in a `beforeDelete` / `afterDelete` callback, or delete the parent with `softDelete=false`.
+
+### `softDelete=false` also deletes rows that are already soft-deleted
+
+`delete(softDelete=false)`, `deleteAll(softDelete=false)`, `deleteOne(softDelete=false)` and `deleteByKey(softDelete=false)` are now always real deletes, including rows that were soft-deleted earlier and the `dependent=` children of a deleted record ([#4371](https://github.com/wheels-dev/wheels/issues/4371)). In 4.1 they skipped soft-deleted rows unless `includeSoftDeletes=true` was passed too. An explicit `includeSoftDeletes=false` alongside `softDelete=false` no longer keeps soft-deleted rows. With `instantiate=true`, `deleteAll(softDelete=false)` now loads those rows and runs their `beforeDelete`, `afterDelete` and `afterCommit` callbacks too.
+
+### `reload()` and `delete()` on a soft-deleted object
+
+Three changes for an object whose row is soft-deleted ([#4372](https://github.com/wheels-dev/wheels/issues/4372)):
+
+- `reload()` reloads the soft-deleted row. In 4.1 it blanked every property. When the row is gone altogether, `reload()` now throws `Wheels.RecordNotFound` instead of blanking the object; uncaught in an action, that error renders the 404 page.
+- A soft `delete()` on an object that is already soft-deleted, or on a stale copy of a row soft-deleted elsewhere, returns `false` and changes nothing. In 4.1 it wrote a new `deletedAt` and returned `true`.
+- After a soft `delete()`, the object's `deletedAt` holds the timestamp written. If the delete is rolled back, it goes back to what it was.
+
 ## CLI and deployment changes
 
 ### Dev servers listen on `127.0.0.1`

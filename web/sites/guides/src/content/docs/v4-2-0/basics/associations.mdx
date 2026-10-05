@@ -90,6 +90,7 @@ The association methods read like English because they use the association name,
 - **`dependent="deleteAll"`** — issue a single `DELETE FROM children WHERE parentId = ?` statement. Fast, but skips the child's callbacks.
 - **`dependent="remove"`** — instantiate each child and set its foreign key to `NULL`. Child's `beforeUpdate` / `afterUpdate` fire. Use when children can survive without a parent.
 - **`dependent="removeAll"`** — single `UPDATE children SET parentId = NULL WHERE parentId = ?`. Fast, skips callbacks.
+- **On a soft delete** — when the parent has a `deletedAt` column and is soft-deleted, children whose model also has one are soft-deleted, and every other child is left alone (no delete, no `NULL` foreign key), so restoring the parent finds them intact. `dependent=` applies to them only when the parent is really deleted (`delete(softDelete=false)`, or a parent without a soft-delete column).
 - **Default (not set)** — no cascade. Deleting the parent leaves orphaned child rows whose foreign key points at a row that no longer exists. You almost always want a `dependent` value, even on small associations.
 
 Choose `delete` (or `deleteAll` if the children don't have callbacks) for strict ownership — comments, line items, anything that can't outlive its parent. Choose `remove` or `removeAll` for looser links — employees who survive their department, posts that survive their author, and so on.
