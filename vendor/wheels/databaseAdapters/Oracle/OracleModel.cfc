@@ -37,6 +37,52 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * Internal function. An integer param whose value is beyond the signed 64-bit range binds as
+	 * text (#4162). NUMBER(20..38, 0) columns can hold such values, but no numeric cf_sql type
+	 * binds them exactly: cf_sql_bigint is clamped (Lucee) or wrapped (BoxLang), and
+	 * cf_sql_numeric / cf_sql_decimal go through a double. Oracle converts a character value
+	 * compared with or stored into a NUMBER exactly. Only pure digit strings (an optional leading
+	 * "-", no decimal point or grouping) qualify, so NLS settings can't change the conversion.
+	 */
+	public struct function $queryParams(required struct settings) {
+		local.rv = super.$queryParams(argumentCollection = arguments);
+		if (
+			ListFindNoCase("cf_sql_bigint,cf_sql_integer", local.rv.cfsqltype)
+			&& !(StructKeyExists(local.rv, "null") && local.rv.null)
+			&& $integerValuesNeedTextBind(local.rv)
+		) {
+			local.rv.cfsqltype = "cf_sql_varchar";
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. True when every value of a query param (one value, or each element of an
+	 * IN list) is a pure digit string and at least one is outside the cf_sql_bigint range.
+	 * Compared as digit strings, never through a double.
+	 */
+	public boolean function $integerValuesNeedTextBind(required struct param) {
+		local.range = $integerKeyRange(sqlType = "cf_sql_bigint");
+		local.values = StructKeyExists(arguments.param, "list") && arguments.param.list
+			? ListToArray(arguments.param.value, arguments.param.separator)
+			: [arguments.param.value];
+		local.state = {beyond = false};
+		for (local.value in local.values) {
+			if (!IsSimpleValue(local.value) || !ReFind("^-?[0-9]+$", local.value)) {
+				return false;
+			}
+			local.digits = $canonicalIntegerString(local.value);
+			if (
+				$compareIntegerStrings(local.digits, local.range.min) < 0
+				|| $compareIntegerStrings(local.digits, local.range.max) > 0
+			) {
+				local.state.beyond = true;
+			}
+		}
+		return local.state.beyond;
+	}
+
+	/**
 	 * Map database types to the ones used in CFML.
 	 */
 	public string function $getType(required string type, string scale, string details, string precision = "") {

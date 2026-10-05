@@ -31,6 +31,10 @@ component extends="Model" {
         // on Lucee and BoxLang, and is NOT detectable on Adobe CF or RustCFML — there the
         // behaviour inside a raw transaction{} is left to the engine and is not guaranteed.
         // Always use the Wheels-managed transaction for these callbacks.
+        // Nested units: save(transaction="savepoint") / invokeWithTransaction(..., transaction="savepoint")
+        // run as a savepoint inside an already-open transaction — on a false return or a throw only that
+        // unit's own writes roll back and the outer transaction carries on; with no open transaction it
+        // behaves like transaction="commit".
         afterCommit("enqueueSearchIndex", on="create,update");
         afterRollback("releaseReservation");
 

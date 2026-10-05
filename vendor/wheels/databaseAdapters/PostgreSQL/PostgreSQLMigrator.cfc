@@ -69,13 +69,11 @@ component extends="wheels.databaseAdapters.Abstract" {
 				if (arguments.alter) {
 					arguments.sql = arguments.sql & " SET";
 				}
-				if (
-					arguments.options.default == "NULL"
-					|| (
-						arguments.options.default == ""
-						&& ListFindNoCase("boolean,date,datetime,time,timestamp,decimal,float,integer", arguments.options.type)
-					)
-				) {
+				if (arguments.options.default == "" && !$emptyDefaultBecomesNull(arguments.options)) {
+					// No default given: a NOT NULL column gets no DEFAULT clause at all
+					// (MySQL rejects DEFAULT NULL NOT NULL), and nothing emits a bare
+					// DEFAULT or an empty literal for a type that is not string-like.
+				} else if (arguments.options.default == "NULL" || arguments.options.default == "") {
 					arguments.sql = arguments.sql & " DEFAULT NULL";
 				} else if (arguments.options.type == 'boolean') {
 					arguments.sql = arguments.sql & " DEFAULT #IIf(arguments.options.default, true, false)#";

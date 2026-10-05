@@ -1,0 +1,1 @@
+- On Oracle, a whole number beyond the signed 64-bit range (more than 9,223,372,036,854,775,807, or less than -9,223,372,036,854,775,808) written to or compared against a `NUMBER` column is now bound as text, which Oracle converts exactly. It was clamped (Lucee), wrapped (BoxLang) or rounded through a double, so it could be stored or matched as a different number (#4162)

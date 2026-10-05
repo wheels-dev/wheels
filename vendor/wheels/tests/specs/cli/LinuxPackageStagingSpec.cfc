@@ -37,6 +37,7 @@ component extends="wheels.WheelsTest" {
 			describe("build-linux-packages.sh", () => {
 
 				it("consumes the lucli-native wheels-module tarball, not the legacy wheels-cli zip", () => {
+					$requireRepoPath("tools/distribution-drafts/linux-packages");
 					expect(fileExists(buildScript)).toBeTrue("Missing file: " & buildScript);
 					var src = fileRead(buildScript);
 
@@ -69,6 +70,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("emits a wrapper that routes lucli through the wheels module", () => {
+					$requireRepoPath("tools/distribution-drafts/linux-packages");
 					var src = fileRead(buildScript);
 
 					// The wrapper must route lucli through the wheels module in one
@@ -132,6 +134,7 @@ component extends="wheels.WheelsTest" {
 					describe(t.label, () => {
 
 						it("ships /opt/wheels/.version so `wheels --version` reports the installed version", () => {
+							$requireRepoPath("tools/distribution-drafts/linux-packages");
 							expect(fileExists(t.path)).toBeTrue("Missing file: " & t.path);
 							var src = fileRead(t.path);
 							var hasVersionFile = reFindNoCase(
@@ -146,6 +149,7 @@ component extends="wheels.WheelsTest" {
 						});
 
 						it("ships /opt/wheels/.channel so `wheels --version` reports the installed channel", () => {
+							$requireRepoPath("tools/distribution-drafts/linux-packages");
 							var src = fileRead(t.path);
 							var hasChannelFile = reFindNoCase(
 								"dst:[[:space:]]+/opt/wheels/\.channel",
@@ -159,6 +163,7 @@ component extends="wheels.WheelsTest" {
 						});
 
 						it("declares tar as an rpm runtime dependency", () => {
+							$requireRepoPath("tools/distribution-drafts/linux-packages");
 							var src = fileRead(t.path);
 							// Match `tar` as a list item under overrides.rpm.depends. It can
 							// either be a bare entry or part of an alternative — we just need
@@ -178,6 +183,7 @@ component extends="wheels.WheelsTest" {
 						});
 
 						it("stages framework src from ./build/framework/wheels/ so contents flatten under vendor/wheels/", () => {
+							$requireRepoPath("tools/distribution-drafts/linux-packages");
 							var src = fileRead(t.path);
 							// wheels-core-VER.zip has a top-level `wheels/` directory inside it
 							// (the smoke test asserts this at tools/ci/smoke-test-module.sh:112).

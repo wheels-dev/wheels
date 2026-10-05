@@ -110,7 +110,15 @@ component extends="wheels.databaseAdapters.Abstract" {
 			local.nullSQL = addColumnOptions(sql = "", options = local.opts, alter = true);
 		}
 		local.sql = "ALTER TABLE #quoteTableName(arguments.name)# ALTER COLUMN #quoteColumnName(arguments.column.name)# #arguments.column.sqlType()# #local.nullSQL#;";
-		if (StructKeyExists(arguments.column, "default")) {
+		// An empty default on a NOT NULL column means no default (as on CREATE/ADD):
+		// add no DF_ constraint at all rather than DEFAULT NULL.
+		if (
+			StructKeyExists(arguments.column, "default")
+			&& !(
+				arguments.column["default"] == ""
+				&& !$emptyDefaultBecomesNull({allowNull = StructKeyExists(arguments.column, "allowNull") ? arguments.column.allowNull : true})
+			)
+		) {
 			local.opts = {type = arguments.column.type, "default" = arguments.column["default"]};
 			local.columnSQL = addColumnOptions(sql = "", options = local.opts, alter = true);
 			local.sql = local.sql & "ALTER TABLE #quoteTableName(arguments.name)# ADD CONSTRAINT DF_#objectCase(arguments.column.name)# #local.columnSQL# FOR #quoteColumnName(arguments.column.name)#;";

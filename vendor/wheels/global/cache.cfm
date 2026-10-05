@@ -24,25 +24,100 @@
 		// make all cache keys domain specific (do not use request scope below since it may not always be initialized)
 		StructInsert(arguments, ListLen(StructKeyList(arguments)) + 1, cgi.http_host, true);
 
-		// we need to make sure we are looping through the passed in arguments in the same order everytime
-		local.values = [];
-		local.keyList = ListSort(StructKeyList(arguments), "textnocase", "asc");
-		local.keyArray = ListToArray(local.keyList);
-		local.iEnd = ArrayLen(local.keyArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			ArrayAppend(local.values, arguments[local.keyArray[local.i]]);
-		}
-
-		if (!ArrayIsEmpty(local.values)) {
-			// this might fail if a query contains binary data so in those rare cases we fall back on using cfwddx (which is a little bit slower which is why we don't use it all the time)
-			try {
-				local.rv = SerializeJSON(local.values);
-				local.rv = $engineAdapter().normalizeForHash(local.rv);
-			} catch (any e) {
-				local.rv = $wddx(input = local.values);
+		// Build a tagged, order-preserving structure (struct keys sorted, argument names, array elements
+		// and query rows kept in order) and serialize it once, so the key ignores struct key order only.
+		local.keyArray = ListToArray(ListSort(StructKeyList(arguments), "textnocase", "asc"));
+		try {
+			local.rv = SerializeJSON($canonicalCacheStruct(arguments, local.keyArray, 0));
+		} catch (any e) {
+			// values the canonical encoder cannot represent (e.g. driver-specific Java objects) fall back on cfwddx
+			local.values = [];
+			local.iEnd = ArrayLen(local.keyArray);
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				if (StructKeyExists(arguments, local.keyArray[local.i])) {
+					ArrayAppend(local.values, arguments[local.keyArray[local.i]]);
+				}
 			}
+			local.rv = $wddx(input = local.values);
 		}
 		return Hash(local.rv);
+	}
+
+	/**
+	 * Internal function.
+	 * Canonical form of a struct (or the arguments scope) for `$hashedKey()`: a "t"-tagged array of
+	 * lower-cased key / value pairs in the given key order. Simple values are inlined; complex values
+	 * become tagged arrays, and an undefined value becomes an empty array, so the forms cannot collide.
+	 */
+	public array function $canonicalCacheStruct(required any container, required array keys, numeric depth = 0) {
+		local.rv = ["t"];
+		local.iEnd = ArrayLen(arguments.keys);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.key = arguments.keys[local.i];
+			ArrayAppend(local.rv, LCase(local.key));
+			if (!StructKeyExists(arguments.container, local.key)) {
+				ArrayAppend(local.rv, []);
+			} else if (IsSimpleValue(arguments.container[local.key])) {
+				ArrayAppend(local.rv, arguments.container[local.key]);
+			} else {
+				ArrayAppend(local.rv, $canonicalCacheValue(arguments.container[local.key], arguments.depth + 1));
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 * Canonical form of a value for `$hashedKey()`. Struct keys are sorted (their engine iteration order
+	 * is not stable), while array elements and query rows keep their position. Queries are embedded as-is
+	 * and serialized natively, which preserves row and cell order.
+	 */
+	public any function $canonicalCacheValue(any value, numeric depth = 0) {
+		// `value` is optional because some engines report a declared-but-unpassed argument as a key
+		// holding null, which then arrives here as a missing argument
+		if (!StructKeyExists(arguments, "value") || IsNull(arguments.value)) {
+			return [];
+		}
+		if (arguments.depth > 64) {
+			Throw(type = "Wheels.CacheKeyTooDeep", message = "Value is nested too deeply to build a cache key.");
+		}
+		if (IsBinary(arguments.value)) {
+			return ["x", Hash(ToBase64(arguments.value))];
+		}
+		if (IsSimpleValue(arguments.value)) {
+			return arguments.value;
+		}
+		if (IsQuery(arguments.value)) {
+			return ["q", arguments.value];
+		}
+		if (IsArray(arguments.value)) {
+			local.rv = ["a"];
+			local.iEnd = ArrayLen(arguments.value);
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				if (!ArrayIsDefined(arguments.value, local.i)) {
+					ArrayAppend(local.rv, []);
+				} else if (IsSimpleValue(arguments.value[local.i])) {
+					ArrayAppend(local.rv, arguments.value[local.i]);
+				} else {
+					ArrayAppend(local.rv, $canonicalCacheValue(arguments.value[local.i], arguments.depth + 1));
+				}
+			}
+			return local.rv;
+		}
+		if (IsObject(arguments.value)) {
+			// model objects are keyed on their class and current property values
+			if (StructKeyExists(arguments.value, "$classData") && StructKeyExists(arguments.value, "properties")) {
+				local.object = arguments.value;
+				return ["m", local.object.$classData().modelName, $canonicalCacheValue(local.object.properties(), arguments.depth + 1)];
+			}
+			return ["o", SerializeJSON(arguments.value)];
+		}
+		if (IsStruct(arguments.value)) {
+			local.keys = StructKeyArray(arguments.value);
+			ArraySort(local.keys, "textnocase");
+			return $canonicalCacheStruct(arguments.value, local.keys, arguments.depth + 1);
+		}
+		return ["o", SerializeJSON(arguments.value)];
 	}
 
 	/**

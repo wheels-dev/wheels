@@ -29,7 +29,7 @@ Three keys are required. Omitting any of them stops the loader with `<path to de
 The loader rejects any top-level key not on this list. Case-insensitive. The allowlist contains only keys the runtime actually reads — Kamal keys that `wheels deploy` has not implemented yet are **rejected** rather than accepted-and-ignored (see [Rejected Kamal keys](#rejected-kamal-keys) below).
 
 ```text title="Allowed top-level keys (illustrative — do not type)"
-service, image, servers, registry, builder, env, ssh, proxy, boot, accessories, volumes
+service, image, servers, registry, builder, env, ssh, proxy, boot, accessories, volumes, migrate
 ```
 
 <Aside type="caution" title="Some sub-keys are still parsed but ignored">
@@ -276,6 +276,36 @@ boot:
 ```
 
 Both values must be a non-negative number (`limit` also accepts a percentage string). Anything else fails validation with `invalid boot.limit: '<value>' (must be a non-negative number or percentage)`.
+
+## `migrate`
+
+Runs the database migrations once per deploy, on one host (4.2.0). Kamal has no equivalent; it's a Wheels key.
+
+```yaml title="config/deploy.yml"
+migrate: true          # migrate on the default host, wait up to 300s
+
+# or
+migrate:
+  host: 10.0.0.1       # optional; default: the first host of the first role
+  timeout: 600         # optional; seconds the migrate host's health check waits (default 300)
+```
+
+With `migrate:` set, `wheels deploy`:
+
+1. boots and cuts over the migrate host first, with `WHEELS_MIGRATE_ON_BOOT=true` and the longer health-check timeout, so its app migrates strictly at start;
+2. stops the deploy if that host's health check fails (a migration failed or timed out), before any other host is touched;
+3. boots every other app container with `WHEELS_MIGRATE_ON_BOOT=false`, so it never migrates at start, whatever `autoMigrateDatabase` or `migrateOnBoot` say.
+
+Without the block nothing changes: each app container migrates at start only if its settings ask for it, which is safe with one app host only. `--dry-run` prints each host's `docker run` line, so you can see which host gets `WHEELS_MIGRATE_ON_BOOT=true`.
+
+The migrate host must be in a proxy-fronted role (`web`, or a role with `proxy: true`), because its health check is what stops a deploy whose migration failed. `migrate.host` must be a host listed under `servers:`. A `deploy.yml` with only job/worker roles is refused; run the migrations yourself there. Validation errors:
+
+- `migrate must be true, false, or a block with host and timeout`
+- `unknown key: migrate.<name> (allowed migrate keys: host, timeout)`
+- `migrate.host must be a host name or address`
+- `migrate.timeout must be a positive number of seconds`
+
+**Write migrations the old release can run against.** The migrate host cuts over first, so for a moment the other hosts still run the previous release against the new schema. Make each deploy's schema change additive (expand), and remove what the old code needs only in a later deploy (contract): add a column, deploy the code that uses it, then drop the old column in the next release. A rename is an add, a backfill, then a later drop.
 
 ## Rejected Kamal keys
 

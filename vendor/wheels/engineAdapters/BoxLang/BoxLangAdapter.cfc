@@ -142,19 +142,6 @@ component extends="wheels.engineAdapters.Base" output="false" {
 		}
 	}
 
-	// --- Hash Normalization ---
-
-	/**
-	 * BoxLang needs a different normalization approach for consistent hashing.
-	 * Removes structural chars with regex and sorts parts.
-	 */
-	public string function normalizeForHash(required string serialized) {
-		local.normalized = REReplace(arguments.serialized, '[\[\]{}"]', "", "all");
-		local.parts = listToArray(local.normalized, ",");
-		arraySort(local.parts, "textnocase");
-		return arrayToList(local.parts, ",");
-	}
-
 	// --- Struct Defaults ---
 
 	/**

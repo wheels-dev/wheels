@@ -403,12 +403,13 @@
 	 * on EVERY instantiation of every Global-derived component (per model row,
 	 * per controller, per Plugins instance) while its input — the function set
 	 * injected by the `/app/global/functions.cfm` include above — is constant
-	 * for the application lifetime. The memo is keyed per concrete class name
-	 * because whether a subclass's own (e.g. private) methods are already
-	 * registered in `variables` at this point in the pseudo-constructor is
-	 * engine-dependent, so the promotable set is not guaranteed identical
-	 * across subclasses. The gate is the cached key itself, never a separate
-	 * done-flag (##2800 lesson), and the cache lives inside
+	 * for the application lifetime. The memo has one entry, under the constant
+	 * key "wheels.Global": inside this pseudo-constructor GetMetadata(this) names
+	 * `wheels.Global` for every subclass on every supported engine, so that was
+	 * always the effective key, and calling GetMetadata(this) on each instance
+	 * cost about 225 µs on RustCFML for nothing (#4174). The per-key guards below
+	 * still decide what each instance gets. The gate is the cached key itself,
+	 * never a separate done-flag (##2800 lesson), and the cache lives inside
 	 * `application[$appKey()]`, which `?reload=true` rebuilds as a fresh
 	 * struct — so invalidation is structural. When `application` (or the
 	 * Wheels struct in it) is unavailable — CLI/test bootstrap, early
@@ -416,18 +417,14 @@
 	 */
 	public void function $promoteIncludedGlobalsToThis() {
 		var promoteCache = "";
-		var promoteCacheKey = "";
+		var promoteCacheKey = "wheels.Global";
 		if (IsDefined("application")) {
 			var promoteAppKey = $appKey();
 			if (StructKeyExists(application, promoteAppKey) && IsStruct(application[promoteAppKey])) {
-				var classMetadata = GetMetadata(this);
-				if (IsStruct(classMetadata) && StructKeyExists(classMetadata, "name") && Len(classMetadata.name)) {
-					promoteCacheKey = classMetadata.name;
-					if (!StructKeyExists(application[promoteAppKey], "promotedGlobalKeys")) {
-						application[promoteAppKey].promotedGlobalKeys = {};
-					}
-					promoteCache = application[promoteAppKey].promotedGlobalKeys;
+				if (!StructKeyExists(application[promoteAppKey], "promotedGlobalKeys")) {
+					application[promoteAppKey].promotedGlobalKeys = {};
 				}
+				promoteCache = application[promoteAppKey].promotedGlobalKeys;
 			}
 		}
 		if (IsStruct(promoteCache) && StructKeyExists(promoteCache, promoteCacheKey)) {
