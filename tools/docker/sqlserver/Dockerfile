@@ -6,6 +6,7 @@ LABEL maintainer "Wheels Core Team"
 # we add this to /opt/mssql-tools/bin which completely overrides the
 # sqlcmd from the base image. Read up on why we do this here:
 # https://github.com/microsoft/go-sqlcmd/discussions/501#discussion-6088877
+# The download retries on transient 5xx / 429 answers.
 WORKDIR /opt/mssql-tools/bin
 ENV GOSQLCMD_VERSION=v1.5.0
 ARG TARGETPLATFORM
@@ -14,7 +15,7 @@ RUN case ${TARGETPLATFORM} in \
     "linux/arm64")  GOSQLCMD_ARCH=arm64 ;; \
     *) echo "Unsupported platform: ${TARGETPLATFORM}"; exit 1 ;; \
     esac \
- && wget https://github.com/microsoft/go-sqlcmd/releases/download/${GOSQLCMD_VERSION}/sqlcmd-${GOSQLCMD_VERSION}-linux-${GOSQLCMD_ARCH}.tar.bz2 \
+ && wget --tries=5 --waitretry=3 --retry-connrefused --retry-on-http-error=429,500,502,503,504 https://github.com/microsoft/go-sqlcmd/releases/download/${GOSQLCMD_VERSION}/sqlcmd-${GOSQLCMD_VERSION}-linux-${GOSQLCMD_ARCH}.tar.bz2 \
  && tar -xjf sqlcmd-${GOSQLCMD_VERSION}-linux-${GOSQLCMD_ARCH}.tar.bz2
 
 # Set environment variables, not to have to write them with docker run command
