@@ -1,6 +1,6 @@
 ---
 title: "wheels deploy build create"
-description: Create a docker buildx builder for multi-arch or remote builds.
+description: Create a named docker buildx builder on the control machine.
 type: reference
 sidebar:
   label: "create"
@@ -24,13 +24,11 @@ wheels deploy build create [--destination=<name>] [--dry-run]
 
 ## When to run
 
-- Before the first multi-arch build (`builder.arch:` has more than one entry).
-- Before the first build against a remote builder (`builder.remote:` is set).
-- Single-arch local builds don't need `build create` — `docker build` alone suffices.
+Only when you want a named `kamal-<service>` buildx builder on the control machine, for example to select it yourself with `docker buildx use kamal-<service>`. `build push` and `wheels deploy` do not need it.
 
 ## Behavior
 
-Emits `docker buildx create --use ...` with a name derived from the service. Idempotent — re-running uses the existing builder.
+Emits `docker buildx create --name kamal-<service> --driver=docker-container` on the control machine. The builder is not selected with `--use`, and `build push` / `wheels deploy` do not pass `--builder`, so they build with your current default builder.
 
 ## Example
 
