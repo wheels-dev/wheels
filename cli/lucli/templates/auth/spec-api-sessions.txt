@@ -10,11 +10,12 @@ component extends="wheels.WheelsTest" {
 
 		describe("api.Sessions controller", () => {
 
-			it("returns 401 for invalid credentials", () => {
+			// No `format` param: a client that sends no Accept header and no
+			// .json extension still gets JSON.
+			it("returns a JSON 401 for invalid credentials", () => {
 				var result = processRequest(
 					params = {
 						route: "apiSession",
-						format: "json",
 						email: "auth-spec-nobody@example.com",
 						password: "not-the-password-1"
 					},
@@ -22,6 +23,7 @@ component extends="wheels.WheelsTest" {
 					returnAs = "struct"
 				);
 				expect(result.status).toBe(401);
+				expect(DeserializeJSON(result.body)).toHaveKey("error");
 			});
 
 		});

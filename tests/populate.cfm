@@ -1,4 +1,3 @@
-<cfsetting requestTimeOut="300">
 <!--- get the version of the database we're running against --->
 <cftry>
 	<cfdbinfo name="local.dbinfo" datasource="#application.wheels.dataSourceName#" type="version">

@@ -246,7 +246,7 @@ Three actions, three responsibilities:
        }
 
        function index() {
-           posts = model("Post").published().findAll(include="comments", order="publishedAt DESC");
+           posts = model("Post").published().findAll(order="publishedAt DESC");
        }
 
        function show() {
@@ -353,7 +353,7 @@ The migration adds the `userId` column, but the models don't yet know about each
            hasMany(name="comments", dependent="delete");
            belongsTo(name="user");
            validatesPresenceOf("title,body");
-           validatesLengthOf(property="title", maximum=120);
+           validatesLengthOf(property="title", maximum=120, allowBlank=true);
        }
    }
    ```
@@ -408,6 +408,7 @@ With the association in place, `post.user()` returns the author, `user.posts()` 
 
    ```cfm {test:compile}
    mapper()
+       .get(name="up", to="up##index")
        .resources(name="posts", binding=true, callback=function(map) {
            map.resources(name="comments", only="create");
        })
@@ -417,8 +418,8 @@ With the association in place, `post.user()` returns the author, `user.posts()` 
        .post(name="authenticate", pattern="/login", to="sessions##create")
        .delete(name="logout", pattern="/logout", to="sessions##delete")
        .get(name="hello", pattern="/hello", to="main##hello")
-       .wildcard()
        .root(to="posts##index", method="get")
+       .wildcard()
    .end();
    ```
 
@@ -500,8 +501,8 @@ That's the hand-rolled version. Thirty-ish lines of logic total, no hidden machi
 Scrape the CSRF token from the layout's `<meta name="csrf-token" content="...">` tag (present on every page render), not from a form's hidden input (not every form includes one), and %-encode brackets and `@` in the POST body — curl gives both characters special meaning. A known-working shape:
 
 ```bash title="known-working signup smoke test"
-TOKEN=$(curl -s http://localhost:8080/signup | grep -oE 'content="[^"]+" name="csrf-token"' | sed -E 's/.*content="([^"]+)".*/\1/')
-curl -s -X POST http://localhost:8080/signup \
+TOKEN=$(curl -s -c /tmp/cj -b /tmp/cj http://localhost:8080/signup | grep -oE 'content="[^"]+" name="csrf-token"' | sed -E 's/.*content="([^"]+)".*/\1/')
+curl -s -c /tmp/cj -b /tmp/cj -X POST http://localhost:8080/signup \
   -H "X-CSRF-Token: $TOKEN" \
   --data "user%5Bemail%5D=alice%40example.com&user%5Bpassword%5D=secret123"
 ```
@@ -521,7 +522,7 @@ The design is a registry: an `Authenticator` holds a list of named strategies. O
 
 <Steps>
 
-1. Create `config/services.cfm`:
+1. Add these registrations to `config/services.cfm` (`wheels new` created it with a comment explaining the format):
 
    ```cfm {test:compile}
    <cfscript>
@@ -540,6 +541,7 @@ The design is a registry: an `Authenticator` holds a list of named strategies. O
 Next, wire the session strategy into the authenticator so `authenticate(request)` has something to try. This is `onApplicationStart` work — it only needs to happen once per app boot. The right file is `app/events/onapplicationstart.cfm`. If you don't already have one, create it; otherwise append to it:
 
 ```cfm title="app/events/onapplicationstart.cfm" {test:compile}
+<cfsilent>
 <cfscript>
 if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
     var auth = application.wo.service("authenticator");
@@ -549,6 +551,7 @@ if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsIns
     }
 }
 </cfscript>
+</cfsilent>
 ```
 
 Don't put this in `config/app.cfm` — that file is for `Application.cfc` `this`-scope settings (`this.name`, `this.datasources`, `this.sessionTimeout`, etc.), not for init code. The DI container isn't initialized when `config/app.cfm` runs, so `application.wheelsdi` doesn't exist yet and the registration silently no-ops.
@@ -638,7 +641,7 @@ One change from 6a: the post-save `session.userId = user.id;` line is replaced w
        }
 
        function index() {
-           posts = model("Post").published().findAll(include="comments", order="publishedAt DESC");
+           posts = model("Post").published().findAll(order="publishedAt DESC");
        }
 
        function show() {

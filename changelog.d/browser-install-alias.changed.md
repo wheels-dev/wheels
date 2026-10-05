@@ -1,0 +1,1 @@
+- `wheels browser install` now runs `wheels browser setup` (an alias, as `wheels packages install` is of `add`). It used to print that LuCLI intercepts the command and it won't reach Wheels, then do nothing; it does reach Wheels, since LuCLI intercepts `install` only as the first argument.

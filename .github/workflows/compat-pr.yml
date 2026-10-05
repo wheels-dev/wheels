@@ -87,8 +87,9 @@ jobs:
         if: steps.changes.outputs.framework_changed == 'true' && matrix.cfengine == 'adobe2023'
         run: |
           mkdir -p ./.engine/adobe2023/WEB-INF/lib
-          wget -q https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar \
-            -O ./.engine/adobe2023/WEB-INF/lib/ojdbc10.jar
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors \
+            -o ./.engine/adobe2023/WEB-INF/lib/ojdbc10.jar \
+            https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar
 
       - name: Start CF engine
         if: steps.changes.outputs.framework_changed == 'true'

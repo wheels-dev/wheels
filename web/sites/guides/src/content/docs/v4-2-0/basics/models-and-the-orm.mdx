@@ -120,6 +120,24 @@ component extends="Controller" {
 
 Pagination is built into `findAll`: pass `page` and `perPage` and the framework runs a count query, a primary-key query, and a hydration query behind the scenes. Pair with the view pagination helpers (`paginationNav()`) to render navigation.
 
+In a JSON API there's no navigation to render. Call `pagination()` after the `findAll` instead: it returns `currentPage`, `totalPages` and `totalRecords` for that query (pass `handle=` if the query has one). Copy the values into a struct with quoted keys, because rendered as is the key case varies:
+
+```cfm {test:compile} title="app/controllers/api/Widgets.cfc (fragment)"
+component extends="wheels.Controller" {
+    function config() {
+        provides("json");
+    }
+    function index() {
+        local.widgets = model("widget").findAll(page = params.page ?: 1, perPage = 25, returnAs = "objects");
+        local.p = pagination();
+        renderWith(data = {
+            "widgets" = local.widgets,
+            "pagination" = {"page" = local.p.currentPage, "totalPages" = local.p.totalPages, "totalRecords" = local.p.totalRecords}
+        });
+    }
+}
+```
+
 ## Creating records
 
 Two patterns, chosen by whether you need to inspect or mutate the record before it's saved.
@@ -301,6 +319,21 @@ In a view: `##post.displayTitle()##`. In a controller: `if (post.isPublished()) 
 After `save()` the instance's primary key is populated and any property you set in a callback is current. Columns the database computed on your behalf — `DEFAULT` expressions, triggers, generated columns — are not refreshed automatically. When you need the authoritative post-save state, call `post.reload()` to re-query the row and overwrite the in-memory instance.
 
 This is rarely needed. Most apps don't use DB-computed columns, and when they do, the reload is usually only required in tests or in flows that show the record back to the user immediately.
+
+## Automatic timestamps
+
+`createdAt` and `updatedAt` are set for you on create and update, in UTC: the `timeStampMode` setting defaults to `"utc"`. The other values are `"local"` (the server's time) and `"epoch"`; change it with `set(timeStampMode = "local")` in `config/settings.cfm`.
+
+The values come back without a time zone. Rendered as is (for example in JSON), a date is labeled with the server's UTC offset, which is wrong for a UTC value. Format timestamps explicitly where you output them; with the default mode the stored value is UTC:
+
+```cfm {test:compile} title="app/models/Widget.cfc (fragment)"
+component extends="Model" {
+    // ISO-8601 in UTC, for JSON responses. Assumes the default timeStampMode ("utc").
+    public string function createdAtIso() {
+        return DateFormat(this.createdAt, "yyyy-mm-dd") & "T" & TimeFormat(this.createdAt, "HH:mm:ss") & "Z";
+    }
+}
+```
 
 ## Related guides
 

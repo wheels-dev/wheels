@@ -1,0 +1,2 @@
+- `wheels start` stops before starting anything when the port in `lucee.json` is taken, names the Wheels server that holds it (with `cd <its folder> && wheels stop`), and suggests a free `--port`. It used to warn and then fail with LuCLI's `Use: lucli server stop <name>`.
+- `wheels new` without `--port` no longer gives every app port 8080: it takes the first port from 8080 that is free and not pinned in another project's `lucee.json`.

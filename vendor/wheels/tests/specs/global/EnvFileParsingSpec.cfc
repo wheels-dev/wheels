@@ -43,11 +43,22 @@ component extends="wheels.WheelsTest" {
 		describe(".env parsing through this app's real Application.cfc", () => {
 
 			it("keeps a numeric 1 as a value, not as the boolean true", () => {
-				// WHEELS_SPEC_NUMERIC_ONE=1.0 lives in the repo's tracked .env, and
-				// this application's Application.cfc parsed it on boot — so this is
-				// the real parser, not a copy of its logic.
-				expect(application.env).toHaveKey("WHEELS_SPEC_NUMERIC_ONE");
-				var parsed = application.env["WHEELS_SPEC_NUMERIC_ONE"];
+				// The host application's own parser (public/Application.cfc's
+				// loadEnvFile), run on a fixture that ships with this suite, so the
+				// spec passes the same way in the framework repo and inside an app
+				// built with `wheels new` (whose .env has no spec keys). "Application"
+				// resolves to the app's webroot Application.cfc: there is none in
+				// this spec's own directory.
+				var hostApp = CreateObject("component", "Application");
+				prepareMock(hostApp);
+				makePublic(hostApp, "loadEnvFile");
+				var parsedEnv = {};
+				var fixture = ExpandPath("/wheels/tests/_assets/env/numeric-one.env");
+				expect(FileExists(fixture), "fixture missing: #fixture#").toBeTrue();
+				hostApp.loadEnvFile(fixture, parsedEnv);
+
+				expect(parsedEnv).toHaveKey("WHEELS_SPEC_NUMERIC_ONE");
+				var parsed = parsedEnv["WHEELS_SPEC_NUMERIC_ONE"];
 				// Compare(), not toBe(): TestBox's toBe() uses CFML `==`, which is
 				// the very trap under test — with the coercing parser this value is
 				// the BOOLEAN true, and `"true" == "1.0"` is still true numerically,
@@ -57,6 +68,8 @@ component extends="wheels.WheelsTest" {
 				expect(Compare(ToString(parsed), "1.0"), "the value itself must survive").toBe(0);
 				expect(IsNumeric(parsed), "and still be usable as a number").toBeTrue();
 				expect(Val(parsed)).toBe(1);
+				// A real boolean still becomes one.
+				expect(IsBoolean(parsedEnv["WHEELS_SPEC_TRUE"]) && parsedEnv["WHEELS_SPEC_TRUE"]).toBeTrue();
 			});
 
 		});
@@ -64,6 +77,7 @@ component extends="wheels.WheelsTest" {
 		describe("No copy of the parser may reintroduce the coercing test", () => {
 
 			it("every .env/settings parser compares booleans as strings", () => {
+				$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 				// Derived from THIS spec's own path so a worktree or a CI runner
 				// resolves the same files:
 				//   <root>/vendor/wheels/tests/specs/global/EnvFileParsingSpec.cfc
