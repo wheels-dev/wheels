@@ -48,7 +48,7 @@ component extends="wheels.WheelsTest" {
 	}
 
 	function forgetModels() {
-		for (var m in ["UAutoNote", "UAutoPost", "UAutoPage", "UBothNote", "UGhostOwner"]) {
+		for (var m in ["UAutoNote", "UAutoPost", "UAutoPage", "UBothNote", "UGhostOwner", "UMixedNote", "UMixedTypeNote"]) {
 			StructDelete(application.wheels.models, m);
 		}
 	}
@@ -61,6 +61,14 @@ component extends="wheels.WheelsTest" {
 		);
 	}
 
+	function insertNote(required string body, required numeric id, required string type) {
+		QueryExecute(
+			"INSERT INTO c_o_r_e_uautonotes (body, notable_id, notable_type) VALUES (:b, :i, :t)",
+			{b = arguments.body, i = {value = arguments.id, cfsqltype = "cf_sql_bigint"}, t = arguments.type},
+			{datasource = variables.g.get("dataSourceName")}
+		);
+	}
+
 	function run() {
 
 		describe("A polymorphic association on an underscore-shaped schema", () => {
@@ -69,6 +77,8 @@ component extends="wheels.WheelsTest" {
 				for (var table in variables.tables) {
 					QueryExecute("DELETE FROM #table#", [], {datasource = variables.g.get("dataSourceName")});
 				}
+				// a cold start for every spec, so each path resolves the columns itself
+				forgetModels();
 			});
 
 			it("creates through hasMany and reads back through belongsTo", () => {
@@ -88,10 +98,11 @@ component extends="wheels.WheelsTest" {
 				expect(post.uAutoNoteCount()).toBe(1);
 			});
 
-			it("filters an include join by the type column", () => {
+			it("filters an include join by the type column, as the association's first use", () => {
 				var post = variables.g.model("UAutoPost").create(title = "joined");
-				post.createUAutoNote(body = "mine");
-				variables.g.model("UAutoNote").create(body = "not mine", notable_id = post.id, notable_type = "UAutoPage");
+				// raw rows, so the include join is the first thing to read the association's columns
+				insertNote("mine", post.id, "UAutoPost");
+				insertNote("not mine", post.id, "UAutoPage");
 				var rows = variables.g.model("UAutoPost").findAll(where = "id = #post.id#", include = "uAutoNotes", returnAs = "query");
 				expect(rows.recordCount).toBe(1);
 			});
@@ -103,12 +114,26 @@ component extends="wheels.WheelsTest" {
 				expect(rawNote("page note").notable_type).toBe("UAutoPage");
 			});
 
-			it("sets both columns through nested properties", () => {
+			it("sets both columns through nested properties, as the association's first use", () => {
 				var post = variables.g.model("UAutoPost").new(title = "nested", uAutoNotes = [{body = "via nesting"}]);
 				expect(post.save()).toBeTrue();
 				var raw = rawNote("via nesting");
 				expect(raw.notable_type).toBe("UAutoPost");
 				expect(raw.notable_id).toBe(post.id);
+			});
+
+			it("resolves only the derived name when the other is passed", () => {
+				var mixed = variables.g.model("UMixedNote");
+				mixed.$resolvePolymorphicColumns("notable");
+				expect(mixed.$classData().associations.notable.foreignKey).toBe("notable_id");
+				expect(mixed.$classData().associations.notable.foreignType).toBe("notable_type");
+			});
+
+			it("resolves only the derived key when the type is passed", () => {
+				var mixed = variables.g.model("UMixedTypeNote");
+				mixed.$resolvePolymorphicColumns("notable");
+				expect(mixed.$classData().associations.notable.foreignKey).toBe("notable_id");
+				expect(mixed.$classData().associations.notable.foreignType).toBe("notable_type");
 			});
 
 			it("keeps the legacy names when both shapes exist", () => {
