@@ -421,8 +421,28 @@
 		if (StructKeyExists(application.wheels.$strictArgumentsSeen, local.seenKey)) {
 			return;
 		}
+		// Argument names can come from a request (argumentCollection = params), so the record of
+		// what was logged is capped: past the cap, one last line says logging stopped.
+		if (StructCount(application.wheels.$strictArgumentsSeen) >= $strictArgumentsSeenCap()) {
+			if (!StructKeyExists(application.wheels, "$strictArgumentsCapped")) {
+				application.wheels.$strictArgumentsCapped = true;
+				writeLog(
+					file = "wheels",
+					type = "warning",
+					text = "Wheels: strictArguments has logged #$strictArgumentsSeenCap()# unknown arguments and stops logging new ones until the application reloads. Check for argumentCollection = params passed to a framework function."
+				);
+			}
+			return;
+		}
 		application.wheels.$strictArgumentsSeen[local.seenKey] = true;
 		writeLog(file = "wheels", type = "warning", text = "Wheels: " & local.message);
+	}
+
+	/**
+	 * Internal function. How many distinct unknown arguments "warn" logs before it stops.
+	 */
+	public numeric function $strictArgumentsSeenCap() {
+		return 500;
 	}
 
 	/**

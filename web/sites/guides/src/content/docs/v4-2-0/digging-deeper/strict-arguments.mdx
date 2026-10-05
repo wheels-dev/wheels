@@ -95,6 +95,25 @@ component extends="Model" {
 }
 ```
 
+## Don't pass `params` straight through
+
+`findAll(argumentCollection = params)` turns every request parameter into an argument name, so a visitor decides what reaches the finder. With `strictArguments` on, every unknown parameter is reported, and with `"throw"` an extra query-string key fails the request. Pick the keys you mean:
+
+```cfm title="app/controllers/Posts.cfc" {test:compile}
+component extends="Controller" {
+    function index() {
+        posts = model("post").findAll(
+            where = "status = 'published'",
+            order = "publishedAt DESC",
+            page = Val(params.page ?: 1),
+            perPage = 20
+        );
+    }
+}
+```
+
+`"warn"` logs at most 500 distinct unknown arguments per application lifetime. After that it logs one line saying it stopped, so arbitrary request keys can't grow the log or the record of what was logged.
+
 <Aside type="note">
 `strictArguments` checks argument names, not values.
 </Aside>

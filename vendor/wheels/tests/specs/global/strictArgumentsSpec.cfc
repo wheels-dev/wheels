@@ -146,6 +146,22 @@ component extends="wheels.WheelsTest" {
 				expect(StructKeyList(application.wheels.$strictArgumentsSeen)).toInclude("foreign_key");
 			});
 
+			it("stops recording once the cap is reached", () => {
+				useMode("warn");
+				var author = variables.g.model("author");
+				var full = {};
+				for (var i = 1; i <= author.$strictArgumentsSeenCap(); i++) {
+					full["filler|hasMany|arg#i#"] = true;
+				}
+				application.wheels.$strictArgumentsSeen = full;
+				StructDelete(application.wheels, "$strictArgumentsCapped");
+				var failure = failureOf(() => author.$checkArguments(args = {name = "posts", foreign_key = "x"}, name = "hasMany"));
+				expect(failure.type).toBe("");
+				expect(StructCount(application.wheels.$strictArgumentsSeen)).toBe(author.$strictArgumentsSeenCap());
+				expect(StructKeyExists(application.wheels, "$strictArgumentsCapped")).toBeTrue();
+				StructDelete(application.wheels, "$strictArgumentsCapped");
+			});
+
 			it("reports a finder argument once, under the finder the app called", () => {
 				useMode("warn");
 				var author = variables.g.model("author");
