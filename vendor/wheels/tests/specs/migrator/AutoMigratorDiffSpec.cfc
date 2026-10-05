@@ -86,6 +86,17 @@ component extends="wheels.WheelsTest" {
 				expect(application.wo.model("diffsub.NestedThing").tableName()).toBeFalse();
 			});
 
+			it("names a model file by its path under the model root", () => {
+				var m = variables.autoMigrator;
+				expect(m.$modelNameFromPath("/app/models/User.cfc", "/app/models/")).toBe("User");
+				expect(m.$modelNameFromPath("/app/models/admin/reports/Sale.cfc", "/app/models/")).toBe("admin.reports.Sale");
+				expect(m.$modelNameFromPath("/app/models/Model.cfc", "/app/models/")).toBe("");
+				expect(m.$modelNameFromPath("/app/models/_Base.cfc", "/app/models/")).toBe("");
+				expect(m.$modelNameFromPath("/app/models/_shared/Thing.cfc", "/app/models/")).toBe("");
+				expect(m.$modelNameFromPath("/app/models/.hidden/Thing.cfc", "/app/models/")).toBe("");
+				expect(m.$modelNameFromPath("/elsewhere/Thing.cfc", "/app/models/")).toBe("");
+			});
+
 			it("lists each model once and skips the base Model.cfc", () => {
 				var names = variables.autoMigrator.$diffableModelNames();
 				var seen = {};
