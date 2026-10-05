@@ -137,7 +137,7 @@ Escaped is not the same as bound. Don't build those positions from request input
 
 ### Searching for a literal term
 
-A search box sends whatever the user typed, and a `%` or `_` in that text is a `LIKE` wildcard, not a literal character — a search for `50%` would match every row that merely contains `50`. `escapeForLike()` escapes the `\` escape character and the `%` and `_` wildcards (and, when the default database is SQL Server, `[`) so the term matches literally. Add your own surrounding wildcards and declare `ESCAPE '\'`:
+A search box sends whatever the user typed, and a `%` or `_` in that text is a `LIKE` wildcard, not a literal character — a search for `50%` would match every row that merely contains `50`. `escapeForLike()` escapes the `\` escape character and the `%` and `_` wildcards (and, on SQL Server, `[`) so the term matches literally. On SQL Server, `[` is escaped only once a model has initialised the adapter — if you call `escapeForLike()` before any `model()` call in a fresh or just-reloaded app, `[` is left unescaped; every other database treats `[` as a literal anyway. Add your own surrounding wildcards and declare `ESCAPE '\'`:
 
 ```cfm
 posts = model("Post").findAll(
