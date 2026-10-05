@@ -95,7 +95,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	public boolean function $cliCommandIsMutating(required string command, boolean writesFiles = false) {
 		local.mutating = "createMigration,migrateTo,migrateToLatest,migrateUp,migrateDown,renameSystemTables,"
 			& "redoMigration,forgetVersion,pretendVersion,migrationUnlock,dbRollback,dbSeed,dbCreate,dbReset,dbSetup,dbDump,"
-			& "jobsProcessNext,jobsRetry,jobsPurge";
+			& "jobsProcessNext,jobsRetry,jobsPurge,jobsEnqueue";
 		if (ListFindNoCase(local.mutating, arguments.command)) {
 			return true;
 		}
@@ -836,6 +836,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 
 	function testbox() {
 		$blockInProduction();
+		$refuseUnisolatedTestRunIfNeeded(canonicalPath = "/wheels/app/tests");
 		// Prefer the project's own runner if it exists (advanced users who
 		// scaffolded a custom tests/runner.cfm). Otherwise fall back to a
 		// built-in app-test runner that scans tests.specs/ via TestBox and
@@ -887,8 +888,36 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		}
 	}
 
+	/**
+	 * Refuses a test-runner request that reached this action in an isolation-CONFIGURED app without
+	 * binding the isolated `<name>_wheelsTest` application — e.g. through a custom route the path trigger
+	 * does not cover. Running specs there would mutate the live application scope. Emits a 409 pointing at
+	 * the canonical runner path (which the path trigger isolates) and aborts. A no-op when isolation is
+	 * not configured for the app (it keeps the live-scope swap with the #4354 warning) or the request is
+	 * already in the isolated application.
+	 */
+	private void function $refuseUnisolatedTestRunIfNeeded(required string canonicalPath) {
+		var tc = new wheels.events.TestContext();
+		var isolationConfigured = StructKeyExists(request, "$wheelsTestContextConfigured");
+		if (!tc.testRunnerMustRefuse(isolationConfigured = isolationConfigured, applicationName = application.applicationName)) {
+			return;
+		}
+		cfheader(statuscode = 409);
+		cfcontent(type = "application/json");
+		WriteOutput(
+			SerializeJSON({
+				success = false,
+				error = "Test run refused: this request reached the test runner without the isolated test application, so running specs here would mutate the live application. Use "
+					& arguments.canonicalPath
+					& " (which binds the isolated _wheelsTest scope), or send the X-Wheels-Test-Context header (TestClient and BrowserTest do this)."
+			})
+		);
+		abort;
+	}
+
 	public function tests_testbox() {
 		$blockInProduction();
+		$refuseUnisolatedTestRunIfNeeded(canonicalPath = "/wheels/core/tests");
 		// Delegate to RocketUnit if testFramework setting says so
 		if (
 			StructKeyExists(application, "wheels")

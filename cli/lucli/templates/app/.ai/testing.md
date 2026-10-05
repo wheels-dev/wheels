@@ -42,6 +42,18 @@ StructDelete(request.wheels, "$queryCache");
 
 `$queryCache` is a reserved key under `request.wheels`; deleting it drops every model's cached finder results for the current request.
 
+## Counting the queries a call sends (4.2+)
+
+`assertQueries(count, callback)`, `assertNoQueries(callback)`, `assertQueriesMatch(pattern, callback, count = "")`, `assertNoQueriesMatch(pattern, callback)` and `recordQueries(callback)` (returns `[{sql, dataSource}]`) count the SQL statements the model layer sends while `callback` runs. They're in every `wheels.WheelsTest` spec. They return the callback's result, take an optional `dataSource` filter, nest, and list the statements on failure with each bound value as `?` (a value written into the SQL with `parameterize = false` appears as written).
+
+```cfm
+var post = assertQueries(1, () => model("Post").findByKey(1));
+assertNoQueries(() => post.title);
+assertNoQueriesMatch("comments", () => model("Post").findAll(include = "author"));
+```
+
+What isn't counted: a finder answered from the per-request query cache above (no SQL is sent; pass `reload = true`), raw `queryExecute` (including advisory locks, the migration lock, the job store and SQL Server's probes), transaction control, and test-client requests (a request of their own).
+
 ## Which environment app specs run in
 
 `wheels test` runs your specs in the environment `.env` sets (`WHEELS_ENV=development` in a new app), not `testing`, so `config/testing/settings.cfm` doesn't apply to them. Put spec-wide defaults in `config/development/settings.cfm`. For example, to keep every spec from sending mail:

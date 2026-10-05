@@ -88,6 +88,30 @@ component extends="Controller" {
 
 `enqueue()`, `enqueueIn()`, and `enqueueAt()` all return a struct with the persisted row's `id`. The controller keeps responding fast — the actual email send happens when the next `processQueue()` poll picks the row up.
 
+### Enqueue from the command line
+
+`wheels jobs enqueue` adds a job without writing code: to kick one off by hand, re-run a one-off task, or enqueue from a deploy script. It needs this app's server running, started with `wheels start`.
+
+```bash
+wheels jobs enqueue SendWelcomeEmailJob --data='{"userId":42}'   # run now
+wheels jobs enqueue SendFollowupEmailJob --in=300                 # run in 5 minutes
+wheels jobs enqueue SendDripEmailJob --at=2026-10-06T09:00:00Z     # run at a time
+wheels jobs enqueue billing.InvoiceJob --queue=billing --priority=5
+```
+
+| Argument / flag | Description |
+|---|---|
+| `<JobName>` | The job class under `app/jobs/`: `SendWelcomeEmailJob`, or `billing.InvoiceJob` for `app/jobs/billing/InvoiceJob.cfc`. |
+| `--data` | The data passed to `perform()`, as a JSON object. |
+| `--queue`, `--priority` | Override the job's own `this.queue` and `this.priority`. |
+| `--in` | Run it after this many seconds. |
+| `--at` | Run it at this time, in ISO 8601: with `Z` or an offset (`2026-10-06T11:00:00+02:00`), or without one for this machine's local time (`2026-10-06 09:00`). A time in the past is refused. |
+| `--format=json` | Print the enqueued job as JSON. |
+
+"Scheduling" here means one delayed run (`--in` / `--at`, the same as `enqueueIn()` / `enqueueAt()`). Wheels has no recurring, cron-style schedule; for that, run `wheels jobs enqueue` or `processQueue()` from your system's scheduler.
+
+The class must be a component under `app/jobs/` (or a `jobClassPrefixes` path, the same list the worker accepts) that extends `wheels.Job`. Anything else is refused before it's loaded, and an unknown name lists the job classes it found. Enqueueing writes a row, so like `wheels jobs work` it only talks to this project's own server and sends the reload password.
+
 ### Enqueueing inside a transaction
 
 `enqueue()` writes its `wheels_jobs` row through the app's datasource, so a job enqueued inside a transaction commits or rolls back with the rest of it. That makes a transactional outbox simple: save the data and enqueue the work in one model method, and run it with `invokeWithTransaction()`.

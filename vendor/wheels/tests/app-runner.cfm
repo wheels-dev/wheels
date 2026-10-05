@@ -47,8 +47,10 @@
     // Warn when test-context isolation is OFF (the request bound the
     // live application scope instead of <name>_wheelsTest) — specs then mutate
     // live application settings. Set WHEELS_ENV=development or testing so
-    // events/testcontext.cfm binds the isolated application.
-    if (!(Len(application.applicationName) >= 11 && Right(application.applicationName, 11) == "_wheelsTest")) {
+    // events/testcontext.cfm binds the isolated application. Isolated-name test
+    // reuses wheels.events.TestContext.isIsolatedApplicationName() (single source).
+    local.isolationCheck = new wheels.events.TestContext();
+    if (!local.isolationCheck.isIsolatedApplicationName(application.applicationName)) {
         cfheader(name = "X-Wheels-Test-Isolation", value = "off");
         try {
             writeLog(
