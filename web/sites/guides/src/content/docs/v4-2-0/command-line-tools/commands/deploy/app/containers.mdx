@@ -1,13 +1,13 @@
 ---
 title: "wheels deploy app containers"
-description: docker ps filtered by the service label — lists every version's container on every host.
+description: docker ps filtered by the service label — lists the service's running containers on every host.
 type: reference
 sidebar:
   label: "containers"
   order: 5
 ---
 
-`docker ps` filtered by the service label. Shows every container for the service on every host, across every version. Useful for confirming retained containers before a rollback.
+`docker ps` filtered by the service label. Shows the service's running containers on every host, across every version.
 
 ## Synopsis
 
@@ -27,7 +27,7 @@ Unlike most `app` verbs, `--release` is **not** required — this verb enumerate
 
 ## Behavior
 
-Emits `docker ps --filter label=service=<service>` on every host in the targeted role(s). Running *and* stopped containers are returned.
+Emits `docker ps --filter label=service=<service>` on every host in the targeted role(s). The command has no `-a`, so only running containers are listed; use [`app details`](/v4-2-0/command-line-tools/commands/deploy/app/details/) without `--release` to include stopped ones.
 
 ## Example
 

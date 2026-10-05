@@ -25,8 +25,8 @@ wheels deploy build deliver [--version=<v>] [--destination=<name>] [--dry-run]
 
 ## Behavior
 
-1. Runs locally: `docker build` → `docker push`.
-2. Runs remotely on every host: `docker pull`.
+1. Runs locally: `docker buildx build --push --tag <image>:<version> --file <dockerfile> <context>` (build and push in one step).
+2. Runs remotely on every host: `docker pull <image>:<version>`.
 
 No container is started — use [`wheels deploy`](/v4-2-0/command-line-tools/commands/deploy/deploy/) for a full rollout.
 

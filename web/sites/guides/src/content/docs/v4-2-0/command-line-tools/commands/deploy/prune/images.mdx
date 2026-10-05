@@ -7,7 +7,7 @@ sidebar:
   order: 2
 ---
 
-Prune old images of the service on every host. Leaves the current image and anything referenced by a retained container.
+Prune dangling images labelled with the service on every host.
 
 ## Synopsis
 
@@ -24,7 +24,7 @@ wheels deploy prune images [--destination=<name>] [--dry-run]
 
 ## Behavior
 
-Per host, emits a `docker image prune --filter` scoped to the service's image name. Images referenced by retained containers are safe.
+Per host, emits `docker image prune -f --filter label=service=<service>`. Without `-a`, `docker image prune` removes only dangling (untagged) images, and only those carrying a `service=<service>` label. The `Dockerfile` that `wheels deploy init` generates sets no such label and the build adds none, so on a default setup this removes nothing; tagged images of old versions stay on the host.
 
 ## Example
 

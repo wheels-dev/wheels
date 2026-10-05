@@ -530,7 +530,7 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.positional(name = "type", default = "", choices = "resource,model,controller,view", description = "What to remove: resource, model, controller, or view")
 			.positional(name = "name", default = "", description = "Name of the artifact to remove")
-			.flag(name = "force", default = false, description = "Skip the confirmation prompt");
+			.flag(name = "force", default = false, description = "Delete the files; without it, destroy only lists what it would delete");
 	}
 
 	// Feeds only the MCP inputSchema (mcpToolSpecs). `app` is no longer
@@ -1727,14 +1727,17 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Parse args for `wheels coverage`: --top N (report length) and
-	 * --no-test-db (test-db=false).
+	 * `wheels coverage` options: --top N (report length) and --no-test-db
+	 * (test-db=false). Named <command>ArgSpec so `--help` lists them.
 	 */
+	private any function coverageArgSpec() {
+		return new services.ArgSpec()
+			.option(name = "top", default = "15", description = "How many functions the CRAP ranking lists")
+			.flag(name = "test-db", default = true, description = "Run the suite against the test database");
+	}
+
 	private struct function parseCoverageArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.option(name = "top", default = "15")
-			.flag(name = "test-db", default = true)
-			.parse(arguments.coll);
+		var parsed = coverageArgSpec().parse(arguments.coll);
 		return {
 			top = Val(parsed.top),
 			useTestDb = parsed["test-db"]
@@ -2743,28 +2746,11 @@ component extends="modules.BaseModule" {
 		// recovery prompt referencing `lucli server start --force`, but `lucli`
 		// isn't on PATH after `brew install wheels` — the user gets an
 		// unactionable error from a fresh `wheels start`. Onboarding F1/F2.
-		var force = false;
-		var engine = "lucee";
-		var enginePort = 0;
-		var passThrough = [];
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var a = args[i];
-			if (a == "--force") {
-				force = true;
-			} else if (a == "--engine") {
-				engine = lCase($startFlagValue(args, i, "engine"));
-				i++;
-			} else if (left(a, 9) == "--engine=") {
-				engine = lCase(mid(a, 10, len(a) - 9));
-			} else if (a == "--port") {
-				enginePort = val($startFlagValue(args, i, "port"));
-				i++;
-			} else if (left(a, 7) == "--port=") {
-				enginePort = val(mid(a, 8, len(a) - 7));
-			} else {
-				arrayAppend(passThrough, a);
-			}
-		}
+		var opts = $parseStartArgs(args);
+		var force = opts.force;
+		var engine = opts.engine;
+		var enginePort = opts.enginePort;
+		var passThrough = opts.passThrough;
 
 		// An unknown engine used to fall through to Lucee silently (#3895).
 		if (!listFind("lucee,rustcfml", engine)) {
@@ -2786,8 +2772,17 @@ component extends="modules.BaseModule" {
 		// the warning emitted further down. `--port` used to be parsed and then
 		// dropped for Lucee projects — only the RustCFML branch consumed it — so
 		// `wheels start --port=8090` silently booted on the lucee.json port.
-		if (engine != "rustcfml") {
-			$resolveStartPorts(enginePort);
+		if (opts.dryRun) {
+			if (engine == "rustcfml") {
+				throw(type = "Wheels.InvalidArguments", message = "wheels start --dry-run isn't supported with --engine=rustcfml.");
+			}
+			// LuCLI's own --dry-run prints the config it would start with and changes nothing, so the
+			// port goes to it rather than into lucee.json.
+			if (enginePort > 0) {
+				arrayAppend(passThrough, "--port=" & enginePort);
+			}
+			executeCommand("server", $startCommandArgs(passThrough), variables.projectRoot);
+			return "";
 		}
 
 		// RustCFML backend — separate lifecycle from LuCLI (no JDK/Lucee
@@ -2816,6 +2811,10 @@ component extends="modules.BaseModule" {
 			out("To restart: wheels stop && wheels start", "cyan");
 			return "";
 		}
+
+		// Only now that a start will happen: resolving the ports can move the shutdown port and
+		// write lucee.json, which a start of a running server must not do (#4411).
+		$resolveStartPorts(enginePort);
 
 		// A failed start leaves a registration holding only LuCLI's config file
 		// and no project path. That exact shape is a leftover, not another
@@ -2882,8 +2881,7 @@ component extends="modules.BaseModule" {
 
 		// Delegate to LuCLI's server start command. Forward only args we
 		// haven't consumed ourselves (--force is wheels-side, not LuCLI-side).
-		var cmdArgs = ["start"];
-		cmdArgs.append(passThrough, true);
+		var cmdArgs = $startCommandArgs(passThrough);
 
 		try {
 			executeCommand("server", cmdArgs, variables.projectRoot);
@@ -3239,7 +3237,7 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.positional(name = "appName", description = "Name of the application and of the directory it's created in")
 			.option(name = "port", default = 8080, type = "numeric", description = "Server port (default: 8080, or the first port above it that is free and no other project pins)")
-			.option(name = "datasource", default = "", description = "Datasource name (default: the app name)")
+			.option(name = "datasource", default = "", description = "Datasource name (default: the app name, lowercased)")
 			.option(name = "reload-password", default = "", description = "Reload password (default: random)")
 			.flag(name = "setup-h2", default = false, description = "Use the H2 embedded database instead of SQLite")
 			.flag(name = "sqlite", default = true, description = "Set up the zero-config SQLite database")
@@ -3730,11 +3728,11 @@ component extends="modules.BaseModule" {
 			if (a == "--force") force = true;
 		}
 
-		if (!$isWheelsProjectDir(variables.projectRoot)) {
-			out("Not in a Wheels project directory.", "yellow");
-			out("Run this from the root of a Wheels app (the directory holding config/settings.cfm).");
-			return "";
-		}
+		// Outside a Wheels project, `setup agents` has nothing to write .mcp.json beside. It used to
+		// print a note and return "" — exit 0, so a scripted `wheels setup agents` in the wrong directory
+		// looked like it succeeded (#4409). Guard with the shared project check (same throw/type/guidance
+		// as `wheels generate` and `wheels destroy`) so it exits non-zero.
+		$requireWheelsProject("wheels setup agents");
 
 		var changed = $writeAgentConfigs(variables.projectRoot, force);
 
@@ -4255,7 +4253,12 @@ component extends="modules.BaseModule" {
 				return "handled";
 
 			case "/routes":
-				if (!consoleExec(arguments.evalUrl, "application.wheels.routes.map(function(r){ return r.pattern & ' -> ' & r.controller & '##' & r.action; })", arguments.password)) {
+				// Not an eval expression: formatting each route needs a per-element loop, and the console's
+				// eval endpoint runs expressions through evaluate() (consoleeval.cfm), which has no closure
+				// or arrow grammar — `.map(function(r){...})` and `.map((r)=>...)` both fail to parse
+				// ("Closing )] for function [MAP] not found", #4410). Fetch the route table from the same
+				// CLI endpoint `wheels routes` uses and format it here instead.
+				if (!$consoleRoutes(arguments.evalUrl)) {
 					return "error";
 				}
 				return "handled";
@@ -4274,6 +4277,46 @@ component extends="modules.BaseModule" {
 				return "handled";
 		}
 		return "";
+	}
+
+	/**
+	 * Print the application route table for the console's `/routes` command as
+	 * `pattern -> controller#action` lines. The console's eval endpoint can't
+	 * format routes itself — evaluate() has no closure/arrow grammar to map over
+	 * them (#4410) — so this reads the route table from the same CLI endpoint
+	 * `wheels routes` uses (derived from evalUrl, which shares the server base)
+	 * and formats it here. Returns false, so the REPL records a failed command
+	 * and exits non-zero on EOF, when the fetch fails or the server refuses.
+	 */
+	private boolean function $consoleRoutes(required string evalUrl) {
+		try {
+			var routesUrl = replace(arguments.evalUrl, "/wheels/console/eval", "/wheels/cli?command=routes&format=json");
+			var httpResult = makeHttpRequest(routesUrl);
+			if (!isJSON(httpResult)) {
+				out("Failed to fetch routes: the server returned a non-JSON response.", "red");
+				verbose(httpResult);
+				return false;
+			}
+			var result = deserializeJSON(httpResult);
+			if (!(structKeyExists(result, "success") && result.success)) {
+				out("Failed to fetch routes: #result.message ?: 'unknown error'#", "red");
+				return false;
+			}
+			var routes = structKeyExists(result, "routes") && isArray(result.routes) ? result.routes : [];
+			if (!arrayLen(routes)) {
+				out("(no routes)");
+				return true;
+			}
+			// chr(35) is '#': built by concatenation so neither the value nor out() treats it as an
+			// interpolation delimiter.
+			for (var route in routes) {
+				out((route.pattern ?: "") & " -> " & (route.controller ?: "") & chr(35) & (route.action ?: ""));
+			}
+			return true;
+		} catch (any e) {
+			out("Failed to fetch routes: #e.message#", "red");
+			return false;
+		}
 	}
 
 	/**
@@ -5010,7 +5053,7 @@ component extends="modules.BaseModule" {
 		// Each command starts with an empty secret/warning registry, so a
 		// long-lived process never carries one command's secrets into the next.
 		new modules.wheels.services.deploy.lib.SecretRedaction().reset();
-		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		var args = $deployArgv(structuredArgs(arguments));
 		var opts = $deployArgsToOptions(args);
 		if (!structKeyExists(opts, "configPath") || !len(opts.configPath)) {
 			opts.configPath = expandPath("config/deploy.yml");
@@ -5048,6 +5091,32 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The deploy argv, with space-form values bound to their flags (#4417). LuCLI hands
+	 * `--release v8` over as release="true" plus a positional after a gap, so without binding `v8`
+	 * became the subcommand ("Unknown deploy subcommand: v8") and `--service myapp2` was dropped.
+	 * `bindSpaceFormValues()` binds only what it can match one-to-one; a value flag still left bare
+	 * (several space-form values it can't tell apart, or a flag given no value) is an error that
+	 * asks for the `--flag=value` form, rather than a silent misread.
+	 */
+	private array function $deployArgv(required struct coll) {
+		var valueFlags = "account,adapter,config,configPath,container,destination,from,host,image,keep,message,registry-username,release,role,service,tail,version";
+		var matchers = {};
+		for (var flag in listToArray(valueFlags)) {
+			matchers[flag] = listFind("keep,tail", flag) ? "^[0-9]+$" : "";
+		}
+		var bound = new services.ArgSpec().bindSpaceFormValues(arguments.coll, matchers);
+		for (var flag in listToArray(valueFlags)) {
+			if (structKeyExists(bound, flag) && isSimpleValue(bound[flag]) && compareNoCase(trim(toString(bound[flag])), "true") == 0) {
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "wheels deploy: --#flag# needs a value. Write it as --#flag#=<value>."
+				);
+			}
+		}
+		return new services.ArgSpec().toArgv(bound);
+	}
+
+	/**
 	 * Dispatch the direct DeployMainCli verbs. Extracted from deploy() to keep
 	 * its dispatcher under the complexity gate.
 	 */
@@ -5059,7 +5128,7 @@ component extends="modules.BaseModule" {
 				return arguments.dmc.redeploy(arguments.opts);
 			case "rollback":
 				if (arrayLen(arguments.positional) < 2) {
-					throw(message = "rollback requires a version argument: wheels deploy rollback <version>");
+					throw(type = "DeployMainCli.MissingVersion", message = "rollback requires a version argument: wheels deploy rollback <version>");
 				}
 				arguments.opts.version = arguments.positional[2];
 				return arguments.dmc.rollback(arguments.opts);
@@ -5268,7 +5337,7 @@ component extends="modules.BaseModule" {
 				return bootstrapCli.bootstrap(arguments.opts);
 			case "exec":
 				if (arrayLen(arguments.positional) < 2) {
-					throw(message = "wheels deploy exec requires a command");
+					throw(type = "DeployServerCli.MissingCommand", message = "wheels deploy exec requires a command");
 				}
 				// Preserve multi-token commands: join all positional args after `exec`.
 				var execCmdParts = [];
@@ -5288,7 +5357,7 @@ component extends="modules.BaseModule" {
 				var serverVerb = arguments.positional[2];
 				if (serverVerb == "exec") {
 					if (arrayLen(arguments.positional) < 3) {
-						throw(message = "wheels deploy server exec requires a command");
+						throw(type = "DeployServerCli.MissingCommand", message = "wheels deploy server exec requires a command");
 					}
 					// Preserve multi-token commands: join all positional args after the verb.
 					var cmdParts = [];
@@ -5536,7 +5605,7 @@ component extends="modules.BaseModule" {
 		help &= "  add <name>[@<version>] [--force]        Install a package into vendor/<name>/ (canonical)" & nl;
 		help &= "  update <name> --yes                     Update an installed package" & nl;
 		help &= "  update --all --yes                      Update every installed package" & nl;
-		help &= "  remove <name>                           Delete an installed package from vendor/" & nl;
+		help &= "  remove <name> --yes                     Delete an installed package from vendor/" & nl;
 		help &= "  registry refresh                        Bust the 24-hour registry cache" & nl;
 		help &= "  registry info                           Show the registry URL and cache state" & nl;
 		help &= "  help, --help, -h                        Show this help" & nl & nl;
@@ -6603,9 +6672,11 @@ component extends="modules.BaseModule" {
 			case "test":
 				return browserTest(args);
 			default:
-				out("Unknown browser command: #subcommand#", "red");
-				out("Valid commands: setup, test");
-				return "";
+				$refuse(
+					"Unknown browser command: #subcommand#",
+					"Wheels.InvalidArguments",
+					["Valid commands: setup, test"]
+				);
 		}
 	}
 
@@ -7206,9 +7277,11 @@ component extends="modules.BaseModule" {
 		// Look up the named snippet pattern
 		var snippets = getSnippetRegistry();
 		if (!structKeyExists(snippets, pattern)) {
-			out("Unknown snippet pattern: #pattern#", "red");
-			out("Run 'wheels generate snippets' for available patterns.");
-			return "";
+			$refuse(
+				"Unknown snippet pattern: #pattern#",
+				"Wheels.Generate.Refused",
+				["Run 'wheels generate snippets' for available patterns."]
+			);
 		}
 
 		var snippet = snippets[pattern];
@@ -7519,7 +7592,7 @@ component extends="modules.BaseModule" {
 			"seed-data": {
 				name: "Seed Data",
 				description: "Database seeding template with seedOnce() examples",
-				hint: "Run seeds with: wheels seed.",
+				hint: "wheels seed reads app/db/: move seeds.cfm to app/db/seeds.cfm and seeds-development.cfm to app/db/seeds/development.cfm, then run: wheels seed.",
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
@@ -9020,11 +9093,12 @@ component extends="modules.BaseModule" {
 				skipPackages: true,
 				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector(""wheels.Bindings"")` (the constructor requires the bindings path). The legacy adapter does NOT shim this item."
 			});
-			// renderPage()/renderPageToString() removed in 4.0 — shimmed by
-			// the optional wheels-legacy-adapter package, but unshimmed apps
-			// throw at first render.
+			// renderPage()/renderPageToString() were renamed in 2.0 (to renderView()
+			// and renderView(returnAs="string")); old code that still calls them
+			// throws at first render on 4.x unless the optional
+			// wheels-legacy-adapter package shims them.
 			arrayAppend(checks, {
-				description: "Removed renderPage()/renderPageToString() helpers",
+				description: "renderPage()/renderPageToString(), renamed to renderView() in 2.0",
 				pattern: "renderPage(ToString)?\s*\(",
 				checkType: "grep",
 				scanDir: "app",
@@ -9437,6 +9511,25 @@ component extends="modules.BaseModule" {
 			scanTargets: [{path: ".gitignore"}],
 			fix: "Remove the vendor line and commit vendor/, so a clone, CI run or image build has the framework and your packages. Guide: ""Commit vendor/"", #guide#"
 		});
+		// `null` was the migration column option's name before 3.0 renamed it allowNull, with no
+		// alias until 4.2. From 3.0 through 4.1 a null=false column was created nullable; 4.2 reads
+		// null=false again, so a database rebuilt on 4.2 can be stricter than one built earlier.
+		arrayAppend(arguments.checks, {
+			description: "Migrations use null=false, the column option's name before Wheels 3.0",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "[,(]\s*null\s*=\s*[""']?(false|no|0)[""']?\s*[,)]",
+			scanTargets: [{path: "app/migrator/migrations", extensions: "cfc", recurse: true}],
+			fix: "Wheels 3.0 through 4.1 ignored null=false, so a database built or rebuilt by them from these migrations has these columns NULLABLE, and they may now hold NULL rows. 4.2 reads null=false again: a database rebuilt on 4.2 gets NOT NULL columns, stricter than the one you run. Check each column for NULL rows before you tighten it with changeColumn(allowNull=false), and rename null to allowNull in the migrations. Guide: ""Migration column option null"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "Migrations use null=true, the column option's name before Wheels 3.0",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "[,(]\s*null\s*=\s*[""']?(true|yes|1)[""']?\s*[,)]",
+			scanTargets: [{path: "app/migrator/migrations", extensions: "cfc", recurse: true}],
+			fix: "4.2 reads null as a deprecated alias of allowNull and logs a warning. Rename it to allowNull. Guide: ""Migration column option null"", #guide#"
+		});
 		arrayAppend(arguments.checks, {
 			description: "findAll(returnAs=""structs"") now returns an array",
 			severity: "advisory",
@@ -9493,6 +9586,14 @@ component extends="modules.BaseModule" {
 			pattern: "renderNotFound",
 			scanTargets: [{path: "config/routes.cfm"}],
 			fix: "A request for that action gets Wheels.ActionNotAllowed. Rename the action and its route. Guide: ""renderNotFound is a framework helper"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "A route targets an action named isSafeRedirectUrl (now a reserved framework helper)",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "isSafeRedirectUrl",
+			scanTargets: [{path: "config/routes.cfm"}],
+			fix: "A request for that action gets Wheels.ActionNotAllowed. Rename the action and its route; a controller's own isSafeRedirectUrl helper that no route targets keeps working. Guide: ""isSafeRedirectUrl is a framework helper"", #guide#"
 		});
 		arrayAppend(arguments.checks, {
 			description: "A MySQL datasource sets tinyInt1isBit=false",
@@ -10434,6 +10535,36 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The error message a failed test-runner response carries, or "" when it carries none. A run that
+	 * failed before producing counts returns {success:false, error, message} — e.g. the core runner's
+	 * "Test database not available" guard, or a test-db populate failure. Some engine errors instead
+	 * surface as a serialized exception document whose Message / RootCause.message holds the cause, so
+	 * those are checked as a fallback. Used to surface the real cause instead of "no test bundles ran"
+	 * (#4408). Public only so the CLI specs can reach it (cli/CLAUDE.md "public for specs" carve-out);
+	 * hidden from MCP via the $-prefix sweep.
+	 */
+	public string function $runnerErrorMessage(required any result) {
+		if (!isStruct(arguments.result)) {
+			return "";
+		}
+		for (var key in ["error", "message"]) {
+			if (structKeyExists(arguments.result, key) && isSimpleValue(arguments.result[key]) && len(trim(arguments.result[key]))) {
+				return trim(arguments.result[key]);
+			}
+		}
+		if (
+			structKeyExists(arguments.result, "RootCause")
+			&& isStruct(arguments.result.RootCause)
+			&& structKeyExists(arguments.result.RootCause, "message")
+			&& isSimpleValue(arguments.result.RootCause.message)
+			&& len(trim(arguments.result.RootCause.message))
+		) {
+			return trim(arguments.result.RootCause.message);
+		}
+		return "";
+	}
+
+	/**
 	 * True when a run of the DEFAULT scope (no --filter / --directory / path)
 	 * discovered no spec bundles, the spec root has no .cfc files on disk, and
 	 * nothing else went wrong: an app with no specs yet, such as a fresh
@@ -10593,7 +10724,7 @@ component extends="modules.BaseModule" {
 				out("", "yellow");
 				out("Warning: --db only applies to --core tests; ignoring for the app suite.", "yellow");
 				out("App tests run against the configured app datasource (or", "yellow");
-				out("<datasource>_test when --useTestDB is set). To test against a different", "yellow");
+				out("<datasource>_test when --test-db is set). To test against a different", "yellow");
 				out("engine, point your app's datasource env var at it (or use --core).", "yellow");
 				out("See: command-line-tools/wheels-commands/testing##testing-against-different-engines", "yellow");
 				out("", "yellow");
@@ -11158,6 +11289,16 @@ component extends="modules.BaseModule" {
 			};
 		}
 		if (isStruct(arguments.result) && $cliTestResultFailed(result = arguments.result)) {
+			// Surface the runner's own error when it carries one — a failed test-db populate, a missing
+			// datasource ("Datasource [...] doesn't exist") — instead of masking it as "no test bundles
+			// ran for this scope", which hid the real cause and read like an empty run (#4408).
+			var runnerError = $runnerErrorMessage(arguments.result);
+			if (len(runnerError)) {
+				return {
+					text = "Test run failed: #runnerError##arguments.duration#",
+					color = "red"
+				};
+			}
 			return {
 				text = "#arguments.totalPass# passed, but no test bundles ran for this scope#arguments.duration#",
 				color = "red"
@@ -12027,7 +12168,12 @@ component extends="modules.BaseModule" {
 			var why = structKeyExists(pins, arguments.opts.port + 1) ? "pinned by " & pins[arguments.opts.port + 1] : "in use";
 			out("Shutdown port #arguments.opts.port + 1# is #why#; using #shutdownPort#.", "yellow");
 		}
-		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
+		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621) or --setup-h2.
+		// With --setup-h2 the H2 datasources are written into config/app.cfm (configureH2Database), so
+		// lucee.json must not also carry the SQLite pair — otherwise the app keeps stale SQLite
+		// datasource entries alongside its H2 ones (#4413).
+		var noLuceeDatasources = arguments.opts.noSQLite
+			|| (structKeyExists(arguments.opts, "setupH2") && arguments.opts.setupH2);
 		return {
 			"appName": arguments.appName,
 			"datasourceName": arguments.opts.datasource,
@@ -12036,8 +12182,109 @@ component extends="modules.BaseModule" {
 			"port": arguments.opts.port,
 			"shutdownPort": shutdownPort,
 			"openBrowser": arguments.opts.openBrowser ? "true" : "false",
-			"datasourcesBlock": arguments.opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(arguments.opts.datasource)
+			"datasourcesBlock": noLuceeDatasources ? "{}" : buildSQLiteDatasourcesBlock(arguments.opts.datasource)
 		};
+	}
+
+	/**
+	 * The flags `wheels start` handles itself, out of its argv: `--force`, `--engine`, `--port`
+	 * (also `-p N` / `-p=N`, which LuCLI would otherwise take without moving the shutdown port off
+	 * it, #4411) and `--dry-run` (noted, and still passed on). Everything else is passed on to
+	 * LuCLI's `server start` in `passThrough`.
+	 */
+	private struct function $parseStartArgs(required array args) {
+		var rv = {force = false, engine = "lucee", enginePort = 0, dryRun = false, passThrough = []};
+		for (var i = 1; i <= arrayLen(arguments.args); i++) {
+			var a = arguments.args[i];
+			if (a == "--force") {
+				rv.force = true;
+			} else if (a == "--engine") {
+				rv.engine = lCase($startFlagValue(arguments.args, i, "engine"));
+				i++;
+			} else if (left(a, 9) == "--engine=") {
+				rv.engine = lCase(mid(a, 10, len(a) - 9));
+			} else if (a == "--port" || a == "-p") {
+				rv.enginePort = val($startFlagValue(arguments.args, i, "port"));
+				i++;
+			} else if (left(a, 7) == "--port=" || left(a, 4) == "--p=") {
+				rv.enginePort = val(listRest(a, "="));
+			} else {
+				if (a == "--dry-run") {
+					rv.dryRun = true;
+				}
+				arrayAppend(rv.passThrough, a);
+			}
+		}
+		return rv;
+	}
+
+	/**
+	 * The argv for LuCLI's `server start`: "start" and the flags `wheels start` passed on, plus the
+	 * environment LuCLI took from its root `--env` / `-e` option, which never reaches the module's
+	 * own arguments (#4412). An explicit `--env` / `--environment` that did reach them wins.
+	 */
+	private array function $startCommandArgs(required array passThrough) {
+		var rv = ["start"];
+		rv.append(arguments.passThrough, true);
+		var env = $lucliRootEnvironment();
+		if (len(env) && !$hasEnvironmentFlag(arguments.passThrough)) {
+			arrayAppend(rv, "--environment=" & env);
+		}
+		return rv;
+	}
+
+	/**
+	 * Whether the argv already names an environment for LuCLI's `server start`.
+	 */
+	private boolean function $hasEnvironmentFlag(required array argv) {
+		for (var a in arguments.argv) {
+			if (reFind("^--(env|environment)(=|$)", a)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * The environment LuCLI took from its root `--env` / `-e` option (or LUCLI_ENV), or "" when
+	 * there is none. LuCLI records LUCLI_ENV in LuCLI.getCurrentEnvironment(), but on the route
+	 * that runs a module under its binary name it parses `--env` / `-e` without recording them, so
+	 * those are read back from this process's own command line.
+	 */
+	private string function $lucliRootEnvironment() {
+		try {
+			var env = createObject("java", "org.lucee.lucli.LuCLI").getCurrentEnvironment();
+			if (!isNull(env) && len(trim(env))) {
+				return trim(env);
+			}
+		} catch (any e) {
+			// An older LuCLI without getCurrentEnvironment(): fall back to the command line.
+		}
+		try {
+			var processArgs = createObject("java", "java.lang.ProcessHandle").current().info().arguments();
+			return processArgs.isPresent() ? $environmentFromArgv(processArgs.get()) : "";
+		} catch (any e) {
+			return "";
+		}
+	}
+
+	/**
+	 * The value of a root `--env` / `-e` option in an argv (`--env=prod`, `--env prod`, `-e prod`,
+	 * `-e=prod`), or "". Public ONLY so StartSideEffectsSpec can unit-test it; hidden from MCP by the
+	 * $-prefix sweep in mcpHiddenTools().
+	 */
+	public string function $environmentFromArgv(required any argv) {
+		var n = arrayLen(arguments.argv);
+		for (var i = 1; i <= n; i++) {
+			var a = toString(arguments.argv[i]);
+			if (reFind("^(--env|-e)=.+", a)) {
+				return listRest(a, "=");
+			}
+			if ((a == "--env" || a == "-e") && i < n) {
+				return toString(arguments.argv[i + 1]);
+			}
+		}
+		return "";
 	}
 
 	/**
@@ -14378,11 +14625,9 @@ component extends="modules.BaseModule" {
 		var basePath = opts.basePath;
 		var directory = opts.directory;
 
-		// Pre-flight: verify Playwright JARs
+		// Pre-flight: verify Playwright JARs (throws Wheels.Browser.NotInstalled, exit non-zero, if not set up)
 		var manifestPath = variables.projectRoot & "/vendor/wheels/browser-manifest.json";
-		if (!$browserVerifyPlaywright(manifestPath)) {
-			return "";
-		}
+		$browserVerifyPlaywright(manifestPath);
 
 		out("Running browser tests...", "cyan");
 		out("Directory: #directory#");
@@ -14486,12 +14731,18 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * Pre-flight: verify the Playwright JARs in browser-manifest.json are
-	 * present and SHA-matched. Prints guidance and returns false when not.
+	 * present and SHA-matched. Throws Wheels.Browser.NotInstalled (which exits
+	 * non-zero) when the manifest is missing or a JAR is absent / SHA-mismatched,
+	 * so a scripted `wheels browser test` on an un-set-up host fails instead of
+	 * silently exiting 0 (#4409). Returns normally when everything is in place.
 	 */
-	private boolean function $browserVerifyPlaywright(required string manifestPath) {
+	private void function $browserVerifyPlaywright(required string manifestPath) {
 		if (!fileExists(arguments.manifestPath)) {
-			out("browser-manifest.json not found at: #arguments.manifestPath#", "red");
-			return false;
+			$refuse(
+				"browser-manifest.json not found at: #arguments.manifestPath#",
+				"Wheels.Browser.NotInstalled",
+				["Run: wheels browser setup"]
+			);
 		}
 		var manifest = deserializeJSON(fileRead(arguments.manifestPath));
 		var installDir = $resolveBrowserInstallDir();
@@ -14511,18 +14762,18 @@ component extends="modules.BaseModule" {
 		}
 
 		if (!allInstalled) {
-			out("Playwright not installed.", "red");
 			if (arrayLen(missingJars)) {
 				out("Missing: #arrayToList(missingJars, ', ')#", "yellow");
 			}
 			if (arrayLen(mismatchedJars)) {
 				out("SHA mismatch: #arrayToList(mismatchedJars, ', ')#", "yellow");
 			}
-			out("");
-			out("Run: wheels browser setup");
-			return false;
+			$refuse(
+				"Playwright not installed.",
+				"Wheels.Browser.NotInstalled",
+				["Run: wheels browser setup"]
+			);
 		}
-		return true;
 	}
 
 	/**

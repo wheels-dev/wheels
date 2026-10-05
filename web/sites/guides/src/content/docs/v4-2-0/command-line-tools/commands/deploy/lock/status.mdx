@@ -24,7 +24,7 @@ wheels deploy lock status [--destination=<name>] [--dry-run]
 
 ## Behavior
 
-Reads `/tmp/kamal_deploy_lock_<service>` on a single host. Unlocked: empty output. Locked: message and performer from the lock file.
+Emits `readlink /tmp/kamal_deploy_lock_<service>` on every host and prints each host's output. Locked: the lock holder (user, host, timestamp and message). Unlocked: readlink's "No such file" diagnostic for that host. A missing lock or an unreachable host is reported, not thrown.
 
 Always run this before `lock release` — it's the only safe way to tell a stale lock from an active one.
 

@@ -1,0 +1,1 @@
+- `wheels browser <unknown>`, `wheels browser test` without Playwright installed, `wheels setup agents` outside a project, and `wheels generate snippets <unknown>` now exit non-zero instead of printing a refusal and exiting 0, so scripts and CI can detect the failure (#4409)
