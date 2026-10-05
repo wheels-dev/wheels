@@ -43,5 +43,6 @@ For deeper application-side material use:
   — JSON docs optimized for AI consumption.
 - Offline API and guides lookup, no server needed: `wheels lookup findAll`,
   `wheels lookup "nested resources"` (MCP tool: `lookup`).
-- MCP: run `wheels setup agents` to write `.mcp.json` and `.opencode.json` (or add `{"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}` by hand)
+- MCP: `wheels new` writes `.mcp.json` and `.opencode.json` (skip with `--no-agents`); in an
+  existing app, run `wheels setup agents` to write them (or add `{"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}` by hand)
   and prefer `mcp__wheels__*` tools over CLI commands.

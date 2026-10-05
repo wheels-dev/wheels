@@ -953,7 +953,8 @@ component extends="modules.BaseModule" {
 				return [
 					"  wheels new myapp                              SQLite, port 8080",
 					"  wheels new myapp --port=3000 --setup-h2       H2 instead of SQLite",
-					"  wheels new myapp --datasource=mydb --no-sqlite  Your own datasource"
+					"  wheels new myapp --datasource=mydb --no-sqlite  Your own datasource",
+					"  wheels new myapp --no-agents                  No .mcp.json / .opencode.json"
 				];
 			case "test":
 				return [
@@ -3237,7 +3238,8 @@ component extends="modules.BaseModule" {
 			.option(name = "reload-password", default = "", description = "Reload password (default: random)")
 			.flag(name = "setup-h2", default = false, description = "Use the H2 embedded database instead of SQLite")
 			.flag(name = "sqlite", default = true, description = "Set up the zero-config SQLite database")
-			.flag(name = "open-browser", default = true, description = "Open the browser when the server starts");
+			.flag(name = "open-browser", default = true, description = "Open the browser when the server starts")
+			.flag(name = "agents", default = true, description = "Write .mcp.json and .opencode.json so AI assistants find the Wheels MCP server; skip with --no-agents");
 	}
 
 	/**
@@ -3260,6 +3262,7 @@ component extends="modules.BaseModule" {
 			setupH2 = parsed["setup-h2"],
 			noSQLite = !parsed.sqlite,
 			openBrowser = parsed["open-browser"],
+			agents = parsed.agents,
 			isEmpty = structIsEmpty(arguments.coll)
 		};
 	}
@@ -3300,7 +3303,8 @@ component extends="modules.BaseModule" {
 			reloadPassword: opts.reloadPassword,
 			setupH2: opts.setupH2,
 			noSQLite: opts.noSQLite,
-			openBrowser: opts.openBrowser
+			openBrowser: opts.openBrowser,
+			agents: opts.agents
 		};
 
 		if (!len(appName)) {
@@ -3727,61 +3731,7 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		// Two clients, two shapes. Claude Code reads `.mcp.json` (mcpServers +
-		// separate command/args); OpenCode reads `.opencode.json` (an `mcp` key,
-		// `type: "local"`, and command+args as ONE array). Both are written —
-		// that is what the wrapper's own `wheels mcp` help has always promised.
-		var targets = [
-			{
-				file: ".mcp.json",
-				label: "Claude Code",
-				rootKey: "mcpServers",
-				entry: {command: "wheels", args: ["mcp", "wheels"]},
-				schema: ""
-			},
-			{
-				file: ".opencode.json",
-				label: "OpenCode",
-				rootKey: "mcp",
-				entry: {type: "local", command: ["wheels", "mcp", "wheels"], enabled: true},
-				schema: "https://opencode.ai/config.json"
-			}
-		];
-
-		// Load and validate everything BEFORE writing anything: a bad
-		// .opencode.json must not leave a half-applied setup with .mcp.json
-		// already rewritten.
-		var loaded = [];
-		for (var t in targets) {
-			arrayAppend(loaded, $loadMcpConfig(variables.projectRoot & "/" & t.file, t));
-		}
-
-		var changed = [];
-		for (var i = 1; i <= arrayLen(targets); i++) {
-			var t = targets[i];
-			var state = loaded[i];
-			var config = state.config;
-			if (!structKeyExists(config, t.rootKey) || !IsStruct(config[t.rootKey])) {
-				config[t.rootKey] = {};
-			}
-			if (len(t.schema) && !structKeyExists(config, "$schema")) {
-				config["$schema"] = t.schema;
-			}
-			var existing = config[t.rootKey].wheels ?: {};
-			var correct = $mcpEntryMatches(existing, t.entry);
-			if (!correct || force) {
-				config[t.rootKey].wheels = t.entry;
-				fileWrite(state.path, serializeJSON(config));
-				arrayAppend(changed, {
-					file: t.file,
-					path: state.path,
-					verb: !state.existed ? "Created" : (correct ? "Rewrote" : (structCount(existing) ? "Updated" : "Added")),
-					others: structCount(config[t.rootKey]) - 1
-				});
-			} else {
-				arrayAppend(changed, {file: t.file, path: state.path, verb: "", others: structCount(config[t.rootKey]) - 1});
-			}
-		}
+		var changed = $writeAgentConfigs(variables.projectRoot, force);
 
 		var wrote = [];
 		for (var c in changed) {
@@ -3812,6 +3762,91 @@ component extends="modules.BaseModule" {
 		out("  Restart your AI assistant so it picks up the new server,");
 		out("  then ask it to run `wheels routes` to confirm the connection.");
 		return "";
+	}
+
+	/**
+	 * Write the wheels entry into `.mcp.json` and `.opencode.json` under `root`,
+	 * merging into whatever else those files list. Returns one {file, path, verb,
+	 * others} per file; `verb` is "" when the file already had the right entry.
+	 * Prints nothing, so `setup agents` and `wheels new` each report it their own
+	 * way. Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public array function $writeAgentConfigs(required string root, boolean force = false) {
+		// Two clients, two shapes. Claude Code reads `.mcp.json` (mcpServers +
+		// separate command/args); OpenCode reads `.opencode.json` (an `mcp` key,
+		// `type: "local"`, and command+args as ONE array). Both are written —
+		// that is what the wrapper's own `wheels mcp` help has always promised.
+		var targets = [
+			{
+				file: ".mcp.json",
+				label: "Claude Code",
+				rootKey: "mcpServers",
+				entry: {command: "wheels", args: ["mcp", "wheels"]},
+				schema: ""
+			},
+			{
+				file: ".opencode.json",
+				label: "OpenCode",
+				rootKey: "mcp",
+				entry: {type: "local", command: ["wheels", "mcp", "wheels"], enabled: true},
+				schema: "https://opencode.ai/config.json"
+			}
+		];
+
+		// Load and validate everything BEFORE writing anything: a bad
+		// .opencode.json must not leave a half-applied setup with .mcp.json
+		// already rewritten.
+		var loaded = [];
+		for (var t in targets) {
+			arrayAppend(loaded, $loadMcpConfig(arguments.root & "/" & t.file, t));
+		}
+
+		var changed = [];
+		for (var i = 1; i <= arrayLen(targets); i++) {
+			var t = targets[i];
+			var state = loaded[i];
+			var config = state.config;
+			if (!structKeyExists(config, t.rootKey) || !IsStruct(config[t.rootKey])) {
+				config[t.rootKey] = {};
+			}
+			if (len(t.schema) && !structKeyExists(config, "$schema")) {
+				config["$schema"] = t.schema;
+			}
+			var existing = config[t.rootKey].wheels ?: {};
+			var correct = $mcpEntryMatches(existing, t.entry);
+			if (!correct || arguments.force) {
+				config[t.rootKey].wheels = t.entry;
+				fileWrite(state.path, serializeJSON(config));
+				arrayAppend(changed, {
+					file: t.file,
+					path: state.path,
+					verb: !state.existed ? "Created" : (correct ? "Rewrote" : (structCount(existing) ? "Updated" : "Added")),
+					others: structCount(config[t.rootKey]) - 1
+				});
+			} else {
+				arrayAppend(changed, {file: t.file, path: state.path, verb: "", others: structCount(config[t.rootKey]) - 1});
+			}
+		}
+
+		return changed;
+	}
+
+	/**
+	 * `wheels new`'s AI-assistant configs: the files `setup agents` writes, in the
+	 * new app's root. Never fails the scaffold, since the app works without them:
+	 * returns a warning to print instead, or "" when they were written.
+	 */
+	private string function $writeNewAppAgentConfigs(required string targetDir, required string appName) {
+		try {
+			for (var written in $writeAgentConfigs(arguments.targetDir)) {
+				if (len(written.verb)) {
+					printCreated(arguments.appName & "/" & written.file);
+				}
+			}
+			return "";
+		} catch (any e) {
+			return "Couldn't write the AI-assistant configs (#e.message#). Add them later with: cd #arguments.appName# && wheels setup agents";
+		}
 	}
 
 	/**
@@ -11239,7 +11274,8 @@ component extends="modules.BaseModule" {
 			luceeAdminPassword: generateRandomPassword(),
 			setupH2: structKeyExists(options, "setupH2") ? options.setupH2 : false,
 			noSQLite: structKeyExists(options, "noSQLite") ? options.noSQLite : false,
-			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true
+			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true,
+			agents: structKeyExists(options, "agents") ? options.agents : true
 		};
 
 		// Resolve the Wheels framework source BEFORE creating any files. A
@@ -11314,6 +11350,10 @@ component extends="modules.BaseModule" {
 		// a reviewable file rather than an inline string means an edit to it
 		// cannot live only in a working tree and vanish without a trace.
 
+		// The AI-assistant configs `wheels setup agents` writes, so the new app's
+		// assistant finds the Wheels MCP server without a second command.
+		var agentsWarning = opts.agents ? $writeNewAppAgentConfigs(targetDir, appName) : "";
+
 		out("");
 		out("Application created!", "green");
 		out("");
@@ -11326,6 +11366,12 @@ component extends="modules.BaseModule" {
 			out("  Database:        H2 embedded (db/h2/)", "green");
 		} else if (!opts.noSQLite) {
 			out("  Database:        SQLite (db/development.sqlite)", "green");
+		}
+		if (opts.agents && !len(agentsWarning)) {
+			out("  AI assistants:   .mcp.json and .opencode.json (skip with --no-agents)");
+		}
+		if (len(agentsWarning)) {
+			out("  " & agentsWarning, "yellow");
 		}
 		out("");
 		out("Next steps:", "bold");
