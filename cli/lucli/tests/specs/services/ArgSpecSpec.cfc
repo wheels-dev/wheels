@@ -332,6 +332,40 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(argv).toInclude("--dry-run");
 				});
 
+				// A key containing ":" is a generator property token (name:type) that
+				// LuCLI parsed as key=value because it carried a "=value" default; it is
+				// NOT a flag. It must be re-emitted verbatim as key=value so the default
+				// survives — the true/false -> --key/--no-key conversion would drop it.
+				it("re-emits a colon key verbatim as key=value (property token, not a flag)", () => {
+					var argv = new cli.lucli.services.ArgSpec()
+						.toArgv({"arg1": "model", "arg2": "Link", "url:string": "https://example.com"});
+					expect(argv).toInclude("url:string=https://example.com");
+					expect(argv).notToInclude("--url:string=https://example.com");
+				});
+
+				it("preserves a false default on a colon key (active:boolean=false, not --no-)", () => {
+					var argv = new cli.lucli.services.ArgSpec()
+						.toArgv({"arg1": "model", "arg2": "Thing", "active:boolean": "false"});
+					expect(argv).toInclude("active:boolean=false");
+					expect(argv).notToInclude("--no-active:boolean");
+				});
+
+				it("preserves a true default on a colon key (flag:boolean=true, not a bare flag)", () => {
+					var argv = new cli.lucli.services.ArgSpec()
+						.toArgv({"arg1": "model", "arg2": "Thing", "flag:boolean": "true"});
+					expect(argv).toInclude("flag:boolean=true");
+					expect(argv).notToInclude("--flag:boolean");
+				});
+
+				it("leaves ordinary boolean flags (no colon) converting exactly as before", () => {
+					// Regression guard: the colon-key branch must not touch flags that
+					// carry no ":" — they still become --key / --no-key.
+					var argv = new cli.lucli.services.ArgSpec()
+						.toArgv({"arg1": "myapp", "open-browser": "false", "force": "true"});
+					expect(argv).toInclude("--no-open-browser");
+					expect(argv).toInclude("--force");
+				});
+
 			});
 
 			describe("toInputSchema() — typed MCP tool input schema", () => {

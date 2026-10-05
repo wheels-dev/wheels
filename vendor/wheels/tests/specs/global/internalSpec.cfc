@@ -346,11 +346,15 @@ component extends="wheels.WheelsTest" {
 				args = {};
 				args.a = a;
 				e = g.$hashedKey(argumentCollection = args);
-				ArraySwap(a, 1, 3);
-				ArraySwap(a, 4, 5);
 				r = g.$hashedKey(argumentCollection = args);
 
 				expect(e).toBe(r)
+
+				ArraySwap(args.a, 1, 3);
+				ArraySwap(args.a, 4, 5);
+				swapped = g.$hashedKey(argumentCollection = args);
+
+				expect(swapped).notToBe(e)
 			})
 		})
 

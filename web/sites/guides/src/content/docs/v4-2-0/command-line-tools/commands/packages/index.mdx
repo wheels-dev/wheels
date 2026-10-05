@@ -8,7 +8,7 @@ sidebar:
 
 `wheels packages` is the CLI surface for the [wheels-packages registry](https://github.com/wheels-dev/wheels-packages) — a curated, git-based distribution channel for Wheels ecosystem packages. Every verb talks to the registry over plain HTTPS and installs into `vendor/<name>/`, where `PackageLoader` picks it up on next reload.
 
-The install verb is [`add`](./add). `wheels packages install <name>` never reaches this command — LuCLI's built-in extension installer intercepts the literal `install` subcommand and prints `No git or extension dependencies to install` without touching `vendor/`.
+The install verb is [`add`](./add). `install` is an alias of it, so `wheels packages install <name>` works the same way. Earlier CLI releases could intercept the literal `install` subcommand before it reached this command, so `add` is the form that works on every 4.x CLI.
 
 There is no ForgeBox and no CommandBox. The registry manifest is authoritative, tarballs live on the registry's GitHub Releases, and every tarball has a sha256 in the manifest that the installer verifies before extraction. Supply-chain attacks via force-pushed tags or drifted source archives are defeated by this design.
 

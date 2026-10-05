@@ -1,0 +1,1 @@
+- `wheels new` also skips shutdown ports that another project pins in its `lucee.json` (projects you've started, plus folders next to the new app), even when that project isn't running, and warns when the requested `--port` is one of them.

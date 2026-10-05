@@ -159,6 +159,142 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect($fkCount(migration, "product_id")).toBe(0);
 			});
 		});
+
+		// Columns are REQUIRED by default (migration allowNull=false + a combined
+		// validatesPresenceOf); `:optional` makes a column nullable and `=value`
+		// gives it a DEFAULT. A column that is optional or defaulted is excluded
+		// from validatesPresenceOf, so the generated model and migration agree —
+		// previously every column was presence-validated even though the migration
+		// made it nullable, so a fresh row with a blank optional column could never
+		// save.
+		describe("required-by-default columns with the :optional and =value markers", () => {
+			beforeEach(() => {
+				variables.tempRoot = getTempDirectory() & "wheels-generate-markers-" & createUUID();
+				for (var dir in ["vendor/wheels", "app/models", "app/controllers", "app/views", "app/migrator/migrations", "config", "tests/specs"]) {
+					directoryCreate(variables.tempRoot & "/" & dir, true, true);
+				}
+				fileWrite(variables.tempRoot & "/config/routes.cfm", 'mapper().wildcard().end();');
+				fileWrite(variables.tempRoot & "/config/settings.cfm", "");
+				variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
+			});
+
+			afterEach(() => {
+				structDelete(request, "$wheelsGenerateDryRun");
+				structDelete(request, "$wheelsDryRunPaths");
+				if (directoryExists(variables.tempRoot)) directoryDelete(variables.tempRoot, true);
+			});
+
+			it("unmarked columns are required: NOT NULL in the migration and combined in validatesPresenceOf (##2219 intent preserved)", () => {
+				mod.generate(type = "scaffold", name = "Gizmo", attributes = "name:string priority:integer");
+				expect($source("app/models/Gizmo.cfc")).toInclude('validatesPresenceOf("name,priority")');
+				var migration = $migration("gizmos");
+				expect(reFindNoCase("columnNames\s*=\s*['""]name['""][^)]*allowNull\s*=\s*false", migration)).toBeGT(0);
+				expect(reFindNoCase("columnNames\s*=\s*['""]priority['""][^)]*allowNull\s*=\s*false", migration)).toBeGT(0);
+			});
+
+			it("a :optional column is nullable and excluded from validatesPresenceOf", () => {
+				mod.generate(type = "scaffold", name = "Gizmo", attributes = "name:string note:text:optional");
+				// The exact closing quote proves `note` is not in the presence list.
+				expect($source("app/models/Gizmo.cfc")).toInclude('validatesPresenceOf("name")');
+				var migration = $migration("gizmos");
+				expect(reFindNoCase("columnNames\s*=\s*['""]note['""][^)]*allowNull\s*=\s*true", migration)).toBeGT(0);
+			});
+
+			it("a =value column gets a migration default and is excluded from validatesPresenceOf", () => {
+				mod.generate(type = "scaffold", name = "Gizmo", attributes = "name:string status:string=active");
+				expect($source("app/models/Gizmo.cfc")).toInclude('validatesPresenceOf("name")');
+				var migration = $migration("gizmos");
+				// A defaulted column is still NOT NULL (required by default); it is
+				// just not presence-validated, because the default fills an absence.
+				expect(reFindNoCase("columnNames\s*=\s*['""]status['""][^)]*allowNull\s*=\s*false", migration)).toBeGT(0);
+				expect(reFindNoCase("columnNames\s*=\s*['""]status['""][^)]*default\s*=\s*['""]active['""]", migration)).toBeGT(0);
+			});
+
+			it("a =value :optional column is nullable, defaulted, and not presence-validated", () => {
+				mod.generate(type = "scaffold", name = "Gizmo", attributes = "name:string note:string=none:optional");
+				expect($source("app/models/Gizmo.cfc")).toInclude('validatesPresenceOf("name")');
+				var migration = $migration("gizmos");
+				expect(reFindNoCase("columnNames\s*=\s*['""]note['""][^)]*allowNull\s*=\s*true", migration)).toBeGT(0);
+				expect(reFindNoCase("columnNames\s*=\s*['""]note['""][^)]*default\s*=\s*['""]none['""]", migration)).toBeGT(0);
+			});
+
+			it("a model whose columns are all optional gets no validatesPresenceOf", () => {
+				mod.generate(type = "model", name = "Loosey", attributes = "a:string:optional b:integer:optional");
+				expect($source("app/models/Loosey.cfc")).notToInclude("validatesPresenceOf");
+			});
+
+			it("a belongsTo foreign key is required: NOT NULL and presence-validated", () => {
+				mod.generate(type = "model", name = "Review", attributes = "body:text", belongsTo = "Product");
+				expect($source("app/models/Review.cfc")).toInclude('validatesPresenceOf("body,productId")');
+				var migration = $migration("reviews");
+				expect(reFindNoCase("columnNames\s*=\s*['""]productId['""][^)]*allowNull\s*=\s*false", migration)).toBeGT(0);
+			});
+
+			// The cases below drive the REAL LuCLI handoff: a `name:type=value` token
+			// arrives as a ":"-key in the argCollection (not via attributes=), so it
+			// exercises structuredArgs -> ArgSpec.toArgv, where a generic boolean
+			// conversion used to drop true/false defaults.
+
+			it("preserves a boolean false default through the real argCollection handoff", () => {
+				mod.generate(argumentCollection = {arg1: "model", arg2: "Flag", "active:boolean": "false"});
+				var migration = $rawMigration("flags");
+				expect(reFindNoCase("columnNames\s*=\s*['""]active['""][^)]*allowNull\s*=\s*false", migration)).toBeGT(0);
+				expect(reFindNoCase("columnNames\s*=\s*['""]active['""][^)]*default\s*=\s*['""]false['""]", migration)).toBeGT(0);
+				// A defaulted column is excluded from presence.
+				expect($source("app/models/Flag.cfc")).notToInclude("validatesPresenceOf");
+			});
+
+			it("preserves a boolean true default (not dropped as a bare flag)", () => {
+				mod.generate(argumentCollection = {arg1: "model", arg2: "Toggle", "enabled:boolean": "true"});
+				var migration = $rawMigration("toggles");
+				expect(reFindNoCase("columnNames\s*=\s*['""]enabled['""][^)]*default\s*=\s*['""]true['""]", migration)).toBeGT(0);
+			});
+
+			it("keeps a colon-bearing URL default intact through the real handoff", () => {
+				mod.generate(argumentCollection = {arg1: "model", arg2: "Site", "homepage:string": "https://example.com"});
+				expect($rawMigration("sites")).toInclude("default='https://example.com'");
+			});
+
+			it("encodes a hashed default as a literal CFML string in the generated migration", () => {
+				// "invoice##" in this source is the single-character default "invoice"
+				// followed by one hash. The emitter must double it so the file holds a
+				// literal (written "invoice####" in this assertion) rather than a CFML
+				// interpolation that would break the migration.
+				mod.generate(argumentCollection = {arg1: "model", arg2: "Bill", "code:string": "invoice##"});
+				var migration = $rawMigration("bills");
+				expect(migration).toInclude("default='invoice####'");
+				expect(migration).notToInclude("invoice##'");
+			});
+
+			it("generate property accepts a =value token through the real handoff", () => {
+				// Previously LuCLI's conversion left generateProperty with "--status:string"
+				// -> "__status", which GeneratorPaths.identifier rejected. The token now
+				// arrives verbatim and the add-column migration carries the default.
+				mod.generate(argumentCollection = {arg1: "property", arg2: "Account", "status:string": "active"});
+				var paths = directoryList(variables.tempRoot & "/app/migrator/migrations", false, "path", "*Status*");
+				expect(arrayLen(paths)).toBeGTE(1);
+				var raw = fileRead(paths[arrayLen(paths)]);
+				expect(raw).toInclude("columnNames=""status""");
+				expect(raw).toInclude("default=""active""");
+			});
+
+			it("generate property escapes a hashed default in the generated migration", () => {
+				mod.generate(argumentCollection = {arg1: "property", arg2: "Invoice", "code:string": "ref##"});
+				var paths = directoryList(variables.tempRoot & "/app/migrator/migrations", false, "path", "*Code*");
+				expect(arrayLen(paths)).toBeGTE(1);
+				var raw = fileRead(paths[arrayLen(paths)]);
+				expect(raw).toInclude("default=""ref####""");
+				expect(raw).notToInclude("ref##""");
+			});
+		});
+	}
+
+	private string function $rawMigration(required string tableName) {
+		// Like $migration but WITHOUT comment-stripping: $stripComments treats "//"
+		// as a line comment, which would mangle a URL default (https://...).
+		var paths = directoryList(variables.tempRoot & "/app/migrator/migrations", false, "path", "*create_" & arguments.tableName & "_table.cfc");
+		expect(arrayLen(paths)).toBe(1);
+		return fileRead(paths[1]);
 	}
 
 	private numeric function $fkCount(required string migration, required string column) {

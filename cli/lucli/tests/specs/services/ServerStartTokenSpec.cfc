@@ -68,7 +68,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		var cmd = ["/bin/chmod"];
 		for (var a in arguments.args) arrayAppend(cmd, a);
 		var proc = createObject("java", "java.lang.ProcessBuilder").init(cmd).redirectErrorStream(true).start();
-		proc.waitFor();
+		if (!proc.waitFor(javaCast("long", 10), createObject("java", "java.util.concurrent.TimeUnit").SECONDS)) {
+			proc.destroyForcibly();
+			return -1;
+		}
 		return proc.exitValue();
 	}
 
