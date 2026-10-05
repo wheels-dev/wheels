@@ -165,7 +165,9 @@
 				arguments.closeTransaction
 				&& StructKeyExists(request.wheels.$txnCallbacks, arguments.connectionArgs)
 			) {
-				$resolveTransactionCallbacks(connection = arguments.connectionArgs, type = "afterRollback");
+				// After the transaction block has ended (a failed begin, or a method that threw).
+				// The original error is the one that propagates, not a failing callback's.
+				$resolveTransactionCallbacks(connection = arguments.connectionArgs, type = "afterRollback", propagateErrors = false);
 			}
 			rethrow;
 		}
@@ -285,10 +287,9 @@
 		} catch (any e) {
 			transaction action="rollback";
 			request.wheels.transactions[arguments.ctx.connectionArgs] = false;
-			// Marker reset above; fire afterRollback (owner only) before the rethrow.
-			if (arguments.ctx.closeTransaction) {
-				$resolveTransactionCallbacks(connection = arguments.ctx.connectionArgs, type = "afterRollback", propagateErrors = false);
-			}
+			// afterRollback fires in $runInTransaction's catch, once this transaction block has
+			// ended: a callback that writes (a job enqueued with transactional = false) must not
+			// run on the connection the block is about to roll back.
 			rethrow;
 		}
 	}

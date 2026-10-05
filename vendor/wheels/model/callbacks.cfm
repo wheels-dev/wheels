@@ -801,7 +801,12 @@
 		local.rolledBack = [];
 		local.iEnd = ArrayLen(local.store.queue);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			if (local.i <= arguments.mark) {
+			// A durable entry (a job enqueued with transactional = false) stays queued: it must be
+			// written when the outermost transaction ends, not dropped with the savepoint.
+			if (
+				local.i <= arguments.mark
+				|| (StructKeyExists(local.store.queue[local.i], "durable") && local.store.queue[local.i].durable)
+			) {
 				ArrayAppend(local.kept, local.store.queue[local.i]);
 			} else {
 				ArrayAppend(local.rolledBack, local.store.queue[local.i]);
