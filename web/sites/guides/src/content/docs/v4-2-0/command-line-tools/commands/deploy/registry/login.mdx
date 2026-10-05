@@ -12,14 +12,13 @@ sidebar:
 ## Synopsis
 
 ```txt title="
-wheels deploy registry login [--password=<value>] [--destination=<name>] [--dry-run]
+wheels deploy registry login [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--password=<value>` | Pass the password literally. Overrides the resolved `registry.password[0]` secret. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print the commands without executing. |
 
@@ -28,10 +27,10 @@ wheels deploy registry login [--password=<value>] [--destination=<name>] [--dry-
 Per host:
 
 ```txt title="
-echo <password> | docker login <server> --username <username> --password-stdin
+docker login '<server>' -u '<username>' --password-stdin
 ```
 
-Password comes from `.kamal/secrets` via the first key in `registry.password:`, or from `--password` when provided.
+The password comes from `.kamal/secrets` via the first key in `registry.password:` and is written to the command's stdin over SSH. There is no `--password` flag.
 
 `wheels deploy` runs this automatically before a push. Call it directly if you want to pre-authenticate hosts outside the deploy flow.
 

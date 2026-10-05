@@ -16,9 +16,14 @@ component extends="Base" {
         return chain([containers(arguments.keep), images()]);
     }
 
+    /**
+     * Remove every image of this service that no container uses (#4416). `--all` is what makes it
+     * reach tagged release images: without it docker removes only dangling ones. The filter matches
+     * the `service=` label `build push` puts on the image.
+     */
     public string function images() {
         return docker(
-            "image", "prune", "-f",
+            "image", "prune", "--all", "--force",
             "--filter", "label=service=" & variables.config.service()
         );
     }

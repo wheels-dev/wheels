@@ -66,7 +66,7 @@ Commands at the prompt start with `/`. They're short-circuits for things you'd o
 | `/ds`, `/datasource` | Print the current datasource name. |
 | `/reload` | Reload the application (equivalent to `?reload=true`). |
 | `/clear` | Clear the terminal screen (ANSI reset). |
-| `/exit`, `/quit`, `/q` | Exit the console. |
+| `/exit`, `/quit`, `/q` | Exit the console. Bare `exit` and `quit` work too. |
 
 ### Examples
 
@@ -97,7 +97,7 @@ wheels> /models
 Build a new model instance, check validations, and inspect the error list:
 
 ```text title="illustrative — sample REPL session"
-wheels> var u = model("User").new(email="bad")
+wheels> u = model("User").new(email="bad")
 wheels> u.valid()
 => false
 
@@ -112,7 +112,7 @@ wheels> u.errorsOn("email")
 Resolve a DI-registered service and invoke a method:
 
 ```text title="illustrative — sample REPL session"
-wheels> var svc = service("emailService")
+wheels> svc = service("emailService")
 wheels> svc.isConfigured()
 => true
 ```
@@ -132,12 +132,12 @@ The two surfaces look similar and are not the same tool.
 
 | | `wheels console` | `wheels repl` (LuCLI) |
 |---|---|---|
-| Prompt | `wheels>` | `cfml>` |
+| Prompt | `wheels>` | `wheels>` (same prompt; the banner reads `CFML REPL`) |
 | App context | Full Wheels app loaded | None — bare CFML evaluator |
 | Models resolve? | Yes | No |
 | DI container available? | Yes (`service("...")`) | No |
 | Requires a running server? | Yes | No |
-| Exit commands | `/exit`, `/quit`, `/q`, Ctrl+D | `exit`, `quit`, Ctrl+D |
+| Exit commands | `/exit`, `/quit`, `/q`, `exit`, `quit`, Ctrl+D | `exit`, `quit`, Ctrl+D |
 | Use case | Inspect running app state | Quick CFML expression evaluation anywhere |
 
 Reach for the console when you need to see what the application sees. Reach for LuCLI's `repl` when you want to try a CFML expression outside a project, or when no Wheels server is running and you just need a calculator.
@@ -146,10 +146,10 @@ Reach for the console when you need to see what the application sees. Reach for 
 
 Any of these end the session:
 
-- Type `/exit`, `/quit`, or `/q` and press Enter.
+- Type `/exit`, `/quit`, `/q`, `exit`, or `quit` and press Enter.
 - Press Ctrl+D to send EOF — the console prints `Bye!` and returns.
 
-There is no `.exit` command. Typing `exit` or `quit` without the leading slash will be evaluated as a CFML expression and produce an error.
+There is no `.exit` command.
 
 ### Scripting and exit codes
 
@@ -169,7 +169,7 @@ printf '%s\n' 'model("Post").create(title="Console Post", body="Created from the
 `model().create()` returns the object even when validation fails. The console treats `_hasErrors` on that result as a failed expression, so the pipeline above is a safe gate — do not assert success from the CLI exit code alone without this contract.
 
 <Aside type="note" title="Expressions, not statements">
-Each line is evaluated as a CFML expression. Variable assignments work (`var x = 1`), but multi-line blocks, `if`/`else` control flow, and `cfscript` component declarations are not supported — wrap them in a `.cfm` script and execute that instead.
+Each line is evaluated as a CFML expression. Plain assignments work and persist for the rest of the session (`x = 1`, then `x * 2`); a `var` declaration (`var x = 1`) is a syntax error. Multi-line blocks, `if`/`else` control flow, and `cfscript` component declarations are not supported — wrap them in a `.cfm` script and execute that instead.
 </Aside>
 
 ## Related commands

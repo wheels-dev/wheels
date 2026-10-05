@@ -134,6 +134,9 @@ component {
 		application.$wheels.cache.page = {};
 		application.$wheels.cache.partial = {};
 		application.$wheels.cache.query = {};
+		// The application data cache (appCacheFetch() and friends), kept apart so appCacheClear() and
+		// app keys never touch the framework's own entries.
+		application.$wheels.cache.data = {};
 		application.$wheels.cacheLastCulledAt = Now();
 
 		// Set up paths to various folders in the framework. When the app

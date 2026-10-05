@@ -20,7 +20,7 @@ concurrency:
 jobs:
   triage:
     name: Triage issue
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     if: |
       vars.WHEELS_BOT_ENABLED == 'true'
