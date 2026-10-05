@@ -204,6 +204,15 @@ component extends="Model" {
 }
 ```
 
+Advisory locks follow the same rule. `withAdvisoryLock()` on a tenant model takes the lock in that tenant's database, so it only excludes callers working on the same tenant database (on MySQL, lock names are server-wide, so on the same MySQL server). For one lock across every tenant, such as a nightly job that must not run twice, call it through a shared model, which takes the lock on the default datasource:
+
+```cfm {test:compile} title="anywhere you call a model: controller, job or model"
+// one lock for the whole application, whichever tenant is active
+model("Plan").withAdvisoryLock(name = "nightly-billing", callback = function() {
+    // ...
+});
+```
+
 Rule of thumb: if the table exists in every tenant database, don't share it. If it exists only in the central database, share it. `User` is the classic borderline case — share it if users span tenants (one account, many tenants), scope it per tenant if accounts belong to exactly one tenant.
 
 ## Accessing the tenant inside your app

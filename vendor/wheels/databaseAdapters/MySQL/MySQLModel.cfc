@@ -145,7 +145,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		local.result = queryExecute(
 			"SELECT GET_LOCK(?, ?) AS lockResult, CONNECTION_ID() AS sessionId",
 			[arguments.name, arguments.timeout],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 		if (!IsQuery(local.result) || local.result.lockResult != 1) {
 			Throw(
@@ -164,7 +164,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		queryExecute(
 			"SELECT RELEASE_LOCK(?)",
 			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 	}
 
@@ -175,7 +175,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		local.result = queryExecute(
 			"SELECT RELEASE_LOCK(?) AS released",
 			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 		return IsQuery(local.result) && IsNumeric(local.result.released) && local.result.released == 1;
 	}
@@ -188,7 +188,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		local.result = queryExecute(
 			"SELECT IS_USED_LOCK(?) AS holder",
 			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 		if (!IsQuery(local.result) || !IsNumeric(local.result.holder)) {
 			return false;
