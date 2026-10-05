@@ -312,6 +312,10 @@ component output="false" extends="wheels.Global" {
 			transactionWrapper.value = request.$wheelsTransactionWrapper;
 		}
 		transaction action="begin" {
+			// Outer catch-free try/finally: the request-state restore in the finally below must run
+			// even if a model callback ends the request with abort, because BoxLang skips a finally
+			// whose try has a catch clause (invariant 22). The inner try keeps the commit/rollback catch.
+			try {
 			try {
 				// The seeder, not each model.save(), owns commit/rollback. Without
 				// this signal a validation failure rolls back earlier valid models.
@@ -416,6 +420,7 @@ component output="false" extends="wheels.Global" {
 				result.success = false;
 				result.message = "Database seeding failed: " & e.message;
 				return result;
+			}
 			} finally {
 				if (transactionWrapper.exists) {
 					request.$wheelsTransactionWrapper = transactionWrapper.value;
