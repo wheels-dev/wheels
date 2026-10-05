@@ -484,6 +484,9 @@ component {
 	 */
 	public TestClient function fetchCsrfToken(string path = "/") {
 		variables.csrfEnabled = true;
+		// Only this page counts: a token held from an earlier page must not make a
+		// page without one look like it had one.
+		variables.csrfTokenValue = "";
 		get(path = arguments.path);
 		if (!Len(variables.csrfTokenValue)) {
 			Throw(
@@ -860,6 +863,10 @@ component {
 		// The session's authenticity token on unsafe requests: the X-CSRF-Token
 		// header, and the authenticityToken field on a form body. When the caller
 		// passed either one, that is the token: neither is added.
+		// A session cookie changed since the token was captured (withCookie(), or a
+		// test editing the jar): that token belongs to another session, so drop it
+		// before deciding what to send.
+		$dropCsrfTokenIfSessionChanged();
 		var requestBody = arguments.body;
 		if (
 			ListFindNoCase("POST,PUT,PATCH,DELETE", arguments.method)
@@ -936,10 +943,8 @@ component {
 	 * session has a new token), then pick up the token on this page, if any.
 	 */
 	private void function $syncCsrfToken() {
+		$dropCsrfTokenIfSessionChanged();
 		var fingerprint = $sessionCookieFingerprint();
-		if (Len(variables.csrfTokenValue) && Compare(fingerprint, variables.csrfSessionFingerprint) != 0) {
-			variables.csrfTokenValue = "";
-		}
 		if (!variables.csrfEnabled) {
 			return;
 		}
@@ -947,6 +952,15 @@ component {
 		if (Len(found)) {
 			variables.csrfTokenValue = found;
 			variables.csrfSessionFingerprint = fingerprint;
+		}
+	}
+
+	/**
+	 * Forget the token when the session cookies differ from when it was captured.
+	 */
+	private void function $dropCsrfTokenIfSessionChanged() {
+		if (Len(variables.csrfTokenValue) && Compare($sessionCookieFingerprint(), variables.csrfSessionFingerprint) != 0) {
+			variables.csrfTokenValue = "";
 		}
 	}
 

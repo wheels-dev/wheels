@@ -40,6 +40,7 @@ mapper()
     // wheels.tests.specs.wheelstest.TestClientSetCookieSpec. Must precede .wildcard().
     .get(name="cookieRoundTripSet", pattern="/_cookieroundtrip/set", to="CookieRoundTripProbe##setValue")
     .get(name="cookieRoundTripRead", pattern="/_cookieroundtrip/read", to="CookieRoundTripProbe##readValue")
+    .post(name="cookieRoundTripEchoCsrf", pattern="/_cookieroundtrip/echocsrf", to="CookieRoundTripProbe##echoCsrfHeader")
     // wheels.tests.specs.wheelstest.TestClientCsrfSpec. Must precede .wildcard().
     .get(name="csrfClientMeta", pattern="/_csrfclient/meta", to="CsrfTestClientProbe##metaPage")
     .get(name="csrfClientField", pattern="/_csrfclient/field", to="CsrfTestClientProbe##fieldPage")

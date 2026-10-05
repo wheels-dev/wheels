@@ -67,6 +67,32 @@ component extends="wheels.WheelsTest" {
 				expect(state.type).toBe("Wheels.TestClient.CsrfTokenNotFound");
 			});
 
+			it("fetchCsrfToken() judges only the page it fetched, not a token held from before", () => {
+				var tc = $testClient();
+				tc.fetchCsrfToken("/_csrfclient/meta");
+				var state = {type = ""};
+				try {
+					tc.fetchCsrfToken("/_csrfclient/plain");
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Wheels.TestClient.CsrfTokenNotFound");
+			});
+
+			it("drops the token before sending when the session cookie changed after capture", () => {
+				var tc = $testClient();
+				tc.get("/_csrfclient/meta");
+				// Sent while the session is unchanged...
+				tc.post("/_csrfclient/save").assertOk();
+				tc.post("/_cookieroundtrip/echocsrf").assertSee("header=[" & tc.csrfToken() & "]");
+				// ...and not once a session cookie is replaced.
+				var jar = tc.$cookieJar();
+				var sessionName = StructKeyExists(jar, "JSESSIONID") ? "JSESSIONID" : "CFID";
+				tc.withCookie(sessionName, "replaced-session");
+				tc.post("/_cookieroundtrip/echocsrf").assertSee("header=[]");
+				expect(tc.csrfToken()).toBe("");
+			});
+
 			it("never shares a token between clients", () => {
 				var first = $testClient();
 				first.get("/_csrfclient/meta");
