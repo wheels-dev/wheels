@@ -54,6 +54,7 @@ Creates a new application in `<name>/` under the current working directory. SQLi
 | `--setup-h2` | off | Configure H2 as the embedded database instead of SQLite. Creates `db/h2/` and writes H2 datasource entries. |
 | `--no-sqlite` | off | Skip embedded-database setup entirely. Use when you plan to wire an external datasource yourself. |
 | `--no-open-browser` | off | Don't open a browser on `wheels start`. Sets `openBrowser: false` in the generated config. |
+| `--no-agents` | off | Don't write `.mcp.json` and `.opencode.json`. By default `wheels new` writes them, the same files `wheels setup agents` writes, so an AI assistant opening the app finds the Wheels MCP server. |
 
 #### Example
 
@@ -137,6 +138,8 @@ myblog/
   .env
   .env.example
   .gitignore
+  .mcp.json               # Claude Code's MCP config (not with --no-agents)
+  .opencode.json          # OpenCode's MCP config (not with --no-agents)
   AGENTS.md
   CLAUDE.md
   lucee.json

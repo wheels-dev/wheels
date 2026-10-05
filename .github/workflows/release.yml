@@ -164,6 +164,45 @@ jobs:
 
           echo "✓ Release checklist validation passed"
 
+      # `wheels lookup` (and its MCP tool) reads an offline docs index shipped
+      # inside the module, cli/lucli/data/docs-index.json. It is built here,
+      # before anything is published, so a failure can't leave a version on
+      # ForgeBox with no GitHub release or module behind it (#4314).
+      #
+      # It has to describe this build's framework version:
+      #   - a release (main) reads the committed docs/api/v<version>.json, with
+      #     --strict, so a missing file fails the build with the reason;
+      #   - a snapshot build reads the API JSON the snapshot workflow's fast-test
+      #     job generated from the running framework (artifact api-docs-snapshot),
+      #     also with --strict;
+      #   - a manual run on develop has no fast-test artifact, so it builds from
+      #     the newest API JSON committed and says so in a warning, rather than
+      #     failing the recovery path.
+      - name: Setup Node for Docs Index
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download API docs snapshot
+        id: api-docs-snapshot
+        if: env.BRANCH == 'develop'
+        continue-on-error: true
+        uses: actions/download-artifact@v6
+        with:
+          name: api-docs-snapshot
+          path: docs/api
+
+      - name: Build Docs Index For wheels lookup
+        env:
+          SNAPSHOT_API_JSON: ${{ steps.api-docs-snapshot.outcome }}
+        run: |
+          if [ "$BRANCH" = "main" ] || [ "$SNAPSHOT_API_JSON" = "success" ]; then
+            node tools/build/scripts/build-docs-index.mjs --strict --version "$WHEELS_VERSION"
+          else
+            echo "::warning title=Docs index::No api-docs-snapshot artifact (a manual run on develop?), so the wheels lookup index uses the newest committed API JSON instead of this build's."
+            node tools/build/scripts/build-docs-index.mjs --version "$WHEELS_VERSION"
+          fi
+
       #############################################
       # Prepare and Publish to ForgeBox
       #############################################
@@ -364,7 +403,9 @@ jobs:
           # report a stale version. (Historically mirrored the same substitution
           # the now-frozen prepare-cli.sh did for the legacy wheels-cli ForgeBox
           # artifact; that leg was removed in #3184.) See #2326.
-          find cli/lucli -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" \) -exec sed -i.bak "s/@build\.version@/${MODULE_VERSION}/g" {} \;
+          # data/ (the docs index) is skipped: the guides it holds quote the
+          # placeholder literally.
+          find cli/lucli -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" \) -not -path "cli/lucli/data/*" -exec sed -i.bak "s/@build\.version@/${MODULE_VERSION}/g" {} \;
           find cli/lucli -name "*.bak" -delete
           # Generate .module-version at build time with the canonical version.
           # This file is read at runtime by the brew/scoop/.deb/.rpm wrappers
