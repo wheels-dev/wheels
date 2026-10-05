@@ -185,6 +185,27 @@
 
 
 	/**
+	 * Escapes the `LIKE` wildcards in a string so it can be used as a literal search term in a
+	 * `LIKE` comparison that declares `ESCAPE '\'`. The escape character `\` is escaped first, then
+	 * `%`, `_` and `[` (the last is a wildcard on SQL Server). Supply the result as a bound parameter
+	 * and add your own surrounding wildcards:
+	 *
+	 * `model("post").findAll(where="title LIKE :q ESCAPE '\'", params={q="%" & escapeForLike(term) & "%"})`
+	 *
+	 * [section: Global Helpers]
+	 * [category: String Functions]
+	 *
+	 * @value String whose `LIKE` wildcards should be treated as literals.
+	 */
+	public string function escapeForLike(required string value) {
+		local.rv = Replace(arguments.value, "\", "\\", "all");
+		local.rv = Replace(local.rv, "%", "\%", "all");
+		local.rv = Replace(local.rv, "_", "\_", "all");
+		local.rv = Replace(local.rv, "[", "\[", "all");
+		return local.rv;
+	}
+
+	/**
 	 * Capitalizes the first character of the supplied string.
 	 *
 	 * [section: Global Helpers]
