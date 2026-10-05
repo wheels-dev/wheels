@@ -23,13 +23,6 @@
 	// because WHEELS_ENV is not a trustworthy production signal.
 
 	if (StructKeyExists(this, "name") && Len(this.name)) {
-		// Mark that test-context isolation is CONFIGURED for this app — this include is present and ran.
-		// The test-runner actions (wheels.Public testbox / tests_testbox) read this to refuse running
-		// specs in the live scope when a request reached them WITHOUT binding the isolated application
-		// (e.g. a custom route the path trigger doesn't cover). Apps without this include never set it,
-		// so they keep the existing live-scope swap behaviour.
-		request.$wheelsTestContextConfigured = true;
-
 		this.wheels.$testContext = {
 			suffix = "_wheelsTest",
 			match = false,
@@ -48,6 +41,9 @@
 			&& Right(this.name, Len(this.wheels.$testContext.suffix)) == this.wheels.$testContext.suffix
 		) {
 			this.wheels.$testContext.match = true;
+			// Already in the isolated application — isolation is configured and active. Lockstep with
+			// TestContext.requestIsTestContextConfigured(alreadyIsolated=true, environmentAllows=...).
+			request.$wheelsTestContextConfigured = true;
 		} else {
 			// (1) Resolve the environment from WHEELS_ENV. The constructor already
 			// computes `currentEnv` for the same purpose (session-cookie Secure);
@@ -73,6 +69,15 @@
 			);
 
 			if (this.wheels.$testContext.envAllows) {
+				// Isolation is configured AND the constructor's WHEELS_ENV gate allows it — mark the
+				// request so the runner actions (wheels.Public testbox / tests_testbox) refuse a
+				// live-scope run that reached them without binding isolation (e.g. a custom route the
+				// path trigger doesn't cover). Set ONLY here (and in the already-isolated branch): an
+				// app whose WHEELS_ENV doesn't allow isolation never binds and must keep the existing
+				// live-scope swap + #4354 warning, so it must NOT get the marker. Lockstep with
+				// TestContext.requestIsTestContextConfigured(alreadyIsolated || environmentAllows).
+				request.$wheelsTestContextConfigured = true;
+
 				// (2) Path trigger — path_info or script_name must START with a runner endpoint
 				// (/wheels/core/tests or /wheels/app/tests) at a whole-segment boundary, so a runner
 				// path merely embedded inside an application route does not bind the test context.

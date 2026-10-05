@@ -37,12 +37,34 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("TestContext.requestIsTestContextConfigured — when the include marks the request", () => {
+
+			variables.tc2 = new wheels.events.TestContext();
+
+			it("marks when the request is already in the isolated application", () => {
+				expect(variables.tc2.requestIsTestContextConfigured(alreadyIsolated = true, environmentAllows = false)).toBeTrue();
+			});
+
+			it("marks when the include's environment gate allows isolation (WHEELS_ENV dev/testing)", () => {
+				expect(variables.tc2.requestIsTestContextConfigured(alreadyIsolated = false, environmentAllows = true)).toBeTrue();
+			});
+
+			it("does NOT mark when the include is present but its environment gate disallows isolation", () => {
+				// The failing case: include present, but WHEELS_ENV unset (dev set only in
+				// config/environment.cfm), so the constructor's envAllows is false and isolation never
+				// binds. The request must stay unmarked so the runner guard keeps the live-scope swap +
+				// #4354 warning and does NOT 409. Pairs with testRunnerMustRefuse(isolationConfigured=false).
+				expect(variables.tc2.requestIsTestContextConfigured(alreadyIsolated = false, environmentAllows = false)).toBeFalse();
+			});
+
+		});
+
 		describe("events/testcontext.cfm marks isolation as configured", () => {
 
-			it("sets request.$wheelsTestContextConfigured for a request that ran the include", () => {
-				// This very spec runs through the test runner, whose request went through the include in
-				// Application.cfc's constructor, so the marker is present (and request scope was writable
-				// in the constructor on this engine).
+			it("sets request.$wheelsTestContextConfigured for a request that bound the isolated app", () => {
+				// This very spec runs through the test runner in the isolated _wheelsTest application
+				// (WHEELS_ENV allows it), so the include set the marker — and request scope was writable
+				// in the constructor on this engine.
 				expect(StructKeyExists(request, "$wheelsTestContextConfigured")).toBeTrue();
 			});
 
