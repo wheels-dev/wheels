@@ -411,7 +411,16 @@ component {
 				continue;
 			}
 			var stringValue = toString(value);
-			if (compareNoCase(stringValue, "true") == 0) {
+			// A key containing ":" is not a flag — it is a generator property token
+			// (`name:type`) that LuCLI parsed as a key=value pair because it carried
+			// a "=value" default (e.g. `status:string=active`, `active:boolean=false`).
+			// Re-emit it verbatim as `key=value` so the default survives: the generic
+			// true/false -> --key/--no-key conversion below would otherwise turn
+			// `active:boolean=false` into `--no-active:boolean` and drop the default.
+			// No command names a real flag with a ":".
+			if (find(":", key)) {
+				arrayAppend(result, key & "=" & stringValue);
+			} else if (compareNoCase(stringValue, "true") == 0) {
 				arrayAppend(result, "--" & key);
 			} else if (compareNoCase(stringValue, "false") == 0) {
 				arrayAppend(result, "--no-" & key);
