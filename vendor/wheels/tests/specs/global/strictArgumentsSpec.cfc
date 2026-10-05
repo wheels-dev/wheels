@@ -104,14 +104,26 @@ component extends="wheels.WheelsTest" {
 			it("rejects an unknown column option in a migration", () => {
 				useMode("throw");
 				var t = variables.migration.createTable(name = "c_o_r_e_strictargs", force = true);
-				// `null` is a keyword on some engines, so it goes in through argumentCollection.
-				var options = {columnNames = "title"};
-				options["null"] = true;
-				var failure = failureOf(() => t.string(argumentCollection = options));
+				var failure = failureOf(() => t.string(columnNames = "title", nullable = true));
 				expect(failure.type).toBe("Wheels.UnknownArgument");
 				expect(failure.message).toInclude("Did you mean `allowNull`");
 				expect(failureOf(() => t.string(columnNames = "title", allowNull = true, limit = 50, default = "")).type).toBe("");
 				expect(failureOf(() => t.bigInteger(columnName = "views", unsigned = true)).type).toBe("");
+			});
+
+			it("accepts null, the deprecated column option, without warning", () => {
+				useMode("throw");
+				var t = variables.migration.createTable(name = "c_o_r_e_strictargs", force = true);
+				// `null` is a keyword on some engines, so it goes in through argumentCollection.
+				var options = {columnNames = "title"};
+				options["null"] = false;
+				expect(failureOf(() => t.string(argumentCollection = options)).type).toBe("");
+				expect(t.columns[ArrayLen(t.columns)].allowNull).toBeFalse();
+				useMode("warn");
+				var more = {columnNames = "summary"};
+				more["null"] = false;
+				t.string(argumentCollection = more);
+				expect(StructCount(application.wheels.$strictArgumentsSeen)).toBe(0);
 			});
 
 			it("doesn't check functions that turn unknown arguments into something", () => {

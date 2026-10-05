@@ -16,7 +16,7 @@ You'll learn:
 
 ## Why it exists
 
-Wheels functions take named arguments, and an unknown name is ignored. A typo such as `orderby` for `order`, or a name from another framework such as `foreign_key` or `null`, doesn't fail. The call runs without the option, and the mistake shows up later as unordered results, a missing foreign key or a column that allows NULL when you didn't mean it to.
+Wheels functions take named arguments, and an unknown name is ignored. A typo such as `orderby` for `order`, or a name from another framework such as `foreign_key` or `nullable`, doesn't fail. The call runs without the option, and the mistake shows up later as unordered results, a missing foreign key or a column that allows NULL when you didn't mean it to.
 
 With `strictArguments` on, those calls are reported where they're made:
 
@@ -63,7 +63,7 @@ Documented aliases are accepted: `property` for `properties`, `method` for `meth
 | Argument | Use instead |
 |---|---|
 | `foreign_key`, `class_name` | `foreignKey`, `modelName` |
-| `null` on a migration column | `allowNull` |
+| `nullable` on a migration column | `allowNull` (`null`, its name before Wheels 3.0, is still read, with a deprecation warning) |
 | `orderby`, `sort` | `order` |
 | `limit` on a finder | `maxRows` |
 | `on` on `beforeSave()` | `beforeCreate()` or `beforeUpdate()` (`afterCommit()` and `afterRollback()` do take `on`) |

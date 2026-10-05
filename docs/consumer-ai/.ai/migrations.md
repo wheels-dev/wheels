@@ -2,7 +2,7 @@
 
 Part of the Wheels application guide; start with `../CLAUDE.md`.
 
-Column options are `allowNull` (never `null`), `default`, `limit`, `precision`, `scale`; with `strictArguments` on (development default), an unknown option such as `null=true` is logged instead of ignored.
+Column options are `allowNull`, `default`, `limit`, `precision`, `scale` (`null` is the deprecated pre-3.0 name for `allowNull`; write `allowNull`); with `strictArguments` on (development default), an unknown option such as `nullable=true` is logged instead of ignored.
 
 ## Shared Dev DB Reconciliation
 
