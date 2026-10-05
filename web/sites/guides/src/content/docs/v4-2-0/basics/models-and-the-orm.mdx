@@ -326,7 +326,7 @@ component extends="Model" {
 - **On a create**, every property the insert wrote is listed, from an empty value, including the generated key.
 - **A save that changed nothing** reports nothing. **A save that fails** keeps what the previous save reported.
 - **`reload()` and `clearChangeInformation()` clear it.** `save(reload=true)` keeps it.
-- **A save inside one of the object's own callbacks** replaces it with that save's changes.
+- **A save inside one of the object's own callbacks** (say, an `afterSave` that sets a property and calls `save()` again) replaces it with that inner save's changes. Because the outer save hasn't reset its baseline yet when the inner one runs, the inner save's changes include the outer save's too: after `title` is saved and an `afterSave` then sets and saves `slug`, `savedChanges()` lists both `title` and `slug`.
 </Aside>
 
 ## Custom methods

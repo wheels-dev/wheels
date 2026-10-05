@@ -106,6 +106,15 @@ component extends="wheels.WheelsTest" {
 				expect(request.$scLog[1].from).toBe("savedch-as-before");
 			});
 
+			it("reports the inner save, outer changes included, when a callback saves the object again", () => {
+				var t = g.model("tag").create(name = "savedch-nest-before", transaction = "none");
+				g.model("tag").$registerCallback(type = "afterSave", methods = "saveDescriptionOnce");
+				t.name = "savedch-nest-after";
+				t.save(transaction = "none");
+				expect(ListSort(t.savedChangedProperties(), "textnocase")).toBe("description,name");
+				expect(t.savedChangeFrom("name")).toBe("savedch-nest-before");
+			});
+
 			it("shows each afterCommit the save that queued it when one object is saved twice in a transaction", () => {
 				var t = g.model("tag").create(name = "savedch-a", transaction = "none");
 				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordSavedChangesOnCommit");

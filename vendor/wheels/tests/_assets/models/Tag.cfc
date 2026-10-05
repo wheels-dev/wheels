@@ -233,6 +233,15 @@ component extends="Model" {
 		}
 	}
 
+	// An afterSave that saves the object again, once.
+	function saveDescriptionOnce() {
+		if (!Len(this.description ?: "")) {
+			this.description = "savedch-nested";
+			this.save(transaction = "none");
+		}
+		return true;
+	}
+
 	function txnRenameTwice() {
 		request.$scTag.update(name = request.$scNames[1]);
 		request.$scTag.update(name = request.$scNames[2]);
