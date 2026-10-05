@@ -15,7 +15,8 @@
 	 * Support varies by database:
 	 * - PostgreSQL: Full support via pg_advisory_lock/pg_advisory_unlock
 	 * - MySQL: Full support via GET_LOCK/RELEASE_LOCK
-	 * - SQL Server: Full support via sp_getapplock/sp_releaseapplock
+	 * - SQL Server: Full support via sp_getapplock/sp_releaseapplock, owned by the database session, so
+ *   no transaction is needed
 	 * - SQLite: No-op (file-level locking only)
 	 * - CockroachDB: Not supported (throws error, use forUpdate() instead)
 	 * - H2: Not supported (throws error)

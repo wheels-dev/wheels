@@ -1,7 +1,7 @@
 /**
- * withAdvisoryLock() keeps a second caller out and leaves no lock held (#4197). MySQL and
- * PostgreSQL advisory locks belong to a database session and a session can take the same lock
- * again, while Wheels runs the acquire and the release as separate pooled queries. On Lucee and
+ * withAdvisoryLock() keeps a second caller out and leaves no lock held (#4197). MySQL,
+ * PostgreSQL and SQL Server (#4220) advisory locks belong to a database session and a session can
+ * take the same lock again, while Wheels runs the acquire and the release as separate pooled queries. On Lucee and
  * BoxLang a second caller borrowed the idle connection holding the lock, took it too, and the lock
  * stayed held after both finished.
  */
@@ -11,7 +11,7 @@ component extends="wheels.WheelsTest" {
 		variables.g = application.wo;
 		variables.ds = variables.g.get("dataSourceName");
 		variables.adapterName = variables.g.get("adapterName");
-		variables.applies = ListFindNoCase("PostgreSQLModel,MySQLModel", variables.adapterName) > 0;
+		variables.applies = ListFindNoCase("PostgreSQLModel,MySQLModel,MicrosoftSQLServerModel", variables.adapterName) > 0;
 	}
 
 	// A separate adapter instance on the test datasource, so a mock never touches the model's own.
@@ -38,6 +38,14 @@ component extends="wheels.WheelsTest" {
 				{datasource = variables.ds}
 			);
 			return q.n > 0;
+		}
+		if (variables.adapterName == "MicrosoftSQLServerModel") {
+			var s = QueryExecute(
+				"SELECT COUNT(*) AS n FROM sys.dm_tran_locks WHERE resource_type = 'APPLICATION' AND CHARINDEX('[' + LEFT(?, 32) + ']', resource_description) > 0",
+				[arguments.name],
+				{datasource = variables.ds}
+			);
+			return s.n > 0;
 		}
 		var m = QueryExecute("SELECT IS_USED_LOCK(?) AS id", [arguments.name], {datasource = variables.ds});
 		return !IsNull(m.id) && Len(m.id) > 0;
@@ -72,11 +80,11 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
-		describe("withAdvisoryLock() on MySQL and PostgreSQL", () => {
+		describe("withAdvisoryLock() on MySQL, PostgreSQL and SQL Server", () => {
 
 			it("keeps a second caller out while the first holds the lock, and frees it afterwards", () => {
 				if (!variables.applies) {
-					skip("Session advisory locks: MySQL and PostgreSQL.");
+					skip("Session advisory locks: MySQL, PostgreSQL and SQL Server.");
 				}
 				var name = lockName();
 				var state = {entered = false, type = ""};
@@ -100,7 +108,7 @@ component extends="wheels.WheelsTest" {
 
 			it("leaves the lock free after it returns and after its callback throws", () => {
 				if (!variables.applies) {
-					skip("Session advisory locks: MySQL and PostgreSQL.");
+					skip("Session advisory locks: MySQL, PostgreSQL and SQL Server.");
 				}
 				var name = lockName();
 				var ok = function() {
@@ -123,7 +131,7 @@ component extends="wheels.WheelsTest" {
 
 			it("frees the lock for the next caller once the first has finished", () => {
 				if (!variables.applies) {
-					skip("Session advisory locks: MySQL and PostgreSQL.");
+					skip("Session advisory locks: MySQL, PostgreSQL and SQL Server.");
 				}
 				var name = lockName();
 				var holder = startHolder(name, 500);
@@ -159,7 +167,7 @@ component extends="wheels.WheelsTest" {
 			// gone is not our failure, so only our holder still holding it counts.
 			it("does not report a lock that another session holds once ours is gone", () => {
 				if (!variables.applies) {
-					skip("Session advisory locks: MySQL and PostgreSQL.");
+					skip("Session advisory locks: MySQL, PostgreSQL and SQL Server.");
 				}
 				var name = lockName();
 				var other = startHolder(name, 3000);
@@ -179,7 +187,7 @@ component extends="wheels.WheelsTest" {
 
 			it("records the session that took the lock", () => {
 				if (!variables.applies) {
-					skip("Session advisory locks: MySQL and PostgreSQL.");
+					skip("Session advisory locks: MySQL, PostgreSQL and SQL Server.");
 				}
 				var name = lockName();
 				var adapter = freshAdapter();
@@ -189,6 +197,25 @@ component extends="wheels.WheelsTest" {
 				expect(adapter.$isAdvisoryLockHeld(name = name, holder = "0")).toBeFalse();
 				adapter.$releaseAdvisoryLockVerified(name = name, holder = holder);
 				expect(isHeld(name)).toBeFalse();
+			});
+
+			// SQL Server identifies the holder through sys.dm_tran_locks, which needs the VIEW SERVER
+			// (PERFORMANCE) STATE permission. Without it, the check falls back to whether any session
+			// holds the lock.
+			it("still sees a held SQL Server lock without the permission to read sys.dm_tran_locks", () => {
+				if (variables.adapterName != "MicrosoftSQLServerModel") {
+					skip("SQL Server's sys.dm_tran_locks permission.");
+				}
+				var name = lockName();
+				var other = startHolder(name, 2000);
+				var adapter = freshAdapter();
+				prepareMock(adapter);
+				adapter.$(method = "$isAdvisoryLockHeldBySession", throwException = true, throwType = "Wheels.SpecPermissionDenied", throwMessage = "VIEW SERVER PERFORMANCE STATE permission was denied on object 'server', database 'master'.");
+				var state = {held = adapter.$isAdvisoryLockHeld(name = name, holder = "0")};
+				thread action="join" name="#other#" timeout="15000";
+				state.heldAfter = adapter.$isAdvisoryLockHeld(name = name);
+				expect(state.held).toBeTrue();
+				expect(state.heldAfter).toBeFalse();
 			});
 
 			it("keeps the callback's error when the release fails too", () => {

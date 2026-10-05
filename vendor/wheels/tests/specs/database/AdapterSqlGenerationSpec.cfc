@@ -178,7 +178,7 @@ component extends="wheels.WheelsTest" {
                     var mysql = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLModel");
                     expect(mysql.$supportsAdvisoryLocks()).toBeTrue();
                     var mssql = CreateObject("component", "wheels.databaseAdapters.MicrosoftSQLServer.MicrosoftSQLServerModel");
-                    expect(mssql.$supportsAdvisoryLocks()).toBeTypeOf("boolean");
+                    expect(mssql.$supportsAdvisoryLocks()).toBeTrue();
                 });
 
             });

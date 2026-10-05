@@ -1217,11 +1217,9 @@ component output=false extends="wheels.Global"{
 	 * connection pinned by an enclosing transaction, so it covers the callback's own queries and
 	 * (where the lock is transaction-scoped) auto-releases when that transaction ends.
 	 *
-	 * Distinct from `$supportsAdvisoryLocks()`, which reports standalone (session) support. An
-	 * adapter may support one and not the other: SQL Server reports `$supportsAdvisoryLocks()` false
-	 * (its standalone `sp_getapplock @LockOwner = 'Transaction'` needs an open transaction) but
-	 * overrides this to true, taking a session-owned `sp_getapplock @LockOwner = 'Session'` lock on
-	 * the transaction-pinned connection.
+	 * Distinct from `$supportsAdvisoryLocks()`, which reports standalone (session) support; an
+	 * adapter may support one and not the other. SQL Server supports both with a session-owned
+	 * `sp_getapplock @LockOwner = 'Session'` lock, on the transaction-pinned connection here.
 	 */
 	public boolean function $supportsTransactionalAdvisoryLock() {
 		return false;
