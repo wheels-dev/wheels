@@ -257,6 +257,8 @@ component output="false" {
 		// Add route to Wheels.
 		ArrayAppend(variables.routes, local.routeStruct);
 		ArrayAppend(application[$appKey()].routes, local.routeStruct);
+		// Any change to the table invalidates Dispatch's route index (#4157).
+		$bumpRouteTableGeneration();
 
 		// Invalidate the URLFor controller/action memo on every mutation.
 		// A previous lookup might have negative-cached a (controller, action)
@@ -287,6 +289,19 @@ component output="false" {
 					application[$appKey()].staticRoutes[local.staticKey] = local.routeStruct;
 				}
 			}
+		}
+	}
+
+	/**
+	 * Internal function. Marks the route table as changed, so Dispatch rebuilds its
+	 * route index (#4157) before the next match.
+	 */
+	public void function $bumpRouteTableGeneration() {
+		local.appKey = $appKey();
+		if (StructKeyExists(application[local.appKey], "routeTableGeneration")) {
+			application[local.appKey].routeTableGeneration++;
+		} else {
+			application[local.appKey].routeTableGeneration = 1;
 		}
 	}
 

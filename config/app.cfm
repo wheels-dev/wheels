@@ -20,6 +20,14 @@
 	, username: 'sa'
 	};
 
+	// App tests (/wheels/app/tests, `wheels test`) run on `<datasource>_test`, a
+	// separate database, and refuse to run without one.
+	this.datasources['wheels-dev_test'] = {
+		class: 'org.h2.Driver'
+	, connectionString: "jdbc:h2:file:" & expandPath("../db/h2/wheels-dev_test") & ";MODE=MySQL"
+	, username: 'sa'
+	};
+
 	// CI datasource injection: when WHEELS_CI=true, define SQLite datasources
 	// directly so tests can run without Lucee Admin configuration.
 	if (server.system.environment.WHEELS_CI ?: "" == "true") {

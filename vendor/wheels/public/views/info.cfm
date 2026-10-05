@@ -93,6 +93,7 @@ settings = [
 		name = 'Migrator',
 		values = [
 			'autoMigrateDatabase',
+			'migrateOnBoot',
 			'migratorTableName',
 			'levelsTableName',
 			'createMigratorTable',

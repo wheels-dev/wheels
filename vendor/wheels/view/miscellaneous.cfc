@@ -280,7 +280,7 @@ component {
 	 *
 	 * @partial The name of the partial file to be used. Prefix with a leading slash (`/`) if you need to build a path from the root `views` folder. Do not include the partial filename's underscore and file extension. If you want to have Wheels display the partial for a single model object, array of model objects, or a query, pass a variable containing that data into this argument.
 	 * @group If passing a query result set for the partial argument, use this to specify the field to group the query by. A new query will be passed into the partial template for you to iterate over.
-	 * @cache Number of minutes to cache the content for.
+	 * @cache Number of minutes to cache the content for. The cache key is a hash of every argument passed to the partial, including the full contents (all rows) of a `query` argument, so editing a row produces a new cache key automatically. Pass any viewer state the output depends on (for example `editable=true`) as an argument so it becomes part of the key. Partial caching runs only when the `cachePartials` setting is on — on in production, off in development and testing.
 	 * @layout The layout to wrap the content in. Prefix with a leading slash (`/`) if you need to build a path from the root `views` folder. Pass `false` to not load a layout at all.
 	 * @spacer HTML or string to place between partials when called using a query.
 	 * @dataFunction Name of controller function to load data from.
@@ -486,6 +486,8 @@ component {
 		local.sortedKeys = ListSort(StructKeyList(arguments.attributes), "textnocase");
 		local.sortedKeysArray = ListToArray(local.sortedKeys);
 		local.iEnd = ArrayLen(local.sortedKeysArray);
+		// Resolve the HTML-attribute encoding flag once rather than per attribute (#4151).
+		local.encodeHtmlAttributes = $get("encodeHtmlAttributes");
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.key = local.sortedKeysArray[local.i];
 			// place the attribute name and value in the string unless it should be skipped according to the arguments or if it's an internal argument (starting with a "$" sign)
@@ -503,7 +505,8 @@ component {
 						name = local.key,
 						value = arguments.attributes[local.key],
 						encode = arguments.encode,
-						encodeExcept = arguments.encodeExcept
+						encodeExcept = arguments.encodeExcept,
+						encodeHtmlAttributes = local.encodeHtmlAttributes
 					);
 				}
 			}
@@ -521,8 +524,15 @@ component {
 		required string name,
 		required string value,
 		required boolean encode,
-		required string encodeExcept
+		required string encodeExcept,
+		any encodeHtmlAttributes = ""
 	) {
+		// The caller ($tag) resolves $get("encodeHtmlAttributes") once and passes it, so we don't
+		// call $get per attribute (#4151). An external caller that omits it gets the same value via
+		// the fallback. (Not a signature default so the $get isn't engine-evaluated at parse time.)
+		if (!IsBoolean(arguments.encodeHtmlAttributes)) {
+			arguments.encodeHtmlAttributes = $get("encodeHtmlAttributes");
+		}
 		// For custom data attributes we convert underscores and camel case to hyphens.
 		// E.g. "dataDomCache" and "data_dom_cache" becomes "data-dom-cache".
 		// This is to get around the issue with not being able to use a hyphen in an argument name in CFML.
@@ -539,7 +549,7 @@ component {
 
 		// set standard attribute name / value to use as the default to return (e.g. name / value part of <input name="value">)
 		local.rv = " " & arguments.name & "=""";
-		local.rv &= arguments.encode && !ListFind(arguments.encodeExcept, arguments.name) && $get("encodeHtmlAttributes")
+		local.rv &= arguments.encode && !ListFind(arguments.encodeExcept, arguments.name) && arguments.encodeHtmlAttributes
 			? EncodeForHTMLAttribute($canonicalize(arguments.value))
 			: arguments.value;
 		local.rv &= """";

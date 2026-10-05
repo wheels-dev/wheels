@@ -786,7 +786,194 @@ component output=false extends="wheels.Global"{
 			local.rv.separator = Chr(7);
 			local.rv.value = $cleanInStatementValue(local.rv.value);
 		}
+		$applyWideDecimalBind(local.rv);
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. Rebinds a decimal / numeric param whose value has more significant
+	 * digits than a double holds exactly (more than 15) in the adapter's exact form (#4172).
+	 * Lucee and BoxLang bind cf_sql_decimal / cf_sql_numeric through a double, so such a value
+	 * was stored, or matched, as a different number. Values with up to 15 significant digits
+	 * (money and quantity amounts) keep their bind. Adapters opt in via $wideDecimalBindType().
+	 */
+	public void function $applyWideDecimalBind(required struct param) {
+		if (
+			!ListFindNoCase("cf_sql_decimal,cf_sql_numeric", arguments.param.cfsqltype)
+			|| (StructKeyExists(arguments.param, "null") && arguments.param.null)
+		) {
+			return;
+		}
+		local.wideType = $wideDecimalBindType();
+		if (Len(local.wideType) && $hasWideDecimalValue(arguments.param)) {
+			arguments.param.cfsqltype = local.wideType;
+		}
+	}
+
+	/**
+	 * Internal function. The cf_sql type an adapter binds a high-precision decimal in, exactly;
+	 * "" keeps the decimal bind. Overridden per adapter (#4172).
+	 */
+	public string function $wideDecimalBindType() {
+		return "";
+	}
+
+	/**
+	 * Internal function. True when every value of a param (one value, or each element of an IN
+	 * list) is a plain decimal literal (an optional "-", digits, an optional fraction; no
+	 * exponent or grouping) and at least one has more than 15 significant digits.
+	 */
+	public boolean function $hasWideDecimalValue(required struct param) {
+		local.values = StructKeyExists(arguments.param, "list") && arguments.param.list
+			? ListToArray(arguments.param.value, arguments.param.separator)
+			: [arguments.param.value];
+		local.state = {wide = false};
+		for (local.value in local.values) {
+			if (!IsSimpleValue(local.value) || !ReFind("^-?[0-9]+(\.[0-9]+)?$", Trim(local.value))) {
+				return false;
+			}
+			if ($significantDigitCount(Trim(local.value)) > 15) {
+				local.state.wide = true;
+			}
+		}
+		return local.state.wide;
+	}
+
+	/**
+	 * Internal function. The number of significant digits in a plain decimal literal: leading
+	 * zeros and a fraction's trailing zeros don't count.
+	 */
+	public numeric function $significantDigitCount(required string value) {
+		local.digits = ReReplace(arguments.value, "^-", "");
+		if (Find(".", local.digits)) {
+			local.digits = ReReplace(local.digits, "0+$", "");
+			local.digits = ReReplace(local.digits, "\.$", "");
+		}
+		local.digits = ReReplace(Replace(local.digits, ".", ""), "^0+", "");
+		return Len(local.digits);
+	}
+
+	/**
+	 * Internal function. Rewrites each high-precision decimal param that $applyWideDecimalBind()
+	 * rebinds as text into `CAST(? AS DECIMAL(p, s))` (#4172), for databases that would otherwise
+	 * compare that text inexactly: SQL Server rounds it to the column's scale, and MySQL compares
+	 * a text IN list as doubles. `s` is the value's own fraction digits, never the column's: a
+	 * cast to a smaller scale would round the value onto a stored value it doesn't equal.
+	 *
+	 * A value the database can't store in any DECIMAL equals no stored value, so it is left out
+	 * of an IN list while another value remains (IN and NOT IN are unchanged). A single such
+	 * value, or a list of only such values, keeps its text bind. Values written into the SQL text
+	 * (parameterize=false) are decimal literals and already compare exactly. Adapters opt in via
+	 * $wideDecimalCastLimits().
+	 */
+	public void function $castWideDecimalParams(required struct args) {
+		local.limits = $wideDecimalCastLimits();
+		if (!arguments.args.parameterize || StructIsEmpty(local.limits)) {
+			return;
+		}
+		local.rv = [];
+		for (local.part in arguments.args.sql) {
+			// Adobe CF passes arrays by value, so the parts are returned and appended here.
+			if ($isWideDecimalParam(local.part)) {
+				local.parts = $castDecimalParts(part = local.part, limits = local.limits);
+			} else {
+				local.parts = [local.part];
+			}
+			for (local.item in local.parts) {
+				ArrayAppend(local.rv, local.item);
+			}
+		}
+		arguments.args.sql = local.rv;
+	}
+
+	/**
+	 * Internal function. The largest DECIMAL precision and scale an adapter casts a high-precision
+	 * decimal param to; an empty struct (the default) leaves the param uncast (#4172).
+	 */
+	public struct function $wideDecimalCastLimits() {
+		return {};
+	}
+
+	/**
+	 * Internal function. True for a decimal / numeric param, one value or an IN list, that
+	 * $applyWideDecimalBind() rebinds as text.
+	 */
+	public boolean function $isWideDecimalParam(required any part) {
+		if (
+			!IsStruct(arguments.part)
+			|| !StructKeyExists(arguments.part, "type")
+			|| !StructKeyExists(arguments.part, "value")
+			|| !ListFindNoCase("cf_sql_decimal,cf_sql_numeric", arguments.part.type)
+		) {
+			return false;
+		}
+		local.qp = $queryParams(arguments.part);
+		return !(StructKeyExists(local.qp, "null") && local.qp.null) && local.qp.cfsqltype == $wideDecimalBindType();
+	}
+
+	/**
+	 * Internal function. The SQL parts for a high-precision decimal param as `CAST(? AS DECIMAL(p, s))`,
+	 * or for an IN list as `(CAST(...), CAST(...))` with one single-value param per value. A param
+	 * with no value the database can store is returned unchanged.
+	 */
+	public array function $castDecimalParts(required struct part, required struct limits) {
+		local.qp = $queryParams(arguments.part);
+		local.isList = StructKeyExists(local.qp, "list") && local.qp.list;
+		local.values = $storableDecimalValues(
+			values = local.isList ? ListToArray(local.qp.value, Chr(7)) : [local.qp.value],
+			limits = arguments.limits
+		);
+		if (!ArrayLen(local.values)) {
+			return [arguments.part];
+		}
+		local.rv = [];
+		local.iEnd = ArrayLen(local.values);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.param = StructCopy(arguments.part);
+			StructDelete(local.param, "list");
+			local.param.value = local.values[local.i];
+			ArrayAppend(local.rv, (local.i == 1 ? (local.isList ? "(" : "") : ", ") & "CAST(");
+			ArrayAppend(local.rv, local.param);
+			ArrayAppend(
+				local.rv,
+				" AS DECIMAL(#arguments.limits.precision#, #$fractionDigitCount(local.values[local.i])#))"
+				& (local.isList && local.i == local.iEnd ? ")" : "")
+			);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. The trimmed values a DECIMAL within the adapter's limits can hold: at
+	 * most `limits.scale` fraction digits and `limits.precision` digits in all.
+	 */
+	public array function $storableDecimalValues(required array values, required struct limits) {
+		local.rv = [];
+		for (local.value in arguments.values) {
+			local.value = Trim(local.value);
+			local.fraction = $fractionDigitCount(local.value);
+			if (local.fraction <= arguments.limits.scale && $integerDigitCount(local.value) + local.fraction <= arguments.limits.precision) {
+				ArrayAppend(local.rv, local.value);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. The fraction digits of a plain decimal literal, trailing zeros dropped.
+	 */
+	public numeric function $fractionDigitCount(required string value) {
+		if (!Find(".", arguments.value)) {
+			return 0;
+		}
+		return Len(ReReplace(ListLast(arguments.value, "."), "0+$", ""));
+	}
+
+	/**
+	 * Internal function. The integer digits of a plain decimal literal, leading zeros dropped.
+	 */
+	public numeric function $integerDigitCount(required string value) {
+		return Len(ReReplace(ListFirst(ReReplace(arguments.value, "^-", ""), "."), "^0+", ""));
 	}
 
 	/**
@@ -801,6 +988,34 @@ component output=false extends="wheels.Global"{
 	) {
 		arguments.type = "columns";
 		return $dbinfo(argumentCollection = arguments);
+	}
+
+	/**
+	 * A CFML date passed where a string is expected (the query builder, a dynamic finder)
+	 * arrives as its CFML literal: {ts 'yyyy-mm-dd HH:mm:ss'}, {d 'yyyy-mm-dd'} or
+	 * {t 'HH:mm:ss'}. In SQL that literal is just text, which never matches a date stored
+	 * as text (SQLite). Returns the same yyyy-mm-dd HH:mm:ss text that save() writes for a
+	 * date. Only the exact shapes a date produces are unwrapped (regardless of column type,
+	 * since SQLite date columns are often declared TEXT); any other value, such as text that
+	 * merely looks like {d 'abc'}, is returned unchanged.
+	 */
+	public string function $unwrapDateLiteral(required string str) {
+		local.match = ReFind(
+			"^\{(?:ts '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,9})?)'|d '(\d{4}-\d{2}-\d{2})'|t '(\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?)')\}$",
+			arguments.str,
+			1,
+			true
+		);
+		if (local.match.pos[1] == 0) {
+			return arguments.str;
+		}
+		if (local.match.len[2] > 0) {
+			return Mid(arguments.str, local.match.pos[2], local.match.len[2]);
+		}
+		if (local.match.len[3] > 0) {
+			return Mid(arguments.str, local.match.pos[3], local.match.len[3]) & " 00:00:00";
+		}
+		return "1899-12-30 " & Mid(arguments.str, local.match.pos[4], local.match.len[4]);
 	}
 
 	/**
@@ -819,6 +1034,7 @@ component output=false extends="wheels.Global"{
 	 * value, so classic single-quote payloads land harmlessly inside a literal.
 	 */
 	public string function $quoteValue(required string str, string sqlType = "CF_SQL_VARCHAR", string type) {
+		arguments.str = $unwrapDateLiteral(arguments.str);
 		if (!StructKeyExists(arguments, "type")) {
 			arguments.type = $getValidationType(arguments.sqlType);
 		}
@@ -925,6 +1141,60 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. Acquires an advisory lock and returns the id of the database session that
+	 * holds it, or "" when the adapter can't tell (#4197). Session-scoped adapters override this.
+	 */
+	public string function $acquireAdvisoryLockSession(required string name, numeric timeout = 10) {
+		$acquireAdvisoryLock(name = arguments.name, timeout = arguments.timeout);
+		return "";
+	}
+
+	/**
+	 * Internal function. Releases an advisory lock and reports whether this release freed it.
+	 * Adapters whose locks belong to a pooled database session override this (#4197).
+	 */
+	public boolean function $tryReleaseAdvisoryLock(required string name) {
+		$releaseAdvisoryLock(name = arguments.name);
+		return true;
+	}
+
+	/**
+	 * Internal function. True while the named advisory lock is held: by the database session
+	 * `holder` when given, by any session otherwise (#4197).
+	 */
+	public boolean function $isAdvisoryLockHeld(required string name, string holder = "") {
+		return false;
+	}
+
+	/**
+	 * Internal function. Releases an advisory lock and makes sure it is free (#4197). MySQL and
+	 * PostgreSQL locks belong to the database session that took them, and the release is a separate
+	 * pooled query, so it can run on another session and free nothing. The release is then retried
+	 * for up to `retrySeconds`; a lock that stays held throws Wheels.AdvisoryLockReleaseFailed.
+	 * `holder` is the session recorded at acquire: only that session still holding the lock counts,
+	 * so another server that took the lock once ours was gone is not reported as a failure.
+	 */
+	public void function $releaseAdvisoryLockVerified(required string name, numeric retrySeconds = 5, string holder = "") {
+		local.deadline = GetTickCount() + arguments.retrySeconds * 1000;
+		while (true) {
+			if (
+				$tryReleaseAdvisoryLock(name = arguments.name)
+				|| !$isAdvisoryLockHeld(name = arguments.name, holder = arguments.holder)
+			) {
+				return;
+			}
+			if (GetTickCount() >= local.deadline) {
+				Throw(
+					type = "Wheels.AdvisoryLockReleaseFailed",
+					message = "Advisory lock '#arguments.name#' is still held after #arguments.retrySeconds# seconds of release attempts.",
+					extendedInfo = "The lock belongs to the pooled database session that acquired it, and the release kept running on other sessions. It stays held until that connection closes or releases it."
+				);
+			}
+			Sleep(100);
+		}
+	}
+
+	/**
 	 * Reports whether this adapter supports standalone advisory locks — i.e.,
 	 * `$acquireAdvisoryLock` / `$releaseAdvisoryLock` can be invoked directly
 	 * (no enclosing transaction or extension setup required) and will succeed.
@@ -939,6 +1209,83 @@ component output=false extends="wheels.Global"{
 	 */
 	public boolean function $supportsAdvisoryLocks() {
 		return false;
+	}
+
+	/**
+	 * Internal function. Reports whether this adapter supports transaction-scoped advisory locks —
+	 * the opt-in `withAdvisoryLock(transaction = true)` path (#4198). The lock is acquired on the
+	 * connection pinned by an enclosing transaction, so it covers the callback's own queries and
+	 * (where the lock is transaction-scoped) auto-releases when that transaction ends.
+	 *
+	 * Distinct from `$supportsAdvisoryLocks()`, which reports standalone (session) support. An
+	 * adapter may support one and not the other: SQL Server reports `$supportsAdvisoryLocks()` false
+	 * (its standalone `sp_getapplock @LockOwner = 'Transaction'` needs an open transaction) but
+	 * overrides this to true, taking a session-owned `sp_getapplock @LockOwner = 'Session'` lock on
+	 * the transaction-pinned connection.
+	 */
+	public boolean function $supportsTransactionalAdvisoryLock() {
+		return false;
+	}
+
+	/**
+	 * Internal function. Reports whether this adapter's transaction-scoped lock is actually
+	 * session-scoped and so must be released explicitly before the transaction closes (#4198).
+	 * MySQL's `GET_LOCK` and SQL Server's `sp_getapplock @LockOwner = 'Session'` are session- not
+	 * transaction-scoped: pinning them to the transaction's connection still guards the callback, but
+	 * they do not auto-release at transaction end, so the caller releases them with
+	 * `$releaseAdvisoryLockTransactional()` first. PostgreSQL (`pg_advisory_xact_lock`) auto-releases
+	 * at transaction end and leaves this false.
+	 */
+	public boolean function $transactionalAdvisoryLockIsSessionScoped() {
+		return false;
+	}
+
+	/**
+	 * Internal function. Acquires a transaction-scoped advisory lock on the current (pinned)
+	 * connection (#4198). Called only inside an open transaction, and only after
+	 * `$supportsTransactionalAdvisoryLock()` has reported true, so the default is never reached in
+	 * practice; it throws for safety. Throws `Wheels.AdvisoryLockTimeout` when the lock cannot be
+	 * taken in time.
+	 */
+	public void function $acquireAdvisoryLockTransactional(required string name, numeric timeout = 10) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "Transaction-scoped advisory locks are not supported for this database adapter.",
+			extendedInfo = "The #GetMetaData(this).name# adapter does not implement transaction-scoped advisory locking. Call withAdvisoryLock() without transaction = true, or use a database that supports it (PostgreSQL, MySQL, or SQL Server)."
+		);
+	}
+
+	/**
+	 * Internal function. Releases a transaction-scoped advisory lock before the transaction closes
+	 * (#4198). Only session-scoped locks (MySQL, SQL Server) need this; a transaction-scoped lock
+	 * (PostgreSQL) auto-releases at transaction end, so the default is a no-op.
+	 */
+	public void function $releaseAdvisoryLockTransactional(required string name) {
+	}
+
+	/**
+	 * Internal function. The connection attributes for an advisory-lock query, built the SAME way the
+	 * model's own query path does (`$performQuery`): empty username/password are OMITTED (#4198). This
+	 * matters for the transaction-scoped path: on Adobe CF a query with `{datasource}` and one with
+	 * `{datasource, username:"", password:""}` resolve to DIFFERENT pooled connections, so a lock taken
+	 * with the always-on form lands on a different connection than the model's writes — the writes then
+	 * run outside the lock's transaction and are not rolled back with it. Matching the model's form
+	 * pins the lock and the callback's queries to one connection on every engine. Lucee treats the two
+	 * forms as the same connection, which is why this only surfaced on Adobe.
+	 *
+	 * The datasource is resolved through `$effectiveDataSource()`, exactly as `$performQuery` does, so a
+	 * non-shared (tenant) model takes the lock on its tenant datasource — the same one its writes use —
+	 * rather than on the default datasource.
+	 */
+	public struct function $advisoryLockConnection() {
+		local.conn = {datasource = $effectiveDataSource()};
+		if (Len(variables.username)) {
+			local.conn.username = variables.username;
+		}
+		if (Len(variables.password)) {
+			local.conn.password = variables.password;
+		}
+		return local.conn;
 	}
 
 	/**

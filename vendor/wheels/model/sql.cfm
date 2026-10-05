@@ -1449,9 +1449,11 @@
 			}
 			local.wherePos = ArrayLen(local.rv) + 1;
 			local.params = [];
-			// split on AND/OR only where they stand as keywords: `_` and `$` are identifier
-			// characters, so `ORDER_AND_ITEMS.id` / `X$OR_Y.id` must not be cut in two (#3675)
-			local.where = ReReplace(
+			local.useTableAlias = (StructKeyExists(arguments, "useIndex") && !StructIsEmpty(arguments.useIndex)) && !($softDeletion() && arguments.softDelete);
+			// split on AND/OR (in any case) only where they stand as keywords: `_` and `$` are
+			// identifier characters, so `ORDER_AND_ITEMS.id` / `X$OR_Y.id` must not be cut in two
+			// (#3675). Literals are masked at this point, so none of their text can split.
+			local.where = ReReplaceNoCase(
 				ReReplace(arguments.where, variables.wheels.class.RESQLWhere, "\1?\8", "all"),
 				"([^a-zA-Z0-9_$])(AND|OR)([^a-zA-Z0-9_$])",
 				"\1#Chr(7)#\2\3",
@@ -1472,13 +1474,21 @@
 					local.elementDataPart = local.element;
 				}
 				// strip a leading AND/OR keyword only, never the start of an identifier like ORDERS (#3675)
-				local.elementDataPart = Trim(ReReplace(local.elementDataPart, "^(AND|OR)([^a-zA-Z0-9_$]|$)", "\2"));
+				local.elementDataPart = Trim(ReReplaceNoCase(local.elementDataPart, "^(AND|OR)([^a-zA-Z0-9_$]|$)", "\2"));
+				// the condition ends at its placeholder; anything after it (a LIKE ... ESCAPE
+				// clause) stays in the SQL as written
+				if (Find("?", local.elementDataPart)) {
+					local.elementDataPart = Left(local.elementDataPart, Find("?", local.elementDataPart));
+				}
 				local.temp = ReFind(
 					"^([a-zA-Z0-9-_\.$]*) ?#variables.wheels.class.RESQLOperators#",
 					local.elementDataPart,
 					1,
 					true
 				);
+				// A condition whose value is a function call is not a bound parameter: the part
+				// read above is the call's argument. Under include its column is qualified (the
+				// else branch below) so a column name the joined tables share is not ambiguous.
 				if (ArrayLen(local.temp.len) > 1) {
 					local.where = Replace(local.where, local.element, Replace(local.element, local.elementDataPart, "?", "one"));
 					local.param.property = Mid(local.elementDataPart, local.temp.pos[2], local.temp.len[2]);
@@ -1542,9 +1552,20 @@
 						local.param.list = true;
 					}
 					ArrayAppend(local.params, local.param);
+				} else {
+					// A function call compared with a bound value (ABS(id) = 1) binds that value
+					// with the call as its column; otherwise, under include, a condition whose
+					// value is a function call gets its column qualified.
+					local.leftExpression = Find("?", local.element) ? $leftExpressionParam(where = arguments.where, element = local.element, index = ArrayLen(local.params) + 1) : {};
+					if (!StructIsEmpty(local.leftExpression)) {
+						local.where = Replace(local.where, local.element, Replace(local.element, local.leftExpression.dataPart, "?", "one"));
+						ArrayAppend(local.params, local.leftExpression.param);
+					} else if (ArrayLen(local.classes) > 1) {
+						local.where = $qualifyUnboundConditionColumn(where = local.where, element = local.element, classes = local.classes, useTableAlias = local.useTableAlias);
+					}
 				}
 			}
-			local.where = ReplaceList(local.where, "#Chr(7)#AND,#Chr(7)#OR", "AND,OR");
+			local.where = Replace(local.where, Chr(7), "", "all");
 
 			// add to sql array
 			local.where = " " & local.where & " ";
@@ -1604,6 +1625,195 @@
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			if (IsSimpleValue(local.rv[local.i])) {
 				local.rv[local.i] = $restoreMaskedLiterals(local.rv[local.i]);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. For a WHERE condition whose value is a function call (so not a
+	 * bound parameter), qualifies the property it starts with by its
+	 * table, as a bound condition's column is, so a column name shared by the included
+	 * tables is not ambiguous. Leaves the condition alone when it doesn't start with a
+	 * property of the model or an included one.
+	 */
+	public string function $qualifyUnboundConditionColumn(
+		required string where,
+		required string element,
+		required array classes,
+		required boolean useTableAlias
+	) {
+		local.match = ReFindNoCase(
+			"^(\s*(?:(?:AND|OR)\s+)?[\s(]*)([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)?)( ?#variables.wheels.class.RESQLOperators#)",
+			arguments.element,
+			1,
+			true
+		);
+		if (ArrayLen(local.match.len) < 4 || local.match.len[3] == 0) {
+			return arguments.where;
+		}
+		local.column = $whereConditionColumn(
+			property = Mid(arguments.element, local.match.pos[3], local.match.len[3]),
+			classes = arguments.classes,
+			useTableAlias = arguments.useTableAlias
+		);
+		if (!Len(local.column)) {
+			return arguments.where;
+		}
+		// Left() with a length of 0 throws on Lucee 7
+		local.prefix = local.match.len[2] > 0 ? Left(arguments.element, local.match.len[2]) : "";
+		local.qualified = local.prefix & local.column & Mid(arguments.element, local.match.pos[3] + local.match.len[3], Len(arguments.element));
+		return Replace(arguments.where, arguments.element, local.qualified, "one");
+	}
+
+	/**
+	 * Internal function. The SQL for a WHERE property: the first of the model and its
+	 * included classes that has it, as quoted table.column (or tbl.column under useIndex),
+	 * or a calculated property's SQL. Empty when no class has it.
+	 */
+	public string function $whereConditionColumn(required string property, required array classes, required boolean useTableAlias) {
+		local.table = ListFirst(arguments.property, ".");
+		local.name = ListLast(arguments.property, ".");
+		for (local.classData in arguments.classes) {
+			if (Find(".", arguments.property) && local.table != local.classData.tableName) {
+				continue;
+			}
+			if (StructKeyExists(local.classData.propertyStruct, local.name)) {
+				local.columnName = variables.wheels.class.adapter.$quoteIdentifier(local.classData.properties[local.name].column);
+				if (arguments.useTableAlias) {
+					return "tbl." & local.columnName;
+				}
+				return variables.wheels.class.adapter.$quoteIdentifier(local.classData.tableName) & "." & local.columnName;
+			}
+			if (StructKeyExists(local.classData.calculatedProperties, local.name)) {
+				return "(" & local.classData.calculatedProperties[local.name].sql & ")";
+			}
+		}
+		return "";
+	}
+
+	/**
+	 * Internal function. For a WHERE condition whose left side is a function call and
+	 * whose value the WHERE regex bound (`ABS(id) = ?`, `UPPER(title) IS ?`), returns the
+	 * text to replace (dataPart) and the parameter, with the call as its column. The
+	 * value's SQL type comes from the bound value's shape, since there is no column to
+	 * take it from. Empty when the condition is not that shape.
+	 */
+	public struct function $leftExpressionParam(required string where, required string element, required numeric index) {
+		local.qpos = Find("?", arguments.element);
+		local.before = Left(arguments.element, local.qpos - 1);
+		local.operator = $trailingWhereOperator(local.before);
+		if (!Len(local.operator)) {
+			return {};
+		}
+		local.expressionEnd = Len(RTrim(local.before)) - Len(local.operator);
+		local.expressionStart = $callExpressionStart(arguments.element, local.expressionEnd);
+		if (local.expressionStart == 0) {
+			return {};
+		}
+		local.lead = local.expressionStart > 1 ? Left(arguments.element, local.expressionStart - 1) : "";
+		// ReFind never matches an empty string, so only check a lead that is there
+		if (Len(local.lead) && !ReFindNoCase("^\s*((AND|OR)\s+)?[\s(]*$", local.lead)) {
+			return {};
+		}
+		local.expression = Trim(Mid(arguments.element, local.expressionStart, local.expressionEnd - local.expressionStart + 1));
+		local.param = $boundValueType($boundWhereValue(where = arguments.where, index = arguments.index));
+		local.param.property = local.expression;
+		local.param.column = local.expression;
+		local.param.operator = Trim(local.operator);
+		return {dataPart: Mid(arguments.element, local.expressionStart, local.qpos - local.expressionStart + 1), param: local.param};
+	}
+
+	/**
+	 * Internal function. The comparison operator that ends `text` (ignoring trailing
+	 * whitespace), as written, or "" when it doesn't end in one. Longest operators first.
+	 */
+	public string function $trailingWhereOperator(required string text) {
+		local.text = RTrim(arguments.text);
+		local.match = ReFindNoCase("(\s(NOT\s+LIKE|LIKE|NOT\s+IN|IN|IS\s+NOT|IS)|<>|<=|>=|!=|!<|!>|=|<|>)$", local.text, 1, true);
+		if (ArrayLen(local.match.len) < 2 || local.match.len[1] == 0) {
+			return "";
+		}
+		return Mid(local.text, local.match.pos[1], local.match.len[1]);
+	}
+
+	/**
+	 * Internal function. When the text of `element` up to position `endPos` (ignoring
+	 * trailing whitespace) is a function call (a name, then balanced parentheses),
+	 * returns the position the call starts at; otherwise 0.
+	 */
+	public numeric function $callExpressionStart(required string element, required numeric endPos) {
+		local.i = arguments.endPos;
+		while (local.i >= 1 && ReFind("\s", Mid(arguments.element, local.i, 1))) {
+			local.i--;
+		}
+		if (local.i < 1 || Mid(arguments.element, local.i, 1) != ")") {
+			return 0;
+		}
+		local.depth = 0;
+		while (local.i >= 1) {
+			local.char = Mid(arguments.element, local.i, 1);
+			if (local.char == ")") {
+				local.depth++;
+			} else if (local.char == "(") {
+				local.depth--;
+				if (local.depth == 0) {
+					break;
+				}
+			}
+			local.i--;
+		}
+		if (local.i < 1) {
+			return 0;
+		}
+		local.nameEnd = local.i - 1;
+		local.i = local.nameEnd;
+		while (local.i >= 1 && ReFind("[A-Za-z0-9_$.]", Mid(arguments.element, local.i, 1))) {
+			local.i--;
+		}
+		return local.i < local.nameEnd ? local.i + 1 : 0;
+	}
+
+	/**
+	 * Internal function. The text of the index-th value the WHERE regex binds in `where`
+	 * (already masked), or "" when there are fewer.
+	 */
+	public string function $boundWhereValue(required string where, required numeric index) {
+		local.start = 1;
+		for (local.n = 1; local.n <= arguments.index; local.n++) {
+			local.match = ReFind(variables.wheels.class.RESQLWhere, arguments.where, local.start, true);
+			if (ArrayLen(local.match.len) < 5) {
+				return "";
+			}
+			local.start = local.match.pos[4] + local.match.len[4];
+		}
+		return Mid(arguments.where, local.match.pos[4], local.match.len[4]);
+	}
+
+	/**
+	 * Internal function. Parameter type settings for a bound value with no column to take
+	 * them from: a 64-bit integer or a decimal for a number, 1/0 for TRUE/FALSE, string otherwise
+	 * (a quoted value, or NULL, which binds as a null).
+	 */
+	public struct function $boundValueType(required string value) {
+		local.value = Trim(arguments.value);
+		local.rv = {dataType: "string", type: "CF_SQL_VARCHAR", scale: 0, list: false};
+		if (ReFind("^[+-]?[0-9]+$", local.value)) {
+			// 64-bit: ids and other whole numbers can exceed 32 bits (CockroachDB SERIAL ids do)
+			local.rv.dataType = "integer";
+			local.rv.type = "CF_SQL_BIGINT";
+		} else if (ReFindNoCase("^(true|false)$", local.value)) {
+			local.rv.dataType = "integer";
+			local.rv.type = "CF_SQL_INTEGER";
+		} else if (ReFind("^[+-]?[0-9]*\.[0-9]+$", local.value)) {
+			local.rv.dataType = "float";
+			local.rv.type = "CF_SQL_DECIMAL";
+			local.rv.scale = Len(ListLast(local.value, "."));
+		} else if (Left(local.value, 1) == "(") {
+			local.rv.list = true;
+			if (!Find("'", local.value)) {
+				local.rv.dataType = "integer";
+				local.rv.type = "CF_SQL_BIGINT";
 			}
 		}
 		return local.rv;

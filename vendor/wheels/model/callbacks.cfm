@@ -590,7 +590,49 @@
 	 */
 	public void function $prepareTransactionCallbackStore(required string connection, required boolean closeTransaction) {
 		if (arguments.closeTransaction && !$transactionForeign(arguments.connection)) {
-			request.wheels.$txnCallbacks[arguments.connection] = {real = true, queue = []};
+			// dataSource: where this owner's writes actually go (a tenant's datasource unless
+			// the model is shared), so a job enqueued inside it knows whether it shares the
+			// job store's datasource.
+			request.wheels.$txnCallbacks[arguments.connection] = {real = true, queue = [], dataSource = $transactionOwnerDataSource()};
+			$pushTransactionOwner(arguments.connection);
+		}
+	}
+
+	/**
+	 * Internal. The datasource this model's queries run against: the tenant's when a tenant
+	 * is active and the model is not shared, otherwise its own.
+	 */
+	public string function $transactionOwnerDataSource() {
+		if (StructKeyExists(variables.wheels.class, "adapter") && IsObject(variables.wheels.class.adapter)) {
+			return variables.wheels.class.adapter.$effectiveDataSource();
+		}
+		return variables.wheels.class.dataSource;
+	}
+
+	/**
+	 * Internal. Owners of open Wheels-managed transactions, innermost last.
+	 */
+	public void function $pushTransactionOwner(required string connection) {
+		if (!StructKeyExists(request.wheels, "$txnOwnerStack")) {
+			request.wheels.$txnOwnerStack = [];
+		}
+		ArrayAppend(request.wheels.$txnOwnerStack, arguments.connection);
+	}
+
+	/**
+	 * Internal. Removes the innermost entry for `connection` from the owner stack.
+	 */
+	public void function $popTransactionOwner(required string connection) {
+		if (!StructKeyExists(request, "wheels") || !StructKeyExists(request.wheels, "$txnOwnerStack")) {
+			return;
+		}
+		local.i = ArrayLen(request.wheels.$txnOwnerStack);
+		while (local.i >= 1) {
+			if (Compare(request.wheels.$txnOwnerStack[local.i], arguments.connection) == 0) {
+				ArrayDeleteAt(request.wheels.$txnOwnerStack, local.i);
+				return;
+			}
+			local.i--;
 		}
 	}
 
@@ -722,6 +764,7 @@
 		if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "$txnCallbacks")) {
 			StructDelete(request.wheels.$txnCallbacks, arguments.connection);
 		}
+		$popTransactionOwner(arguments.connection);
 		$runQueueCallbacks(queue = local.queue, type = arguments.type, propagateErrors = arguments.propagateErrors);
 	}
 

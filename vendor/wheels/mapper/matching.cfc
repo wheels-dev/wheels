@@ -675,6 +675,9 @@ component {
 					local.route.regex = local.newRegex;
 
 					// Write modified route back to the local array reference.
+					// Safe for Dispatch's route index (#4157): it keys routes only on
+					// `pattern` and `methods`, which this never changes, and the matcher
+					// reads `regex` from the route itself on every request.
 					local.routes[local.i] = local.route;
 				}
 

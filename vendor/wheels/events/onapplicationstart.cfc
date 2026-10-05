@@ -114,6 +114,7 @@ component {
 		// controller, and mapper object materialization (issue #3213). Like the
 		// schema cache, it lives for the application lifetime and is rebuilt on reload.
 		application.$wheels.integrationPlans = {};
+		application.$wheels.controllerIntegration = {};
 		application.$wheels.helperFileCache = {};
 		application.$wheels.layoutFileCache = {};
 		application.$wheels.existingObjectFiles = {};
@@ -298,11 +299,6 @@ component {
 			);
 		}
 
-		// Set the coreTestDatasourceName to the application dataSourceName if it doesn't exits
-		if (!StructKeyExists(application.$wheels, "coreTestDataSourceName")) {
-			application.$wheels.coreTestDataSourceName = application.$wheels.dataSourceName;
-		}
-
 		// Test framework: "testbox" (default) or "rocketunit"
 		if (!StructKeyExists(application.$wheels, "testFramework")) {
 			application.$wheels.testFramework = "testbox";
@@ -335,6 +331,9 @@ component {
 
 		// Create migrations object and set default settings.
 		application.$wheels.autoMigrateDatabase = false;
+		// Strict boot migration (#4063): a migration that cannot run stops the
+		// application from starting. WHEELS_MIGRATE_ON_BOOT overrides it.
+		application.$wheels.migrateOnBoot = false;
 		// New default names (F15 Phase 1). The migrator's $detectSystemTables()
 		// helper at runtime will flip these back to the legacy `c_o_r_e_*`
 		// names if it finds those tables already in the database, so existing
@@ -342,6 +341,12 @@ component {
 		// New installs get the clean `wheels_*` prefix.
 		application.$wheels.migratorTableName = "wheels_migrator_versions";
 		application.$wheels.levelsTableName = "wheels_levels";
+		// Cross-process migration lock (#4134): instances sharing a database run its migrations
+		// one at a time. A waiting instance gives up after migrationLockTimeout seconds; a holder
+		// that died frees the lock once its lease (renewed before each step) runs out.
+		application.$wheels.migratorLockTableName = "wheels_migrator_locks";
+		application.$wheels.migrationLockTimeout = 300;
+		application.$wheels.migrationLockLease = 3600;
 		application.$wheels.createMigratorTable = true;
 		application.$wheels.writeMigratorSQLFiles = false;
 		// Preserve column / table / index name case as written in the migration.
@@ -385,6 +390,10 @@ component {
 		// Parse set(baseUrl=...) now: a malformed value stops the application
 		// from starting instead of failing the first absolute URL (#3842).
 		application.wo.$cacheBaseUrl(application.$wheels);
+
+		// Default coreTestDataSourceName to the dataSourceName the settings files set
+		// (not the folder-derived one above), unless they set it themselves.
+		application.wo.$defaultCoreTestDataSourceName(application.$wheels);
 
 		// Re-derive framework paths now that settings.cfm has loaded. Detection
 		// priority for the URL subpath (issue #2968):
@@ -540,9 +549,22 @@ component {
 			application.wo.$verifyInterfaceContracts();
 		}
 
-		// Auto Migrate Database if requested
-		if (application.wheels.enableMigratorComponent && application.wheels.autoMigrateDatabase) {
-			application.wheels.migrator.migrateToLatest();
+		// Migrate the database at start if requested (#4063). A boolean
+		// WHEELS_MIGRATE_ON_BOOT environment variable overrides both settings;
+		// set(migrateOnBoot=true) migrates strictly (a migration that cannot run
+		// stops the start); set(autoMigrateDatabase=true) keeps its lenient
+		// behaviour (failures are logged and the application still starts).
+		if (application.wheels.enableMigratorComponent) {
+			local.bootMigration = $resolveBootMigration(
+				migrateOnBoot = application.wheels.migrateOnBoot,
+				autoMigrateDatabase = application.wheels.autoMigrateDatabase,
+				envValue = $bootMigrationEnvValue()
+			);
+			if (local.bootMigration == "strict") {
+				$runStrictBootMigration(application.wheels.migrator);
+			} else if (local.bootMigration == "lenient") {
+				application.wheels.migrator.migrateToLatest();
+			}
 		}
 
 		// Redirect away from reloads on GET requests.
@@ -604,6 +626,95 @@ component {
 			return arguments.settingValue;
 		}
 		return !ListFindNoCase("production,testing,maintenance", arguments.environment);
+	}
+
+	/**
+	 * How the application migrates the database at start (#4063): "strict",
+	 * "lenient" or "none".
+	 *
+	 * A WHEELS_MIGRATE_ON_BOOT environment variable holding a boolean overrides
+	 * both settings: true migrates strictly, false never migrates at start, even
+	 * with set(autoMigrateDatabase=true). `wheels deploy` sets it per host (true
+	 * on the one host that migrates, false on every other) so hosts sharing a
+	 * database do not all migrate at once. An empty value means unset; any other
+	 * non-boolean value is ignored, with a warning in the wheels log. Without it,
+	 * set(migrateOnBoot=true) migrates strictly and set(autoMigrateDatabase=true)
+	 * leniently.
+	 *
+	 * @envValue The WHEELS_MIGRATE_ON_BOOT value, or "" when it is not set.
+	 */
+	public string function $resolveBootMigration(
+		required any migrateOnBoot,
+		required any autoMigrateDatabase,
+		string envValue = ""
+	) {
+		local.envValue = Trim(arguments.envValue);
+		if (Len(local.envValue)) {
+			if (IsBoolean(local.envValue)) {
+				return local.envValue ? "strict" : "none";
+			}
+			WriteLog(
+				file = "wheels",
+				type = "warning",
+				text = "WHEELS_MIGRATE_ON_BOOT='#local.envValue#' is not a boolean and was ignored."
+			);
+		}
+		if (IsBoolean(arguments.migrateOnBoot) && arguments.migrateOnBoot) {
+			return "strict";
+		}
+		if (IsBoolean(arguments.autoMigrateDatabase) && arguments.autoMigrateDatabase) {
+			return "lenient";
+		}
+		return "none";
+	}
+
+	/**
+	 * Migrates to the latest version and fails the application start when any
+	 * migration is still pending afterwards (#4063). The migrator reports a
+	 * failed step in its output rather than throwing, so the check is on the
+	 * outcome: every available migration must be applied. The failure is written
+	 * to the wheels log and thrown as Wheels.BootMigrationFailed, so every request,
+	 * the deploy health check included, fails until the cause is fixed.
+	 */
+	public string function $runStrictBootMigration(required any migrator) {
+		local.output = arguments.migrator.migrateToLatest();
+		local.pending = [];
+		for (local.migration in arguments.migrator.getAvailableMigrations()) {
+			if (local.migration.status != "migrated") {
+				ArrayAppend(local.pending, local.migration.version);
+			}
+		}
+		if (ArrayLen(local.pending)) {
+			local.message = "Boot migration did not complete: #ArrayLen(local.pending)# migration(s) still pending (#ArrayToList(local.pending, ', ')#), so the application will not start.";
+			WriteLog(file = "wheels", type = "error", text = local.message & " " & Trim(local.output));
+			Throw(type = "Wheels.BootMigrationFailed", message = local.message, detail = Trim(local.output));
+		}
+		return local.output;
+	}
+
+	/**
+	 * The WHEELS_MIGRATE_ON_BOOT environment variable, or "" when it is not set.
+	 */
+	public string function $bootMigrationEnvValue() {
+		return $readEnvironmentVariable("WHEELS_MIGRATE_ON_BOOT");
+	}
+
+	/**
+	 * A process environment variable, or "" when it is not set. Read the same way
+	 * as WHEELS_SUBPATH and env(): `server.system.environment`, which Lucee, BoxLang
+	 * and Adobe ColdFusion 2023/2025 all populate (Lucee's getSystemSetting() is
+	 * not portable). BootMigrationSpec reads PATH through this function on every
+	 * engine in the compat matrix.
+	 */
+	public string function $readEnvironmentVariable(required string name) {
+		if (
+			StructKeyExists(server, "system")
+			&& StructKeyExists(server.system, "environment")
+			&& StructKeyExists(server.system.environment, arguments.name)
+		) {
+			return server.system.environment[arguments.name];
+		}
+		return "";
 	}
 
 	/**

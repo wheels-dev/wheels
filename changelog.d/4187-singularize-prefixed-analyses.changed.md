@@ -1,0 +1,1 @@
+- `singularize()` returns `psychoanalysis` for `psychoanalyses` instead of the misspelled `psychoanalyasis`; other `-ses` words such as `bases`, `theses` and `analyses` are unchanged (#4187).

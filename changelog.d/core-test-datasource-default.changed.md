@@ -1,0 +1,1 @@
+- When `config/settings.cfm` sets `dataSourceName` and not `coreTestDataSourceName`, `coreTestDataSourceName` now defaults to that `dataSourceName` instead of a datasource named after the folder of the app's front controller. An app that ran the framework test suite on a datasource with that folder's name must now set `coreTestDataSourceName` to it explicitly.

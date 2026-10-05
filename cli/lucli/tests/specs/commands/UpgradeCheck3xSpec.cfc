@@ -55,6 +55,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		return out;
 	}
 
+	/** The matches of the breaking finding whose description starts with `prefix`; [] when there is none. */
+	private array function $matchesFor(required struct report, required string prefix) {
+		for (var f in arguments.report.breaking ?: []) {
+			if (left(f.description, len(arguments.prefix)) == arguments.prefix) return f.matches;
+		}
+		return [];
+	}
+
 	private string function $allText(required struct report) {
 		return serializeJSON([report.breaking ?: [], report.advisories ?: []]);
 	}
@@ -118,6 +126,68 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					"config/settings.cfm": "set(allowEnvironmentSwitchViaUrl=true);"
 				};
 				expect($allText($check($app(files)))).notToInclude("allowEnvironmentSwitchViaUrl");
+			});
+		});
+
+		describe("upgrade check: WireBox references in a 3.x app", () => {
+
+			it("flags the WireBox bootstrap in public/Application.cfc", () => {
+				var files = $wheels30();
+				files["public/Application.cfc"] = 'component {#chr(10)#	function onApplicationStart() {#chr(10)#		application.wirebox = new wirebox.system.ioc.Injector("wheels.Wirebox");#chr(10)#	}#chr(10)#}';
+				var matches = $matchesFor($check($app(files)), "Direct WireBox references");
+				expect(matches).toBe(["public/Application.cfc:3"]);
+			});
+
+			it("skips a package that box.json installs under app/", () => {
+				var files = $wheels30();
+				files["box.json"] = serializeJSON({dependencies: {logbox: "^7.0.0"}, installPaths: {logbox: "app/lib/logbox/"}});
+				files["app/lib/logbox/system/BaseProxy.cfc"] = "component { function x() { return application.wirebox; } }";
+				expect($matchesFor($check($app(files)), "Direct WireBox references")).toBeEmpty();
+			});
+
+			it("skips a package with its own box.json wherever it sits under app/", () => {
+				var files = $wheels30();
+				files["box.json"] = serializeJSON({dependencies: {logbox: "^7.0.0"}, installPaths: {logbox: "app/lib/logbox/"}});
+				files["app/lib/lib/logbox/box.json"] = serializeJSON({name: "LogBox"});
+				files["app/lib/lib/logbox/system/BaseProxy.cfc"] = "component { function x() { return application.wirebox; } }";
+				expect($matchesFor($check($app(files)), "Direct WireBox references")).toBeEmpty();
+			});
+
+			it("still flags the app's own code next to such a package", () => {
+				var files = $wheels30();
+				files["box.json"] = serializeJSON({dependencies: {logbox: "^7.0.0"}, installPaths: {logbox: "./app/lib/logbox"}});
+				files["app/lib/logbox/system/BaseProxy.cfc"] = "component { function x() { return application.wirebox; } }";
+				files["app/lib/Helper.cfc"] = "component { function x() { return application.wirebox.getInstance(""Foo""); } }";
+				expect($matchesFor($check($app(files)), "Direct WireBox references")).toBe(["app/lib/Helper.cfc:1"]);
+			});
+		});
+
+		describe("upgrade check: plugins in a 3.x app", () => {
+
+			it("reports a box.json plugin dependency when plugins/ is empty or missing", () => {
+				var files = $wheels30();
+				files["box.json"] = serializeJSON({dependencies: {"cfwheels-bcrypt": "^1.0.0"}, installPaths: {"cfwheels-bcrypt": "plugins/bcrypt/"}});
+				var root = $app(files);
+				directoryCreate(root & "/plugins");
+				expect($matchesFor($check(root), "Legacy plugins")).toBe(["box.json: cfwheels-bcrypt (plugins/bcrypt/)"]);
+			});
+
+			it("reports a cfwheels- dependency with no installPath and no plugins/ folder", () => {
+				var files = $wheels30();
+				files["box.json"] = serializeJSON({devDependencies: {"cfwheels-dbmigrate": "^2.0.0"}});
+				expect($matchesFor($check($app(files)), "Legacy plugins")).toBe(["box.json: cfwheels-dbmigrate"]);
+			});
+
+			it("reports code that reads application.wheels.plugins", () => {
+				var files = $wheels30();
+				files["app/models/User.cfc"] = "component {#chr(10)#	function hash(pw) { return application.wheels.plugins.bcrypt.hash(pw); }#chr(10)#}";
+				expect($matchesFor($check($app(files)), "Legacy plugins")).toBe(["app/models/User.cfc:2"]);
+			});
+
+			it("ignores dependencies installed outside plugins/", () => {
+				var files = $wheels30();
+				files["box.json"] = serializeJSON({dependencies: {"cfwheels-tools": "^1.0.0", logbox: "^7.0.0"}, installPaths: {"cfwheels-tools": "vendor/tools/", logbox: "app/lib/logbox/"}});
+				expect($matchesFor($check($app(files)), "Legacy plugins")).toBeEmpty();
 			});
 		});
 

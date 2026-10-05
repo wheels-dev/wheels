@@ -1,6 +1,39 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
+	 * Internal function. This database converts a high-precision decimal sent as text exactly,
+	 * in an insert and in a comparison (#4172).
+	 */
+	public string function $wideDecimalBindType() {
+		return "cf_sql_varchar";
+	}
+
+	/**
+	 * Internal function. SQL Server converts a text value to the column's DECIMAL type, rounding
+	 * it to the column's scale, so a high-precision decimal also binds inside an exact cast (#4172).
+	 */
+	public struct function $wideDecimalCastLimits() {
+		return {precision = 38, scale = 38};
+	}
+
+	/**
+	 * Internal function. Casts high-precision decimal params exactly before running the query.
+	 */
+	public struct function $performQuery(
+		required array sql,
+		required boolean parameterize,
+		numeric limit = 0,
+		numeric offset = 0,
+		string dataSource = variables.dataSource,
+		string $primaryKey = "",
+		string $debugName = "query",
+		boolean $captureResult = true
+	) {
+		$castWideDecimalParams(args = arguments);
+		return super.$performQuery(argumentCollection = arguments);
+	}
+
+	/**
 	 * SQL Server accepts at most 2100 parameters in one request, and the JDBC drivers use some of them
 	 * themselves: mssql-jdbc (Lucee, BoxLang) runs 2098 bound values and fails at 2099, Adobe's
 	 * driver runs 2097 and fails at 2098. 2097 is the highest count that runs on every engine (#3906).
@@ -328,6 +361,84 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public boolean function $supportsAdvisoryLocks() {
 		return false;
+	}
+
+	/**
+	 * SQL Server supports the transaction-scoped path (#4198), using a SESSION-owned application lock
+	 * (sp_getapplock @LockOwner = 'Session'). The sp_getapplock 'Transaction' owner is unusable under
+	 * Lucee / Adobe: cftransaction sets the JDBC connection to autocommit = false without issuing an
+	 * explicit BEGIN TRANSACTION, so @@TRANCOUNT stays 0 and sp_getapplock @LockOwner = 'Transaction'
+	 * returns -999 (verified on Lucee 7 — the pinning gate proved same-connection but not
+	 * @@TRANCOUNT > 0). The transaction's role here is purely to pin one connection, exactly as for
+	 * MySQL, so the session lock, the callback's queries and the release all run on one session.
+	 */
+	public boolean function $supportsTransactionalAdvisoryLock() {
+		return true;
+	}
+
+	/**
+	 * A SESSION-owned application lock is session- not transaction-scoped: it does not auto-release at
+	 * transaction end, so the caller releases it explicitly on the pinned connection before the
+	 * transaction closes (#4198). Same contract as MySQL.
+	 */
+	public boolean function $transactionalAdvisoryLockIsSessionScoped() {
+		return true;
+	}
+
+	/**
+	 * Internal function. Acquires a SQL Server session-owned application lock with sp_getapplock on
+	 * the current (pinned) connection (#4198). @LockOwner = 'Session' is required because cftransaction
+	 * does not raise @@TRANCOUNT on SQL Server (see $supportsTransactionalAdvisoryLock).
+	 *
+	 * sp_getapplock RETURNS a status rather than throwing: >= 0 granted (0 immediately, 1 after
+	 * waiting), < 0 failed (-1 timeout, -2 canceled, -3 deadlock victim, -999 parameter/other). The
+	 * batch opens with SET NOCOUNT ON so the driver does not surface a leading update count ahead of
+	 * the SELECT, which would leave QueryExecute without a result set.
+	 */
+	public void function $acquireAdvisoryLockTransactional(required string name, numeric timeout = 10) {
+		local.result = queryExecute(
+			"SET NOCOUNT ON; DECLARE @r int; EXEC @r = sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = ?; SELECT @r AS lockResult",
+			[arguments.name, arguments.timeout * 1000],
+			$advisoryLockConnection()
+		);
+		local.status = (IsQuery(local.result) && local.result.recordCount) ? Val(local.result.lockResult) : -999;
+		if (local.status < 0) {
+			if (local.status == -1) {
+				Throw(
+					type = "Wheels.AdvisoryLockTimeout",
+					message = "Could not acquire advisory lock '#arguments.name#' within #arguments.timeout# seconds.",
+					extendedInfo = "SQL Server sp_getapplock returned -1 (timeout), indicating another session holds the lock."
+				);
+			}
+			Throw(
+				type = "Wheels.AdvisoryLockError",
+				message = "Could not acquire advisory lock '#arguments.name#' (sp_getapplock returned #local.status#).",
+				extendedInfo = "SQL Server sp_getapplock returned a negative status: -2 canceled, -3 deadlock victim, -999 parameter or other error."
+			);
+		}
+	}
+
+	/**
+	 * Internal function. Releases the SQL Server session-owned application lock on the pinned
+	 * connection before the transaction closes (#4198). sp_releaseapplock returns >= 0 on success
+	 * (0 released) and < 0 on error; on the pinned connection a negative result is a real failure and
+	 * is thrown (no retry). SET NOCOUNT ON keeps the status SELECT the only result set. The caller runs
+	 * this in a finally inside the transaction, so a release error never replaces the callback's own.
+	 */
+	public void function $releaseAdvisoryLockTransactional(required string name) {
+		local.result = queryExecute(
+			"SET NOCOUNT ON; DECLARE @r int; EXEC @r = sp_releaseapplock @Resource = ?, @LockOwner = 'Session'; SELECT @r AS releaseResult",
+			[arguments.name],
+			$advisoryLockConnection()
+		);
+		local.status = (IsQuery(local.result) && local.result.recordCount) ? Val(local.result.releaseResult) : -999;
+		if (local.status < 0) {
+			Throw(
+				type = "Wheels.AdvisoryLockReleaseFailed",
+				message = "Advisory lock '#arguments.name#' could not be released on its pinned connection.",
+				extendedInfo = "SQL Server sp_releaseapplock returned #local.status# on the connection that holds the lock, which should not happen inside the lock's own transaction."
+			);
+		}
 	}
 
 	/**

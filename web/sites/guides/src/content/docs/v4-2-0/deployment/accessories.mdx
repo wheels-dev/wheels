@@ -126,7 +126,7 @@ Read the password from `server.system.environment`: in the container it arrives 
 
 **3. No driver step.** The `lucee/lucee` 7.1 image that `wheels deploy init` uses already contains the PostgreSQL (42.7.9), MySQL (9.6.0) and SQL Server (13.2.1) JDBC drivers, so nothing has to be installed at boot. For MySQL, use `class: "com.mysql.cj.jdbc.Driver"`, `bundleName: "com.mysql.cj"` and a `jdbc:mysql://myapp-db:3306/myapp` URL.
 
-**4. Migrations.** `set(autoMigrateDatabase=true)` in `config/production/settings.cfm` runs pending migrations when the app starts. That is safe for **one app host only**: with several hosts sharing the database, every host migrates at boot at the same time. With more than one host, run migrations once yourself after the rollout, for example from one host, until a one-shot migrate step exists ([#4063](https://github.com/wheels-dev/wheels/issues/4063)).
+**4. Migrations.** `set(autoMigrateDatabase=true)` in `config/production/settings.cfm` runs pending migrations when the app starts. That is safe for **one app host only**: with several hosts sharing the database, every host migrates at boot at the same time. With more than one host, add [`migrate:`](/v4-2-0/deployment/config-reference/#migrate) to `config/deploy.yml` instead: `wheels deploy` then migrates on one host before the others boot, and turns migration at start off on every other host.
 
 Boot the accessory before the first deploy (`wheels deploy accessory boot db`, or `wheels deploy setup`, which boots every accessory first).
 

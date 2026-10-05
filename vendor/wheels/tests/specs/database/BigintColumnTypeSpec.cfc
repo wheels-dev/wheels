@@ -41,6 +41,20 @@ component extends="wheels.WheelsTest" {
 				expect(oracle.$getType(type = "number", scale = 0, details = "", precision = 38)).toBe("cf_sql_bigint")
 			})
 
+			it("binds an Oracle integer beyond 64 bits as text, and nothing else (##4162)", () => {
+				expect(oracle.$queryParams({type = "cf_sql_bigint", value = "10"}).cfsqltype).toBe("cf_sql_bigint")
+				expect(oracle.$queryParams({type = "cf_sql_bigint", value = "9223372036854775807"}).cfsqltype).toBe("cf_sql_bigint")
+				expect(oracle.$queryParams({type = "cf_sql_bigint", value = "-9223372036854775808"}).cfsqltype).toBe("cf_sql_bigint")
+				expect(oracle.$queryParams({type = "cf_sql_bigint", value = "9223372036854775808"}).cfsqltype).toBe("cf_sql_varchar")
+				expect(oracle.$queryParams({type = "cf_sql_bigint", value = "-9223372036854775809"}).cfsqltype).toBe("cf_sql_varchar")
+				expect(oracle.$queryParams({type = "cf_sql_bigint", value = "123456789012345678901234567890"}).cfsqltype).toBe("cf_sql_varchar")
+				expect(oracle.$queryParams({type = "cf_sql_integer", value = "123456789012345678901234567890"}).cfsqltype).toBe("cf_sql_varchar")
+				expect(oracle.$queryParams({type = "cf_sql_bigint", value = "+123456789012345678901234567890"}).cfsqltype).toBe("cf_sql_bigint")
+				expect(oracle.$queryParams({type = "cf_sql_bigint", value = "1,123456789012345678901234567890", list = true}).cfsqltype).toBe("cf_sql_varchar")
+				expect(oracle.$queryParams({type = "cf_sql_bigint", value = "1,2", list = true}).cfsqltype).toBe("cf_sql_bigint")
+				expect(oracle.$queryParams({type = "cf_sql_bigint", value = "", null = true}).cfsqltype).toBe("cf_sql_bigint")
+			})
+
 			it("keeps other Oracle NUMBER shapes as before", () => {
 				expect(oracle.$getType(type = "number", scale = 0, details = "", precision = 10)).toBe("cf_sql_integer")
 				expect(oracle.$getType(type = "number", scale = 0, details = "", precision = 1)).toBe("cf_sql_integer")
