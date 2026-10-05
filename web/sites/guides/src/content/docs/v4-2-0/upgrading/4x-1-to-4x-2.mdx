@@ -347,6 +347,10 @@ If your app builds storage keys from user input or file names, check that none o
 
 Both refuse to run outside a Wheels project (`Wheels.NotAWheelsProject`, non-zero exit) instead of writing or deleting files in the current directory ([#3909](https://github.com/wheels-dev/wheels/issues/3909)). `wheels generate app` still works anywhere.
 
+### Generated model columns are required by default
+
+`wheels generate model` and `wheels generate scaffold` now create each unmarked `name:type` column as `allowNull=false` and add it to `validatesPresenceOf`, so the model and its migration agree ([#4285](https://github.com/wheels-dev/wheels/pull/4285)). In 4.1 every column was validated for presence while the migration made it nullable. Mark a column nullable with `name:type:optional`, or give it a default with `name:type=value`; neither is added to `validatesPresenceOf`. Models you already generated are unchanged. Update scripts that generate models if some of their columns should stay nullable.
+
 ### App creation is CLI-only over MCP
 
 The stdio MCP server (`wheels mcp wheels`) no longer offers `create`, and refuses `generate` with `type=app` ([#3910](https://github.com/wheels-dev/wheels/issues/3910), [#3980](https://github.com/wheels-dev/wheels/issues/3980)). Run `wheels new <name>` in a terminal.
