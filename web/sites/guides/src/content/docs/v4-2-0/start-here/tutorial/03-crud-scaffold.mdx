@@ -86,7 +86,7 @@ rm app/controllers/Posts.cfc
 rm -r app/views/posts
 ```
 
-Leave `app/models/Post.cfc`, `app/migrator/migrations/<timestamp>_create_posts_table.cfc`, `app/db/seeds.cfm`, and `config/routes.cfm` alone.
+Leave `app/models/Post.cfc`, `app/migrator/migrations/<timestamp>_create_posts_table.cfc`, and `app/db/seeds.cfm` alone. You'll update `config/routes.cfm` later in this part.
 
 ## Generate the scaffold
 
@@ -253,10 +253,11 @@ Part 2 restricted the resource to `only="index,show"`. Drop the restriction so a
 
    ```cfm {test:compile}
    mapper()
+       .get(name="up", to="up##index")
        .resources(name="posts", binding=true)
        .get(name="hello", pattern="/hello", to="main##hello")
-       .wildcard()
        .root(to="posts##index", method="get")
+       .wildcard()
    .end();
    ```
 

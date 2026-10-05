@@ -61,6 +61,12 @@ jobs:
   build:
     name: Build & Publish Release
     runs-on: ubuntu-latest
+    # Stable runs queue instead of overlapping, so two quick pushes to main
+    # can't both pass the republish check before either uploads (#4221).
+    # Snapshot runs get a unique group and never wait.
+    concurrency:
+      group: ${{ github.ref == 'refs/heads/main' && 'release-stable' || format('release-{0}', github.run_id) }}
+      cancel-in-progress: false
     steps:
       - name: Checkout Repository
         id: Checkout-Repository
@@ -92,6 +98,18 @@ jobs:
             echo "WHEELS_VERSION=${BASE_VERSION}" >> $GITHUB_ENV
             echo "BRANCH=main" >> $GITHUB_ENV
           fi
+
+      # A published version's assets never change (#4221). Without this check a
+      # push to main whose wheels.json still names a released version rebuilt
+      # and replaced that release's assets in place (v4.1.0, 2026-09-17), and
+      # republished it to ForgeBox. It runs before any build or publish step
+      # and fails closed. The decision (and its fixtures) lives in
+      # tools/ci/release_republish_guard.py.
+      - name: Refuse to republish an existing release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/ci/release_republish_guard.py --repo "$GITHUB_REPOSITORY" --tag "v${WHEELS_VERSION}" --sha "$GITHUB_SHA"
 
       - name: Make build scripts executable
         run: |

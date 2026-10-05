@@ -136,6 +136,64 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("S2b production error page (showErrorInformation off) uses the same status map", () => {
+
+			// Finding F24: with showErrorInformation off (the default outside
+			// development, i.e. production/testing), $runOnError routes to
+			// $runOnErrorRenderTemplate, which used to hardcode statusCode=500 for
+			// every error. So an app-thrown Wheels.*NotFound came back 500, not
+			// 404, and a Wheels.NotAuthorized came back 500, not 403 — the status
+			// classification only ran on the showErrorInformation=on branch. The
+			// production path must classify through the same $wheelsErrorStatusCode
+			// allow-list as the development path (#2319/#3075/#3156).
+
+			beforeEach(() => {
+				_savedShowError = application.wheels.showErrorInformation;
+				application.wheels.showErrorInformation = false;
+			});
+
+			afterEach(() => {
+				application.wheels.showErrorInformation = _savedShowError;
+			});
+
+			it("maps Wheels.RecordNotFound to 404 through live $runOnError (production)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.RecordNotFound"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(404);
+			});
+
+			it("maps Wheels.RouteNotFound to 404 through live $runOnError (production)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.RouteNotFound"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(404);
+			});
+
+			it("maps Wheels.ActionNotAllowed to 404 through live $runOnError (production, ##3075)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.ActionNotAllowed"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(404);
+			});
+
+			it("maps Wheels.NotAuthorized to 403 through live $runOnError (production, ##3156)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.NotAuthorized"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(403);
+			});
+
+			it("keeps a server-side Wheels.TableNotFound at 500 through live $runOnError (production)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.TableNotFound"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(500);
+			});
+
+			it("keeps a generic non-allow-listed Wheels error at 500 (production)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.UnknownThingHappened"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(500);
+			});
+
+		});
+
 		describe("S3 $mail catch-any swallow stays (does not rethrow)", () => {
 
 			beforeEach(() => {
@@ -431,6 +489,79 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("S8 production (showErrorInformation off) keeps a non-Wheels exception at HTTP 500", () => {
+
+			// Complements the development status map (onerrorSpec / S2): the
+			// development path classifies Wheels error TYPES, but a genuine
+			// NON-Wheels exception (a plain Java/CFML runtime error) has no Wheels
+			// type to resolve, so on the production error-page path it must stay
+			// 500 — never accidentally 404/403.
+			beforeEach(() => {
+				_savedShowError = application.wheels.showErrorInformation;
+				application.wheels.showErrorInformation = false;
+			});
+
+			afterEach(() => {
+				application.wheels.showErrorInformation = _savedShowError;
+			});
+
+			it("a plain non-Wheels exception renders the production page with HTTP 500", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $plainException(), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(500);
+			});
+
+			it("a rootCause with no type does not crash the resolver and stays HTTP 500", () => {
+				// The non-BoxLang resolver branch reads exception.rootCause.type; a
+				// rootCause present but without a `type` key must not be dereferenced
+				// unguarded (it would crash the production error page itself). It falls
+				// through to {} and the status stays 500.
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $typelessRootCauseException(), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(500);
+			});
+
+			it("a REAL caught Wheels exception as the rootCause still classifies to 404", () => {
+				// The hand-built specs above use plain structs; the production path can
+				// hand the resolver a real caught exception / Java Throwable as the
+				// rootCause. Build it from a genuine throw/catch so the guard is proven
+				// against each engine's real exception object. Invariant 11: the catch
+				// writes into an outer struct field with NO local. prefix so it persists
+				// on BoxLang.
+				var state = {caught = ""};
+				try {
+					Throw(type = "Wheels.RecordNotFound", message = "real-not-found");
+				} catch (any e) {
+					state.caught = e;
+				}
+				// One wrapper both resolver branches read: Lucee/Adobe take
+				// exception.rootCause; BoxLang takes exception.cause.rootCause. The
+				// top-level type is non-Wheels so BoxLang does not classify it directly.
+				var wrapper = {
+					type = "Application",
+					message = "wrapped",
+					rootCause = state.caught,
+					cause = {rootCause = state.caught}
+				};
+				var em = $onErrorDouble();
+				em.$runOnError(exception = wrapper, eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(404);
+			});
+
+		});
+
+	}
+
+	private struct function $typelessRootCauseException() {
+		// rootCause present but with no `type` key (and a non-Wheels top-level type),
+		// so neither engine branch should classify it — resolver returns {} -> 500.
+		return {
+			type = "java.lang.RuntimeException",
+			message = "boom",
+			rootCause = {
+				message = "root boom"
+			}
+		};
 	}
 
 	private any function $onErrorDouble() {

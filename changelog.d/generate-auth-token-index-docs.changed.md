@@ -1,0 +1,1 @@
+- `wheels generate auth --strategy=token` indexes the `apiTokenDigest` column it looks every request's token up by, and its next steps say how to create the first account and how to protect actions. The app's `.ai/auth.md` gains a "Token APIs" section with a seed for the first account and a filter that requires a bearer token.

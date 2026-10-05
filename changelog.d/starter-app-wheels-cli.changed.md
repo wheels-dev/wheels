@@ -1,0 +1,1 @@
+- The `wheels-starter-app` release zip now includes the framework in `vendor/wheels/` and runs on the Wheels CLI with an embedded SQLite database: unzip, copy `.env.example` to `.env` and set its passwords, then `wheels start`, `wheels migrate latest` and `wheels reload`. Under CommandBox (`box server start`) it still uses H2, with no `box install` step.

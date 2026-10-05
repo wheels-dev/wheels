@@ -159,6 +159,94 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("parseGeneratorArgs — required-by-default and the :optional / =value markers", () => {
+
+			it("marks an unmarked column required", () => {
+				var p = probe.$parseGeneratorArgs(["title:string"]).properties[1];
+				expect(p.required).toBeTrue();
+				expect(structKeyExists(p, "default")).toBeFalse();
+			});
+
+			it("marks a :optional column not required", () => {
+				var p = probe.$parseGeneratorArgs(["note:text:optional"]).properties[1];
+				expect(p.name).toBe("note");
+				expect(p.type).toBe("text");
+				expect(p.required).toBeFalse();
+			});
+
+			it("captures a =value default and keeps the column required", () => {
+				var p = probe.$parseGeneratorArgs(["status:string=draft"]).properties[1];
+				expect(p.name).toBe("status");
+				expect(p.type).toBe("string");
+				expect(p.default).toBe("draft");
+				expect(p.required).toBeTrue();
+			});
+
+			it("combines =value with :optional (nullable, defaulted)", () => {
+				var p = probe.$parseGeneratorArgs(["note:string=none:optional"]).properties[1];
+				expect(p.type).toBe("string");
+				expect(p.default).toBe("none");
+				expect(p.required).toBeFalse();
+			});
+
+			it("keeps a =value alongside a brace size modifier", () => {
+				var p = probe.$parseGeneratorArgs(["title:string{120}=untitled"]).properties[1];
+				expect(p.type).toBe("string");
+				expect(p.limit).toBe("120");
+				expect(p.default).toBe("untitled");
+				expect(p.required).toBeTrue();
+			});
+
+			it("treats an empty =value ('name:string=') as no default", () => {
+				var p = probe.$parseGeneratorArgs(["code:string="]).properties[1];
+				expect(p.type).toBe("string");
+				expect(structKeyExists(p, "default")).toBeFalse();
+				expect(p.required).toBeTrue();
+			});
+
+			it("strips :optional before the enum value list, leaving values intact", () => {
+				var p = probe.$parseGeneratorArgs(["status:enum:draft,published:optional"]).properties[1];
+				expect(p.type).toBe("enum");
+				expect(p.values).toBe("draft,published");
+				expect(p.required).toBeFalse();
+			});
+
+			it("keeps a colon-bearing URL default intact (does not truncate at the first colon)", () => {
+				var p = probe.$parseGeneratorArgs(["site:string=https://example.com"]).properties[1];
+				expect(p.name).toBe("site");
+				expect(p.type).toBe("string");
+				expect(p.default).toBe("https://example.com");
+			});
+
+			it("keeps a colon-bearing timestamp default intact", () => {
+				var p = probe.$parseGeneratorArgs(["startsAt:datetime=2026-10-04T12:00:00"]).properties[1];
+				expect(p.type).toBe("datetime");
+				expect(p.default).toBe("2026-10-04T12:00:00");
+			});
+
+			it("combines a :optional marker with a colon-bearing default", () => {
+				var p = probe.$parseGeneratorArgs(["site:string=https://example.com:optional"]).properties[1];
+				expect(p.default).toBe("https://example.com");
+				expect(p.required).toBeFalse();
+			});
+
+			it("captures a literal true/false default without losing it to flag conversion", () => {
+				var p = probe.$parseGeneratorArgs(["active:boolean=false"]).properties[1];
+				expect(p.name).toBe("active");
+				expect(p.type).toBe("boolean");
+				expect(p.default).toBe("false");
+				expect(p.required).toBeTrue();
+			});
+
+			it("captures a default that contains a literal hash character", () => {
+				// "invoice##" in this source is the single-character default "invoice"
+				// followed by one hash.
+				var p = probe.$parseGeneratorArgs(["code:string=invoice##"]).properties[1];
+				expect(p.default).toBe("invoice##");
+			});
+
+		});
+
 	}
 
 }

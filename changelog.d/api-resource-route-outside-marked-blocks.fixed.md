@@ -1,0 +1,1 @@
+- `wheels generate api-resource` no longer adds its route inside another generator's marked block in `config/routes.cfm` (such as `wheels generate auth`'s `api` namespace, which `generate auth --force` rewrites); it opens its own `.namespace("api")` block instead, and the route it adds to an existing block is indented inside it without moving that block's `.end()`.

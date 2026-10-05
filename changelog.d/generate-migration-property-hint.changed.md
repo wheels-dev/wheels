@@ -1,0 +1,1 @@
+- `wheels generate migration` still writes a blank migration, but a name that reads like a column change now gets a next step: `AddEmailToUsers` (or `add_email_to_users`) points to `wheels generate property User email:string`, which writes the `addColumn()` for you, and `RemoveXFromY` shows the `removeColumn()` call. Its usage example is now `BackfillUserSlugs`.

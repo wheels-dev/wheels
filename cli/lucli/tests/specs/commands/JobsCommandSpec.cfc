@@ -32,6 +32,42 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		testHelper.cleanupTempProject(variables.tempRoot);
 	}
 
+	// A Module whose worker loop talks to canned bridge responses instead of a
+	// server: each makeBridgePost() call returns the next one in turn.
+	private any function workerModule(required array responses) {
+		var m = new cli.lucli.Module(cwd = variables.tempRoot);
+		prepareMock(m);
+		m.$("out");
+		m.$(method = "$requireOwnRunningServer", returns = 61999);
+		m.$("makeBridgePost").$results(argumentCollection = $positional(arguments.responses));
+		return m;
+	}
+
+	// $results() takes the responses as positional arguments.
+	private struct function $positional(required array values) {
+		var args = {};
+		for (var i = 1; i <= arrayLen(arguments.values); i++) {
+			args[i] = arguments.values[i];
+		}
+		return args;
+	}
+
+	private string function jobDone(required string id) {
+		return serializeJSON({success: true, jobResult: {skipped: false, success: true, jobClass: "SpecJob", jobId: arguments.id}});
+	}
+
+	private string function idlePoll() {
+		return serializeJSON({success: true, jobResult: {skipped: true}});
+	}
+
+	private string function printed(required any m) {
+		var said = "";
+		for (var call in arguments.m.$callLog().out) {
+			said &= call[1] & chr(10);
+		}
+		return said;
+	}
+
 	function run() {
 
 		describe("$parseJobsArgs — argument parsing", () => {
@@ -57,6 +93,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var opts = mod.$parseJobsArgs({arg1 = "work", "max-jobs" = "100", quiet = "true"});
 				expect(opts.maxJobs).toBe(100);
 				expect(opts.quiet).toBeTrue();
+			});
+
+			it("parses --stop-when-empty for work, off by default", () => {
+				expect(mod.$parseJobsArgs({arg1 = "work"}).stopWhenEmpty).toBeFalse();
+				expect(mod.$parseJobsArgs({arg1 = "work", "stop-when-empty" = "true"}).stopWhenEmpty).toBeTrue();
 			});
 
 			it("parses a comma-delimited queue list", () => {
@@ -113,6 +154,33 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// Parse-stage validation must fire first so a bad flag yields
 				// a usage error, not a misleading "no server" diagnostic.
 				expect(() => mod.jobs(arg1 = "work", interval = "0")).toThrow(type = "Wheels.InvalidArguments");
+			});
+
+		});
+
+		describe("work --stop-when-empty", () => {
+
+			it("drains the ready jobs, then exits on the first empty poll", () => {
+				var m = workerModule([jobDone("1"), jobDone("2"), idlePoll()]);
+				expect(m.jobs(arg1 = "work", "stop-when-empty" = "true")).toBe("");
+				expect(m.$count("makeBridgePost")).toBe(3);
+				var said = printed(m);
+				expect(said).toInclude("No job ready to run. Shutting down.");
+				expect(said).toInclude("Processed: 2 | Failed: 0");
+			});
+
+			it("exits after one poll when nothing is ready", () => {
+				var m = workerModule([idlePoll()]);
+				expect(m.jobs(arg1 = "work", "stop-when-empty" = "true")).toBe("");
+				expect(m.$count("makeBridgePost")).toBe(1);
+				expect(printed(m)).toInclude("Processed: 0 | Failed: 0");
+			});
+
+			it("still stops at --max-jobs first when the queue outlasts it", () => {
+				var m = workerModule([jobDone("1"), jobDone("2"), jobDone("3")]);
+				m.jobs(arg1 = "work", "stop-when-empty" = "true", "max-jobs" = "2");
+				expect(m.$count("makeBridgePost")).toBe(2);
+				expect(printed(m)).toInclude("Reached max jobs limit (2). Shutting down.");
 			});
 
 		});
