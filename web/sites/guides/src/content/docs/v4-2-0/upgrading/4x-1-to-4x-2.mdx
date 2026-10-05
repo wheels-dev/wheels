@@ -360,6 +360,20 @@ On MySQL, PostgreSQL and SQL Server, `withAdvisoryLock()` now checks that the lo
 
 On SQL Server, `withAdvisoryLock()` called outside a transaction failed with "The statement or function must be executed in the context of a user transaction" ([#4220](https://github.com/wheels-dev/wheels/issues/4220)). The lock now belongs to the database session (`sp_getapplock @LockOwner = 'Session'`), as on MySQL and PostgreSQL, so it works anywhere, with the same release check. To identify which session holds a lock, Wheels reads `sys.dm_tran_locks`, which needs the `VIEW SERVER STATE` (SQL Server 2022: `VIEW SERVER PERFORMANCE STATE`) permission. Without it, a release waits until no session holds the lock, so it can report a failure in the rare case where another server takes the lock the moment ours is freed.
 
+### A tenant model's `withAdvisoryLock()` locks on the tenant database
+
+On MySQL and PostgreSQL, `withAdvisoryLock()` on a tenant (non-shared) model now takes the lock on the active tenant's datasource, the database its queries use ([#4223](https://github.com/wheels-dev/wheels/issues/4223)). 4.1 took it on the application's default datasource. SQL Server and `withAdvisoryLock(transaction = true)` already worked this way.
+
+The consequence: two tenants on different databases that use the same lock name no longer exclude each other. Each one gets its own lock. If a lock must cover every tenant, call `withAdvisoryLock()` through a shared model (one with `sharedModel()` in its `config()`), which keeps the default datasource whichever tenant is active:
+
+```cfm
+model("Plan").withAdvisoryLock(name = "nightly-billing", callback = function() {
+    // runs once across all tenants
+});
+```
+
+Without a tenant datasource, nothing changes.
+
 ### `LocalDisk` storage keys are checked per segment
 
 `LocalDisk` now validates an object key one path segment at a time ([#3912](https://github.com/wheels-dev/wheels/issues/3912)):
