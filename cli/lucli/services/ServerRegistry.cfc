@@ -100,6 +100,32 @@ component {
 	}
 
 	/**
+	 * The registered server that is running on `port`, as
+	 * `{name, projectPath}`; both are "" when no live registration records
+	 * that port. Reads each registration's `server.pid` ("<pid>:<port>") and
+	 * checks the pid is alive, as inspect() does.
+	 */
+	public struct function registrationOnPort(required numeric port) {
+		var rv = {name: "", projectPath: ""};
+		var serversDir = variables.lucliHome & "/servers";
+		if (!len(variables.lucliHome) || !directoryExists(serversDir)) return rv;
+		for (var name in directoryList(serversDir, false, "name")) {
+			var regDir = serversDir & "/" & name;
+			if (!fileExists(regDir & "/server.pid")) continue;
+			var parts = listToArray(trim(fileRead(regDir & "/server.pid")), ":");
+			if (
+				arrayLen(parts) == 2 && isNumeric(parts[1]) && isNumeric(parts[2])
+				&& parts[2] == arguments.port && $isProcessAlive(parts[1])
+			) {
+				rv.name = name;
+				rv.projectPath = fileExists(regDir & "/.project-path") ? trim(fileRead(regDir & "/.project-path")) : "";
+				return rv;
+			}
+		}
+		return rv;
+	}
+
+	/**
 	 * Port of the project's OWN running Lucee server, or 0. Ownership is
 	 * proven by verifyOwnServer(): registration, live server process AND the
 	 * listener on the port all have to match.

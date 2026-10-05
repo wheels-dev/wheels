@@ -107,6 +107,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("demo and wheels-new Application.cfc include testcontext.cfm after config/app.cfm", () => {
+					$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 					// Resolve the demo app via the /config mapping. Do not walk
 					// GetDirectoryFromPath() on an already-directory path —
 					// a trailing slash is a no-op walk on Lucee, which left
@@ -174,7 +175,7 @@ component extends="wheels.WheelsTest" {
 					expect(FindNoCase("abort", window) > 0).toBeTrue(
 						"the refusal must abort before running specs against the primary datasource"
 					);
-					expect(FindNoCase('error = "Test database not available"', helpers) > 0).toBeTrue();
+					expect(FindNoCase('"error" = "Test database not available"', helpers) > 0).toBeTrue();
 					// the shared rule: only an explicit, valid useTestDB=false skips the test DB
 					expect(FindNoCase("if (local.validBoolean && !arguments.requestUrl.useTestDB)", helpers) > 0).toBeTrue(
 						"an omitted useTestDB must default to the test database (false only on explicit valid false)"

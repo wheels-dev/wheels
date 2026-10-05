@@ -112,7 +112,17 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 				local.wheelsError = arguments.exception.cause.rootCause;
 			}
 		} else {
-			if (StructKeyExists(arguments.exception, "rootCause") && Left(arguments.exception.rootCause.type, 6) == "Wheels") {
+			// IsDefined (not IsStruct): the production error path can hand us a
+			// rootCause that is a real caught exception / Java Throwable, not a plain
+			// struct, so IsStruct would wrongly drop a genuine Wheels error to 500.
+			// IsDefined string-resolves the whole dotted path in one evaluation —
+			// true for a struct OR an object that exposes `.type`, false when
+			// rootCause is absent, null, or has no type (so a typeless rootCause
+			// falls through to {} instead of crashing the error page).
+			if (
+				IsDefined("arguments.exception.rootCause.type")
+				&& Left(arguments.exception.rootCause.type, 6) == "Wheels"
+			) {
 				local.wheelsError = arguments.exception.rootCause;
 			} else if (
 				StructKeyExists(arguments.exception, "cause")
@@ -256,7 +266,20 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	}
 
 	public string function $runOnErrorRenderTemplate(required exception, required eventName) {
-		$header(statusCode = 500);
+		// Classify the response status through the same $wheelsErrorStatusCode
+		// allow-list the development path uses ($runOnErrorRenderWheelsError),
+		// instead of returning 500 for every error. Otherwise a production
+		// (showErrorInformation off) request that raised a client-triggerable
+		// Wheels.*NotFound came back 500 rather than 404, and a
+		// Wheels.NotAuthorized came back 500 rather than 403 — the classification
+		// only ran when showErrorInformation was on (#2319/#3075/#3156). A
+		// non-Wheels exception has no resolved type and stays 500.
+		local.wheelsError = $runOnErrorResolveWheelsError(arguments.exception);
+		$header(
+			statusCode = (!StructIsEmpty(local.wheelsError) && StructKeyExists(local.wheelsError, "type"))
+				? $wheelsErrorStatusCode(local.wheelsError.type)
+				: 500
+		);
 
 		local.format = $getRequestFormat();
 		local.formatSpecificTemplate = "#application.wheels.eventPath#/onerror.#local.format#.cfm";

@@ -131,6 +131,12 @@ Wrap these seven files in `<cfsilent>…</cfsilent>` with no trailing newline, o
 
 **Fails safe** on the machine that has `vendor/`. A fresh clone of an app that ignores it has no framework and nothing to restore it from. Remove the `/vendor/` line from `.gitignore` and commit `vendor/`. Check `git status` first: `vendor/` should hold `wheels/` and your packages, not a backup of the old framework.
 
+### Dead format rule in `public/urlrewrite.xml` (optional)
+
+The "Convert dot to format parameter" rule is gone from the shipped `urlrewrite.xml` ([#4132](https://github.com/wheels-dev/wheels/issues/4132)). Its regex had doubled backslashes, so it never matched a normal URL, and format suffixes such as `/posts.json` work because the router reads them from the path.
+
+**Fails safe:** the rule does nothing. Delete it from your `public/urlrewrite.xml` if you like.
+
 ### AI coding docs (optional)
 
 The `CLAUDE.md` that ships with apps is now under 8 KB, with its reference topics in `.ai/<topic>.md` and an `AGENTS.md` that points agents at them ([#3960](https://github.com/wheels-dev/wheels/issues/3960)). Apps installed from the 4.x `wheels-base-template` download also got the framework maintainers' docs instead of the application-developer ones ([#3947](https://github.com/wheels-dev/wheels/issues/3947)).
@@ -173,6 +179,14 @@ For a test server on another host name, set `testClientBaseUrl` or use `$testCli
 
 If a `TestClient` subclass or a test helper in your app sets the `X-Wheels-Test-Context` header or the `WHEELS_TEST_CONTEXT` cookie itself (a pattern from 4.1), delete those lines. `TestClient` and `$testClient()` now send the test context for you, and a value set by hand replaces theirs, so the requests reach the live application and its primary datasource (errors such as a missing table).
 
+The framework's own suite (`/wheels/core/tests`) is stricter when a run would use the app's primary datasource: it ignores `allowTestsAgainstPrimaryDatasource` ([#4254](https://github.com/wheels-dev/wheels/pull/4254)). Without `<datasource>_test` such a run is refused and the log notes that the setting was ignored; only an explicit `useTestDB=false` runs it against the primary datasource. Its `populate.cfm` drops and recreates tables, so it never reaches your real data through the setting. Runs that pick another datasource (`?db=`, or a `coreTestDataSourceName` that isn't the primary) are unchanged, except that a `coreTestDataSourceName` naming a datasource that doesn't exist now gets a 409 response explaining the fix.
+
+If `config/settings.cfm` sets `dataSourceName` but not `coreTestDataSourceName`, `coreTestDataSourceName` now defaults to that `dataSourceName`, so the framework's suite takes the `<datasource>_test` rule above. It used to default to a datasource named after the folder of the app's front controller (`public` in a `wheels new` app), which failed with `Datasource [public] doesn't exist`. If you ran the suite on a datasource with that name, set `coreTestDataSourceName` to it.
+
+A test run keeps the runner's 30-minute request timeout ([#4263](https://github.com/wheels-dev/wheels/pull/4263)). The `tests/populate.cfm` that 4.1's `wheels new` created starts with `<cfsetting requestTimeOut="300">`; the 4.2 runner restores its own limit after your `populate.cfm` runs, so you can leave the line or delete it. A run that is stopped before it finishes is now reported as an error, and says when the request timeout stopped it, instead of 0 passed, 0 failed, 0 errors.
+
+Browser specs that don't run no longer count as passed. Without Playwright (or in CI without `WHEELS_BROWSER_CI_ENABLE`), each `browserDescribe()` spec is reported as skipped, with the reason, and `wheels test` reports the skips (`2 passed, 1 skipped`) instead of a clean pass. When Playwright is installed but the browser can't start, each one is an error unless `WHEELS_BROWSER_SKIP_LAUNCH_FAILURES=true`. A CI job that ran browser specs without a browser now shows them; see [Browser tests](/v4-2-0/testing/browser-tests/).
+
 ### `findAll(returnAs="structs")` returns an array
 
 `findAll()` has always documented `returnAs="structs"` (and `"struct"`) as an array of structs, but through 4.1 it returned a struct keyed by row number: `{1: {...}, 2: {...}}`. From 4.2 it returns the documented array ([#4035](https://github.com/wheels-dev/wheels/pull/4035)). `findInBatches(returnAs="structs")` hands its callback the same array.
@@ -204,9 +218,19 @@ A bare property or method name in a `condition` or `unless` expression now means
 
 `joinType` accepts `inner`, `outer`, `left` and `left outer` (the last three all emit `LEFT OUTER JOIN`). Any other value throws `Wheels.InvalidJoinType` when the association is registered, at application start ([#3936](https://github.com/wheels-dev/wheels/issues/3936)). Before, `joinType="left"` emitted a `LEFT JOIN` that the nested-include grouping didn't recognise, so a nested include under it was silently dropped.
 
+### Production error pages return 404, 403 or 406 for Wheels errors
+
+With `showErrorInformation` off (the default outside development), the error page now returns the HTTP status that fits the Wheels error instead of `500` for every error ([#4238](https://github.com/wheels-dev/wheels/pull/4238)): `404` for an unknown route, record, view, file or action (`Wheels.RouteNotFound`, `RecordNotFound`, `ViewNotFound`, `FileNotFound`, `ActionNotAllowed`, `ActionParameterMissing`), `403` for `Wheels.NotAuthorized` or an invalid CSRF token, and `406` for `Wheels.FormatNotAcceptable`. Other `Wheels.*NotFound` errors, such as a missing table, datasource or model, still return `500`, so monitoring still sees server faults. Development already returned these statuses. Monitoring, alerts or log searches that count production `500`s will see fewer of them; if one keys on `500` for these cases, update it to the new statuses.
+
 ### `renderNotFound` is a framework helper
 
 `renderNotFound(message, type, extendedInfo)` is a new public controller helper that produces a 404 from app code ([#3900](https://github.com/wheels-dev/wheels/issues/3900)). Because it is public, it is now a reserved action name: an existing controller **action** literally named `renderNotFound` gets `Wheels.ActionNotAllowed` instead of dispatching. Rename such an action. A controller that already defines its own `renderNotFound` helper overrides the framework one, and that keeps working.
+
+### A failed `verifies()` without a handler returns 400
+
+A `verifies()` that fails and declares no `handler` and no redirect arguments now ends the request with **HTTP 400** ([#4296](https://github.com/wheels-dev/wheels/pull/4296)). In 4.1 it returned a silent `200` with an empty body, although the declared precondition wasn't met. A JSON request gets `{"error":"Verification failed"}`; other formats get an empty body. A `verifies()` with a `handler` or redirect arguments is unchanged.
+
+If a client relied on the old `200`, handle the `400` there, or give the `verifies()` call a `handler=` (or redirect arguments) so your code owns the failure response.
 
 ### MySQL boolean columns are `BIT(1)`
 
@@ -227,6 +251,8 @@ t.bigInteger(columnNames = "accountId", unsigned = true);
 ### Oracle integer columns carry a precision
 
 On Oracle, new `t.integer()`, `t.references()` and `id` columns are `NUMBER(10)`, new `t.bigInteger()` columns are `NUMBER(19)`, and new `t.boolean()` columns before Oracle 23ai are `NUMBER(1)` ([#4097](https://github.com/wheels-dev/wheels/issues/4097)). Earlier releases created a bare `NUMBER`, which binds as a decimal and validates as a float. The new columns validate as integers, so a fractional value such as `1.5` now fails automatic validation instead of being stored. Existing columns are unchanged and keep their current typing, and `changeColumn()` without a `precision` argument keeps a column's current precision, so it never re-types one. To convert one, see [Integer columns on Oracle](/v4-2-0/basics/migrations/).
+
+On Oracle 23ai and later, new `t.boolean()` columns are a native `BOOLEAN` ([#4057](https://github.com/wheels-dev/wheels/pull/4057)), which the model maps to `cf_sql_bit`; earlier Oracle releases get `NUMBER(1)` as above. Existing numeric boolean columns are unchanged.
 
 ### SQLite date columns are validated as dates
 
@@ -277,6 +303,30 @@ An empty-string value in a `where` condition now binds as a real `''` ([#4055](h
 
 To find affected code, search `app/` for `= ''`, `<> ''`, `!= ''`, for `where` strings that interpolate a value that may be empty (especially `params.*` values and `updateAll()` / `deleteAll()` calls), and for dynamic finders (`findOneBy…`, `findAllBy…`) called with request values.
 
+### Date values in `where()` and dynamic finders match on SQLite
+
+On SQLite, a date passed to the query builder (`where()`, `whereBetween()`, `whereIn()`) or to a dynamic finder (`findOneByPublishedAt(date)`) now compares as a date ([#4281](https://github.com/wheels-dev/wheels/pull/4281)). It used to reach the SQL as its CFML literal (`{ts '...'}`), which never matched a stored date, so the query returned no rows. Code that relied on such a query finding nothing now gets the matching rows. Other databases already matched; they now receive the plain date text.
+
+### `enqueue()` throws `Wheels.Job.EnqueueFailed`
+
+`enqueue()`, `enqueueIn()` and `enqueueAt()` throw `Wheels.Job.EnqueueFailed` when the job can't be written to the job store ([#4266](https://github.com/wheels-dev/wheels/pull/4266)). In 4.1 they returned a struct with `persisted: false`, which was easy to miss, so failed enqueues went unnoticed. Don't read `persisted: false` as a failure any more: a job deferred to a commit (next section) also returns it. Replace `persisted` checks with a check of `status` (`"pending"` once written, `"deferred"` until the commit) where you need one, and where an enqueue is best-effort, wrap it in `try` / `catch (Wheels.Job.EnqueueFailed e)`.
+
+### A job enqueued in a transaction on another datasource waits for the commit
+
+Inside a Wheels-managed transaction (a model save or `invokeWithTransaction()`) on another datasource than the job store's, the job is now written when the transaction commits, and dropped if it rolls back ([#4282](https://github.com/wheels-dev/wheels/pull/4282)). That's a tenant datasource under `TenantResolver`, or a model with its own `dataSource()`. In 4.1, depending on the engine, such a job could survive a rollback, land in the tenant's database where no worker reads it, or not be written at all. `enqueue()` then returns `{status: "deferred", deferred: true, persisted: false}`. That `persisted: false` is not a failure; check `status` instead. A write that fails after the commit throws `Wheels.Job.EnqueueFailed`, and the saved record stays committed. A raw `transaction {}` block isn't tracked, so enqueue after it ends. See [Background jobs: with a tenant datasource](/v4-2-0/digging-deeper/background-jobs/#with-a-tenant-datasource).
+
+### The job table gains a `claimTimeout` column
+
+A worker now records the `timeout` it claimed a job with, and a stale job is reaped on the claiming worker's timeout rather than the polling worker's, so workers with different timeouts can share a queue ([#3989](https://github.com/wheels-dev/wheels/issues/3989)). The `wheels_jobs.claimTimeout` column is added for you on first use, including to tables created by 4.1. If the database user can't run `ALTER TABLE`, the worker falls back to the polling worker's timeout and retries the change after a back-off; grant the privilege once (or add the column yourself) to get the new behaviour.
+
+### CSRF accepts the `X-CSRF-Token` header on any request
+
+A valid `X-CSRF-Token` header now passes CSRF protection on any non-GET request ([#3959](https://github.com/wheels-dev/wheels/issues/3959)). In 4.1 the header was read only when the request also sent `X-Requested-With: XMLHttpRequest`, which Turbo and `fetch()` don't send. Nothing breaks: clients that send both keep working, and a request passes when either the form field or the header holds a valid token. `startFormTag()` and `buttonTo()` gain `authenticityToken=false` to leave the hidden field out of markup that is cached and shared.
+
+### An empty `default` on a non-string column means no default
+
+In a migration, `default=""` on a column that isn't string-like (`bigInteger`, `binary`, `uniqueidentifier`, `integer`, `decimal`, `float`, `date` and so on) now means "no default" ([#4248](https://github.com/wheels-dev/wheels/pull/4248)). It renders as `DEFAULT NULL` when the column allows null and as no `DEFAULT` clause on a `NOT NULL` column. In 4.1, `bigInteger` and `uniqueidentifier` emitted a bare `DEFAULT`, `binary` emitted `DEFAULT ''`, and a `NOT NULL` column got `DEFAULT NULL NOT NULL`, which MySQL rejects; those migrations failed. They now run. Migrations that already worked produce the same schema.
+
 ### `withAdvisoryLock()` can throw `Wheels.AdvisoryLockReleaseFailed`
 
 On MySQL and PostgreSQL, `withAdvisoryLock()` now checks that the lock was released ([#4197](https://github.com/wheels-dev/wheels/issues/4197)). These locks belong to the pooled database session that took them, and on Lucee and BoxLang a busy pool can run the release on a different session, which frees nothing. Wheels retries the release for up to 5 seconds and then throws `Wheels.AdvisoryLockReleaseFailed`, naming the lock, if our session still holds it. The callback has already finished when this is thrown. If the callback itself threw, the failed release is logged instead and the callback's error is what you get. A lock left held stays held until that pooled connection closes, so other callers wait or time out on it. Before 4.2 this went unnoticed. The case is rare, but a scheduled job that relies on the lock should catch the exception and alert. Callers in the same application now also wait for each other, within `timeout`, before taking the database lock. Holding one connection for the whole call, which removes the case, is planned for 4.3 ([#4198](https://github.com/wheels-dev/wheels/issues/4198)).
@@ -300,6 +350,10 @@ If your app builds storage keys from user input or file names, check that none o
 ### `wheels generate` and `wheels destroy` need a project
 
 Both refuse to run outside a Wheels project (`Wheels.NotAWheelsProject`, non-zero exit) instead of writing or deleting files in the current directory ([#3909](https://github.com/wheels-dev/wheels/issues/3909)). `wheels generate app` still works anywhere.
+
+### Generated model columns are required by default
+
+`wheels generate model` and `wheels generate scaffold` now create each unmarked `name:type` column as `allowNull=false` and add it to `validatesPresenceOf`, so the model and its migration agree ([#4285](https://github.com/wheels-dev/wheels/pull/4285)). In 4.1 every column was validated for presence while the migration made it nullable. Mark a column nullable with `name:type:optional`, or give it a default with `name:type=value`; neither is added to `validatesPresenceOf`. Models you already generated are unchanged. Update scripts that generate models if some of their columns should stay nullable.
 
 ### App creation is CLI-only over MCP
 

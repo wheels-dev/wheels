@@ -119,6 +119,17 @@ component extends="Controller" {
 
 The other side of this: work that must happen even when the transaction rolls back, such as a failure notice, can't be enqueued inside it. Enqueue it after the transaction ends.
 
+#### With a tenant datasource
+
+Under `wheels.middleware.TenantResolver`, the tenant's work runs on the tenant datasource while the job store stays on the application's. A job enqueued inside a Wheels-managed transaction (a model save, or `invokeWithTransaction()`) then is written when that transaction commits, and dropped if it rolls back.
+
+- `enqueue()` returns `{status: "deferred", deferred: true, persisted: false}`, with the job's `id`.
+- The job still runs against the tenant's datasource.
+- The same applies to a model with its own `dataSource()` that isn't the application's.
+- A raw `transaction {}` block isn't tracked by Wheels. Under a tenant datasource, enqueue after the block ends, or do the work through a model save or `invokeWithTransaction()`.
+
+When a job can't be written, the enqueue methods throw `Wheels.Job.EnqueueFailed`. If an enqueue is best-effort, catch that type.
+
 ## Process the queue
 
 The simplest way to drain the queue is the bundled worker — a long-lived CLI process that polls the `wheels_jobs` table, claims one `pending` job per cycle, and runs it. It talks to your running app server, so start that first (`wheels start`):
@@ -127,7 +138,8 @@ The simplest way to drain the queue is the bundled worker — a long-lived CLI p
 wheels jobs work                               # process all queues; loops until Ctrl-C
 wheels jobs work --queue=mailers               # only drain the mailers queue
 wheels jobs work --queue=mailers --interval=3  # poll every 3 seconds when idle (default 5)
-wheels jobs work --max-jobs=100                # stop after 100 jobs — one-shot batches from cron or CI
+wheels jobs work --stop-when-empty              # exit once no job is ready to run — one-shot batches from cron or CI
+wheels jobs work --max-jobs=100                # stop after 100 jobs (combine with --stop-when-empty to cap a batch)
 wheels jobs work --quiet                       # suppress per-job output; failures still print
 ```
 

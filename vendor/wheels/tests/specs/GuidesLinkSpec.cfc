@@ -40,10 +40,12 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("links to a guide tree that exists", () => {
+				$requireRepoPath("web/sites/guides/src/content/docs");
 				expect(DirectoryExists(docsRoot & latestSegment)).toBeTrue("missing guides tree " & latestSegment);
 			});
 
 			it("is not behind the newest released guide tree", () => {
+				$requireRepoPath("web/sites/guides/src/content/docs");
 				// When a version's guides are released, bump variables.latest in
 				// vendor/wheels/GuidesLink.cfc and cli/lucli/services/GuidesLink.cfc.
 				// A tree marked status 'snapshot' in versions.ts (in development) is
@@ -59,6 +61,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("reads the snapshot status from versions.ts", () => {
+				$requireRepoPath("web/sites/guides/src/content/docs");
 				var source = FileRead(ExpandPath("/wheels/../..") & "/web/packages/ui/src/data/versions.ts");
 				for (var slug in $snapshotSlugs()) {
 					expect(ReFind("slug: '#slug#'[^}]*status: 'snapshot'", source)).toBeGT(0);
@@ -66,16 +69,25 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("matches the CLI's copy", () => {
+				$requireRepoPath("web/sites/guides/src/content/docs");
 				var cliSource = FileRead(ExpandPath("/wheels/../..") & "/cli/lucli/services/GuidesLink.cfc");
 				expect(cliSource).toInclude('variables.latest = "#guides.latestVersion()#"');
 			});
 
 			it("pins only allowlisted pages, and each exists in its pinned tree", () => {
+				$requireRepoPath("web/sites/guides/src/content/docs");
 				var root = ExpandPath("/wheels/../..") & "/";
 				var allowed = $pinnedPages();
 				var found = 0;
-				for (var file in ["cli/lucli/Module.cfc", "cli/lucli/services/Doctor.cfc"]) {
-					for (var call in ReMatch('pinned\(\s*"v[0-9]+-[0-9]+-0"\s*,\s*"[a-z0-9/_-]+"', FileRead(root & file))) {
+				// Every CLI component, not just the two that build GuidesLink today,
+				// so a pinned() added in another service is checked too. The CLI's
+				// own specs are skipped: a fixture may quote a pinned() call.
+				for (var path in DirectoryList(root & "cli/lucli", true, "path", "*.cfc")) {
+					if (ReFind("[\\/]cli[\\/]lucli[\\/]tests[\\/]", path)) {
+						continue;
+					}
+					var file = ReplaceNoCase(path, root, "");
+					for (var call in ReMatch('pinned\(\s*"v[0-9]+-[0-9]+-0"\s*,\s*"[a-z0-9/_-]+"', FileRead(path))) {
 						var parts = ReMatch('"[^"]+"', call);
 						var entry = ReReplace(parts[1], '"', "", "all") & "/" & ReReplace(ReReplace(parts[2], '"', "", "all"), "/$", "");
 						found++;
@@ -88,6 +100,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("links only to pages that exist in every tree it can resolve to", () => {
+				$requireRepoPath("web/sites/guides/src/content/docs");
 				var pages = $linkedPages();
 				expect(ArrayLen(pages)).toBeGT(5, "the source scan found too few GuidesLink calls");
 				for (var tree in ["v4-0-0", latestSegment]) {

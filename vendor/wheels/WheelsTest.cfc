@@ -128,6 +128,78 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     }
 
     /**
+     * MockBox, with its stub directory in place. MockBox writes a generated stub for
+     * each mocked method under its generation path (`/testbox/system/stubs` by
+     * default, relative to the webroot) and fails when that directory is missing, as
+     * it is in an app made with `wheels new`. Every mock helper (createMock,
+     * createEmptyMock, createStub, prepareMock, querySim) goes through here.
+     *
+     * @generationPath Where MockBox writes its stubs; empty keeps the current path.
+     */
+    public any function getMockBox(string generationPath = "") {
+        local.mockBox = super.getMockBox(argumentCollection = arguments);
+        $ensureMockStubDirectory(local.mockBox);
+        return local.mockBox;
+    }
+
+    /**
+     * Creates `mockBox`'s stub directory, and any missing parents, when it does not
+     * exist. One level at a time with DirectoryCreate(): its create-parents argument
+     * is Lucee-only (issue #2567) and java.io.File is not available on every engine.
+     *
+     * @mockBox A wheels.wheelstest.system.MockBox.
+     */
+    public void function $ensureMockStubDirectory(required any mockBox) {
+        local.dir = ReReplace(ExpandPath(arguments.mockBox.getGenerationPath()), "[/\\]+$", "");
+        local.missing = [];
+        while (Len(local.dir) && !DirectoryExists(local.dir)) {
+            ArrayPrepend(local.missing, local.dir);
+            local.parent = ReReplace(GetDirectoryFromPath(local.dir), "[/\\]+$", "");
+            if (local.parent == local.dir) {
+                break;
+            }
+            local.dir = local.parent;
+        }
+        for (local.path in local.missing) {
+            try {
+                DirectoryCreate(local.path);
+            } catch (any e) {
+                // Another request may have created it meanwhile.
+                if (!DirectoryExists(local.path)) {
+                    rethrow;
+                }
+            }
+        }
+    }
+
+    /**
+     * The Wheels repository root, with a trailing slash, derived from the `/wheels`
+     * mapping (`vendor/wheels`).
+     */
+    public string function $frameworkRepoRoot() {
+        return ExpandPath("/wheels/../..") & "/";
+    }
+
+    /**
+     * Skips the calling spec when the run is not inside the Wheels framework
+     * repository. The framework suite run from an app (`/wheels/core/tests`) has
+     * no `cli/`, `tools/`, `.github/`, `web/` or demo app, so a spec that reads
+     * them reports as skipped there, naming the path it needs, instead of
+     * erroring. Call it first in the spec, before any try/catch. Returns the
+     * absolute path.
+     *
+     * @relativePath The path the spec reads, relative to the repository root.
+     */
+    public string function $requireRepoPath(required string relativePath) {
+        local.relative = ReReplace(arguments.relativePath, "^[/\\]+", "");
+        local.root = $frameworkRepoRoot();
+        if (!DirectoryExists(local.root & "cli/lucli/templates")) {
+            skip("Needs '" & local.relative & "' from the Wheels framework repository, which an app does not have.");
+        }
+        return local.root & local.relative;
+    }
+
+    /**
      * Delete a directory and everything in it, symlink-safe.
      *
      * `DirectoryDelete(path, recurse=true)` leaves the directory behind on

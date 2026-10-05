@@ -418,8 +418,8 @@ With the association in place, `post.user()` returns the author, `user.posts()` 
        .post(name="authenticate", pattern="/login", to="sessions##create")
        .delete(name="logout", pattern="/logout", to="sessions##delete")
        .get(name="hello", pattern="/hello", to="main##hello")
-       .wildcard()
        .root(to="posts##index", method="get")
+       .wildcard()
    .end();
    ```
 

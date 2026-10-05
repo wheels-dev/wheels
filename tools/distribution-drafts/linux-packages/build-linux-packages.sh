@@ -119,7 +119,7 @@ fi
 #    native binary relied on) and (b) is architecture-independent, so the package
 #    installs on amd64 AND arm64. See issue #2700 (routing) and the arch-independent
 #    refactor.
-curl -fsSL -o "${BUILD_DIR}/build/lucli.jar" "${LUCLI_JAR_URL}"
+curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "${BUILD_DIR}/build/lucli.jar" "${LUCLI_JAR_URL}"
 verify_sha256 "${BUILD_DIR}/build/lucli.jar" "${LUCLI_JAR_SHA256}" "LuCLI jar"
 LUCLI_JAR_REPORTED=$(unzip -p "${BUILD_DIR}/build/lucli.jar" lucli/version.properties | sed -n 's/^lucli\.version=//p' | tr -d '\r')
 if [ -z "${LUCLI_JAR_URL_OVERRIDDEN:-}" ] && [ "${LUCLI_JAR_REPORTED}" != "${LUCLI_VERSION}" ]; then
@@ -128,7 +128,7 @@ if [ -z "${LUCLI_JAR_URL_OVERRIDDEN:-}" ] && [ "${LUCLI_JAR_REPORTED}" != "${LUC
 fi
 
 # 4. Download SQLite JDBC
-curl -fsSL -o "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_URL}"
+curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_URL}"
 verify_sha256 "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_SHA256}" "SQLite JDBC jar"
 
 # 5. Generate the user-facing /usr/bin/wheels wrapper

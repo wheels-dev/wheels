@@ -540,7 +540,7 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.positional(name = "type", required = true, choices = "model,controller,view,scaffold,migration,api-resource,route,test,property,helper,policy,snippets,admin,auth", description = "What to generate: model, controller, view, scaffold, migration, api-resource, route, test, property, helper, policy, snippets, admin, or auth")
 			.positional(name = "name", description = "Artifact name (model, controller or resource name)")
-			.positional(name = "attributes", description = "Column definitions for model/scaffold (space- or comma-delimited name:type pairs, e.g. 'title:string body:text')")
+			.positional(name = "attributes", description = "Column definitions for model/scaffold (space- or comma-delimited name:type pairs, e.g. 'title:string body:text'). Columns are required by default; 'name:type:optional' makes one nullable and 'name:type=value' gives it a default (both omit it from validatesPresenceOf)")
 			.flag(name = "dry-run", default = false, description = "Print the would-be paths and write nothing");
 	}
 
@@ -588,6 +588,7 @@ component extends="modules.BaseModule" {
 			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. Empty = all queues")
 			.option(name = "interval", default = 5, type = "numeric", description = "work only: seconds to wait between polls when no job is available")
 			.option(name = "max-jobs", default = 0, type = "numeric", description = "work only: stop after this many jobs (successes + failures count). 0 = run until stopped")
+			.flag(name = "stop-when-empty", default = false, description = "work only: exit when a poll finds no job ready to run, instead of waiting for more. For one-shot batches from cron or CI; combines with --max-jobs")
 			.flag(name = "quiet", default = false, description = "work only: suppress per-job completion output, only print failures")
 			.option(name = "format", default = "table", description = "status only: output format, table or json");
 	}
@@ -1116,6 +1117,14 @@ component extends="modules.BaseModule" {
 		out("  wheels generate admin User");
 		out("  wheels generate auth");
 		out("  wheels generate auth --strategy=jwt");
+		out("");
+		out("Property syntax:", "bold");
+		out("  name:type            required column: NOT NULL + validatesPresenceOf (the default)");
+		out("  name:type:optional   nullable column, excluded from validatesPresenceOf");
+		out("  name:type=value      column DEFAULT (also excluded from presence; the default fills an absence)");
+		out("  name:type{N}         string length / column size, e.g. title:string{120}");
+		out("  name:enum:a,b,c      enum column with the given allowed values");
+		out("  Example: wheels generate model Post title:string body:text:optional status:string=draft");
 	}
 
 	/**
@@ -2657,17 +2666,12 @@ component extends="modules.BaseModule" {
 		// 127.0.0.1-bound databases) and `wheels start` would boot on top of it.
 		// That is fixed upstream, but older LuCLI binaries still ship the bug, so
 		// when lucee.json pins a port we connect-probe it (both address families)
-		// and warn before delegating. We only reach here when our own server is
+		// and refuse before delegating. We only reach here when our own server is
 		// NOT already running (the reg.alive early-return above), so an in-use
 		// pinned port is a genuine foreign collision.
 		var pinnedPort = $readPinnedPort(variables.projectRoot);
 		if (pinnedPort > 0 && getService("portProbe").portInUse(pinnedPort)) {
-			out("");
-			out("Warning: port " & pinnedPort & " (configured in lucee.json) is already in use", "yellow");
-			out("by another process. The server may fail to start, or silently share the port", "yellow");
-			out("(IPv4 clients reaching the other process while localhost reaches Wheels).", "yellow");
-			out("Fix: stop the other process, or change the 'port' in lucee.json.", "yellow");
-			out("");
+			$refuseTakenHttpPort(pinnedPort);
 		}
 
 		out("Starting Wheels server...", "cyan");
@@ -3048,7 +3052,7 @@ component extends="modules.BaseModule" {
 	private any function newArgSpec() {
 		return new services.ArgSpec()
 			.positional(name = "appName", description = "Name of the application and of the directory it's created in")
-			.option(name = "port", default = 8080, type = "numeric", description = "Server port")
+			.option(name = "port", default = 8080, type = "numeric", description = "Server port (default: 8080, or the first port above it that is free and no other project pins)")
 			.option(name = "datasource", default = "", description = "Datasource name (default: the app name)")
 			.option(name = "reload-password", default = "", description = "Reload password (default: random)")
 			.flag(name = "setup-h2", default = false, description = "Use the H2 embedded database instead of SQLite")
@@ -3110,7 +3114,8 @@ component extends="modules.BaseModule" {
 			);
 		}
 		var options = {
-			port: opts.port,
+			// 0 = not given: scaffoldNewApp() picks a free, unpinned port.
+			port: structKeyExists(newColl, "port") ? opts.port : 0,
 			datasource: opts.datasource,
 			reloadPassword: opts.reloadPassword,
 			setupH2: opts.setupH2,
@@ -5545,6 +5550,7 @@ component extends="modules.BaseModule" {
 			queue = trim(parsed.queue),
 			interval = parsed.interval,
 			maxJobs = parsed["max-jobs"],
+			stopWhenEmpty = parsed["stop-when-empty"],
 			quiet = parsed.quiet,
 			format = lCase(trim(parsed.format))
 		};
@@ -5601,7 +5607,7 @@ component extends="modules.BaseModule" {
 				);
 			default:
 				out("Unknown jobs action: #opts.action#", "red");
-				out("Usage: wheels jobs [work|status] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--quiet] [--format=table|json]");
+				out("Usage: wheels jobs [work|status] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--format=table|json]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
 		}
 	}
@@ -5629,6 +5635,9 @@ component extends="modules.BaseModule" {
 		out("Poll interval: #arguments.opts.interval#s");
 		if (arguments.opts.maxJobs > 0) {
 			out("Max jobs: #arguments.opts.maxJobs#");
+		}
+		if (arguments.opts.stopWhenEmpty) {
+			out("Stops when no job is ready to run");
 		}
 		out("Press Ctrl+C to stop");
 		out("");
@@ -5677,10 +5686,13 @@ component extends="modules.BaseModule" {
 			}
 
 			if (arguments.opts.maxJobs > 0 && (counters.processed + counters.failed) >= arguments.opts.maxJobs) {
-				out("");
-				out("Reached max jobs limit (#arguments.opts.maxJobs#). Shutting down.", "green");
-				out("Processed: #counters.processed# | Failed: #counters.failed#");
-				return "";
+				return $jobsWorkStop("Reached max jobs limit (#arguments.opts.maxJobs#). Shutting down.", counters);
+			}
+			// --stop-when-empty: an idle poll means nothing is ready to run, so
+			// a cron or CI batch is done. Without it the worker waits for more,
+			// which is what a supervised long-lived worker wants.
+			if (idle && arguments.opts.stopWhenEmpty) {
+				return $jobsWorkStop("No job ready to run. Shutting down.", counters);
 			}
 
 			// Only sleep when the queue was empty — back-to-back pending jobs
@@ -5690,6 +5702,17 @@ component extends="modules.BaseModule" {
 				sleep(arguments.opts.interval * 1000);
 			}
 		}
+	}
+
+	/**
+	 * Print why the worker loop is ending, plus its counts, and return "" for
+	 * runJobsWork() to return.
+	 */
+	private string function $jobsWorkStop(required string reason, required struct counters) {
+		out("");
+		out(arguments.reason, "green");
+		out("Processed: #arguments.counters.processed# | Failed: #arguments.counters.failed#");
+		return "";
 	}
 
 	/**
@@ -6247,21 +6270,14 @@ component extends="modules.BaseModule" {
 		var subcommand = lCase(args[1]);
 
 		switch (subcommand) {
-			// `setup` is the canonical verb. `install` is accepted but warned —
-			// LuCLI intercepts `install` as its built-in extension installer
-			// before it reaches a module's dispatch, so users typing
-			// `wheels browser install` actually invoke the LuCLI built-in and
-			// see "Reading lucee.json... No git or extension dependencies to
-			// install" instead of the Playwright fetch. The case branch here
-			// only fires if the user reaches us via some other path (e.g. an
-			// argument vector that bypasses LuCLI's parsing). See issue #2332.
+			// `setup` is the documented verb; `install` is an alias of it, as
+			// `wheels packages install` is of `add`. LuCLI intercepts `install`
+			// only as the FIRST argument (`wheels install`), so
+			// `wheels browser install` does reach this module (#4213; the
+			// original interception was #2332).
 			case "setup":
-				return browserInstall(args);
 			case "install":
-				out("'wheels browser install' is intercepted by LuCLI's built-in", "yellow");
-				out("extension installer and won't reach this module. Use:", "yellow");
-				out("  wheels browser setup", "bold");
-				return "";
+				return browserInstall(args);
 			case "test":
 				return browserTest(args);
 			default:
@@ -6397,7 +6413,7 @@ component extends="modules.BaseModule" {
 	private string function generateMigration(required array args) {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate migration <Name>", "yellow");
-			out("  Example: wheels generate migration AddEmailToUsers");
+			out("  Example: wheels generate migration BackfillUserSlugs");
 			$refuse("wheels generate migration: missing required arguments. Usage: wheels generate migration <Name>");
 		}
 
@@ -6419,6 +6435,52 @@ component extends="modules.BaseModule" {
 		$generateWrite(filePath, buildEmptyMigration(migrationName));
 
 		printCreated("app/migrator/migrations/#fileName#");
+		var hint = $migrationNameHint(migrationName);
+		if (len(hint)) {
+			out("");
+			out(hint, "yellow");
+		}
+		return "";
+	}
+
+	/**
+	 * A next step for a migration whose name reads like a column change
+	 * (`AddEmailToUsers`, `add_email_to_users`, `RemoveEmailFromUsers`).
+	 * `generate migration` writes a blank up()/down() whatever the name says,
+	 * so point an add at `wheels generate property`, which writes the
+	 * addColumn() for you, and show the removeColumn() call for a remove.
+	 * Returns "" for any other name. Public for specs; the `$` prefix keeps it
+	 * off the MCP tool list.
+	 */
+	public string function $migrationNameHint(required string migrationName) {
+		var name = arguments.migrationName;
+		var nl = chr(10);
+		var parts = reFind("^(?:Add([A-Z][A-Za-z0-9]*?)To([A-Z][A-Za-z0-9]*)|add_([a-z0-9_]+?)_to_([a-z0-9_]+))$", name, 1, true);
+		if (parts.pos[1] > 0) {
+			var column = parts.pos[2] > 0 ? mid(name, parts.pos[2], parts.len[2]) : mid(name, parts.pos[4], parts.len[4]);
+			var table = parts.pos[3] > 0 ? mid(name, parts.pos[3], parts.len[3]) : mid(name, parts.pos[5], parts.len[5]);
+			// Keep the words' case: lCase() first turned BlogPosts into "Blogpost".
+			// A snake_case table (blog_posts) is PascalCased first; singularize()
+			// then changes only the last word.
+			var pascalTable = "";
+			for (var word in listToArray(table, "_")) {
+				pascalTable &= uCase(left(word, 1)) & mid(word, 2, len(word));
+			}
+			var modelName = getService("helpers").singularize(pascalTable);
+			var columnName = lCase(left(column, 1)) & mid(column, 2, len(column));
+			return "This migration is blank: `generate migration` doesn't read columns from its name." & nl
+				& "To add #columnName# to #lCase(table)# with the migration written for you, use instead:" & nl
+				& "  wheels generate property #modelName# #columnName#:string   (or :integer, :boolean, ...)";
+		}
+		parts = reFind("^(?:Remove([A-Z][A-Za-z0-9]*?)From([A-Z][A-Za-z0-9]*)|remove_([a-z0-9_]+?)_from_([a-z0-9_]+))$", name, 1, true);
+		if (parts.pos[1] > 0) {
+			var column = parts.pos[2] > 0 ? mid(name, parts.pos[2], parts.len[2]) : mid(name, parts.pos[4], parts.len[4]);
+			var table = parts.pos[3] > 0 ? mid(name, parts.pos[3], parts.len[3]) : mid(name, parts.pos[5], parts.len[5]);
+			var columnName = lCase(left(column, 1)) & mid(column, 2, len(column));
+			return "This migration is blank: `generate migration` doesn't read columns from its name." & nl
+				& "Fill in up() with:" & nl
+				& '  removeColumn(table="#lCase(table)#", columnName="#columnName#");';
+		}
 		return "";
 	}
 
@@ -6584,10 +6646,11 @@ component extends="modules.BaseModule" {
 
 		var names = new services.GeneratorPaths();
 		var modelName = capitalize(names.identifier(args[1], "model"));
-		var propArg = args[2];
-		var parts = listToArray(propArg, ":");
-		var propName = names.identifier($underscoreHyphens(arrayLen(parts) ? parts[1] : "", "property"), "property");
-		var propType = names.identifier(arrayLen(parts) > 1 ? parts[2] : "string", "property type");
+		// Share the model generator's token parser so `:optional` and `=value`
+		// are understood here too (it validates the name and type as identifiers).
+		var prop = $parsePropertyArg(args[2]);
+		var propName = prop.name;
+		var propType = prop.type;
 
 		var tableName = getService("helpers").pluralize(lCase(modelName));
 		var timestamp = getService("helpers").generateMigrationTimestamp();
@@ -6604,7 +6667,17 @@ component extends="modules.BaseModule" {
 		content &= tab & 'function up() {' & nl;
 		content &= tab & tab & 'transaction {' & nl;
 		content &= tab & tab & tab & 't = changeTable(name="#tableName#");' & nl;
-		content &= tab & tab & tab & 't.#colType#(columnNames="#propName#");' & nl;
+		// Columns added to an EXISTING table stay nullable (no allowNull=false) so
+		// the ALTER succeeds on a populated table; a `=value` default is emitted
+		// when given (and is safe — it backfills existing rows).
+		var colParams = 'columnNames="#propName#"';
+		if (structKeyExists(prop, "default") && len(prop.default)) {
+			// Literal string in generated CFML: double "##" (interpolation delimiter)
+			// so a "#" in the default stays literal, and double the embedded quotes.
+			var safeDefault = replace(replace(prop.default, "##", "####", "all"), '"', '""', "all");
+			colParams &= ', default="' & safeDefault & '"';
+		}
+		content &= tab & tab & tab & 't.#colType#(#colParams#);' & nl;
 		content &= tab & tab & tab & 't.change();' & nl;
 		content &= tab & tab & '}' & nl;
 		content &= tab & '}' & nl & nl;
@@ -6620,8 +6693,16 @@ component extends="modules.BaseModule" {
 		$generateWrite(migrationDir & "/" & fileName, content);
 		printCreated("app/migrator/migrations/#fileName#");
 		out("");
-		out("Remember to add validation in app/models/#modelName#.cfc config():", "yellow");
-		out('  validatesPresenceOf("#propName#");');
+		// Suggest a presence validation only for a required column with no default —
+		// the same rule the model generator uses. The column is added nullable (so
+		// existing rows are safe); presence then enforces it for new records. An
+		// `:optional` or defaulted column gets no suggestion.
+		var suggestPresence = (structKeyExists(prop, "required") ? prop.required : false)
+			&& !(structKeyExists(prop, "default") && len(prop.default));
+		if (suggestPresence) {
+			out("Remember to add validation in app/models/#modelName#.cfc config():", "yellow");
+			out('  validatesPresenceOf("#propName#");');
+		}
 
 		return "";
 	}
@@ -6966,8 +7047,10 @@ component extends="modules.BaseModule" {
 				out("  3. Restart, then POST credentials to /api/session to receive a JWT.");
 				out("  4. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a bcrypt derivation.");
 			} else {
-				out("  2. Restart, then POST credentials to /api/session to receive a bearer token.");
-				out("  3. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a bcrypt derivation.");
+				out("  2. Create a first account (there is no sign-up endpoint): a seedOnce() in app/db/seeds.cfm, then wheels seed.");
+				out("  3. Restart, then POST credentials to /api/session to receive a bearer token.");
+				out("  4. Protect actions with a filter that authenticates the Authorization header (see .ai/auth.md).");
+				out("  5. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a bcrypt derivation.");
 			}
 			out("  Generated code is yours to edit — re-run with --force and review `git diff` to upgrade.");
 		} else {
@@ -9024,6 +9107,43 @@ component extends="modules.BaseModule" {
 			scanTargets: [{path: "config", extensions: "cfm,cfc", recurse: true}],
 			fix: "Keys with a dots-only segment or a drive-letter prefix are now rejected; leading, trailing and doubled slashes are normalised. Check keys built from user input or file names. Guide: ""LocalDisk storage keys are checked per segment"", #guide#"
 		});
+		// enqueue(), enqueueIn() and enqueueAt() throw Wheels.Job.EnqueueFailed in
+		// 4.2 when the write fails, and a job deferred to a commit returns
+		// persisted: false legitimately, so a persisted check no longer means
+		// "failed". Point at status instead.
+		arrayAppend(arguments.checks, {
+			description: "Code reads persisted from a job result (4.2 throws Wheels.Job.EnqueueFailed on a failed write)",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "\.persisted\b|\[\s*[""']persisted[""']\s*\]",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			fix: "enqueue(), enqueueIn() and enqueueAt() throw Wheels.Job.EnqueueFailed when the job can't be written, so persisted: false no longer means a failure: a job enqueued inside a transaction on another datasource returns status ""deferred"" with persisted: false and is written at the commit. Check status (""pending"" or ""deferred"") instead of persisted, and where an enqueue is best-effort, catch Wheels.Job.EnqueueFailed. Guide: ""enqueue() throws Wheels.Job.EnqueueFailed"", #guide#"
+		});
+		// A tests/runner.cfm of the app's own (often a copy of an older core
+		// runner) gets the <datasource>_test rule but not the built-in runner's
+		// behaviour, such as running tests/populate.cfm against the test database.
+		arrayAppend(arguments.checks, {
+			description: "tests/runner.cfm doesn't use the built-in app runner",
+			severity: "advisory",
+			checkType: "grep",
+			absent: true,
+			pattern: "wheels/tests/app-runner\.cfm",
+			scanTargets: [{path: "tests/runner.cfm"}],
+			fix: "Replace it with the runner wheels new creates, a single include of wheels/tests/app-runner.cfm, so the app gets the built-in runner's behaviour, including running tests/populate.cfm against the test database. Guide: ""App tests use the test database and test application"", #guide#"
+		});
+		// An empty string in a where condition binds as '' instead of NULL, so
+		// these conditions now match rows (and updateAll/deleteAll now change or
+		// delete them). A grep: expect false positives, hence "review these".
+		arrayAppend(arguments.checks, {
+			description: "Review these: an empty string in a where condition now matches ''",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "\b(where|updateAll|deleteAll)\b[^\r\n]*(<>|!=|=)\s*''|\bwhere\s*\(\s*[""'][^""']+[""']\s*,\s*(""""|'')\s*\)|\bfind(One|All)By\w+\s*\(\s*(""""|'')\s*\)",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			fix: "4.2 binds an empty string as '' instead of NULL: col = '' now matches rows that store '', col <> '' matches every other non-NULL row, and updateAll()/deleteAll() with such a condition now change or delete those rows. Check each line, and reject empty input before a lookup. Guide: ""An empty string in where matches empty strings"", #guide#"
+		});
 		return arguments.checks;
 	}
 
@@ -10855,7 +10975,7 @@ component extends="modules.BaseModule" {
 
 		// Merge defaults for any missing options
 		var opts = {
-			port: structKeyExists(options, "port") ? options.port : 8080,
+			port: structKeyExists(options, "port") && options.port > 0 ? options.port : $defaultNewPort(targetDir),
 			datasource: structKeyExists(options, "datasource") ? options.datasource : lCase(appName),
 			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : generateRandomPassword(),
 			luceeAdminPassword: generateRandomPassword(),
@@ -11445,6 +11565,21 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * HTTP port for a `wheels new` app created without --port: 8080, or the
+	 * first port above it that nothing listens on and no other project pins
+	 * in its lucee.json. Every app used to get 8080, so the second app on a
+	 * machine always collided with the first.
+	 */
+	private numeric function $defaultNewPort(required string targetDir) {
+		var pins = $otherProjectPins(arguments.targetDir);
+		var port = $nextFreePort(8080, pins);
+		if (port != 8080) {
+			out("Port 8080 is #structKeyExists(pins, 8080) ? 'pinned by ' & pins[8080] : 'in use'#; this app gets port #port#.", "yellow");
+		}
+		return port;
+	}
+
+	/**
 	 * Placeholder values for the `wheels new` project template.
 	 *
 	 * The shutdown port is the first free port above the HTTP port rather than
@@ -11522,6 +11657,34 @@ component extends="modules.BaseModule" {
 		if (arguments.enginePort > 0) {
 			out("Using port " & arguments.enginePort & " (shutdown " & shutdownPort & ").", "cyan");
 		}
+	}
+
+	/**
+	 * Stop `wheels start` when the HTTP port pinned in lucee.json is taken.
+	 *
+	 * Starting anyway either failed inside LuCLI, whose message names its
+	 * standalone binary ("Use: lucli server stop <name>", not on a Wheels
+	 * install's PATH), or, on a LuCLI with the IPv4-blind check, booted on top
+	 * of the other listener. This names the Wheels server that holds the port
+	 * when the registry knows it, says how to stop it, and suggests a free
+	 * port. Throws Wheels.PortInUse.
+	 */
+	private void function $refuseTakenHttpPort(required numeric port) {
+		var holder = getService("serverRegistry").registrationOnPort(arguments.port);
+		var freePort = $nextFreePort(arguments.port + 1, $otherProjectPins(variables.projectRoot));
+		var heldBy = len(holder.name) ? "the Wheels server '#holder.name#'" : "another process";
+		out("");
+		out("Port #arguments.port# (configured in lucee.json) is in use by #heldBy#.", "red");
+		if (len(holder.projectPath)) {
+			out("Stop it:   cd #holder.projectPath# && wheels stop", "yellow");
+		} else if (!len(holder.name)) {
+			out("Stop that process, or use another port.", "yellow");
+		}
+		out("Or start this app on a free port:   wheels start --port=#freePort#", "yellow");
+		throw(
+			type = "Wheels.PortInUse",
+			message = "wheels start: port #arguments.port# is in use by #heldBy#. Stop it, or run: wheels start --port=#freePort#"
+		);
 	}
 
 	/**
@@ -12123,23 +12286,65 @@ component extends="modules.BaseModule" {
 	 *
 	 * Brace modifiers attach to the type token only, so they never steal
 	 * the value list from `name:enum:a,b`.
+	 *
+	 * Required-ness: a column is REQUIRED by default (`required=true` →
+	 * migration `allowNull=false` + a `validatesPresenceOf`). Two markers opt
+	 * out, so the generated migration and model always agree:
+	 *   - `name:type:optional` → nullable (`required=false`, no presence).
+	 *   - `name:type=value`    → a column DEFAULT (`prop.default`); a defaulted
+	 *                            column is never added to `validatesPresenceOf`
+	 *                            (an absent value is filled by the default).
+	 * The two combine: `name:type=value:optional` is nullable with a default.
+	 * `:optional` uses the word (not `?`) because zsh — the macOS default
+	 * shell — treats a bare `?` as a glob.
 	 */
 	private struct function $parsePropertyArg(required string arg) {
-		// Split on the FIRST two colons only — any additional colons
-		// (e.g. inside the comma-separated value list) belong in the
-		// values segment.
-		var parts = listToArray(arguments.arg, ":");
 		var names = new services.GeneratorPaths();
+		var token = arguments.arg;
+
+		// A trailing ":optional" marks the column nullable. Matched as a literal
+		// SUFFIX (not a positional colon segment) so a ":" inside a "=value"
+		// default — a URL or a timestamp — is never mistaken for the marker.
+		var optional = false;
+		if (len(token) GT 9 && compareNoCase(right(token, 9), ":optional") == 0) {
+			optional = true;
+			token = left(token, len(token) - 9);
+		}
+
+		// A "=value" suffix sets a column DEFAULT. Split on the FIRST "=" so the
+		// value keeps every ":" it contains (e.g. https://host, 12:00:00).
+		// Everything after the first "=" is the default; an empty value
+		// ("name:string=") is treated as no default.
+		var columnDefault = "";
+		var hasDefault = false;
+		var eqPos = find("=", token);
+		if (eqPos > 0) {
+			columnDefault = trim(mid(token, eqPos + 1, len(token) - eqPos));
+			token = left(token, eqPos - 1);
+			hasDefault = len(columnDefault) > 0;
+		}
+
+		// What remains is name[:type[:enumvalues]] (the type may carry {N}/{P,S}).
+		var parts = listToArray(token, ":");
 		// Property names and types are written into generated CFML (models,
 		// migrations, forms), so only plain identifiers are accepted.
 		var propName = names.identifier($underscoreHyphens(arrayLen(parts) ? parts[1] : "", "property"), "property");
 		var typeToken = arrayLen(parts) > 1 ? parts[2] : "string";
+		if (!len(typeToken)) {
+			typeToken = "string";
+		}
+
 		var modifiers = $parseTypeModifiers(typeToken);
 		names.identifier(modifiers.type, "property type");
 		var prop = {
 			name: propName,
-			type: modifiers.type
+			type: modifiers.type,
+			// Required by default; ":optional" makes it nullable.
+			required: !optional
 		};
+		if (hasDefault) {
+			prop.default = columnDefault;
+		}
 		if (structKeyExists(modifiers, "limit")) {
 			prop.limit = modifiers.limit;
 		}

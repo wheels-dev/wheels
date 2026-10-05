@@ -26,6 +26,7 @@ component extends="wheels.WheelsTest" {
 			var modulePath = repoRoot & "/cli/lucli/Module.cfc";
 
 			it("Module.cfc exists at the expected path", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(fileExists(modulePath)).toBeTrue("Missing: " & modulePath);
 			});
 
@@ -50,24 +51,28 @@ component extends="wheels.WheelsTest" {
 			}
 
 			it("scans for CORS default flip (deny-all) — bare wheels.middleware.Cors()", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("wheels.middleware.Cors", block) > 0).toBeTrue(
 					"3.x -> 4.x checks should grep config/ for new wheels.middleware.Cors() without allowOrigins (CHANGELOG ##2039)."
 				);
 			});
 
 			it("scans for RateLimiter without explicit trustProxy/proxyStrategy", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("RateLimiter", block) > 0).toBeTrue(
 					"3.x -> 4.x checks should grep config/ for RateLimiter middleware missing trustProxy/proxyStrategy (CHANGELOG ##2024, ##2088)."
 				);
 			});
 
 			it("scans for allowEnvironmentSwitchViaUrl=true", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("allowEnvironmentSwitchViaUrl", block) > 0).toBeTrue(
 					"3.x -> 4.x checks should grep config/ for allowEnvironmentSwitchViaUrl=true (CHANGELOG ##2076)."
 				);
 			});
 
 			it("scans for missing csrfCookieEncryptionSecretKey configuration", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("csrfCookieEncryptionSecretKey", block) > 0).toBeTrue(
 					"3.x -> 4.x checks should detect a missing csrfCookieEncryptionSecretKey in config/ — the real "
 					& "setting the framework reads (vendor/wheels/controller/csrf.cfc), CHANGELOG ##2054, ##2079."
@@ -82,18 +87,21 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("scans for legacy 'wheels snippets' invocations in build/CI scripts", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("wheels snippets", block) > 0).toBeTrue(
 					"3.x -> 4.x checks should grep build scripts and CI for the legacy 'wheels snippets' command, renamed to 'wheels generate snippets' (CHANGELOG ##1852)."
 				);
 			});
 
 			it("scans for legacy tests/specs/functions/ directory", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("tests/specs/functions", block) > 0).toBeTrue(
 					"3.x -> 4.x checks should detect the legacy tests/specs/functions/ directory, renamed to functional/ (CHANGELOG ##1872)."
 				);
 			});
 
 			it("scans for Vite asset helpers (manifest strictness default flip)", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				var hasVite = findNoCase("viteScriptTag", block) > 0
 					|| findNoCase("viteStyleTag", block) > 0
 					|| findNoCase("vitePreloadTag", block) > 0;
@@ -103,12 +111,14 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("scans for deprecated paginationLinks() helper", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("paginationLinks", block) > 0).toBeTrue(
 					"3.x -> 4.x checks should grep views for paginationLinks( (renamed to paginationNav(), CHANGELOG ##2714)."
 				);
 			});
 
 			it("scans for wirebox.system.ioc bootstraps including the root Application.cfc", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("wirebox.system.ioc", block) > 0).toBeTrue(
 					"3.x -> 4.x checks should grep for wirebox.system.ioc (the guide's hardest item-10 case is a "
 					& "`new wirebox.system.ioc.Injector(...)` bootstrap in the root Application.cfc)."
@@ -119,6 +129,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("covers wheels.Testbox and single-quoted extends forms in the test base class grep", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				// Two checks since #3939: wheels.Testbox (an alias of
 				// wheels.WheelsTest) and the RocketUnit wheels.Test base, each
 				// matching both quote styles through a quote character class.
@@ -132,6 +143,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("scans for removed renderPage()/renderPageToString() helpers", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("renderPage", block) > 0).toBeTrue(
 					"3.x -> 4.x checks should grep app/ for renderPage()/renderPageToString() — removed in 4.0, "
 					& "shimmed only by the optional wheels-legacy-adapter package."
@@ -139,12 +151,14 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("carries an HSTS advisory (SecurityHeaders defaults on in production)", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("SecurityHeaders", block) > 0).toBeTrue(
 					"3.x -> 4.x checks should carry an advisory for the HSTS default flip (guide item 2, CHANGELOG ##2081)."
 				);
 			});
 
 			it("carries a CSRF SameSite advisory", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("SameSite", block) > 0).toBeTrue(
 					"3.x -> 4.x checks should carry an advisory for the CSRF cookie SameSite attribute (guide item 6, CHANGELOG ##2035)."
 				);
@@ -154,6 +168,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("exits non-zero when breaking findings exist (Wheels.UpgradeCheckFailed)", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("Wheels.UpgradeCheckFailed", fullSource) > 0).toBeTrue(
 					"runUpgradeCheck must throw Wheels.UpgradeCheckFailed after the report flushes so breaking findings "
 					& "gate CI with a non-zero exit (mirrors validate()'s Wheels.ValidationFailed)."
@@ -161,6 +176,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("supports --format=json for machine-readable CI output", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(findNoCase("--format=json", fullSource) > 0).toBeTrue(
 					"wheels upgrade check should document/accept --format=json so pipelines can consume the report."
 				);

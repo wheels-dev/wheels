@@ -27,15 +27,7 @@ coreDataSource = $coreTestDataSource(
 if (coreDataSource.action == "refuse") {
 	cfheader(statuscode = 409);
 	cfcontent(type = "application/json");
-	WriteOutput(SerializeJSON({
-		success = false,
-		error = "Test database not available",
-		message = "The framework test suite would run on this app's primary datasource '" & coreDataSource.decision.primary
-			& "'. Pass ?db= to use a wheelstestdb_<db> datasource, create '" & coreDataSource.decision.candidate
-			& "', or run against the primary datasource intentionally with useTestDB=false.",
-		datasource = coreDataSource.decision.primary,
-		candidate = coreDataSource.decision.candidate
-	}));
+	WriteOutput(SerializeJSON($coreTestDataSourceRefusal(choice = coreDataSource)));
 	abort;
 }
 application.wheels.dataSourceName = coreDataSource.target;

@@ -282,6 +282,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var first = find("Backing up vendor/wheels", printed);
 					expect(first).toBeGT(0);
 					expect(find("Backing up vendor/wheels", printed, first + 1)).toBe(0);
+					// The post-swap summary was the part that used to repeat (it
+					// was printed AND returned), so pin it to one occurrence too.
+					expect(arrayLen(reMatch("Framework (upgraded|downgraded|reinstalled|replaced):", printed))).toBe(1);
 				});
 
 				it("announces the exact backup destination and recovery command before the swap summary", () => {
