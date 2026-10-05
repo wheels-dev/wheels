@@ -51,6 +51,7 @@ Open the file for a topic before working on it:
 - Sending email (mailers): `.ai/mailers.md`
 - Server-sent events: `.ai/sse.md`
 - Changing settings in specs: `.ai/testing.md`
+- Upgrading, changed APIs: `.ai/upgrading.md`
 - Guides, `/wheels/ai`: `.ai/README.md`
 
 ## Testing Quick Reference

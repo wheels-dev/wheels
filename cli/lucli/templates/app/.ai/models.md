@@ -94,3 +94,67 @@ model("User").findInBatches(batchSize=500, callback=function(users) {
     processUserBatch(users);
 });
 ```
+
+## Soft delete (on by default when the table has `deletedAt`)
+
+A model whose table has a `deletedAt` column soft-deletes. `t.timestamps()` adds `deletedAt` along with `createdAt` and `updatedAt`, so most tables do. The column name comes from the `softDeleteProperty` setting; set it to `""` to turn soft delete off app-wide.
+
+- `delete()`, `deleteAll()`, `deleteOne()` and `deleteByKey()` run `UPDATE ... SET deletedAt = <timestamp>` instead of `DELETE`. The timestamp follows `timeStampMode` (UTC by default). `beforeDelete` / `afterDelete` still run.
+- Finders skip soft-deleted rows: `findAll`, `findOne`, `findByKey`, `findEach`, `findInBatches`, paginated `findAll(page=)`, `count` / `sum` / `average` / `minimum` / `maximum`, `exists`, association readers (`post.comments()`), `updateAll` / `updateOne` / `updateByKey`, and the query builder. Soft-deleted rows on an `include=` join are filtered too.
+- Pass `includeSoftDeletes=true` to see them: `model("Post").findAll(where="authorId = 7", includeSoftDeletes=true)`.
+- Remove a row for good with `softDelete=false`. For rows that are already soft-deleted, pass both: `model("Post").deleteAll(where="...", softDelete=false, includeSoftDeletes=true)`.
+- Restore: `model("Post").updateByKey(key=params.key, deletedAt="", includeSoftDeletes=true)`.
+- `validatesUniquenessOf` ignores soft-deleted rows, but a database unique index does not: a new row can pass validation and still hit the index.
+
+Gotcha in specs: after `post.delete()`, `model("Post").findByKey(post.id)` returns `false` and `count()` drops, but the row is still in the table. To assert a permanent delete, look with `includeSoftDeletes=true` or delete with `softDelete=false`.
+
+## `dependent=` on `hasMany` / `hasOne`
+
+```cfm
+hasMany(name="comments", dependent="delete");
+```
+
+| Value | What happens to the children when the parent is deleted |
+|---|---|
+| `delete` | Each child is loaded and `delete()`d: its callbacks and its own `dependent=` run. |
+| `deleteAll` | One `DELETE` (or soft-delete `UPDATE`) statement: no child callbacks. |
+| `remove` | Each child is loaded and its foreign key set to NULL through `update()` (validations and callbacks run; a child that fails validation keeps its key). |
+| `removeAll` | One `UPDATE ... SET <foreignKey> = NULL` statement. |
+| `false` (default) | Nothing. |
+
+On `hasOne`, `delete` and `deleteAll` both load the child and call `delete()`; `remove` and `removeAll` both go through `update()`.
+
+Order inside the parent's `delete()` transaction: the parent's `beforeDelete`, then the dependents, then the parent row, then `afterDelete`. If `beforeDelete` returns `false` nothing is deleted; if the parent delete fails, the children's changes roll back with it. `deleteAll()` on the parent without `instantiate=true` runs no callbacks and no `dependent=`.
+
+## Bulk writes: `insertAll` / `upsertAll`
+
+```cfm
+result = model("Product").insertAll(records=[{sku="A1", name="Bolt"}, {sku="A2", name="Nut"}]);   // {insertedCount: 2}
+result = model("Product").upsertAll(records=rows, uniqueBy="sku");                                 // {upsertedCount: n}
+```
+
+- No validations and no callbacks of any kind (including `afterCommit`): they write SQL directly. `createdAt` / `updatedAt` are filled in when missing.
+- Every record must have the same keys, or `Wheels.InvalidRecordKeys` is thrown. Keys that aren't model properties are dropped.
+- `insertAll` has no "ignore duplicates" option: a unique violation throws. Use `upsertAll` when rows may already exist.
+- The count is the number of records you passed, not the number the database changed, and no generated keys come back. Read the rows back if you need their ids.
+- Rows are written in batches of 1000.
+
+## `afterCommit` / `afterRollback` details
+
+- The callback runs on the same in-memory object that was saved, not a fresh copy from the database. `savedChanges()` inside it shows that save's changes.
+- It is queued once per successful `save()` / `delete()`, with no de-duplication: saving one record twice in a transaction (or through two objects) runs it twice, in save order. A `save()` that changed nothing still counts as a successful update and queues it.
+- Outside an explicit transaction, each `save()` is its own transaction, so `afterCommit` runs before `save()` returns.
+- A save that fails validation, or that a `before*` callback stops, queues nothing, so it gets no `afterRollback` either.
+
+## `order=`
+
+- Property names are quoted for you, so a property named after a reserved word (`order="rank DESC"`) is safe. `ASC` / `DESC` may be any case.
+- `order="comments.createdAt"` (table.column) orders by a column of an included association.
+- Raw expressions (anything with parentheses) throw `Wheels.InvalidOrderClause`: define a calculated property and order by its name instead.
+  ```cfm
+  property(name="lastActivity", sql="COALESCE(updatedAt, createdAt)");
+  model("Post").findAll(order="lastActivity DESC");
+  ```
+- `order="random"` uses the database's random order.
+
+`updateAll` binds every value as a parameter, so `updateAll(position="position - 1")` is never evaluated as SQL. There is no increment/decrement API: for a value relative to its current one, use a parameterized `queryExecute("UPDATE ... SET position = position - 1 WHERE ...", {...})` (inside `transaction()` if it goes with other writes).

@@ -42,7 +42,7 @@ Calling `wheels upgrade` with no subcommand prints concise usage listing both ve
 `wheels upgrade check` performs four steps, in order:
 
 1. **Reads the current version** from `vendor/wheels/box.json`. If the file is missing or malformed, the version is reported as `unknown` and the comparison below is skipped.
-2. **Resolves the target version.** If you pass `--to=<version>`, that wins. Otherwise the command hits the GitHub releases API (`api.github.com/repos/wheels-dev/wheels/releases/latest`) and strips the leading `v` from the tag name. If the network call fails, the command prints a yellow notice and exits — it will not invent a target.
+2. **Resolves the target version.** If you pass `--to=<version>`, that wins. Otherwise the command hits the GitHub releases API (`api.github.com/repos/wheels-dev/wheels/releases/latest`) and strips the leading `v` from the tag name. If the network call fails, the command exits non-zero with `Wheels.UpgradeCheckFailed` (so a CI gate never passes without having scanned anything); pass `--to=<version>` when you can't reach GitHub.
 3. **Compares major versions.** If current and target share the same major, the command notes "Same major version — no known breaking changes" for the major-transition checks, then still runs its advisory scan for the same-major patterns below.
 4. **Runs breaking-change checks.** Each check is either a directory existence test or a regex grep across a sub-tree of the project. Major-version transitions add their own checks on top of the advisory scan. Every run, whatever the versions, also includes the app template drift advisory described below. Hits are printed as issues (yellow); absences are printed as passed checks (green).
 
@@ -120,7 +120,7 @@ The checks are hard-coded in the CLI and keyed by the major-version transition:
 - Legacy plugins (deprecated plugin system): a non-empty `plugins/` at the project root, plugin packages in `box.json` (an install path under `plugins/`, or a `cfwheels-*` package with no install path), and code that reads `application.wheels.plugins`. An empty `plugins/` isn't enough to pass: 3.x deletes plugin folders at runtime by default, and `box install` brings them back.
 - `extends="wheels.Test"` or `extends="wheels.Testbox"` (either quote style) anywhere under `tests/`.
 - `application.wirebox` or `wirebox.system.ioc` references under `app/`, `config/`, the root `Application.cfc` and `public/Application.cfc`, skipping third-party packages there (a `box.json` install path, or any folder with its own `box.json`, such as `app/lib/logbox/`) — these must move to `service()` / `application.wheelsdi`, and `new wirebox.system.ioc.Injector(...)` bootstraps to `new wheels.Injector("wheels.Bindings")` (#1888).
-- `renderPage()` / `renderPageToString()` under `app/` — removed in 4.0; replace with `renderView()` / `renderView(returnAs="string")`, or install `wheels-legacy-adapter` for a soft landing.
+- `renderPage()` / `renderPageToString()` under `app/` — pre-2.0 API that 2.0 replaced and later versions don't have; replace with `renderView()` / `renderView(returnAs="string")`, or install `wheels-legacy-adapter` for a soft landing.
 - `new wheels.middleware.Cors()` without `allowOrigins` in `config/` — the 4.0 default changed from wildcard to deny-all (#2039).
 - `new wheels.middleware.RateLimiter` in `config/` — prompts the user to verify `trustProxy` and `proxyStrategy`, whose defaults hardened in 4.0 (#2024, #2088).
 - `allowEnvironmentSwitchViaUrl=true` in `config/` — the production default flipped to `false` (#2076).
