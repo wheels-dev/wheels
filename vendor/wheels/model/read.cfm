@@ -613,6 +613,8 @@
 	 * [category: Miscellaneous Functions]
 	 */
 	public void function reload() {
+		// A reloaded object reports no saved changes, as after clearChangeInformation() (F49).
+		StructDelete(variables, "$savedChanges");
 		local.query = findByKey(key = key(), reload = true, returnAs = "query");
 		local.properties = propertyNames();
 		local.columnInfo = variables.wheels.class.properties;
