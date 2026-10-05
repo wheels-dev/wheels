@@ -16,14 +16,16 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 				time shipping.
 			</p>
 			<div class="hero__cta">
-				<a class="btn btn--primary" href="https://guides.wheels.dev/v3-0-0/">Get started</a>
+				<a class="btn btn--primary" href="https://guides.wheels.dev/v4-1-0/">Get started</a>
 				<a class="btn btn--secondary" href="https://github.com/wheels-dev/wheels">View on GitHub</a>
 			</div>
 			<pre
 				class="hero__install"><code>brew tap wheels-dev/wheels
 brew install wheels
 wheels new myapp</code></pre>
-			<p class="hero__engines">Runs on Lucee 7, Adobe ColdFusion 2023/2025, and BoxLang.</p>
+			<p class="hero__engines">
+				Runs on Lucee 6/7, Adobe ColdFusion 2023/2025, BoxLang, and RustCFML.
+			</p>
 		</div>
 	</section>
 
@@ -86,8 +88,8 @@ wheels new myapp</code></pre>
 				>
 				<h3>Database migrations</h3>
 				<p>
-					Version your schema. <code>wheels dbmigrate latest</code> on one side and
-					<code>wheels dbmigrate down</code> on the other — always reversible.
+					Version your schema. <code>wheels migrate latest</code> moves forward and
+					<code>wheels migrate down</code> steps back one migration.
 				</p>
 			</li>
 			<li>
@@ -106,7 +108,7 @@ wheels new myapp</code></pre>
 				>
 				<h3>Modern CLI</h3>
 				<p>
-					<code>wheels generate</code>, <code>wheels test</code>, <code>wheels server</code> — a first-class
+					<code>wheels generate</code>, <code>wheels test</code>, <code>wheels start</code> — a first-class
 					command-line workflow for every step of development.
 				</p>
 			</li>
@@ -126,8 +128,8 @@ wheels new myapp</code></pre>
 				>
 				<h3>Multi-engine support</h3>
 				<p>
-					Runs on Lucee 5/6/7, Adobe ColdFusion 2023/2025, and BoxLang. Primary development target
-					is Lucee 7.
+					Runs on Lucee 6/7, Adobe ColdFusion 2023/2025, BoxLang, and RustCFML, each tested in CI.
+					The <code>wheels</code> CLI's built-in dev server runs Lucee.
 				</p>
 			</li>
 			<li>
@@ -160,19 +162,22 @@ wheels new myapp</code></pre>
 				The docs are split across subdomains. Pick where you need to land.
 			</p>
 			<div class="resources__grid">
-				<a class="resource" href="https://guides.wheels.dev/v3-0-0/">
+				<a class="resource" href="https://guides.wheels.dev/v4-1-0/">
 					<span class="resource__domain">guides.wheels.dev</span>
 					<h3>Guides</h3>
 					<p>
-						Step-by-step guides from installation through deployment. v4.0-SNAPSHOT, v3.0, and v2.5
-						all available.
+						Step-by-step guides from installation through deployment, for the current release,
+						earlier release lines, and the version in development.
 					</p>
 					<span class="resource__link">Open →</span>
 				</a>
-				<a class="resource" href="https://api.wheels.dev/v3-0-0/">
+				<a class="resource" href="https://api.wheels.dev/v4-1-0/">
 					<span class="resource__domain">api.wheels.dev</span>
 					<h3>API reference</h3>
-					<p>Every function, parameter, and return type. Searchable across 8 framework versions.</p>
+					<p>
+						Every function, parameter, and return type, for the current release and earlier ones
+						back to 1.4.5.
+					</p>
 					<span class="resource__link">Open →</span>
 				</a>
 				<a class="resource" href="https://blog.wheels.dev/">
