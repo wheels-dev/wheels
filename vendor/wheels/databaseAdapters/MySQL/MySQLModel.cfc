@@ -1,5 +1,38 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
+	/**
+	 * Internal function. This database converts a high-precision decimal sent as text exactly,
+	 * in an insert and in a comparison (#4172).
+	 */
+	public string function $wideDecimalBindType() {
+		return "cf_sql_varchar";
+	}
+
+	/**
+	 * Internal function. MySQL compares a multi-element IN list of text values with a DECIMAL
+	 * column as doubles, so a high-precision decimal also binds inside an exact cast (#4172).
+	 */
+	public struct function $wideDecimalCastLimits() {
+		return {precision = 65, scale = 30};
+	}
+
+	/**
+	 * Internal function. Casts high-precision decimal params exactly before running the query.
+	 */
+	public struct function $performQuery(
+		required array sql,
+		required boolean parameterize,
+		numeric limit = 0,
+		numeric offset = 0,
+		string dataSource = variables.dataSource,
+		string $primaryKey = "",
+		string $debugName = "query",
+		boolean $captureResult = true
+	) {
+		$castWideDecimalParams(args = arguments);
+		return super.$performQuery(argumentCollection = arguments);
+	}
+
 	variables.mysqlTypeMap = {
 		"bigint": "cf_sql_bigint",
 		"binary": "cf_sql_binary",
@@ -169,6 +202,66 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public boolean function $supportsAdvisoryLocks() {
 		return true;
+	}
+
+	/**
+	 * MySQL supports the transaction-scoped path (#4198): the transaction pins one connection, so
+	 * GET_LOCK / RELEASE_LOCK and the callback's own queries all run on the same session.
+	 */
+	public boolean function $supportsTransactionalAdvisoryLock() {
+		return true;
+	}
+
+	/**
+	 * GET_LOCK is session- not transaction-scoped: it does not auto-release at transaction end, so
+	 * the caller must release it explicitly on the pinned connection before the transaction closes
+	 * (#4198).
+	 */
+	public boolean function $transactionalAdvisoryLockIsSessionScoped() {
+		return true;
+	}
+
+	/**
+	 * Internal function. Acquires a MySQL advisory lock on the current (pinned) connection with
+	 * GET_LOCK (#4198). Mirrors the session-scoped acquire; the difference is only that the enclosing
+	 * transaction guarantees this runs on the same connection as the callback's queries and the
+	 * release. Throws Wheels.AdvisoryLockTimeout when the lock cannot be taken in time.
+	 */
+	public void function $acquireAdvisoryLockTransactional(required string name, numeric timeout = 10) {
+		local.result = queryExecute(
+			"SELECT GET_LOCK(?, ?) AS lockResult",
+			[arguments.name, arguments.timeout],
+			$advisoryLockConnection()
+		);
+		if (!IsQuery(local.result) || local.result.lockResult != 1) {
+			Throw(
+				type = "Wheels.AdvisoryLockTimeout",
+				message = "Could not acquire advisory lock '#arguments.name#' within #arguments.timeout# seconds.",
+				extendedInfo = "The MySQL GET_LOCK function returned a non-1 result, indicating the lock could not be acquired."
+			);
+		}
+	}
+
+	/**
+	 * Internal function. Releases the MySQL advisory lock on the pinned connection before the
+	 * transaction closes (#4198). Unlike the default (#4200) path, there is no borrowed-session
+	 * retry: the release runs on the same pinned connection that took the lock, so a non-1 result is
+	 * a real failure and is thrown. The caller runs this in a finally inside the transaction block,
+	 * so a release error never replaces the callback's own error.
+	 */
+	public void function $releaseAdvisoryLockTransactional(required string name) {
+		local.result = queryExecute(
+			"SELECT RELEASE_LOCK(?) AS released",
+			[arguments.name],
+			$advisoryLockConnection()
+		);
+		if (!IsQuery(local.result) || !IsNumeric(local.result.released) || local.result.released != 1) {
+			Throw(
+				type = "Wheels.AdvisoryLockReleaseFailed",
+				message = "Advisory lock '#arguments.name#' could not be released on its pinned connection.",
+				extendedInfo = "RELEASE_LOCK returned a non-1 result on the connection that holds the lock, which should not happen inside the lock's own transaction."
+			);
+		}
 	}
 
 	/**

@@ -45,6 +45,24 @@ component extends="wheels.migrator.Base"{
 	}
 
 	/**
+	 * Internal function. Throws Wheels.Migrator.UnsupportedColumnType for a column type this
+	 * migrator has no SQL type for (#4095), before any DDL runs. typeToSQL() would otherwise
+	 * return "" and the column would be emitted with no type: a DDL syntax error on most
+	 * databases, and on SQLite a typeless column whose model fails to load.
+	 */
+	public void function $assertColumnTypeSupported(required string type) {
+		if (IsDefined("variables.sqlTypes") && StructKeyExists(variables.sqlTypes, arguments.type)) {
+			return;
+		}
+		local.supported = IsDefined("variables.sqlTypes") ? ListSort(StructKeyList(variables.sqlTypes), "textnocase") : "";
+		Throw(
+			type = "Wheels.Migrator.UnsupportedColumnType",
+			message = "Column type `#arguments.type#` is not supported by the #adapterName()# migrator.",
+			extendedInfo = "Supported column types: #Replace(local.supported, ",", ", ", "all")#."
+		);
+	}
+
+	/**
 	 * Internal function. The SQL default expression that generates a UUID for a
 	 * uniqueidentifier column whose default is SQL Server's `newid()` (#4094). Each
 	 * adapter sets `variables.uuidDefaultSQL`; SQL Server keeps `newid()`. Returns ""

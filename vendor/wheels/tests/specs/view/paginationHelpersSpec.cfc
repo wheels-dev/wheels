@@ -484,9 +484,7 @@ component extends="wheels.WheelsTest" {
 					// must not trip InvalidArgument, because $paginationLinkToArgs forwards the route's
 					// foundvariables to linkTo() at link-build time.
 					_origShowErr = application.wheels.showErrorInformation
-					_origRoutes = Duplicate(application.wheels.routes)
-					_origStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
-					_origNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
+					_routeSnapshot = $snapshotRoutes()
 					_origRewrite = application.wheels.URLRewriting
 					application.wheels.showErrorInformation = true
 					try {
@@ -499,9 +497,7 @@ component extends="wheels.WheelsTest" {
 							.notToThrow()
 					} finally {
 						application.wheels.showErrorInformation = _origShowErr
-						application.wheels.routes = _origRoutes
-						application.wheels.staticRoutes = _origStaticRoutes
-						application.wheels.namedRoutePositions = _origNamedRoutePositions
+						$restoreRoutes(_routeSnapshot)
 						application.wheels.URLRewriting = _origRewrite
 					}
 				})
@@ -580,9 +576,7 @@ component extends="wheels.WheelsTest" {
 			describe("params forwarding with pageNumberAsParam=false", () => {
 
 				beforeEach(() => {
-					_origRoutes = Duplicate(application.wheels.routes)
-					_origStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
-					_origNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
+					_routeSnapshot = $snapshotRoutes()
 					_origRewrite = application.wheels.URLRewriting
 					$clearRoutes()
 					g.mapper().$match(name = "postsPaged", pattern = "posts/page/[page]", to = "posts##index").end()
@@ -592,9 +586,7 @@ component extends="wheels.WheelsTest" {
 				})
 
 				afterEach(() => {
-					application.wheels.routes = _origRoutes
-					application.wheels.staticRoutes = _origStaticRoutes
-					application.wheels.namedRoutePositions = _origNamedRoutePositions
+					$restoreRoutes(_routeSnapshot)
 					application.wheels.URLRewriting = _origRewrite
 				})
 
@@ -748,10 +740,5 @@ component extends="wheels.WheelsTest" {
 
 	}
 
-	public void function $clearRoutes() {
-		application.wheels.routes = []
-		application.wheels.staticRoutes = {}
-		application.wheels.namedRoutePositions = {}
-	}
 
 }

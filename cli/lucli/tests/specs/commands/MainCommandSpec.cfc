@@ -117,10 +117,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("strips the literal 'hint:' prefix from function metadata", () => {
 				// Lucee surfaces /** hint: ... */ values with the literal "hint:"
-				// prefix; the helper must regex-strip it before rendering. Match
-				// the case-insensitive ^hint\s*:\s* anchor.
-				// The strip lives in $commandHint(), which $commandHelp() calls.
-				expect(variables.source).toInclude('return trim(reReplaceNoCase(trim(fn.hint ?: ""), "^hint\s*:\s*", ""));');
+				// prefix. $commandHint() passes the raw hint on, and
+				// $commandHelpParts() keys on the prefix and strips it from the
+				// summary line.
+				expect(variables.source).toInclude('rv.summary = trim(reReplaceNoCase(lines[1], "^\s*hint\s*:\s*", ""));');
 			});
 
 			it("returns empty string for unknown commands so showHelp() falls through", () => {
@@ -133,7 +133,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var startIdx = reFindNoCase("(?m)^[ \t]*private\s+string\s+function\s+\$commandHelp\s*\(", variables.source);
 				expect(startIdx).toBeGT(0);
 				var body = mid(variables.source, startIdx, 1200);
-				expect(body).toInclude("if (!len(hint))");
+				expect(body).toInclude("if (!len(parts.summary))");
 				expect(body).toInclude("return """"");
 			});
 

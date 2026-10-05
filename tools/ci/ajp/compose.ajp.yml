@@ -3,6 +3,7 @@
 # Lucee 7 gets an AJP connector on 8009; httpd (mod_proxy_ajp) fronts it on port 80 inside
 # the SAME network namespace, the way IIS+BonCode or mod_jk sit on the app server. Every hop
 # is loopback, so the test-context gate (loopback peers only) binds as it does there.
+# tools/ci/ajp/run.sh generates both config files and sets the variables below.
 services:
   lucee7:
     # Only the front end is published; Lucee's own HTTP port stays inside the container.
@@ -10,14 +11,14 @@ services:
       - "${AJP_HTTPD_PORT:-9590}:80"
     volumes:
       - type: bind
-        source: ./tools/ci/ajp/server-ajp.json
+        source: ${AJP_SERVER_JSON:?run through tools/ci/ajp/run.sh, which generates it}
         target: /wheels-test-suite/server.json
   httpd:
-    image: httpd:2.4
+    image: ${AJP_HTTPD_IMAGE:-httpd:2.4}
     network_mode: "service:lucee7"
     volumes:
       - type: bind
-        source: ./tools/ci/ajp/httpd.conf
+        source: ${AJP_HTTPD_CONF:?run through tools/ci/ajp/run.sh, which generates it}
         target: /usr/local/apache2/conf/httpd.conf
         read_only: true
     depends_on:

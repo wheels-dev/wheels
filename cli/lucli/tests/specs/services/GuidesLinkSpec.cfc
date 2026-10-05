@@ -20,6 +20,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(guides.segment("9.9.0")).toBe(latestSegment);
 			});
 
+			it("links an upgrade target of the latest minor to that minor's guides", () => {
+				var target = guides.latestVersion() & ".0";
+				expect(guides.link("upgrading/", target)).toBe("https://guides.wheels.dev/" & latestSegment & "/upgrading/");
+				expect(guides.segment("4.2.0")).toBe("v4-2-0");
+			});
+
 			it("never links older than the 4.0 guides", () => {
 				expect(guides.segment("3.0.0")).toBe("v4-0-0");
 			});

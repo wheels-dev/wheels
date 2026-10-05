@@ -404,7 +404,11 @@ component extends="wheels.WheelsTest" {
 
 - **Test infra scope**: Wheels internals (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files included from plain CFCs like `TestRunner.cfc`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
 - **`#` escape**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiter. In string literals, escape: `&##111;`. Comments (`//`) are fine. Unescaped `#` in strings crashes the **entire** test suite, not just that file.
-- **`$clearRoutes()` in test specs**: NOT inherited from `wheels.WheelsTest`. Copy from `linksSpec.cfc` if your spec manipulates routes.
+- **Route-state save/restore in test specs**: `wheels.WheelsTest` provides `$snapshotRoutes()`, `$restoreRoutes(snapshot)`, and `$clearRoutes()` ([#4194](https://github.com/wheels-dev/wheels/issues/4194)). Any spec that redefines the route table MUST snapshot in `beforeEach` and restore in `afterEach`, or it leaks stale state into later specs (routes, staticRoutes, namedRoutePositions, the urlFor caches, and #4183's index are all separate — a partial restore is the #4192 bug class). Use the helpers rather than hand-rolling the save/restore:
+  ```cfm
+  beforeEach(() => { variables._routes = $snapshotRoutes(); $clearRoutes(); g.mapper()...end(); g.$setNamedRoutePositions(); });
+  afterEach(() => $restoreRoutes(variables._routes));
+  ```
 
 ### Running tests locally
 

@@ -168,7 +168,7 @@ wheels browser setup
 The installer downloads the JARs into `lib/`, Chromium into `~/Library/Caches` (macOS) or `~/.cache` (Linux), and writes a manifest so CI knows what's cached.
 
 <Aside type="note">
-  The verb is `setup`, not `install`. `wheels browser install` reaches LuCLI's generic extension installer first and prints `No git or extension dependencies to install` — looks like success but does nothing. Always use `setup`.
+  The verb is `setup`: `wheels browser setup` downloads the Playwright JARs and browser binaries.
 </Aside>
 
 <Steps>

@@ -486,6 +486,8 @@ component {
 		local.sortedKeys = ListSort(StructKeyList(arguments.attributes), "textnocase");
 		local.sortedKeysArray = ListToArray(local.sortedKeys);
 		local.iEnd = ArrayLen(local.sortedKeysArray);
+		// Resolve the HTML-attribute encoding flag once rather than per attribute (#4151).
+		local.encodeHtmlAttributes = $get("encodeHtmlAttributes");
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.key = local.sortedKeysArray[local.i];
 			// place the attribute name and value in the string unless it should be skipped according to the arguments or if it's an internal argument (starting with a "$" sign)
@@ -503,7 +505,8 @@ component {
 						name = local.key,
 						value = arguments.attributes[local.key],
 						encode = arguments.encode,
-						encodeExcept = arguments.encodeExcept
+						encodeExcept = arguments.encodeExcept,
+						encodeHtmlAttributes = local.encodeHtmlAttributes
 					);
 				}
 			}
@@ -521,8 +524,15 @@ component {
 		required string name,
 		required string value,
 		required boolean encode,
-		required string encodeExcept
+		required string encodeExcept,
+		any encodeHtmlAttributes = ""
 	) {
+		// The caller ($tag) resolves $get("encodeHtmlAttributes") once and passes it, so we don't
+		// call $get per attribute (#4151). An external caller that omits it gets the same value via
+		// the fallback. (Not a signature default so the $get isn't engine-evaluated at parse time.)
+		if (!IsBoolean(arguments.encodeHtmlAttributes)) {
+			arguments.encodeHtmlAttributes = $get("encodeHtmlAttributes");
+		}
 		// For custom data attributes we convert underscores and camel case to hyphens.
 		// E.g. "dataDomCache" and "data_dom_cache" becomes "data-dom-cache".
 		// This is to get around the issue with not being able to use a hyphen in an argument name in CFML.
@@ -539,7 +549,7 @@ component {
 
 		// set standard attribute name / value to use as the default to return (e.g. name / value part of <input name="value">)
 		local.rv = " " & arguments.name & "=""";
-		local.rv &= arguments.encode && !ListFind(arguments.encodeExcept, arguments.name) && $get("encodeHtmlAttributes")
+		local.rv &= arguments.encode && !ListFind(arguments.encodeExcept, arguments.name) && arguments.encodeHtmlAttributes
 			? EncodeForHTMLAttribute($canonicalize(arguments.value))
 			: arguments.value;
 		local.rv &= """";

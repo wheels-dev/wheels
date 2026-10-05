@@ -60,6 +60,10 @@ component {
 			if (local.args.encode == "attributes") {
 				local.args.encode = true;
 			}
+			// linkTo has already normalised its arguments via $args above, so tell URLFor to skip
+			// its redundant generic $args pass (it still applies its own set(functionName="URLFor")
+			// defaults). #4151.
+			local.args.$argsResolved = true;
 			arguments.href = uRLFor(argumentCollection = local.args);
 			local.encodeExcept = "href";
 		} else if (IsBoolean(arguments.sanitizeHref) && arguments.sanitizeHref) {

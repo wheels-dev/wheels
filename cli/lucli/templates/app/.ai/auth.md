@@ -96,3 +96,13 @@ function create() {
 - Keep the `return`. With delayed redirects (`delay=true`, which test runs use), the action would otherwise go on to call `redirectTo` a second time.
 - Don't set `allowExternalRedirects=true` to make a return-to link work: it turns the check off for every redirect in the app.
 - `redirectTo(back=true)` applies the same check to the referrer. If the referrer is on another host, it falls back to the `route` / `controller` / `action` you pass, or to the site root.
+
+To check that a URL stays on this site without redirecting, for example before you store a return-to URL or build a link from it, call `isSafeRedirectUrl(redirectUrl)` (4.2.0). It returns `true` for a relative URL or one on the current host, the same rule `redirectTo(url=…)` applies:
+
+```cfm
+var returnTo = params.return_to ?: "";
+// Len() too: isSafeRedirectUrl("") is true (an empty URL is relative).
+if (IsSimpleValue(returnTo) && Len(returnTo) && isSafeRedirectUrl(returnTo)) {
+    session.returnTo = returnTo;
+}
+```

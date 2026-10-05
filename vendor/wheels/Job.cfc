@@ -639,7 +639,7 @@ component {
 				);
 
 				writeLog(
-					text = "Job '#arguments.jobRow.jobClass#' [#arguments.jobRow.id#] permanently failed after #local.maxRetries# attempts: #e.message#",
+					text = "Job '#arguments.jobRow.jobClass#' [#arguments.jobRow.id#] permanently failed after #local.currentAttempts# attempts (#local.maxRetries# retries): #e.message#",
 					type = "error",
 					file = "wheels_jobs"
 				);

@@ -1,0 +1,241 @@
+/**
+ * Differential (characterization) gate for #4151 linkTo()/URLFor() cost reduction. Pins the
+ * EXACT output of a corpus so the optimizations (de-dup $args, literal Replace in
+ * $urlForSubstituteVariables, lighter $tag) stay byte-identical. Must pass on develop unchanged.
+ *
+ * Two mechanisms:
+ *  - End-to-end GOLDEN strings for engine-independent cases: URLFor/linkTo produce deterministic
+ *    URLs, and $tag sorts attributes alphabetically (so tag output is order-stable across engines).
+ *    These guard the de-dup-$args (W1) call-flow change and the $tag (W3) change.
+ *  - A verbatim REFERENCE COPY of $urlForSubstituteVariables ($refSubstituteVariables) with a
+ *    sub-corpus that INCLUDES regex-backref values (\1, $1) in a pattern variable: that behaviour
+ *    is engine-specific (no capture groups → empty/literal/error per engine), so we assert the
+ *    live function equals the reference on THIS engine rather than a fixed golden. Guards the
+ *    literal-Replace (W2) change.
+ */
+component extends="wheels.WheelsTest" {
+
+	function run() {
+		g = application.wo;
+
+		describe("linkTo/URLFor differential (4151)", () => {
+
+			// The corpus goldens depend on a known route table, so install one (a root route and a
+			// mapKey wildcard that yields the /controller/action/key URLs) and restore the real
+			// routes afterwards. Without this the spec is fragile to whatever routes earlier specs
+			// in the full suite left behind (seen as "Could not find the `posts`/`editPost` route").
+			// Also reset the application-scoped urlForCache around each test so a stale
+			// controller##action -> route-name memo can't point at a now-absent route.
+			beforeEach(() => {
+				// Snapshot EVERY route-derived structure, then rebuild a clean table. Restoring
+				// only `routes` (as an earlier revision did) leaks staticRoutes + namedRoutePositions
+				// into later specs -- the same stale-index class this spec guards against.
+				variables._origRoutes = Duplicate(application.wheels.routes);
+				variables._origStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {};
+				variables._origNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {};
+				$clearRoutes();
+				g.mapper().wildcard(methods = "get,post", mapKey = true).root(to = "home##index", method = "get").end();
+				g.$setNamedRoutePositions();
+				$clearUrlForCache();
+			});
+			afterEach(() => {
+				application.wheels.routes = variables._origRoutes;
+				application.wheels.staticRoutes = variables._origStaticRoutes;
+				application.wheels.namedRoutePositions = variables._origNamedRoutePositions;
+				$clearUrlForCache();
+			});
+
+			it("end-to-end output stays byte-identical across the corpus, cached and uncached", () => {
+				var c = g.controller(name = "dummy");
+
+				var cases = {};
+				cases["url_ctrl_action_key"] = () => c.URLFor(controller = "posts", action = "edit", key = 1);
+				cases["url_params"]          = () => c.URLFor(controller = "posts", action = "index", params = "a=1&b=two");
+				cases["url_format"]          = () => c.URLFor(controller = "posts", action = "show", key = 1, params = "format=json");
+				cases["url_anchor"]          = () => c.URLFor(controller = "posts", action = "show", key = 1, anchor = "comments");
+				cases["url_composite_key"]   = () => c.URLFor(controller = "posts", action = "show", key = "1,2");
+				cases["url_encode_on"]       = () => c.URLFor(controller = "posts", action = "index", params = "q=a b&x=y", encode = true);
+				cases["url_encode_off"]      = () => c.URLFor(controller = "posts", action = "index", params = "q=a b", encode = false);
+				cases["link_basic"]          = () => c.linkTo(text = "Edit", controller = "posts", action = "edit", key = 1);
+				cases["link_class_anchor"]   = () => c.linkTo(text = "Go", controller = "posts", action = "show", key = 1, anchor = "c", class = "btn", rel = "x");
+				cases["link_href"]           = () => c.linkTo(text = "Ext", href = "/raw/path?x=1");
+				cases["url_route_root"]      = () => c.URLFor(route = "root");
+				var attrs5 = {id = "n1", class = "btn", "data-x" = "1", "data-y" = "2", title = "t", href = "/p/1"};
+				cases["element_5attrs"]      = () => c.$element(name = "a", skip = "", content = "X", attributes = attrs5, encode = true, encodeExcept = "href");
+				var attrsSkip = {id = "n2", class = "c", wheelsInternal = "hide", wheelsFoo = "hide2", href = "/p/2"};
+				cases["element_skipstarting"] = () => c.$element(name = "a", skip = "", skipStartingWith = "wheels", content = "Y", attributes = attrsSkip, encode = true, encodeExcept = "href");
+
+				var golden = goldenMap();
+				var appKey = g.$appKey();
+				var clearCache = () => {
+					if (StructKeyExists(application[appKey], "urlForCache")) { StructClear(application[appKey].urlForCache); }
+				};
+
+				for (var name in cases) {
+					clearCache();
+					var uncached = cases[name]();
+					var cached = cases[name]();
+					expect(uncached).toBe(golden[name], "#name# uncached diverged");
+					expect(cached).toBe(golden[name], "#name# cached diverged");
+					// W1 guard: the internal $argsResolved sentinel must never leak into output.
+					expect(uncached).notToInclude("$argsResolved", "#name#: $argsResolved leaked into output");
+				}
+			});
+
+			it("the de-dup ($argsResolved) is output-neutral, including app-level URLFor overrides (W1)", () => {
+				var c = g.controller(name = "dummy");
+				// URLFor called with $argsResolved=true (linkTo's path, skipping the generic $args)
+				// must produce byte-identical output to $argsResolved=false (the full $args path),
+				// because the else-branch still applies application.wheels.functions.URLFor.
+				// Pass the $-prefixed sentinel via argumentCollection: a quoted named argument
+				// ("$argsResolved" = x) in a direct call is a compile error on Adobe 2023
+				// (MissingNameException), though Lucee/BoxLang/Adobe 2025 accept it.
+				var probe = (resolved) => {
+					var pArgs = {controller = "posts", action = "index", params = "q=a b&x=y", encode = true};
+					pArgs["$argsResolved"] = resolved;
+					return c.URLFor(argumentCollection = pArgs);
+				};
+				expect(probe(true)).toBe(probe(false), "de-dup changed URLFor output");
+
+				// Same equivalence with an app-level override on a framework default (no signature
+				// default, so it is actually applied via structAppendDefaults) — proving the override
+				// reaches both paths identically after the de-dup.
+				var prev = StructCopy(application.wheels.functions.URLFor);
+				try {
+					application.wheels.functions.URLFor.encode = false;
+					expect(probe(true)).toBe(probe(false), "URLFor override not applied identically with de-dup");
+				} finally {
+					application.wheels.functions.URLFor = prev;
+				}
+
+				// The internal sentinel must never surface in linkTo output.
+				var link = c.linkTo(text = "x", controller = "posts", action = "edit", key = 1);
+				expect(link).notToInclude("argsResolved", "sentinel leaked into linkTo output");
+			});
+
+			it("$urlForSubstituteVariables stays identical to its pre-optimization reference (incl regex backrefs)", () => {
+				var c = g.controller(name = "dummy");
+				variables.ref = c;
+
+				// Each probe: {name, rv, fv, args}. Covers plain [prop], per-engine backref values
+				// (\1 / $1), wildcard [*prop] with a slash value (encode on/off), BOTH [prop] and
+				// [*prop] in each order (W2's earliest-placeholder branch), and a wildcard value
+				// carrying a backslash (the ReReplace fallback).
+				var base = {route = "", controller = "", action = "", key = "", path = "", format = "", params = "", encode = false, "$encodeForHtmlAttribute" = false, "$URLRewriting" = "On"};
+				var mk = (overrides) => {
+					var a = StructCopy(base);
+					StructAppend(a, overrides, true);
+					return a;
+				};
+				var probes = [
+					{name = "plain multi", rv = "/posts/[controller]/[action]/[key]", fv = "controller,action,key,format", args = mk({controller = "posts", action = "edit", key = "7"})},
+					{name = "backref slash", rv = "/p/[key]", fv = "controller,action,key,format", args = mk({key = "a\1b"})},
+					{name = "backref dollar", rv = "/p/[key]", fv = "controller,action,key,format", args = mk({key = "a$1b"})},
+					{name = "encoded space", rv = "/p/[key]", fv = "controller,action,key,format", args = mk({key = "a b", encode = true})},
+					{name = "rewriting off", rv = "?controller=[controller]&action=[action]&key=[key]&format=[format]", fv = "controller,action,key,format", args = mk({controller = "posts", action = "edit", key = "7", "$URLRewriting" = "Off"})},
+					{name = "wildcard slash encode off", rv = "/files/[*path]", fv = "path", args = mk({path = "a/b/c"})},
+					{name = "wildcard slash encode on", rv = "/files/[*path]", fv = "path", args = mk({path = "a b/c", encode = true})},
+					{name = "both star-first", rv = "/a/[*key]/b/[key]", fv = "key", args = mk({key = "7"})},
+					{name = "both lit-first", rv = "/a/[key]/b/[*key]", fv = "key", args = mk({key = "7"})},
+					{name = "wildcard backref", rv = "/files/[*path]", fv = "path", args = mk({path = "a\1b"})},
+					{name = "wildcard dollar", rv = "/files/[*path]", fv = "path", args = mk({path = "a$1b"})}
+				];
+				for (var p in probes) {
+					var liveArgs = StructCopy(p.args);
+					var refArgs = StructCopy(p.args);
+					var live = c.$urlForSubstituteVariables(rv = p.rv, args = liveArgs, foundVariables = p.fv, coreVariables = p.fv, route = {});
+					var reference = $refSubstituteVariables(rv = p.rv, args = refArgs, foundVariables = p.fv, coreVariables = p.fv, route = {});
+					expect(live).toBe(reference, "substituteVariables diverged: " & p.name);
+					expect(liveArgs.params).toBe(refArgs.params, "substituteVariables params side-effect diverged: " & p.name);
+				}
+			});
+
+		});
+	}
+
+	// Not inherited from wheels.WheelsTest (see CLAUDE.md); mirrors linksSpec.cfc.
+	// Clears EVERY route-derived structure, not just routes: $setNamedRoutePositions()
+	// appends into namedRoutePositions and mapper().end() rebuilds staticRoutes, so a
+	// partial clear would let this spec leave stale indices for whatever runs after it.
+	public void function $clearRoutes() {
+		application.wheels.routes = [];
+		application.wheels.staticRoutes = {};
+		application.wheels.namedRoutePositions = {};
+	}
+
+	private void function $clearUrlForCache() {
+		var appKey = g.$appKey();
+		if (StructKeyExists(application[appKey], "urlForCache")) {
+			StructClear(application[appKey].urlForCache);
+		}
+	}
+
+	// Engine-independent goldens captured from develop (the backref cases are covered by the
+	// reference-copy test above, not here, because their output is engine-specific).
+	private struct function goldenMap() {
+		// url_route_root (URLFor(route="root")) exercises the named-route lookup. It is stable here
+		// because beforeEach now clears namedRoutePositions before $setNamedRoutePositions() rebuilds
+		// it (the method appends, so a stale entry would otherwise shadow the test route's position).
+		return {
+			url_route_root = "/",
+			url_ctrl_action_key = "/posts/edit/1",
+			url_params = "/posts/index?a=1&b=two",
+			url_format = "/posts/show/1?format=json",
+			url_anchor = "/posts/show/1##comments",
+			url_composite_key = "/posts/show/1%2C2",
+			url_encode_on = "/posts/index?q=a+b&x=y",
+			url_encode_off = "/posts/index?q=a b",
+			link_basic = "<a href=""/posts/edit/1"">Edit</a>",
+			link_class_anchor = "<a class=""btn"" href=""/posts/show/1##c"" rel=""x"">Go</a>",
+			link_href = "<a href=""&##x2f;raw&##x2f;path&##x3f;x&##x3d;1"">Ext</a>",
+			element_5attrs = "<a class=""btn"" data-x=""1"" data-y=""2"" href=""/p/1"" id=""n1"" title=""t"">X</a>",
+			element_skipstarting = "<a class=""c"" href=""/p/2"" id=""n2"">Y</a>"
+		};
+	}
+
+	// Verbatim copy of develop's $urlForSubstituteVariables (global/routing.cfm). The live function
+	// is optimized in W2; this frozen copy is the byte-identical oracle. $-helpers resolve through
+	// variables.ref (the controller context).
+	private string function $refSubstituteVariables(required string rv, required struct args, required string foundVariables, required string coreVariables, required struct route) {
+		local.rv = arguments.rv;
+		for (local.i = 1; local.i <= ListLen(arguments.foundVariables); local.i++) {
+			local.property = ListGetAt(arguments.foundVariables, local.i);
+			local.reg = "\[\*?#local.property#\]";
+			if (StructKeyExists(arguments.args, local.property) && Len(arguments.args[local.property])) {
+				local.value = arguments.args[local.property];
+			} else if (StructKeyExists(arguments.route, local.property)) {
+				local.value = arguments.route[local.property];
+			} else if (Len(arguments.args.route) && arguments.args.$URLRewriting != "Off") {
+				Throw(type = "Wheels.IncorrectRoutingArguments", message = "Incorrect Arguments");
+			} else {
+				continue;
+			}
+			if (IsObject(local.value)) {
+				local.value = local.value.key();
+			}
+			local.rawValue = local.value;
+			if (arguments.args.encode && variables.ref.$get("encodeURLs")) {
+				local.value = variables.ref.$encodeUrlParam(local.value);
+				if (arguments.args.$encodeForHtmlAttribute) {
+					local.value = EncodeForHTMLAttribute(local.value);
+				}
+			}
+			if (!ReFind(local.reg, local.rv)) {
+				if (!ListFindNoCase(arguments.coreVariables, local.property)) {
+					if (arguments.args.encode && variables.ref.$get("encodeURLs")) {
+						local.rawValue = Replace(Replace(local.rawValue, "&", "%26", "all"), "=", "%3D", "all");
+					}
+					arguments.args.params = ListAppend(arguments.args.params, "#local.property#=#local.rawValue#", "&");
+				}
+				continue;
+			}
+			if (local.property == "controller" || local.property == "action") {
+				local.value = variables.ref.hyphenize(local.value);
+			} else if (application.wheels.obfuscateUrls) {
+				local.value = variables.ref.obfuscateParam(local.value);
+			}
+			local.rv = ReReplace(local.rv, local.reg, local.value);
+		}
+		return local.rv;
+	}
+}
