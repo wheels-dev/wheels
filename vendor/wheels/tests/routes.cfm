@@ -27,6 +27,10 @@ mapper()
         .get(name="advisoryLockAbortTx", pattern="/abort-tx", to="AdvisoryLockProbe##abortTransaction")
         .get(name="advisoryLockRedirectTx", pattern="/redirect-tx", to="AdvisoryLockProbe##redirectTransaction")
     .end()
+    // Abort-inside-a-transaction fixture: a write in invokeWithTransaction() whose request ends
+    // with abort must be rolled back. Driven by
+    // wheels.tests.specs.model.transactionAbortRollbackSpec. Must precede .wildcard().
+    .get(name="transactionAbortProbe", pattern="/_txnabort/run", to="TransactionAbortProbe##run")
     .wildcard()
 	.get(name="wheelstestbox", pattern="wheels/core/tests", to="wheels##public##tests")
 	.get(name="sampleLinkToTest", pattern="sample/linktotest", to="sample##linktotest")

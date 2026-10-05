@@ -154,6 +154,25 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
 
 21. **On Adobe CF, a mixin UDF that creates a subclass whose pseudo-constructor copies that same UDF onto `this` fails the first time per JVM.** Adobe CF 2023 and 2025 (Lucee and BoxLang are fine): the call's epilogue pops a super scope its prologue never pushed, so it throws `java.util.EmptyStackException` (or a `NullPointerException` on `this.SymTab_superScopes`) at `NeoPageContext.popSuperScope`. The call's own body completes normally. In Wheels, `application.wo` (a plain `wheels.Global`) runs the `global/objects.cfm` mixin `$createObjectFromRoot` to create `wheels.Public`, and Global's pseudo-constructor (`$promoteIncludedGlobalsToThis()`) copies `$createObjectFromRoot` onto the new object. That made **the first request after every cold start** a 500 at the `Public` line in `onapplicationstart.cfc` ([#3730](https://github.com/wheels-dev/wheels/issues/3730)). Any earlier request absorbs the one-time failure, including the Docker healthcheck `GET /` or a readiness retry. That is why the test suite and CI never see it, and why 51edf9dce "fixed" the wrong thing (a Public.$init include nest). Fix: create **any** Global subclass outside a mixin call first, which initializes the engine state for every Global mixin. `onapplicationstart.$init()` creates `wheels.events.SuperScopePrimer` as its first statement; keep it first, and keep the primer empty. Guard: `vendor/wheels/tests/specs/events/SuperScopePrimerSpec.cfc` (structural, because the state is once per JVM). Verify a change in this area with a **cold first request, healthcheck disabled**, never the suite. CI runs exactly that on every engine in `.github/workflows/cold-start-smoke.yml` (`tools/ci/cold-start-smoke.sh`, #3735). Deep reference: [.ai/wheels/cross-engine-compatibility.md](.ai/wheels/cross-engine-compatibility.md).
 
+22. **On BoxLang, a request that ends with `abort` skips any `finally` whose `try` has a `catch` clause — even an unreached `catch (any) { rethrow; }`.** A catch-free `try/finally` runs, and so does one whose finally issues a `transaction action=` statement; whether the try or finally contains a transaction action makes no difference, the catch clause alone decides. Lucee 6/7 and Adobe run the finally either way, so **local Lucee and Adobe green do NOT cover this**. Keep must-run cleanup (a lock release, the rollback of a transaction on abort) in a catch-free `try/finally`; to still tell a normal throw from an abort, nest a `try/catch` that sets a flag inside it:
+    ```cfm
+    var exitState = {completed = false, threw = false};
+    try {
+        try {
+            doWork();
+            exitState.completed = true;
+        } catch (any e) {
+            exitState.threw = true;
+            rethrow;
+        }
+    } finally {
+        if (!exitState.completed && !exitState.threw) {
+            // only an abort gets here: run the must-run cleanup
+        }
+    }
+    ```
+    Hit twice: the session-lock release in `withAdvisoryLock(transaction = true)` ([#4330](https://github.com/wheels-dev/wheels/pull/4330)), and `invokeWithTransaction()`, whose rollback lived in the finally of a try with a catch, so on BoxLang an abort inside it kept the writes made before the abort (`$invokeTransactionMethod()` in `vendor/wheels/model/transactions.cfm`).
+
 Verify Adobe CF fixes locally before pushing — don't iterate via CI:
 ```bash
 curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
