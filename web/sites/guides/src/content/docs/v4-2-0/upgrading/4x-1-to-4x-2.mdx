@@ -398,6 +398,10 @@ If your app builds storage keys from user input or file names, check that none o
 
 `analyses`, `bases`, `cases`, `diagnoses`, `parentheses`, `phases`, `prognoses`, `purchases`, `synopses`, `theses` and `vases` are unchanged. Wheels derives model and table names with `singularize()` and `pluralize()`, so check any name you derived from such a word. A model class or table named after the old `databasis` output needs renaming.
 
+### `insertAll()` and `upsertAll()` run in one transaction
+
+`insertAll()` and `upsertAll()` now honour their `transaction` argument, which defaults to your `transactionMode` setting (`commit` unless you changed it). Records are still written in batches of up to 1000 rows (fewer on SQL Server, to stay within its parameter limit), but all the batches now run in one transaction: a large import is all-or-nothing, and a failing batch rolls back the ones before it. In 4.1 each batch committed on its own. If you relied on that, for example to keep a partial import, pass `transaction="none"`. `transaction="rollback"` writes nothing, like `save(transaction="rollback")`. One transaction holds its locks until the end, so an import of many thousands of rows holds them for the whole call.
+
 ## CLI and deployment changes
 
 ### Dev servers listen on `127.0.0.1`
