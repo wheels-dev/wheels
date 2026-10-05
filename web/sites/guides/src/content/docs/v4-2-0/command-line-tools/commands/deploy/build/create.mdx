@@ -24,11 +24,17 @@ wheels deploy build create [--destination=<name>] [--dry-run]
 
 ## When to run
 
-Only when you want a named `kamal-<service>` buildx builder on the control machine, for example to select it yourself with `docker buildx use kamal-<service>`. `build push` and `wheels deploy` do not need it.
+Once, before the first build, when `builder.remote` is set. [`build push`](../push/) then builds with `--builder kamal-<service>`, so that builder must exist. Without `builder.remote`, `build push` uses your current default builder and doesn't need this.
 
 ## Behavior
 
-Emits `docker buildx create --name kamal-<service> --driver=docker-container` on the control machine. The builder is not selected with `--use`, and `build push` / `wheels deploy` do not pass `--builder`, so they build with your current default builder.
+Emits `docker buildx create --name kamal-<service> --driver=docker-container` on the control machine. When `builder.remote` is set, its endpoint is passed too, so the builder runs on that host:
+
+```txt
+[local] docker buildx create --name kamal-ddapp --driver=docker-container 'ssh://deploy@192.0.2.50'
+```
+
+The builder is not selected with `--use`; `build push` names it with `--builder` instead.
 
 ## Example
 

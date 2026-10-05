@@ -25,9 +25,23 @@ wheels deploy build push [--version=<v>] [--destination=<name>] [--dry-run]
 
 ## Behavior
 
-Emits one command: `docker buildx build --push --tag <image>:<version> --file <dockerfile> <context>`, using `builder.dockerfile` (default `Dockerfile`) and `builder.context` (default `.`). The image is prefixed with `registry.server` unless the server is `docker.io`.
+Emits one command:
 
-`builder.arch`, `builder.args` and `builder.remote` are not applied: the command has no `--platform`, `--build-arg` or `--builder` option, so it always builds on the control machine with the current default buildx builder.
+```txt
+docker buildx build --push --platform linux/<arch>[,linux/<arch>...] [--builder kamal-<service>] --label service=<service> [--build-arg KEY=value ...] --tag <image>:<version> --file <dockerfile> <context>
+```
+
+- **`--file` and the context** come from `builder.dockerfile` (default `Dockerfile`) and `builder.context` (default `.`). The image is prefixed with `registry.server` unless the server is `docker.io`.
+- **`--platform`** lists one `linux/<arch>` per entry in `builder.arch`, which takes a list or a comma-separated string and defaults to `amd64`. An entry that already contains `/` (for example `linux/arm/v7`) is used as is. An entry that isn't a plain platform name (letters, digits, `.`, `_`, `/` and `-` only) stops the command with `Wheels.Deploy.InvalidInput`.
+- **`--builder kamal-<service>`** is added when `builder.remote` is set. That builder is the one [`wheels deploy build create`](../create/) creates on the remote host.
+- **`--build-arg`** is added once per `builder.args` entry, sorted by key.
+- **`--label service=<service>`** is always set. [`wheels deploy prune images`](../../prune/images/) relies on it to find the service's images; images built before this label was added carry none.
+
+With `--dry-run`, for a `builder` of `arch: amd64,arm64`, `remote: ssh://deploy@192.0.2.50` and `args: {ALPHA: first, ZETA: last}`:
+
+```txt
+[local] docker buildx build --push --platform linux/amd64,linux/arm64 --builder kamal-ddapp --label 'service=ddapp' --build-arg 'ALPHA=first' --build-arg 'ZETA=last' --tag 'ddapp/web:v3' --file 'Dockerfile' '.'
+```
 
 ## Example
 

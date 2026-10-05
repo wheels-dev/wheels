@@ -13,8 +13,8 @@ Disk cleanup. Three verbs with increasing scope.
 
 | Verb | Removes |
 |------|---------|
-| [`all`](/v4-2-0/command-line-tools/commands/deploy/prune/all/) | Old stopped containers + dangling service-labelled images. |
-| [`images`](/v4-2-0/command-line-tools/commands/deploy/prune/images/) | Dangling service-labelled images only. |
+| [`all`](/v4-2-0/command-line-tools/commands/deploy/prune/all/) | Old stopped containers + the service's unused images. |
+| [`images`](/v4-2-0/command-line-tools/commands/deploy/prune/images/) | The service's unused images only. |
 | [`containers`](/v4-2-0/command-line-tools/commands/deploy/prune/containers/) | Old stopped containers only. |
 
 ## Retention policy

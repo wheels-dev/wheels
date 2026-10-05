@@ -31,10 +31,10 @@ App container lifecycle. Every verb targets containers labelled with the current
 | Flag | Description |
 |------|-------------|
 | `--release=<v>` | Required for boot/start/stop/remove. Optional for details. Ignored by containers/images/logs/live/maintenance. |
-| `--role=<name>` | Limit to one role. Default: all roles. |
+| `--role=<name>` | Limit to one role. Default: all roles. A name that `deploy.yml` doesn't define stops the command with an error that lists the roles it does define. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print commands without executing. |
 
 <Aside type="note" title="--release and --version">
-`--release=<v>` is the documented form. `--version=<v>` is accepted as an alias and reaches deploy dispatch on the current CLI runtime ([#2674](https://github.com/wheels-dev/wheels/issues/2674), closed). Purely numeric values such as `--release=1` work ([#3111](https://github.com/wheels-dev/wheels/issues/3111), closed).
+`--release=<v>` is the documented form; the space form `--release <v>` works too. `--version=<v>` is accepted as an alias and reaches deploy dispatch on the current CLI runtime ([#2674](https://github.com/wheels-dev/wheels/issues/2674), closed). Purely numeric values such as `--release=1` work ([#3111](https://github.com/wheels-dev/wheels/issues/3111), closed).
 </Aside>
