@@ -60,6 +60,14 @@ component extends="wheels.WheelsTest" {
 				expect(StructCount(request.wheels["$queryCache"]["post"])).toBe(1);
 			})
 
+			it("normalises a namespaced model name to the bare cache slot", () => {
+				model("author").findAll(where = "lastName = 'Djurner'");
+				// The cache is keyed by ListLast(name, "/"), so "admin/author" must hit the "author" slot.
+				application.wo.forgetCachedQueries("admin/author");
+
+				expect(StructCount(request.wheels["$queryCache"]["author"])).toBe(0);
+			})
+
 			it("forgetCachedQueries(all = true) clears every model's cached results this request", () => {
 				model("author").findAll(where = "lastName = 'Djurner'");
 				model("post").findAll(where = "id > 0");

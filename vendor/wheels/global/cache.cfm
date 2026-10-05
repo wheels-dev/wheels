@@ -385,6 +385,9 @@
 	 * forbids the same UDF name in both the Global mixin and a model fragment (both compile into the model
 	 * component). A no-op when nothing has been cached yet.
 	 *
+	 * As with every global helper, `forgetCachedQueries` is a reserved controller action name — a controller
+	 * cannot define an action called `forgetCachedQueries` (it is on the protected-method surface).
+	 *
 	 * [section: Miscellaneous Functions]
 	 * [category: General Functions]
 	 *
@@ -394,7 +397,10 @@
 	 *   outside a model.
 	 */
 	public any function forgetCachedQueries(string modelName = "", boolean all = false) {
-		local.slot = arguments.modelName;
+		// The cache is keyed by the model's bare name, ListLast(name, "/") (Model.cfc), so a namespaced
+		// argument like "admin/User" must be normalised the same way to hit its slot. The auto-scope path
+		// below already reads variables.wheels.class.modelName, which is stored normalised.
+		local.slot = ListLast(arguments.modelName, "/");
 		if (
 			!Len(local.slot)
 			&& StructKeyExists(variables, "wheels")
