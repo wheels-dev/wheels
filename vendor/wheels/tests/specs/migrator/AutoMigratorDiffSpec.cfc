@@ -79,6 +79,13 @@ component extends="wheels.WheelsTest" {
 				expect(ArrayFindNoCase(names, "Author")).toBeGT(0);
 			});
 
+			it("includes a model in a subfolder, named in dot notation", () => {
+				var names = variables.autoMigrator.$diffableModelNames();
+				expect(ArrayFindNoCase(names, "diffsub.NestedThing")).toBeGT(0, "names: " & ArrayToList(names));
+				// The name is one model() resolves.
+				expect(application.wo.model("diffsub.NestedThing").tableName()).toBeFalse();
+			});
+
 			it("lists each model once and skips the base Model.cfc", () => {
 				var names = variables.autoMigrator.$diffableModelNames();
 				var seen = {};
