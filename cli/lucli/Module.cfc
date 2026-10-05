@@ -9020,11 +9020,12 @@ component extends="modules.BaseModule" {
 				skipPackages: true,
 				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector(""wheels.Bindings"")` (the constructor requires the bindings path). The legacy adapter does NOT shim this item."
 			});
-			// renderPage()/renderPageToString() removed in 4.0 — shimmed by
-			// the optional wheels-legacy-adapter package, but unshimmed apps
-			// throw at first render.
+			// renderPage()/renderPageToString() were renamed in 2.0 (to renderView()
+			// and renderView(returnAs="string")); old code that still calls them
+			// throws at first render on 4.x unless the optional
+			// wheels-legacy-adapter package shims them.
 			arrayAppend(checks, {
-				description: "Removed renderPage()/renderPageToString() helpers",
+				description: "renderPage()/renderPageToString(), renamed to renderView() in 2.0",
 				pattern: "renderPage(ToString)?\s*\(",
 				checkType: "grep",
 				scanDir: "app",
@@ -9493,6 +9494,14 @@ component extends="modules.BaseModule" {
 			pattern: "renderNotFound",
 			scanTargets: [{path: "config/routes.cfm"}],
 			fix: "A request for that action gets Wheels.ActionNotAllowed. Rename the action and its route. Guide: ""renderNotFound is a framework helper"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "A route targets an action named isSafeRedirectUrl (now a reserved framework helper)",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "isSafeRedirectUrl",
+			scanTargets: [{path: "config/routes.cfm"}],
+			fix: "A request for that action gets Wheels.ActionNotAllowed. Rename the action and its route; a controller's own isSafeRedirectUrl helper that no route targets keeps working. Guide: ""isSafeRedirectUrl is a framework helper"", #guide#"
 		});
 		arrayAppend(arguments.checks, {
 			description: "A MySQL datasource sets tinyInt1isBit=false",
