@@ -76,12 +76,14 @@ export function defaultExecTimeout(env = process.env) {
 // After the command exits, how long to keep reading output a leftover process may still be writing.
 const EXIT_GRACE_MS = 2_000;
 
-// Commands still running. Each leads its own process group, so a Ctrl-C at the terminal no longer
-// reaches it; when the harness exits (normally, or via the signal handlers in isolated-home.mjs),
-// stop whatever is left rather than leave it running.
+// Commands still running, and commands that exited while something they started still held their
+// output (a server a block started, say). Each leads its own process group, so a Ctrl-C at the
+// terminal no longer reaches it; when the harness exits (normally, or via the signal handlers in
+// isolated-home.mjs, which also delete the isolated home those processes run in), stop them all.
 const running = new Set();
+const leftovers = new Set();
 process.on('exit', () => {
-  for (const proc of running) killGroup(proc, 'SIGKILL');
+  for (const proc of [...running, ...leftovers]) killGroup(proc, 'SIGKILL');
 });
 
 // Kill the child's whole process group (it leads one: spawned detached), so a JVM or anything else it
@@ -113,8 +115,8 @@ function killGroup(proc, signal) {
  * - `opts.timeout` (default defaultExecTimeout()) stops the command and the whole process group it
  *   leads, and reports "timed out after Ns running <program> <args>".
  * - It returns when the command exits, after a short grace for the last output, even if a leftover
- *   process still holds its output pipes. That leftover is not killed: a block may legitimately leave
- *   a server running (`wheels start`).
+ *   process still holds its output pipes. That leftover keeps running while the harness does (a block
+ *   may legitimately leave a server running, `wheels start`), and is stopped when the harness exits.
  */
 export function runExec(program, args = [], opts = {}) {
   const { cwd, env } = opts;
@@ -166,7 +168,12 @@ export function runExec(program, args = [], opts = {}) {
     proc.on('error', (err) => finish({ code: -1, stdout, stderr: stderr + err.message }));
     proc.on('exit', (code, signal) => {
       const exitCode = code ?? (signal ? -1 : 0);
-      graceTimer = setTimeout(() => finish({ code: exitCode, stdout, stderr }), EXIT_GRACE_MS);
+      graceTimer = setTimeout(() => {
+        // The pipes are still open, so something the command started is still running: let the
+        // harness carry on, but keep the group to stop when the harness exits.
+        leftovers.add(proc);
+        finish({ code: exitCode, stdout, stderr });
+      }, EXIT_GRACE_MS);
     });
     proc.on('close', (code, signal) => finish({ code: code ?? (signal ? -1 : 0), stdout, stderr }));
   });

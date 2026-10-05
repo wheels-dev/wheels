@@ -105,3 +105,28 @@ test('the default timeout comes from WHEELS_EXEC_TIMEOUT_MS', async () => {
   assert.equal(defaultExecTimeout({}), 240_000);
   assert.equal(defaultExecTimeout({ WHEELS_EXEC_TIMEOUT_MS: 'nope' }), 240_000);
 });
+
+test('a leftover from a command that exited is stopped when the harness exits', { timeout: 30_000 }, async () => {
+  // A "harness" process runs a command that exits while its grandchild (think: a `wheels start` server)
+  // keeps running, then exits itself. The grandchild must not outlive it: the isolated home it runs in
+  // is deleted on exit, and a detached group no longer gets the terminal's Ctrl-C.
+  const lib = new URL('../lib/exec.mjs', import.meta.url).href;
+  const harness = [
+    `const { runExec } = await import(${JSON.stringify(lib)});`,
+    `const r = await runExec(process.execPath, ['-e', ${JSON.stringify(parentScript({ exit: true }))}]);`,
+    "console.log(r.stdout.trim().split('\\n')[0]);",
+    'process.exit(0);',
+  ].join('\n');
+  const { spawn } = await import('node:child_process');
+  const proc = spawn(NODE, ['--input-type=module', '-e', harness], { stdio: ['ignore', 'pipe', 'inherit'] });
+  let out = '';
+  proc.stdout.on('data', (d) => (out += d));
+  await new Promise((resolve) => proc.once('exit', resolve));
+  const grandchild = Number(out.trim());
+  try {
+    assert.ok(grandchild > 0, `no grandchild pid: ${out}`);
+    assert.ok(await waitDead(grandchild, 5000), `leftover ${grandchild} outlived the harness`);
+  } finally {
+    if (grandchild) try { process.kill(grandchild, 'SIGKILL'); } catch {}
+  }
+});
