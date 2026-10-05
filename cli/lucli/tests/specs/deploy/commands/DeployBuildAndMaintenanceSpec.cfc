@@ -43,6 +43,27 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(cmds.create()).notToInclude("ssh://");
 			});
 
+			it("takes a comma-separated arch string as several platforms", () => {
+				var cfg = new cli.lucli.services.deploy.config.Config({service: "demo", image: "acme/demo", servers: ["1.2.3.4"], builder: {arch: "amd64, arm64"}});
+				expect(new cli.lucli.services.deploy.commands.BuilderCommands(cfg).push("v3")).toInclude("--platform linux/amd64,linux/arm64");
+			});
+
+			it("refuses an arch that isn't a plain platform name, before it reaches the shell", () => {
+				var bad = ["amd64; rm -rf /", "amd64 $(id)", "linux/amd64`id`", "arm64 --push"];
+				for (var arch in bad) {
+					var cfg = new cli.lucli.services.deploy.config.Config({service: "demo", image: "acme/demo", servers: ["1.2.3.4"], builder: {arch: [arch]}});
+					var state = {type = "", message = ""};
+					try {
+						new cli.lucli.services.deploy.commands.BuilderCommands(cfg).push("v3");
+					} catch (any e) {
+						state.type = e.type;
+						state.message = e.message;
+					}
+					expect(state.type).toBe("Wheels.Deploy.InvalidInput", "arch [" & arch & "]");
+					expect(state.message).toInclude("builder.arch");
+				}
+			});
+
 			it("labels the image with its service, so prune images can find it", () => {
 				var cmd = new cli.lucli.services.deploy.commands.BuilderCommands(variables.minimal).push("v3");
 				expect(cmd).toInclude("--label 'service=demo'");
