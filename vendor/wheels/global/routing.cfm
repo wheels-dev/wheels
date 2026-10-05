@@ -440,6 +440,14 @@
 		if (StructKeyExists(application[local.appKey], "staticRoutes")) {
 			StructClear(application[local.appKey].staticRoutes);
 		}
+		// And Dispatch's route index (#4157): drop it, and move the generation on so
+		// an index built from the previous table can never be reused.
+		StructDelete(application[local.appKey], "dynamicRouteIndex");
+		if (StructKeyExists(application[local.appKey], "routeTableGeneration")) {
+			application[local.appKey].routeTableGeneration++;
+		} else {
+			application[local.appKey].routeTableGeneration = 1;
+		}
 		// Drop the URLFor controller/action memo so cached lookups from the
 		// previous route set (including negative-cached misses) can't leak
 		// across a reload. `$addRoute` also clears the memo, but doing it
