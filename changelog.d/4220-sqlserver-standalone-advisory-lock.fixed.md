@@ -1,0 +1,1 @@
+- On SQL Server, `withAdvisoryLock()` works outside a transaction. It failed with "The statement or function must be executed in the context of a user transaction", because `sp_getapplock` took the lock for a transaction; the lock now belongs to the database session, as on MySQL and PostgreSQL, with the same check that the release freed it (#4220)

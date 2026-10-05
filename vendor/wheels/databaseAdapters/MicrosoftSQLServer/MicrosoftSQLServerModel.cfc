@@ -565,37 +565,184 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Acquire a SQL Server application lock using sp_getapplock.
-	 * The lock is scoped to the current session.
+	 * Acquire a SQL Server application lock using sp_getapplock, owned by the database session
+	 * (#4220), so no transaction is needed.
 	 */
 	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
-		queryExecute(
-			"EXEC sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockTimeout = ?",
-			[arguments.name, arguments.timeout * 1000],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
-		);
+		$acquireAdvisoryLockSession(name = arguments.name, timeout = arguments.timeout);
 	}
 
 	/**
-	 * Release a SQL Server application lock.
+	 * Internal function. Acquires a session-owned application lock (sp_getapplock @LockOwner =
+	 * 'Session') and returns the holding session's id, @@SPID read in the same batch (#4220, #4197).
+	 * The default 'Transaction' owner needs an open transaction, so withAdvisoryLock() used to fail
+	 * outside one.
+	 *
+	 * sp_getapplock RETURNS a status rather than throwing: >= 0 granted (0 immediately, 1 after
+	 * waiting), < 0 failed (-1 timeout, -2 canceled, -3 deadlock victim, -999 parameter/other). The
+	 * batch opens with SET NOCOUNT ON so the driver does not surface a leading update count ahead of
+	 * the SELECT, which would leave QueryExecute without a result set.
+	 */
+	public string function $acquireAdvisoryLockSession(required string name, numeric timeout = 10) {
+		local.result = queryExecute(
+			"SET NOCOUNT ON; DECLARE @r int; EXEC @r = sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = ?; SELECT @r AS lockResult, @@SPID AS sessionId",
+			[arguments.name, arguments.timeout * 1000],
+			$advisoryLockConnection()
+		);
+		local.status = (IsQuery(local.result) && local.result.recordCount) ? Val(local.result.lockResult) : -999;
+		if (local.status < 0) {
+			if (local.status == -1) {
+				Throw(
+					type = "Wheels.AdvisoryLockTimeout",
+					message = "Could not acquire advisory lock '#arguments.name#' within #arguments.timeout# seconds.",
+					extendedInfo = "SQL Server sp_getapplock returned -1 (timeout), indicating another session holds the lock."
+				);
+			}
+			Throw(
+				type = "Wheels.AdvisoryLockError",
+				message = "Could not acquire advisory lock '#arguments.name#' (sp_getapplock returned #local.status#).",
+				extendedInfo = "SQL Server sp_getapplock returned a negative status: -2 canceled, -3 deadlock victim, -999 parameter or other error."
+			);
+		}
+		return local.result.sessionId;
+	}
+
+	/**
+	 * Release a SQL Server application lock held by this session. A session that doesn't hold it
+	 * releases nothing.
 	 */
 	public void function $releaseAdvisoryLock(required string name) {
-		queryExecute(
-			"EXEC sp_releaseapplock @Resource = ?",
-			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
-		);
+		$tryReleaseAdvisoryLock(name = arguments.name);
 	}
 
 	/**
-	 * SQL Server's sp_getapplock requires an active user transaction; calling
-	 * `withAdvisoryLock` outside one raises "The statement or function must be
-	 * executed in the context of a user transaction." Until the locking path
-	 * grows an implicit transaction wrapper, report as unsupported so the test
-	 * suite (and any capability-aware callers) skip rather than error.
+	 * Internal function. Releases the lock when this pooled session holds it and reports whether it
+	 * did (#4197). APPLOCK_MODE is checked first: sp_releaseapplock on a session that doesn't hold
+	 * the lock raises an error instead of returning a status.
+	 */
+	public boolean function $tryReleaseAdvisoryLock(required string name) {
+		local.result = queryExecute(
+			"SET NOCOUNT ON; DECLARE @n nvarchar(255) = ?; DECLARE @r int = -1; IF APPLOCK_MODE('public', @n, 'Session') <> 'NoLock' EXEC @r = sp_releaseapplock @Resource = @n, @LockOwner = 'Session'; SELECT @r AS released",
+			[arguments.name],
+			$advisoryLockConnection()
+		);
+		return IsQuery(local.result) && local.result.recordCount && Val(local.result.released) >= 0;
+	}
+
+	/**
+	 * Internal function. True while the named lock is held: by the session `holder` when given, by
+	 * any session otherwise (#4197). The holder is read from sys.dm_tran_locks, where an application
+	 * lock appears as `<db>:[<first 32 characters of the name>]:(<hash>)`. That view needs the VIEW
+	 * SERVER (PERFORMANCE) STATE permission; without it the check falls back to whether ANY session
+	 * holds the lock (APPLOCK_MODE for this session, APPLOCK_TEST for the others), which can only
+	 * make a release wait longer, never report a held lock as free.
+	 */
+	public boolean function $isAdvisoryLockHeld(required string name, string holder = "") {
+		if (!StructKeyExists(variables, "$applockViewDenied")) {
+			try {
+				return $isAdvisoryLockHeldBySession(name = arguments.name, holder = arguments.holder);
+			} catch (any e) {
+				// Only a missing permission switches this adapter to the fallback for good.
+				if (!$isPermissionDenied(e)) {
+					rethrow;
+				}
+				variables.$applockViewDenied = true;
+			}
+		}
+		return $isAdvisoryLockHeldByAnySession(name = arguments.name);
+	}
+
+	/**
+	 * Internal function. True when a database error is SQL Server refusing a permission: error 300
+	 * (VIEW ... STATE permission was denied), 297 (the user does not have permission to perform this
+	 * action) or 229 (permission denied on an object). Keyed on the error number, so it holds on a
+	 * server whose messages aren't in English; the message text is a fallback for an engine that
+	 * gives no number.
+	 */
+	public boolean function $isPermissionDenied(required any exception) {
+		if (ListFind("229,297,300", $sqlServerErrorNumber(arguments.exception))) {
+			return true;
+		}
+		local.text = "";
+		for (local.key in ["message", "detail"]) {
+			try {
+				local.text &= " " & arguments.exception[local.key];
+			} catch (any e) {
+			}
+		}
+		return FindNoCase("permission", local.text) > 0;
+	}
+
+	/**
+	 * Internal function. SQL Server's error number for a database error, or 0. Each engine keeps it
+	 * somewhere else: Lucee and Adobe in nativeErrorCode, BoxLang only on the driver's
+	 * SQLServerException in the Java cause chain, and a thrown error (cfthrow) in errorCode.
+	 */
+	public numeric function $sqlServerErrorNumber(required any exception) {
+		try {
+			local.native = arguments.exception.nativeErrorCode;
+			if (IsNumeric(local.native) && local.native > 0) {
+				return Val(local.native);
+			}
+		} catch (any e) {
+		}
+		try {
+			local.cause = arguments.exception.getCause();
+			local.depth = 0;
+			while (!IsNull(local.cause) && local.depth < 5) {
+				local.code = local.cause.getErrorCode();
+				if (IsNumeric(local.code) && local.code > 0) {
+					return Val(local.code);
+				}
+				local.cause = local.cause.getCause();
+				local.depth++;
+			}
+		} catch (any e) {
+		}
+		try {
+			local.code = arguments.exception.errorCode;
+			if (IsNumeric(local.code) && local.code > 0) {
+				return Val(local.code);
+			}
+		} catch (any e) {
+		}
+		return 0;
+	}
+
+	/**
+	 * Internal function. The sys.dm_tran_locks form of $isAdvisoryLockHeld(); throws without the VIEW
+	 * SERVER (PERFORMANCE) STATE permission.
+	 */
+	public boolean function $isAdvisoryLockHeldBySession(required string name, string holder = "") {
+		local.sql = "SELECT COUNT(*) AS n FROM sys.dm_tran_locks WHERE resource_type = 'APPLICATION' AND request_owner_type = 'SESSION' AND CHARINDEX('[' + LEFT(?, 32) + ']', resource_description) > 0";
+		local.params = [arguments.name];
+		if (Len(arguments.holder)) {
+			local.sql &= " AND request_session_id = ?";
+			ArrayAppend(local.params, {value = arguments.holder, cfsqltype = "cf_sql_integer"});
+		}
+		local.result = queryExecute(local.sql, local.params, $advisoryLockConnection());
+		return IsQuery(local.result) && local.result.recordCount && Val(local.result.n) > 0;
+	}
+
+	/**
+	 * Internal function. True when any session holds the lock, read without special permissions:
+	 * APPLOCK_MODE for this session (APPLOCK_TEST grants a session its own lock), APPLOCK_TEST for the
+	 * others.
+	 */
+	public boolean function $isAdvisoryLockHeldByAnySession(required string name) {
+		local.result = queryExecute(
+			"SET NOCOUNT ON; DECLARE @n nvarchar(255) = ?; SELECT CASE WHEN APPLOCK_MODE('public', @n, 'Session') <> 'NoLock' THEN 1 WHEN APPLOCK_TEST('public', @n, 'Exclusive', 'Session') = 0 THEN 1 ELSE 0 END AS held",
+			[arguments.name],
+			$advisoryLockConnection()
+		);
+		return IsQuery(local.result) && local.result.recordCount && Val(local.result.held) == 1;
+	}
+
+	/**
+	 * SQL Server supports standalone advisory locks with a session-owned sp_getapplock (#4220).
 	 */
 	public boolean function $supportsAdvisoryLocks() {
-		return false;
+		return true;
 	}
 
 	/**
@@ -625,32 +772,11 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * the current (pinned) connection (#4198). @LockOwner = 'Session' is required because cftransaction
 	 * does not raise @@TRANCOUNT on SQL Server (see $supportsTransactionalAdvisoryLock).
 	 *
-	 * sp_getapplock RETURNS a status rather than throwing: >= 0 granted (0 immediately, 1 after
-	 * waiting), < 0 failed (-1 timeout, -2 canceled, -3 deadlock victim, -999 parameter/other). The
-	 * batch opens with SET NOCOUNT ON so the driver does not surface a leading update count ahead of
-	 * the SELECT, which would leave QueryExecute without a result set.
+	 * The same session-owned acquire as the standalone path ($acquireAdvisoryLockSession); the
+	 * enclosing transaction is what pins it to the callback's connection.
 	 */
 	public void function $acquireAdvisoryLockTransactional(required string name, numeric timeout = 10) {
-		local.result = queryExecute(
-			"SET NOCOUNT ON; DECLARE @r int; EXEC @r = sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = ?; SELECT @r AS lockResult",
-			[arguments.name, arguments.timeout * 1000],
-			$advisoryLockConnection()
-		);
-		local.status = (IsQuery(local.result) && local.result.recordCount) ? Val(local.result.lockResult) : -999;
-		if (local.status < 0) {
-			if (local.status == -1) {
-				Throw(
-					type = "Wheels.AdvisoryLockTimeout",
-					message = "Could not acquire advisory lock '#arguments.name#' within #arguments.timeout# seconds.",
-					extendedInfo = "SQL Server sp_getapplock returned -1 (timeout), indicating another session holds the lock."
-				);
-			}
-			Throw(
-				type = "Wheels.AdvisoryLockError",
-				message = "Could not acquire advisory lock '#arguments.name#' (sp_getapplock returned #local.status#).",
-				extendedInfo = "SQL Server sp_getapplock returned a negative status: -2 canceled, -3 deadlock victim, -999 parameter or other error."
-			);
-		}
+		$acquireAdvisoryLockSession(name = arguments.name, timeout = arguments.timeout);
 	}
 
 	/**
