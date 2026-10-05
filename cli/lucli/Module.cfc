@@ -829,18 +829,20 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * The `hint:` of the public command function `fnName`, without the literal
-	 * "hint:" prefix Lucee keeps, or "". Walks up the component's `extends`
-	 * chain, because getMetaData() lists only the functions a component
-	 * declares itself: a subclass of Module (the spec fixtures) would
-	 * otherwise find no hint for any command.
+	 * The raw docblock hint of the public command function `fnName`, or "".
+	 * Kept as Lucee hands it over, including the literal "hint:" prefix:
+	 * $commandHelpParts() keys on that prefix to tell command help from any
+	 * other docblock. Walks up the component's `extends` chain, because
+	 * getMetaData() lists only the functions a component declares itself: a
+	 * subclass of Module (the spec fixtures) would otherwise find no hint for
+	 * any command.
 	 */
 	private string function $commandHint(required string fnName) {
 		var meta = getMetaData(this);
 		while (isStruct(meta)) {
 			for (var fn in (meta.functions ?: [])) {
 				if (lCase(fn.name ?: "") == arguments.fnName && (fn.access ?: "public") == "public") {
-					return trim(reReplaceNoCase(trim(fn.hint ?: ""), "^hint\s*:\s*", ""));
+					return trim(fn.hint ?: "");
 				}
 			}
 			meta = structKeyExists(meta, "extends") ? meta.extends : "";
