@@ -408,13 +408,70 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				return $isAdvisoryLockHeldBySession(name = arguments.name, holder = arguments.holder);
 			} catch (any e) {
 				// Only a missing permission switches this adapter to the fallback for good.
-				if (!FindNoCase("permission", e.message)) {
+				if (!$isPermissionDenied(e)) {
 					rethrow;
 				}
 				variables.$applockViewDenied = true;
 			}
 		}
 		return $isAdvisoryLockHeldByAnySession(name = arguments.name);
+	}
+
+	/**
+	 * Internal function. True when a database error is SQL Server refusing a permission: error 300
+	 * (VIEW ... STATE permission was denied), 297 (the user does not have permission to perform this
+	 * action) or 229 (permission denied on an object). Keyed on the error number, so it holds on a
+	 * server whose messages aren't in English; the message text is a fallback for an engine that
+	 * gives no number.
+	 */
+	public boolean function $isPermissionDenied(required any exception) {
+		if (ListFind("229,297,300", $sqlServerErrorNumber(arguments.exception))) {
+			return true;
+		}
+		local.text = "";
+		for (local.key in ["message", "detail"]) {
+			try {
+				local.text &= " " & arguments.exception[local.key];
+			} catch (any e) {
+			}
+		}
+		return FindNoCase("permission", local.text) > 0;
+	}
+
+	/**
+	 * Internal function. SQL Server's error number for a database error, or 0. Each engine keeps it
+	 * somewhere else: Lucee and Adobe in nativeErrorCode, BoxLang only on the driver's
+	 * SQLServerException in the Java cause chain, and a thrown error (cfthrow) in errorCode.
+	 */
+	public numeric function $sqlServerErrorNumber(required any exception) {
+		try {
+			local.native = arguments.exception.nativeErrorCode;
+			if (IsNumeric(local.native) && local.native > 0) {
+				return Val(local.native);
+			}
+		} catch (any e) {
+		}
+		try {
+			local.cause = arguments.exception.getCause();
+			local.depth = 0;
+			while (!IsNull(local.cause) && local.depth < 5) {
+				local.code = local.cause.getErrorCode();
+				if (IsNumeric(local.code) && local.code > 0) {
+					return Val(local.code);
+				}
+				local.cause = local.cause.getCause();
+				local.depth++;
+			}
+		} catch (any e) {
+		}
+		try {
+			local.code = arguments.exception.errorCode;
+			if (IsNumeric(local.code) && local.code > 0) {
+				return Val(local.code);
+			}
+		} catch (any e) {
+		}
+		return 0;
 	}
 
 	/**

@@ -218,6 +218,40 @@ component extends="wheels.WheelsTest" {
 				expect(state.heldAfter).toBeFalse();
 			});
 
+			it("falls back on the error number, whatever language the message is in", () => {
+				if (variables.adapterName != "MicrosoftSQLServerModel") {
+					skip("SQL Server's sys.dm_tran_locks permission.");
+				}
+				var name = lockName();
+				var other = startHolder(name, 2000);
+				var adapter = freshAdapter();
+				prepareMock(adapter);
+				adapter.$(method = "$isAdvisoryLockHeldBySession", throwException = true, throwType = "Wheels.SpecPermissionDenied", throwMessage = "Die Berechtigung VIEW SERVER PERFORMANCE STATE wurde für das Objekt 'server' verweigert.", throwErrorCode = "300");
+				var state = {held = adapter.$isAdvisoryLockHeld(name = name, holder = "0")};
+				thread action="join" name="#other#" timeout="15000";
+				expect(state.held).toBeTrue();
+			});
+
+			it("reads SQL Server's error number on this engine and from each field", () => {
+				var adapter = CreateObject("component", "wheels.databaseAdapters.MicrosoftSQLServer.MicrosoftSQLServerModel");
+				expect(adapter.$sqlServerErrorNumber({nativeErrorCode = 300})).toBe(300);
+				expect(adapter.$sqlServerErrorNumber({errorCode = "297"})).toBe(297);
+				expect(adapter.$sqlServerErrorNumber({message = "no number"})).toBe(0);
+				expect(adapter.$isPermissionDenied({nativeErrorCode = 229, message = "Zugriff verweigert"})).toBeTrue();
+				expect(adapter.$isPermissionDenied({nativeErrorCode = 208, message = "Invalid object name"})).toBeFalse();
+				if (variables.adapterName != "MicrosoftSQLServerModel") {
+					return;
+				}
+				// A real driver error: Lucee and Adobe report it in nativeErrorCode, BoxLang on its Java cause.
+				var state = {number = -1};
+				try {
+					QueryExecute("SELECT * FROM wheels_spec_no_such_table", [], {datasource = variables.ds});
+				} catch (any e) {
+					state.number = adapter.$sqlServerErrorNumber(e);
+				}
+				expect(state.number).toBe(208);
+			});
+
 			it("keeps the callback's error when the release fails too", () => {
 				var adapter = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLModel");
 				prepareMock(adapter);
