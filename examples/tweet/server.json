@@ -11,5 +11,8 @@
     "app":{
         "cfengine":"lucee",
         "libDirs":"app/lib"
+    },
+    "env":{
+        "LUCEE_EXTENSIONS":"465E1E35-2425-4F4E-8B3FAB638BD7280A;name=H2;version=2.1.214.0001L"
     }
 }

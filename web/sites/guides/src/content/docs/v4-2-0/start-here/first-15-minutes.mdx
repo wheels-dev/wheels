@@ -56,8 +56,8 @@ The dev server stays running in the background. Leave the terminal open.
    ```cfm {test:compile}
    mapper()
        .get(name="greet", pattern="/greet", to="main##greet")
-       .wildcard()
        .root(to="main##index", method="get")
+       .wildcard()
    .end();
    ```
 

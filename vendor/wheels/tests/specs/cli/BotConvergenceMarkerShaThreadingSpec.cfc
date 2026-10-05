@@ -59,6 +59,7 @@ component extends="wheels.WheelsTest" {
 			describe("bot-address-review.yml", () => {
 
 				it("resolves the head SHA once at the workflow level", () => {
+					$requireRepoPath(".github/workflows/bot-address-review.yml");
 					expect(fileExists(addressReview)).toBeTrue("Missing file: " & addressReview);
 					var content = fileRead(addressReview);
 					// The SHA is resolved once in a step
@@ -73,6 +74,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("threads the resolved head SHA into the /address-review command", () => {
+					$requireRepoPath(".github/workflows/bot-address-review.yml");
 					expect(fileExists(addressReview)).toBeTrue("Missing file: " & addressReview);
 					var content = fileRead(addressReview);
 					expect(
@@ -90,6 +92,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("scopes the address-held skip gate to the resolved head SHA output", () => {
+					$requireRepoPath(".github/workflows/bot-address-review.yml");
 					expect(fileExists(addressReview)).toBeTrue("Missing file: " & addressReview);
 					var content = fileRead(addressReview);
 					expect(
@@ -130,6 +133,7 @@ component extends="wheels.WheelsTest" {
 					// capture by reference).
 					(function(prompt) {
 						it("no longer re-derives the SHA via `gh pr view --json headRefOid` in " & prompt.name, () => {
+							$requireRepoPath(".github/workflows/bot-address-review.yml");
 							expect(fileExists(prompt.path)).toBeTrue("Missing file: " & prompt.path);
 							var content = fileRead(prompt.path);
 							expect(reFindNoCase("headRefOid", content) > 0).toBeFalse(

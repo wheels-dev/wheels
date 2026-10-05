@@ -93,27 +93,27 @@ Each channel ships from a signed native repository — distinct package names (`
 
 ```bash title="Debian / Ubuntu (stable)"
 curl -fsSL https://apt.wheels.dev/wheels.gpg \
-  | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
+  | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/wheels.gpg
 echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
   | sudo tee /etc/apt/sources.list.d/wheels.list
 sudo apt update && sudo apt install wheels
 ```
 
 ```bash title="Fedora / RHEL (stable)"
-sudo dnf config-manager --add-repo https://yum.wheels.dev/wheels.repo
+sudo curl -fsSL https://yum.wheels.dev/wheels.repo -o /etc/yum.repos.d/wheels.repo
 sudo dnf install wheels
 ```
 
 ```bash title="Debian / Ubuntu (bleeding-edge)"
 curl -fsSL https://apt.wheels.dev/wheels.gpg \
-  | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
+  | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/wheels.gpg
 echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev bleeding-edge main" \
   | sudo tee /etc/apt/sources.list.d/wheels-be.list
 sudo apt update && sudo apt install wheels-be
 ```
 
 ```bash title="Fedora / RHEL (bleeding-edge)"
-sudo dnf config-manager --add-repo https://yum.wheels.dev/wheels-be.repo
+sudo curl -fsSL https://yum.wheels.dev/wheels-be.repo -o /etc/yum.repos.d/wheels-be.repo
 sudo dnf install wheels-be
 ```
 
@@ -158,7 +158,7 @@ sudo apt update && sudo apt install wheels-be
 # refuses to install while the stable wheels package is present. Remove
 # it first, then add the bleeding-edge .repo source and install.
 sudo dnf remove wheels
-sudo dnf config-manager --add-repo https://yum.wheels.dev/wheels-be.repo
+sudo curl -fsSL https://yum.wheels.dev/wheels-be.repo -o /etc/yum.repos.d/wheels-be.repo
 sudo dnf install wheels-be
 ```
 

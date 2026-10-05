@@ -1,0 +1,33 @@
+name: Release Guard Tests
+
+# Fixture tests for tools/ci/release_republish_guard.py, the check that stops
+# release.yml from republishing an already-released version (#4221). The guard
+# itself only runs on a push to main, so its decision logic is tested here
+# against canned GitHub API responses instead of a real release.
+
+on:
+  pull_request:
+    paths:
+      - 'tools/ci/release_republish_guard.py'
+      - 'tools/ci/test_release_republish_guard.py'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/release-guard-tests.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'tools/ci/release_republish_guard.py'
+      - 'tools/ci/test_release_republish_guard.py'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/release-guard-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  guard-tests:
+    name: Republish guard fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test the republish guard
+        run: python3 tools/ci/test_release_republish_guard.py

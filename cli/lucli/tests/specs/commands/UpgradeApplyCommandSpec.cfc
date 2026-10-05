@@ -42,7 +42,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	private array function listBackups() {
-		return directoryList(variables.tempRoot & "/vendor", false, "name", "wheels.bak-*");
+		var backupsDir = variables.tempRoot & "/.wheels/backups";
+		if (!directoryExists(backupsDir)) {
+			return [];
+		}
+		return directoryList(backupsDir, false, "name", "wheels.bak-*");
 	}
 
 	function run() {
@@ -247,21 +251,40 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("swaps vendor/wheels/ with the bundled framework and backs the old copy up", () => {
 					seedVendorWheels(version = "0.0.1-spec-fixture");
 					fileWrite(variables.tempRoot & "/vendor/wheels/marker.txt", "old-framework");
-					var result = mod.upgrade(arg1 = "apply");
+					mod.upgrade(arg1 = "apply");
+					var result = mod.capturedOutput();
 
 					// Live copy now carries the bundled framework.
 					expect(seededVersion()).toBe(variables.bundledVersion);
 					expect(fileExists(variables.tempRoot & "/vendor/wheels/marker.txt")).toBeFalse();
 
-					// Old copy parked under vendor/wheels.bak-<timestamp>.
+					// Old copy parked under .wheels/backups/wheels.bak-<timestamp>,
+					// outside vendor/: the framework loads every vendor/ folder as a
+					// package, so a backup there logged an error on every boot.
 					var backups = listBackups();
 					expect(arrayLen(backups)).toBe(1);
 					expect(reFindNoCase("^wheels\.bak-\d{8}-\d{6}", backups[1])).toBeGT(0);
-					expect(fileRead(variables.tempRoot & "/vendor/" & backups[1] & "/marker.txt")).toBe("old-framework");
+					expect(fileRead(variables.tempRoot & "/.wheels/backups/" & backups[1] & "/marker.txt")).toBe("old-framework");
+					expect(directoryList(variables.tempRoot & "/vendor", false, "name")).toBe(["wheels"]);
+					// The backups directory ignores itself, whatever the app's .gitignore says.
+					expect(fileRead(variables.tempRoot & "/.wheels/backups/.gitignore")).toInclude("*");
 
 					// And the summary reports old -> new plus the recovery path.
 					expect(result).toInclude("0.0.1-spec-fixture");
 					expect(result).toInclude("Backup");
+				});
+
+				it("prints the report once and returns nothing, so the terminal doesn't show it twice", () => {
+					seedVendorWheels(version = "0.0.1-spec-fixture");
+					var returned = mod.upgrade(arg1 = "apply");
+					expect(returned).toBe("");
+					var printed = mod.capturedOutput();
+					var first = find("Backing up vendor/wheels", printed);
+					expect(first).toBeGT(0);
+					expect(find("Backing up vendor/wheels", printed, first + 1)).toBe(0);
+					// The post-swap summary was the part that used to repeat (it
+					// was printed AND returned), so pin it to one occurrence too.
+					expect(arrayLen(reMatch("Framework (upgraded|downgraded|reinstalled|replaced):", printed))).toBe(1);
 				});
 
 				it("announces the exact backup destination and recovery command before the swap summary", () => {
@@ -270,13 +293,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					// the swap runs, so an interrupt leaves the user holding
 					// the restore command.
 					seedVendorWheels(version = "0.0.1-spec-fixture");
-					var result = mod.upgrade(arg1 = "apply");
+					mod.upgrade(arg1 = "apply");
+					var result = mod.capturedOutput();
 
 					var backups = listBackups();
 					expect(arrayLen(backups)).toBe(1);
 					// The announced destination is the directory the backup
 					// actually landed in (reserved up front, passed through).
-					expect(result).toInclude("Backing up vendor/wheels -> vendor/" & backups[1]);
+					expect(result).toInclude("Backing up vendor/wheels -> .wheels/backups/" & backups[1] & "/ (outside vendor/, ignored by git)");
 					expect(result).toInclude("If this is interrupted, restore with:");
 					expect(result).toInclude('rm -rf "');
 					expect(result).toInclude('/vendor/wheels" && mv "');
@@ -359,7 +383,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 				it("downgrades with --allow-downgrade and says so", () => {
 					seedVendorWheels(version = "4.1.2");
-					var result = mod.upgrade(argumentCollection = {"arg1": "apply", "allow-downgrade": true});
+					mod.upgrade(argumentCollection = {"arg1": "apply", "allow-downgrade": true});
+					var result = mod.capturedOutput();
 
 					expect(seededVersion()).toBe("4.1.1");
 					expect(arrayLen(listBackups())).toBe(1);
@@ -370,7 +395,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 				it("upgrades when the bundled framework is newer and says upgraded", () => {
 					seedVendorWheels(version = "4.1.0");
-					var result = mod.upgrade(arg1 = "apply");
+					mod.upgrade(arg1 = "apply");
+					var result = mod.capturedOutput();
 
 					expect(seededVersion()).toBe("4.1.1");
 					expect(arrayLen(listBackups())).toBe(1);
@@ -381,11 +407,114 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("reinstalls when vendor/wheels/ is already at the bundled version", () => {
 					seedVendorWheels(version = "4.1.1");
 					fileWrite(variables.tempRoot & "/vendor/wheels/marker.txt", "installed-framework");
-					var result = mod.upgrade(arg1 = "apply");
+					mod.upgrade(arg1 = "apply");
+					var result = mod.capturedOutput();
 
 					expect(fileRead(variables.tempRoot & "/vendor/wheels/marker.txt")).toBe("bundled-framework");
 					expect(result).toInclude("Framework reinstalled: 4.1.1 -> 4.1.1");
 					expect(result).notToInclude("upgraded");
+				});
+
+				// A CommandBox app's box.json pins wheels-core. Left at the old
+				// version, a later `box install` copies that framework back
+				// over the new vendor/wheels/ and leaves a mix of both.
+				it("points box.json's wheels-core at the new framework and says so", () => {
+					seedVendorWheels(version = "4.1.0");
+					var box = '{' & chr(10)
+						& '    "name":"app",' & chr(10)
+						& '    "dependencies":{' & chr(10)
+						& '        "wheels-core":"^3.0.1"' & chr(10)
+						& '    },' & chr(10)
+						& '    "installPaths":{' & chr(10)
+						& '        "wheels-core":"vendor/wheels/"' & chr(10)
+						& '    }' & chr(10)
+						& '}' & chr(10);
+					fileWrite(variables.tempRoot & "/box.json", box);
+
+					mod.upgrade(arg1 = "apply");
+					var result = mod.capturedOutput();
+
+					expect(seededVersion()).toBe("4.1.1");
+					expect(fileRead(variables.tempRoot & "/box.json")).toBe(replace(box, '"wheels-core":"^3.0.1"', '"wheels-core":"^4.1.1"'));
+					expect(result).toInclude("box.json: wheels-core ^3.0.1 -> ^4.1.1 (so box install keeps this framework)");
+				});
+
+				it("keeps each section's own range when both sections pin wheels-core", () => {
+					seedVendorWheels(version = "4.1.0");
+					var box = '{"dependencies":{"wheels-core":"^3.0.1"},"devDependencies":{"wheels-core":"~3.0.0"}}';
+					fileWrite(variables.tempRoot & "/box.json", box);
+
+					mod.upgrade(arg1 = "apply");
+					var result = mod.capturedOutput();
+
+					expect(fileRead(variables.tempRoot & "/box.json")).toBe('{"dependencies":{"wheels-core":"^4.1.1"},"devDependencies":{"wheels-core":"~4.1.1"}}');
+					expect(result).toInclude("box.json: wheels-core ^3.0.1 -> ^4.1.1");
+					expect(result).toInclude("box.json (devDependencies): wheels-core ~3.0.0 -> ~4.1.1");
+				});
+
+				it("leaves a channel spec alone and names the line to change", () => {
+					seedVendorWheels(version = "4.1.0");
+					var box = '{"dependencies":{"wheels-core":"be"}}';
+					fileWrite(variables.tempRoot & "/box.json", box);
+
+					mod.upgrade(arg1 = "apply");
+					var result = mod.capturedOutput();
+
+					expect(fileRead(variables.tempRoot & "/box.json")).toBe(box);
+					expect(result).toInclude('box.json: wheels-core is "be", which apply doesn''t rewrite');
+					expect(result).toInclude('"wheels-core": "4.1.1"');
+					expect(result).notToInclude("be ->");
+				});
+
+				it("doesn't report an update it couldn't write", () => {
+					seedVendorWheels(version = "4.1.0");
+					// Valid JSON, but a nested object keeps the in-place rewrite
+					// from locating the dependencies block.
+					var box = '{"dependencies":{"wheels-core":"^3.0.1","x":{"y":"1"}}}';
+					fileWrite(variables.tempRoot & "/box.json", box);
+
+					mod.upgrade(arg1 = "apply");
+					var result = mod.capturedOutput();
+
+					expect(fileRead(variables.tempRoot & "/box.json")).toBe(box);
+					expect(result).toInclude("box.json: wheels-core could not be located to rewrite");
+					expect(result).notToInclude("^3.0.1 -> ^4.1.1");
+				});
+
+				it("refuses before changing anything when box.json can't be read", () => {
+					seedVendorWheels(version = "4.1.0");
+					fileWrite(variables.tempRoot & "/box.json", '{"dependencies":{"wheels-core":"^3.0.1"');
+
+					expect(() => mod.upgrade(arg1 = "apply")).toThrow(type = "Wheels.UpgradeApplyFailed", regex = "box\.json is not valid JSON.*Nothing was changed");
+
+					expect(seededVersion()).toBe("4.1.0");
+					expect(arrayLen(listBackups())).toBe(0);
+					expect(mod.capturedOutput()).notToInclude("Backing up vendor/wheels");
+				});
+
+				it("names old framework backups still inside vendor/", () => {
+					seedVendorWheels(version = "4.1.0");
+					directoryCreate(variables.tempRoot & "/vendor/wheels.bak-20260101-000000", true, true);
+					directoryCreate(variables.tempRoot & "/vendor/wheels-basecoat", true, true);
+
+					mod.upgrade(arg1 = "apply");
+					var result = mod.capturedOutput();
+
+					expect(result).toInclude("Old framework backups are still inside vendor/: vendor/wheels.bak-20260101-000000/.");
+					expect(result).toInclude("move them to .wheels/backups/ or delete them");
+					expect(result).notToInclude("vendor/wheels-basecoat");
+				});
+
+				it("leaves a box.json without wheels-core alone", () => {
+					seedVendorWheels(version = "4.1.0");
+					var box = '{"name":"app","dependencies":{"other":"1.0.0"}}';
+					fileWrite(variables.tempRoot & "/box.json", box);
+
+					mod.upgrade(arg1 = "apply");
+					var result = mod.capturedOutput();
+
+					expect(fileRead(variables.tempRoot & "/box.json")).toBe(box);
+					expect(result).notToInclude("box.json: wheels-core");
 				});
 			});
 

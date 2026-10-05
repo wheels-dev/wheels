@@ -1,0 +1,1 @@
+- With `include`, a `where` condition that compares a column with a function call (e.g. `id = ABS(1)`) now qualifies the column with its table instead of failing as an ambiguous column when the joined tables share its name
