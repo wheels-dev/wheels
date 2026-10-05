@@ -223,25 +223,6 @@ component {
 	}
 
 	/**
-	 * Concatenate the CGI fields that carry the runner PATH: path_info and
-	 * script_name.
-	 */
-	public string function $cgiHaystack(required struct cgiScope) {
-		var haystack = "";
-		var keys = "path_info,script_name";
-		var i = 0;
-		var key = "";
-		var keyCount = ListLen(keys);
-		for (i = 1; i <= keyCount; i++) {
-			key = ListGetAt(keys, i);
-			if (StructKeyExists(arguments.cgiScope, key)) {
-				haystack &= " " & ToString(arguments.cgiScope[key]);
-			}
-		}
-		return haystack;
-	}
-
-	/**
 	 * True when the request path targets a test-runner endpoint, anchored at the START of the path.
 	 * For each of `path_info` and `script_name`: the query string is stripped; a non-canonical path
 	 * (one containing a `..` traversal or an empty `//` segment) is rejected outright; then the value
