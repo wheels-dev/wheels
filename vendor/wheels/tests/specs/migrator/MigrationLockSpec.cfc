@@ -329,6 +329,113 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("migrationLockStatus() and releaseMigrationLock()", () => {
+
+			beforeEach(() => {
+				resetState();
+			});
+
+			it("reports no lock when nothing holds it", () => {
+				var status = variables.migrator.migrationLockStatus();
+				expect(status.held).toBeFalse();
+				expect(status.expired).toBeFalse();
+				expect(status.owner).toBe("");
+				expect(status.host).toBe("");
+			});
+
+			it("reports a live lock's holder, how long it has held it, and when its lease expires", () => {
+				holdAsAnotherInstance(60000);
+				var status = variables.migrator.migrationLockStatus();
+				expect(status.held).toBeTrue();
+				expect(status.expired).toBeFalse();
+				expect(status.owner).toBe("spec-other-instance");
+				expect(status.host).toBe("spec-host");
+				expect(status.heldForSeconds).toBeGTE(0);
+				expect(status.expiresInSeconds).toBeGT(50);
+				expect(status.expiresInSeconds).toBeLTE(60);
+			});
+
+			it("reports an expired lease as held and expired", () => {
+				holdAsAnotherInstance(-5000);
+				var status = variables.migrator.migrationLockStatus();
+				expect(status.held).toBeTrue();
+				expect(status.expired).toBeTrue();
+				expect(status.expiresInSeconds).toBeLT(0);
+			});
+
+			it("reports no lock when the lock table doesn't exist", () => {
+				var saved = application.wheels.migratorLockTableName;
+				application.wheels.migratorLockTableName = "wheels_spec_absent_locks";
+				var state = {held = true};
+				try {
+					state.held = variables.migrator.migrationLockStatus().held;
+				} finally {
+					application.wheels.migratorLockTableName = saved;
+				}
+				expect(state.held).toBeFalse();
+			});
+
+			it("leaves a live lock in place without force", () => {
+				holdAsAnotherInstance(60000);
+				var result = variables.migrator.releaseMigrationLock();
+				expect(result.released).toBeFalse();
+				expect(result.lock.owner).toBe("spec-other-instance");
+				expect(rawQuery("SELECT lockowner FROM #lockTable()#").lockowner).toBe("spec-other-instance");
+			});
+
+			it("removes an expired lease without force", () => {
+				holdAsAnotherInstance(-5000);
+				var result = variables.migrator.releaseMigrationLock();
+				expect(result.released).toBeTrue();
+				expect(lockRows()).toBe(0);
+			});
+
+			it("removes a live lock with force, returning what it removed", () => {
+				holdAsAnotherInstance(60000);
+				var result = variables.migrator.releaseMigrationLock(force = true);
+				expect(result.released).toBeTrue();
+				expect(result.lock.owner).toBe("spec-other-instance");
+				expect(result.lock.host).toBe("spec-host");
+				expect(lockRows()).toBe(0);
+			});
+
+			it("succeeds with force when nothing holds the lock", () => {
+				var result = variables.migrator.releaseMigrationLock(force = true);
+				expect(result.released).toBeFalse();
+				expect(result.lock.held).toBeFalse();
+			});
+
+			it("makes a holder that lost its row fail its next renewal", () => {
+				var held = variables.migrator.$acquireMigrationLock();
+				variables.migrator.releaseMigrationLock(force = true);
+				var state = {type = ""};
+				try {
+					variables.migrator.$renewMigrationLock();
+				} catch (any e) {
+					state.type = e.type;
+				}
+				variables.migrator.$releaseMigrationLock(held);
+				expect(state.type).toBe("Wheels.MigrationLockLost");
+			});
+
+			it("points a lock timeout at wheels migrate unlock", () => {
+				var saved = application.wheels.migrationLockTimeout;
+				application.wheels.migrationLockTimeout = 1;
+				holdAsAnotherInstance(60000);
+				var state = {detail = ""};
+				try {
+					variables.migrator.migrateTo(variables.version);
+				} catch (any e) {
+					state.detail = e.extendedInfo;
+				} finally {
+					application.wheels.migrationLockTimeout = saved;
+				}
+				expect(state.detail).toInclude("wheels migrate unlock");
+				expect(state.detail).toInclude("spec-host");
+			});
+
+		});
+
 	}
 
 }

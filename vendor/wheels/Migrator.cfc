@@ -526,7 +526,7 @@ component output="false" extends="wheels.Global"{
 				Throw(
 					type = "Wheels.MigrationLockTimeout",
 					message = "Another instance has held the migration lock for longer than migrationLockTimeout (#local.timeout# seconds), so the migrations were not run.",
-					extendedInfo = "Held by #local.holder#. If that instance is gone, the lock frees itself when its lease expires; to clear it now, delete the row from #$migrationLockTable()#."
+					extendedInfo = "Held by #local.holder#. If that instance is gone, the lock frees itself when its lease expires. To clear it now, run `wheels migrate unlock --force`, or delete the row from #$migrationLockTable()#."
 				);
 			}
 			Sleep(1000);
@@ -650,16 +650,76 @@ component output="false" extends="wheels.Global"{
 	 * Internal function. A description of the instance holding the migration lock, for errors.
 	 */
 	public string function $migrationLockHolder() {
+		local.status = migrationLockStatus();
+		if (!local.status.held) {
+			return "no instance any more";
+		}
+		return "host `#local.status.host#` (owner #local.status.owner#) for #local.status.heldForSeconds# seconds; its lease expires in #local.status.expiresInSeconds# seconds";
+	}
+
+	/**
+	 * Reports who holds the migration lock (#4209): `held`, `expired` (its lease ran out, so the
+	 * next migration takes it over), `owner`, `host`, `heldForSeconds` and `expiresInSeconds`
+	 * (negative once expired). A missing lock table means nothing holds it.
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public struct function migrationLockStatus() {
+		local.rv = {
+			"held" = false,
+			"expired" = false,
+			"owner" = "",
+			"host" = "",
+			"heldForSeconds" = 0,
+			"expiresInSeconds" = 0
+		};
+		if (!$migratorTableExists($migratorDataSource(), $migrationLockTable())) {
+			return local.rv;
+		}
 		local.rows = $migrationLockQuery(
 			sql = "SELECT lockowner, lockhost, acquiredat, expiresat FROM #$migrationLockTable()# WHERE lockname = :lockName",
 			params = {lockName = $migrationLockText($migrationLockName())}
 		);
 		if (!local.rows.recordCount) {
-			return "no instance any more";
+			return local.rv;
 		}
-		local.heldFor = Int((GetTickCount() - Val(local.rows.acquiredat)) / 1000);
-		local.expiresIn = Int((Val(local.rows.expiresat) - GetTickCount()) / 1000);
-		return "host `#local.rows.lockhost#` (owner #local.rows.lockowner#) for #local.heldFor# seconds; its lease expires in #local.expiresIn# seconds";
+		local.now = GetTickCount();
+		local.rv["held"] = true;
+		local.rv["owner"] = local.rows.lockowner;
+		local.rv["host"] = local.rows.lockhost;
+		local.rv["heldForSeconds"] = Fix((local.now - Val(local.rows.acquiredat)) / 1000);
+		local.rv["expiresInSeconds"] = Fix((Val(local.rows.expiresat) - local.now) / 1000);
+		local.rv["expired"] = Val(local.rows.expiresat) < local.now;
+		return local.rv;
+	}
+
+	/**
+	 * Removes the migration lock's lease row (#4209), for when the instance holding it is gone.
+	 * Without `force` only an expired lease is removed; with it the row goes whoever holds it, and
+	 * a holder that is still running fails its next renewal with Wheels.MigrationLockLost. Returns
+	 * `released` and `lock`, the migrationLockStatus() from before the removal.
+	 *
+	 * @force Remove a lease that hasn't expired.
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public struct function releaseMigrationLock(boolean force = false) {
+		local.rv = {"released" = false, "lock" = migrationLockStatus()};
+		if (!local.rv.lock.held) {
+			return local.rv;
+		}
+		local.sql = "DELETE FROM #$migrationLockTable()# WHERE lockname = :lockName AND lockowner = :owner";
+		local.params = {lockName = $migrationLockText($migrationLockName()), owner = $migrationLockText(local.rv.lock.owner)};
+		if (!arguments.force) {
+			// In the DELETE itself, so a holder renewing its lease meanwhile keeps it.
+			local.sql &= " AND expiresat < :now";
+			local.params.now = $migrationLockMs(GetTickCount());
+		}
+		$migrationLockQuery(sql = local.sql, params = local.params);
+		local.rv["released"] = $migrationLockOwner() != local.rv.lock.owner;
+		return local.rv;
 	}
 
 	/**

@@ -62,6 +62,7 @@ component extends="wheels.WheelsTest" {
 						"renameSystemTables",
 						"forgetVersion",
 						"pretendVersion",
+						"migrationUnlock",
 						"jobsProcessNext",
 						"jobsRetry",
 						"jobsPurge"
@@ -75,6 +76,7 @@ component extends="wheels.WheelsTest" {
 					var readOnly = [
 						"info",
 						"doctor",
+						"migrationLockStatus",
 						"dbStatus",
 						"dbVersion",
 						"dbSchema",

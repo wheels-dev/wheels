@@ -28,6 +28,7 @@ component extends="wheels.WheelsTest" {
 			it("handles() returns true for every declared command", () => {
 				var declared = "createMigration,migrateTo,migrateToLatest,migrateUp,migrateDown,"
 					& "renameSystemTables,diff,redoMigration,info,doctor,forgetVersion,pretendVersion,"
+					& "migrationLockStatus,migrationUnlock,"
 					& "dbStatus,dbVersion,dbRollback,dbSchema,introspect,dbSeed,routes,dbCreate,dbDrop,"
 					& "dbReset,dbSetup,dbDump,dbRestore,dbShell,jobsProcessNext,jobsStatus,jobsRetry,"
 					& "jobsPurge,jobsMonitor";
@@ -81,6 +82,40 @@ component extends="wheels.WheelsTest" {
 				var rv = bridge.dispatch(command = "forgetVersion", context = {}, params = {});
 				expect(rv.success).toBeFalse();
 				expect(rv.message).toInclude("Missing required argument: version");
+			});
+
+			it("migrationLockStatus returns the migrator's lock status", () => {
+				var lockStatus = {held = true, expired = false, owner = "abc", host = "web-1", heldForSeconds = 5, expiresInSeconds = 3595};
+				var fakeMigrator = {migrationLockStatus = () => lockStatus};
+				var rv = bridge.dispatch(command = "migrationLockStatus", context = {migrator = fakeMigrator}, params = {});
+				expect(rv.success).toBeTrue();
+				expect(rv.lock.held).toBeTrue();
+				expect(rv.lock.host).toBe("web-1");
+			});
+
+			it("migrationUnlock passes force through and returns what it removed", () => {
+				var seen = {force = ""};
+				var release = function(boolean force = false) {
+					seen.force = arguments.force;
+					return {released = true, lock = {held = true, expired = false, owner = "abc", host = "web-1", heldForSeconds = 5, expiresInSeconds = 3595}};
+				};
+				var fakeMigrator = {releaseMigrationLock = release};
+				var rv = bridge.dispatch(command = "migrationUnlock", context = {migrator = fakeMigrator}, params = {force = "true"});
+				expect(seen.force).toBeTrue();
+				expect(rv.success).toBeTrue();
+				expect(rv.released).toBeTrue();
+				expect(rv.lock.owner).toBe("abc");
+			});
+
+			it("migrationUnlock doesn't force without an explicit force=true", () => {
+				var seen = {force = ""};
+				var release = function(boolean force = false) {
+					seen.force = arguments.force;
+					return {released = false, lock = {held = false, expired = false, owner = "", host = "", heldForSeconds = 0, expiresInSeconds = 0}};
+				};
+				var fakeMigrator = {releaseMigrationLock = release};
+				bridge.dispatch(command = "migrationUnlock", context = {migrator = fakeMigrator}, params = {force = "nonsense"});
+				expect(seen.force).toBeFalse();
 			});
 
 			it("migrateToLatest delegates to the migrator and returns its message", () => {

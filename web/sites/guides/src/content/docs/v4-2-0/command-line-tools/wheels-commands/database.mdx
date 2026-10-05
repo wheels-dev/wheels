@@ -28,7 +28,7 @@ Apply or roll back migration files in `app/migrator/migrations/`.
 #### Synopsis
 
 ```txt title="
-wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables|diff]
+wheels migrate [latest|up|down|info|doctor|forget|pretend|unlock|rename-system-tables|diff]
 ```
 
 Running `wheels migrate` with no subcommand defaults to `latest`. Unknown subcommands print `Unknown migration action: <name>` and exit without touching the schema.
@@ -62,6 +62,20 @@ Deletes a stale tracking row: `wheels migrate forget <version> --yes`. Dry-run b
 ##### `pretend`
 
 Records a version as applied without running its `up()`: `wheels migrate pretend <version> --yes`. Dry-run by default; `--yes` is required to mutate. Refuses if the version is already applied or has no matching file. Refusals exit non-zero.
+
+##### `unlock`
+
+Shows who holds the migration lock: the host, its owner id, how long it has held the lock and when its lease expires. Instances that share a database take turns running migrations under this lock. An instance that dies while holding it blocks the others until its lease runs out (`migrationLockLease`, default 3600 seconds).
+
+- Nothing holds the lock, or the holder's lease has expired: exits 0. The next migration takes over an expired lease.
+- A live instance holds it: removes nothing and exits non-zero, naming the command that does.
+
+```bash
+wheels migrate unlock           # who holds the lock; changes nothing
+wheels migrate unlock --force   # remove it (--yes works too)
+```
+
+`--force` removes the lock whoever holds it and prints what it removed. Use it only when that instance is gone: a holder that is still running fails its next migration step with `Wheels.MigrationLockLost`. Through MCP, the `migrate` tool's `unlock` action only reports unless `force` is true.
 
 ##### `rename-system-tables`
 

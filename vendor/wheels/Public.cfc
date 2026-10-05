@@ -94,7 +94,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 */
 	public boolean function $cliCommandIsMutating(required string command, boolean writesFiles = false) {
 		local.mutating = "createMigration,migrateTo,migrateToLatest,migrateUp,migrateDown,renameSystemTables,"
-			& "redoMigration,forgetVersion,pretendVersion,dbRollback,dbSeed,dbCreate,dbReset,dbSetup,dbDump,"
+			& "redoMigration,forgetVersion,pretendVersion,migrationUnlock,dbRollback,dbSeed,dbCreate,dbReset,dbSetup,dbDump,"
 			& "jobsProcessNext,jobsRetry,jobsPurge";
 		if (ListFindNoCase(local.mutating, arguments.command)) {
 			return true;
