@@ -343,7 +343,9 @@ If your app builds storage keys from user input or file names, check that none o
 
 ### `singularize()` corrects some `-ses` words
 
-`singularize()` now returns `psychoanalysis` for `psychoanalyses`, and likewise for any word that ends in `analyses` without starting with it ([#4187](https://github.com/wheels-dev/wheels/issues/4187)). 4.1 returned the misspelling `psychoanalyasis`. `analyses`, `bases`, `diagnoses`, `parentheses`, `prognoses`, `synopses` and `theses` are unchanged. Wheels derives model and table names with `singularize()` and `pluralize()`, so check any name you derived from such a word.
+`singularize()` now returns `psychoanalysis` for `psychoanalyses`, and likewise for any word that ends in `analyses` without starting with it ([#4187](https://github.com/wheels-dev/wheels/issues/4187)). 4.1 returned the misspelling `psychoanalyasis`. `singularize("databases")` now returns `database` rather than `databasis`, so `Databases` and `userDatabases` give `Database` and `userDatabase` ([#4189](https://github.com/wheels-dev/wheels/issues/4189)).
+
+`analyses`, `bases`, `cases`, `diagnoses`, `parentheses`, `phases`, `prognoses`, `purchases`, `synopses`, `theses` and `vases` are unchanged. Wheels derives model and table names with `singularize()` and `pluralize()`, so check any name you derived from such a word. A model class or table named after the old `databasis` output needs renaming.
 
 ## CLI and deployment changes
 
