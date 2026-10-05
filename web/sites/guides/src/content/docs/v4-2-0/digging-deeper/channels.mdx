@@ -134,9 +134,9 @@ When `channelAdapter` is not set, the default is `"memory"`. Both `publish()` an
 In-process pub/sub backed by a `ConcurrentHashMap`. Delivery is instant — `publish()` invokes each subscriber's callback synchronously on the publishing request, and the subscriber's streaming loop flushes it to the browser.
 
 - Best for: single-server deployments and development.
-- No persistence: an event published while a channel has no connected subscribers is gone. There is no replay, so `Last-Event-ID` resume cannot recover events missed while disconnected.
+- No persistence across restarts: events live in the application's memory. Each channel keeps its last 100 events, so a reconnect that sends a last event ID replays the events published after it. If that ID has already dropped out of the 100, the whole retained log is replayed.
 - Single-server only: subscribers on server A never see events published on server B.
-- Empty channels are pruned automatically when their last subscriber disconnects, so per-entity channel names like `user.42` don't accumulate over the application's lifetime.
+- A channel's subscriber list is pruned when its last subscriber disconnects, but its event log (up to 100 events) stays in memory for the life of the application. Per-entity channel names like `user.42` therefore each keep a small log; the database adapter has no such cost.
 
 ### Database
 
@@ -145,6 +145,7 @@ Persists every event to a `wheels_events` table, which is auto-created on first 
 - Best for: multi-server deployments, and anywhere you want resume/replay (events persist, so `Last-Event-ID` recovery works across reconnects).
 - Latency is bounded by the poll interval rather than instant.
 - Events are retained for 60 minutes by default.
+- A subscriber that connects without a last event ID first receives the events published in the last 5 minutes.
 
 The table schema:
 
@@ -187,7 +188,7 @@ Publish an event to a channel. Available anywhere global helpers are — control
 The return struct depends on the adapter:
 
 - **memory:** `{id, channel, event, subscriberCount, timestamp}` — `subscriberCount` is how many subscribers the event was delivered to.
-- **database:** `{id, channel, event, persisted}` — `persisted` is `false` if the insert failed (the error is logged to `wheels_channels.log`, not thrown).
+- **database:** `{id, channel, event, persisted}`. If the insert fails, the error is logged to `wheels_channels.log` and `publish()` throws `Wheels.Channel.PublishFailed`.
 
 ### subscribeToChannel()
 
@@ -196,7 +197,7 @@ Call from a controller action to open a long-lived SSE connection streaming a ch
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `channel` | string | required | Channel to subscribe to |
-| `events` | string | `""` | Comma-delimited event types to deliver; empty delivers all |
+| `events` | string | `""` | Comma-delimited event types to deliver; empty delivers all. Names match exactly and case-sensitively, so don't put spaces after the commas |
 | `lastEventId` | string | `""` | Resume after this event ID; auto-detected from the `Last-Event-ID` header when empty |
 | `adapter` | string | `""` | Per-call adapter override |
 | `pollInterval` | numeric | `2` | Seconds between table polls (database adapter only) |
@@ -255,7 +256,7 @@ sse.close();
 const orders = WheelsSSE.subscribe('/orders/stream', {channel: 'orders'});
 ```
 
-`channel`, `events`, and `lastEventId` are appended to the URL as query parameters. Event data is `JSON.parse`d when possible; otherwise handlers receive the raw string.
+`channel`, `events`, and `lastEventId` are appended to the URL as query parameters. `subscribeToChannel()` reads only the `Last-Event-ID` header by itself, so an action behind `WheelsSSE` should pass `lastEventId = params.lastEventId ?: ""` to resume after a reconnect. Event data is `JSON.parse`d when possible; otherwise handlers receive the raw string.
 
 ### Constructor options
 
@@ -362,7 +363,9 @@ publish(
 
 ## Authentication and deployment
 
-A subscribe action is an ordinary controller action — gate it with [filters](/v4-2-0/digging-deeper/authorization-and-filters/) exactly like anything else. Remember that the browser's `EventSource` can't set custom headers, so token-in-header schemes don't apply; the SSE guide's [authentication section](/v4-2-0/digging-deeper/server-sent-events/#authentication-on-sse) covers the workable alternatives (same-origin session cookies being the default for a Wheels app subscribing to its own channels).
+A subscribe action is an ordinary controller action — gate it with [filters](/v4-2-0/digging-deeper/authorization-and-filters/) exactly like anything else. Channels have no access control of their own: `subscribeToChannel()` accepts any non-empty name, and the channel arrives as a URL parameter the client can edit, so derive the channel on the server or check that the user may read it.
+
+Filters run once, when the connection opens. Events are not re-checked as they stream, so a user whose access is revoked keeps receiving a channel's events until the connection ends: at most `timeout` seconds, after which the browser reconnects and your filters run again. Use a shorter `timeout` on sensitive channels. Remember that the browser's `EventSource` can't set custom headers, so token-in-header schemes don't apply; the SSE guide's [authentication section](/v4-2-0/digging-deeper/server-sent-events/#authentication-on-sse) covers the workable alternatives (same-origin session cookies being the default for a Wheels app subscribing to its own channels).
 
 Channel subscriptions are long-lived requests, so the same deployment rules apply as for raw SSE streams: bump the request timeout for endpoints meant to outlive your engine's default (see [Long-lived connections and timeouts](/v4-2-0/digging-deeper/server-sent-events/#long-lived-connections-and-timeouts)) and make sure your reverse proxy doesn't buffer `text/event-stream` responses (see [Through reverse proxies](/v4-2-0/digging-deeper/server-sent-events/#through-reverse-proxies)).
 
