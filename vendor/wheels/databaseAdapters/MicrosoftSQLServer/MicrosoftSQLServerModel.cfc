@@ -223,6 +223,15 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * Internal function. Wheels.TooManyParameters advice for SQL Server: which long lists run as one
+	 * STRING_SPLIT parameter, and which (dates and times, or a database below level 130) don't.
+	 */
+	public string function $tooManyParametersAdvice(required numeric limit) {
+		return super.$tooManyParametersAdvice(limit = arguments.limit)
+			& " On SQL Server 2016 and later (database compatibility level 130 or higher), Wheels runs a long integer, decimal, string or uniqueidentifier list as one parameter; a date or time list, or a database below level 130, still needs batching.";
+	}
+
+	/**
 	 * Internal function. True when the datasource's database has compatibility level 130 or higher,
 	 * which STRING_SPLIT needs. Read once per datasource and kept in the application's Wheels
 	 * settings, so an application reload reads it again.

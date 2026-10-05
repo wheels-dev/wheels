@@ -694,9 +694,17 @@ component output=false extends="wheels.Global"{
 			Throw(
 				type = "Wheels.TooManyParameters",
 				message = "This query would bind #local.count# parameters, but the database accepts at most #local.limit# per statement.",
-				extendedInfo = "Each value of an IN list (whereIn(), whereNotIn() or a hand-written IN (...)) binds as its own parameter. Query the values in batches of fewer than #local.limit#, or select them with a join or a subquery instead of a long list."
+				extendedInfo = $tooManyParametersAdvice(limit = local.limit)
 			);
 		}
+	}
+
+	/**
+	 * Internal function. What Wheels.TooManyParameters tells the developer to do. An adapter
+	 * that runs some long lists another way says which ones.
+	 */
+	public string function $tooManyParametersAdvice(required numeric limit) {
+		return "Each value of an IN list (whereIn(), whereNotIn() or a hand-written IN (...)) binds as its own parameter. Query the values in batches of fewer than #arguments.limit#, or select them with a join or a subquery instead of a long list.";
 	}
 
 	/**

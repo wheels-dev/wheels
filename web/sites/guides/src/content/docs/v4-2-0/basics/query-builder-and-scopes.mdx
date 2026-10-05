@@ -67,6 +67,12 @@ The two-argument form of `where` means equality. The three-argument form takes a
 | `first()` | Executes, returns the first matching row |
 | `count()` | Executes `COUNT(*)`, returns an integer |
 
+**Long IN lists.** Every value of a `whereIn()` / `whereNotIn()` list is bound as its own parameter. Two databases limit that:
+- **Oracle** 19c and earlier accept at most 1000 values per list. Wheels splits a longer list into groups for you.
+- **SQL Server** accepts about 2,100 parameters per statement.
+  - On SQL Server 2016 and later (database compatibility level 130 or higher), a statement over the limit runs its largest integer, decimal, string and uniqueidentifier lists as one parameter each, expanded on the server with `STRING_SPLIT`.
+  - A long date or time list, or a database below level 130, fails before it runs with `Wheels.TooManyParameters`. Query those values in batches, or use a join or subquery instead of a long list.
+
 Every builder method can start the chain directly on the model class — you don't have to lead with `where()`. Starting with `select()` reads naturally when you only need a few columns:
 
 ```cfm {test:compile}

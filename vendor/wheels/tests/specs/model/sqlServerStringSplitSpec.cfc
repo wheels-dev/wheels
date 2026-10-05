@@ -61,13 +61,14 @@ component extends="wheels.WheelsTest" {
 
 	// The error a call throws, or empty fields when it doesn't.
 	function errorOf(required any callback) {
-		var state = {type = "", message = ""};
+		var state = {type = "", message = "", extendedInfo = ""};
 		var target = arguments.callback;
 		try {
 			target();
 		} catch (any e) {
 			state.type = e.type;
 			state.message = e.message;
+			state.extendedInfo = e.extendedInfo;
 		}
 		return state;
 	}
@@ -191,6 +192,7 @@ component extends="wheels.WheelsTest" {
 				}
 				var thrown = errorOf(() => variables.g.model("post").whereIn("createdAt", dates).count());
 				expect(thrown.type).toBe("Wheels.TooManyParameters");
+				expect(thrown.extendedInfo).toInclude("a date or time list");
 			});
 
 			it("keeps Wheels.TooManyParameters below compatibility level 130", () => {
@@ -206,6 +208,7 @@ component extends="wheels.WheelsTest" {
 					}
 					var thrown = errorOf(() => variables.g.model("author").whereIn("id", paddedIds(2200)).count());
 					expect(thrown.type).toBe("Wheels.TooManyParameters");
+					expect(thrown.extendedInfo).toInclude("below level 130");
 					expect(application.wheels.sqlServerCompatibilityLevels[ds]).toBe(120);
 				} finally {
 					QueryExecute("ALTER DATABASE CURRENT SET COMPATIBILITY_LEVEL = #original#", [], {datasource = ds});
