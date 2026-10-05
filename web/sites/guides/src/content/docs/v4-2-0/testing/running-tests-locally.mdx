@@ -89,7 +89,7 @@ WheelsTest doesn't ship tag-based include/exclude filtering at this release; dir
 - **No Java found** (CLI path) — on non-brew installs the CLI refuses to start and points at Adoptium when it can't find a JVM; set `JAVA_HOME` in your shell profile. Homebrew installs export it themselves.
 - **404 from `/wheels/app/tests`** — the app isn't running as `development` (the allowlist above), or your server isn't pointing at this app's `public/`.
 - **Port already in use** — a previous `wheels start` or another server holds the port; `lsof -i :<port>` and stop it.
-- **Playwright JARs missing** — browser specs skip with `this.browserTestSkipped = true` instead of failing, so the suite stays green. Run `wheels browser setup` once, or see [Browser Tests](/v4-2-0/testing/browser-tests/).
+- **Playwright JARs missing** — browser specs are reported as skipped instead of failing: `wheels test` prints `N passed, M skipped` with the reason. Run `wheels browser setup` once, or see [Browser Tests](/v4-2-0/testing/browser-tests/). If Playwright is installed but Chromium can't start, the browser specs fail with the launch error instead.
 - **Populate SQL errors** — "Table already exists" means a stale table from a previous run; add `DROP TABLE IF EXISTS` first. "No such function: NOW" (or similar) means cross-engine SQL drift; use `CURRENT_TIMESTAMP` — it's ANSI SQL and works everywhere, while `NOW()` fails on SQLite and SQL Server.
 - **"1 error(s)" with a bundle path but no failing assertion** — the runner caught a load-time or setup error in that spec file. The two common causes: `it()` called directly inside `run()` without an enclosing `describe()`, or `beforeAll()` throwing. Check the spec file at the path shown in the summary.
 

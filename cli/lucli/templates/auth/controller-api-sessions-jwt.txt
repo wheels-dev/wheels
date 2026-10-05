@@ -35,6 +35,10 @@ component extends="app.controllers.Controller" {
 		// apply — replace the inherited exception mode for this controller.
 		protectsFromForgery(with="ignore");
 		provides("json");
+		// Answer in JSON even when the request names no format (no .json
+		// extension, no Accept header); otherwise renderWith() looks for an
+		// HTML view that doesn't exist.
+		filters(through="setJsonResponse");
 		verifies(only="create", post=true, params="email,password");
 	}
 
@@ -56,17 +60,22 @@ component extends="app.controllers.Controller" {
 			// so construction here cannot fail on a running app.
 			var jwtService = new wheels.auth.JwtService(secretKey=env("WHEELS_JWT_SECRET"));
 			var token = jwtService.encode(claims={sub: {{modelVar}}.key(), email: {{modelVar}}.email});
-			renderWith(data={token: token, tokenType: "Bearer", expiresIn: 3600}, status=201);
+			// Quoted keys keep their case in the JSON on every engine.
+			renderWith(data={"token": token, "tokenType": "Bearer", "expiresIn": 3600}, status=201);
 		} else {
-			renderWith(data={error: "Invalid email or password."}, status=401);
+			renderWith(data={"error": "Invalid email or password."}, status=401);
 		}
 	}
 
 	// DELETE /api/session — documentation endpoint: JWTs can't be revoked server-side
 	function delete() {
 		renderWith(data={
-			message: "JWTs are stateless and cannot be revoked server-side. Discard the token client-side; it expires on its own."
+			"message": "JWTs are stateless and cannot be revoked server-side. Discard the token client-side; it expires on its own."
 		});
+	}
+
+	private function setJsonResponse() {
+		params.format = "json";
 	}
 
 }

@@ -30,6 +30,10 @@ component extends="app.controllers.Controller" {
 		// apply — replace the inherited exception mode for this controller.
 		protectsFromForgery(with="ignore");
 		provides("json");
+		// Answer in JSON even when the request names no format (no .json
+		// extension, no Accept header); otherwise renderWith() looks for an
+		// HTML view that doesn't exist.
+		filters(through="setJsonResponse");
 		verifies(only="create", post=true, params="email,password");
 	}
 
@@ -48,9 +52,10 @@ component extends="app.controllers.Controller" {
 		}
 		if (IsObject({{modelVar}}) && {{modelVar}}.authenticate(params.password ?: "")) {
 			var token = {{modelVar}}.generateApiToken();
-			renderWith(data={token: token, tokenType: "Bearer"}, status=201);
+			// Quoted keys keep their case in the JSON on every engine.
+			renderWith(data={"token": token, "tokenType": "Bearer"}, status=201);
 		} else {
-			renderWith(data={error: "Invalid email or password."}, status=401);
+			renderWith(data={"error": "Invalid email or password."}, status=401);
 		}
 	}
 
@@ -68,10 +73,14 @@ component extends="app.controllers.Controller" {
 			if (IsObject({{modelVar}})) {
 				{{modelVar}}.revokeApiToken();
 			}
-			renderWith(data={revoked: true});
+			renderWith(data={"revoked": true});
 		} else {
-			renderWith(data={error: result.error}, status=result.statusCode);
+			renderWith(data={"error": result.error}, status=result.statusCode);
 		}
+	}
+
+	private function setJsonResponse() {
+		params.format = "json";
 	}
 
 }

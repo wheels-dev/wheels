@@ -1,0 +1,1 @@
+- `wheels generate auth --strategy=token` and `--strategy=jwt`: the generated `api/Sessions` controller answers in JSON when the request names no format (no `.json` extension or `Accept` header), instead of an HTTP 500 for a missing view, and its response keys keep their case (`token`, `tokenType`, `expiresIn`, `error`, `revoked`, `message`).

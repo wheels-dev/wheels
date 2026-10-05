@@ -28,6 +28,7 @@ component extends="wheels.WheelsTest" {
 			for (var rel in targets) {
 				(function(relPath) {
 					it("logs the root cause before rendering the minimal page in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);

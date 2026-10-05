@@ -175,6 +175,10 @@ model("Post").findAll()
 
 The override triggers only when the model hasn't opted out (see [Shared models](#shared-models-cross-tenant-data) below), the query uses the model's default datasource, and `request.wheels.tenant.dataSource` is non-empty. Associations do **not** cross datasources: a JOIN uses the calling model's resolved datasource for the entire query. Don't `include` a shared model from a tenant model when the two live in different databases.
 
+<Aside type="caution">
+  **Every tenant database must be the same database type as the primary.** Tenant routing swaps only the datasource name. A model keeps the database adapter, and so the SQL dialect, of the datasource it's configured with: normally the application's primary datasource. A tenant database of another type gets SQL it can't run. A MySQL tenant behind a SQLite primary fails on its first `create()` with a MySQL syntax error, with or without a transaction. Put all tenants on the primary's database engine.
+</Aside>
+
 ## Shared models (cross-tenant data)
 
 Some models are deliberately global — the `Tenant` registry itself, billing plans, currencies, feature flags, system-wide audit logs. These tables live in your application's default datasource, not in each tenant's database. Mark them with `sharedModel()` in `config()` and the framework skips the per-request datasource override for them.
