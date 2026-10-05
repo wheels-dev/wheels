@@ -9184,7 +9184,7 @@ component extends="modules.BaseModule" {
 				fix: "On Adobe ColdFusion, session cleanup can call onSessionEnd() after the application scope is gone, and a bare application.wo then throws. Route it through arguments.applicationScope.wo, guarded with StructKeyExists. #adopt# Guide: ""Adobe teardown guards in onError / onSessionEnd"", #guide41#"},
 			{since: "4.0.6", severity: "advisory", pattern: "testcontext\.cfm",
 				description: "public/Application.cfc doesn't include the isolated test context",
-				fix: "Without it the test suites run against your live application scope. #adopt# Guide: ""Isolated test-application include"", #guide41#"},
+				fix: "Without it the test suites run against your live application scope: a run that uses the test database switches the live application's datasource for the whole run, so other requests to the app read and write the test database meanwhile. #adopt# Guide: ""Isolated test-application include"", #guide41#"},
 			{since: "4.1.0", severity: "advisory", pattern: "resources/java",
 				description: "public/Application.cfc doesn't put the bundled jBCrypt jar on the Java load path",
 				fix: "Without it bcryptHash()/bcryptVerify() use the slow pure-CFML fallback, and code that loads a BCrypt class can fail. #adopt# Guide: ""jBCrypt load path"", #guide41#"},
