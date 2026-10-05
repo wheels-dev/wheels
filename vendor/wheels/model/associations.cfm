@@ -29,11 +29,15 @@
 		// Polymorphic belongsTo: the name is the interface name (e.g. "commentable").
 		// foreignKey defaults to {name}Id and foreignType to {name}Type; both can be passed.
 		if (arguments.polymorphic) {
+			// Derived names are checked against the schema on first use ($resolvePolymorphicColumns).
+			arguments.$derivedPolymorphicColumns = "";
 			if (!Len(arguments.foreignKey)) {
 				arguments.foreignKey = "#arguments.name#id";
+				arguments.$derivedPolymorphicColumns = ListAppend(arguments.$derivedPolymorphicColumns, "foreignKey");
 			}
 			if (!Len(arguments.foreignType)) {
 				arguments.foreignType = "#arguments.name#type";
+				arguments.$derivedPolymorphicColumns = ListAppend(arguments.$derivedPolymorphicColumns, "foreignType");
 			}
 			// Don't infer modelName — it's resolved at runtime from the type column.
 			arguments.modelName = "";
@@ -84,11 +88,15 @@
 		// Polymorphic hasMany: `as` is the polymorphic interface name on the child side.
 		// foreignKey defaults to {as}Id and foreignType to {as}Type; both can be passed.
 		if (Len(arguments.as)) {
+			// Derived names are checked against the schema on first use ($resolvePolymorphicColumns).
+			arguments.$derivedPolymorphicColumns = "";
 			if (!Len(arguments.foreignKey)) {
 				arguments.foreignKey = "#arguments.as#id";
+				arguments.$derivedPolymorphicColumns = ListAppend(arguments.$derivedPolymorphicColumns, "foreignKey");
 			}
 			if (!Len(arguments.foreignType)) {
 				arguments.foreignType = "#arguments.as#type";
+				arguments.$derivedPolymorphicColumns = ListAppend(arguments.$derivedPolymorphicColumns, "foreignType");
 			}
 		}
 
@@ -141,11 +149,15 @@
 		// Polymorphic hasOne: `as` is the polymorphic interface name on the child side.
 		// foreignKey defaults to {as}Id and foreignType to {as}Type; both can be passed.
 		if (Len(arguments.as)) {
+			// Derived names are checked against the schema on first use ($resolvePolymorphicColumns).
+			arguments.$derivedPolymorphicColumns = "";
 			if (!Len(arguments.foreignKey)) {
 				arguments.foreignKey = "#arguments.as#id";
+				arguments.$derivedPolymorphicColumns = ListAppend(arguments.$derivedPolymorphicColumns, "foreignKey");
 			}
 			if (!Len(arguments.foreignType)) {
 				arguments.foreignType = "#arguments.as#type";
+				arguments.$derivedPolymorphicColumns = ListAppend(arguments.$derivedPolymorphicColumns, "foreignType");
 			}
 		}
 
@@ -250,6 +262,62 @@
 		// We delete the name from the arguments because we use it as the key and don't need to store it elsewhere.
 		StructDelete(arguments, "name");
 		variables.wheels.class.associations[local.associationName] = arguments;
+	}
+
+	/**
+	 * Internal function. Resolves a polymorphic association's DERIVED column names against the child's
+	 * real columns on first use, the way the non-polymorphic defaults are (#3337): `<name>id` /
+	 * `<name>type` when the child has them, else `<name>_id` / `<name>_type`, which
+	 * `t.references(polymorphic = true)` writes with useUnderscoreReferenceColumns. When both shapes
+	 * exist the legacy one wins; when neither does, or the schema can't be read, the legacy default
+	 * stays. Names passed as foreignKey / foreignType are never changed. Memoized per association.
+	 */
+	public void function $resolvePolymorphicColumns(required string associationName) {
+		if (!StructKeyExists(variables.wheels.class.associations, arguments.associationName)) {
+			return;
+		}
+		local.association = variables.wheels.class.associations[arguments.associationName];
+		if (!StructKeyExists(local.association, "$derivedPolymorphicColumns") || !Len(local.association.$derivedPolymorphicColumns)) {
+			return;
+		}
+		lock name="wheelsPolymorphicColumns#application.applicationName#" type="exclusive" timeout="10" {
+			if (Len(local.association.$derivedPolymorphicColumns)) {
+				$applyPolymorphicColumnShapes(associationName = arguments.associationName, association = local.association);
+				local.association.$derivedPolymorphicColumns = "";
+			}
+		}
+	}
+
+	/**
+	 * Internal function. The schema read behind [see:$resolvePolymorphicColumns]: the child is this
+	 * model for a polymorphic belongsTo, and the associated model for hasMany / hasOne with `as`. A
+	 * failure to read it keeps the legacy names.
+	 */
+	public void function $applyPolymorphicColumnShapes(required string associationName, required struct association) {
+		try {
+			if (arguments.association.type == "belongsTo") {
+				local.base = arguments.associationName;
+				local.childProperties = variables.wheels.class.properties;
+			} else {
+				local.base = arguments.association.as;
+				local.childProperties = model(arguments.association.modelName).$classData().properties;
+			}
+			for (local.column in ListToArray(arguments.association.$derivedPolymorphicColumns)) {
+				local.suffix = local.column == "foreignKey" ? "id" : "type";
+				if (
+					!StructKeyExists(local.childProperties, local.base & local.suffix)
+					&& StructKeyExists(local.childProperties, local.base & "_" & local.suffix)
+				) {
+					arguments.association[local.column] = local.base & "_" & local.suffix;
+				}
+			}
+		} catch (any e) {
+			writeLog(
+				file = "wheels",
+				type = "warning",
+				text = "Wheels: couldn't read the columns for the polymorphic association `#arguments.associationName#`; using its default column names. #e.message#"
+			);
+		}
 	}
 
 	/*
