@@ -9115,16 +9115,17 @@ component extends="modules.BaseModule" {
 			fix: "Keys with a dots-only segment or a drive-letter prefix are now rejected; leading, trailing and doubled slashes are normalised. Check keys built from user input or file names. Guide: ""LocalDisk storage keys are checked per segment"", #guide#"
 		});
 		// enqueue(), enqueueIn() and enqueueAt() throw Wheels.Job.EnqueueFailed in
-		// 4.2 instead of returning persisted: false, so a persisted check is dead
-		// code and the failure now surfaces as an exception.
+		// 4.2 when the write fails, and a job deferred to a commit returns
+		// persisted: false legitimately, so a persisted check no longer means
+		// "failed". Point at status instead.
 		arrayAppend(arguments.checks, {
-			description: "Code reads persisted from a job result (4.2 throws Wheels.Job.EnqueueFailed instead)",
+			description: "Code reads persisted from a job result (4.2 throws Wheels.Job.EnqueueFailed on a failed write)",
 			severity: "advisory",
 			checkType: "grep",
 			pattern: "\.persisted\b|\[\s*[""']persisted[""']\s*\]",
 			scanDir: "app",
 			extensions: "cfc,cfm",
-			fix: "enqueue(), enqueueIn() and enqueueAt() no longer return persisted: false; they throw Wheels.Job.EnqueueFailed when the job can't be written. Remove the persisted check, and where an enqueue is best-effort, catch Wheels.Job.EnqueueFailed. Guide: ""enqueue() throws Wheels.Job.EnqueueFailed"", #guide#"
+			fix: "enqueue(), enqueueIn() and enqueueAt() throw Wheels.Job.EnqueueFailed when the job can't be written, so persisted: false no longer means a failure: a job enqueued inside a transaction on another datasource returns status ""deferred"" with persisted: false and is written at the commit. Check status (""pending"" or ""deferred"") instead of persisted, and where an enqueue is best-effort, catch Wheels.Job.EnqueueFailed. Guide: ""enqueue() throws Wheels.Job.EnqueueFailed"", #guide#"
 		});
 		// A tests/runner.cfm of the app's own (often a copy of an older core
 		// runner) gets the <datasource>_test rule but not the built-in runner's
