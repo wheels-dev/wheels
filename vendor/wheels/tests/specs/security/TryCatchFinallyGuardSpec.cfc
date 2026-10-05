@@ -3,8 +3,9 @@
  *
  * On BoxLang, when a request ends with `abort` (or `cflocation`), a `finally` whose `try` ALSO has a
  * `catch` clause is SKIPPED — even a `catch (any e) { rethrow; }` that never runs. A catch-FREE
- * `try { ... } finally { ... }` runs its finally on abort as expected. Lucee and Adobe run the finally
- * either way; no transaction is involved. See CLAUDE.md Cross-Engine Invariant 22.
+ * `try { ... } finally { ... }` runs its finally on abort as expected, and so does one whose finally
+ * issues a transaction action; the catch clause alone decides. Lucee and Adobe run the finally either
+ * way; no transaction is involved. See CLAUDE.md Cross-Engine Invariant 22.
  *
  * The practical consequence: any framework cleanup that MUST run even when app code (an action, a
  * filter, a callback, a view/include, a mailer render, a job handler) ends the request with an abort
@@ -18,15 +19,18 @@
  *
  * Scope: `*.cfc` and `*.cfm` under vendor/wheels, EXCLUDING `/tests/` and `/wheelstest/` — that code
  * runs in the test harness, not on a production request path, so a try/catch/finally there cannot be
- * skipped by a request abort and is out of scope for this guard.
+ * skipped by a request abort and is out of scope for this guard. SCRIPT syntax only: the tag-based
+ * cftry / cfcatch / cffinally form (and tag-style comments) is not scanned; there are no tag-based
+ * finally blocks in production vendor/wheels today. (Angle-bracket tag syntax is omitted here on
+ * purpose: Lucee's tag scanner parses a literal cf-tag even inside a comment.)
  *
- * Scan notes (Anti-Pattern 14 spirit):
- * - Comments and string literals are blanked with a single-pass char state machine (NOT a global
- *   non-greedy regex, which hangs Lucee 7), so braces/keywords inside them are not miscounted.
- * - Only files containing BOTH "catch" and "finally" are parsed (cheap pre-filter), so the char scan
- *   runs on a handful of files.
- * - A brace-depth frame stack associates each catch/finally with its owning try, so a NESTED
- *   outer-finally / inner-catch (the safe shape) is correctly NOT flagged.
+ * Detection ($scanTryCatchFinally): comments and string literals are first blanked to spaces by a
+ * single-pass char state machine (NOT a global regex, which hangs Lucee 7), preserving length and
+ * newlines so line numbers stay accurate. The cleaned text is then brace-matched over the whole file:
+ * each `try {` is matched to its closing `}`, and the following `catch (...) {} / finally {}` chain is
+ * walked. A try is an offender iff its own chain has BOTH a catch and a finally. Because the matcher
+ * works on real brace depth (not line adjacency), a NESTED outer-finally / inner-catch is correctly
+ * classified as clean. $scanTryCatchFinally is exercised directly by the self-test below.
  */
 component extends="wheels.WheelsTest" {
 
@@ -43,8 +47,7 @@ component extends="wheels.WheelsTest" {
 					"/model/locking.cfm": "$advisoryLockTransactionBody outer try: the lock release already runs in an inner catch-free finally (invariant 22, PR ##4330); the outer catch/rollback is tracked separately."
 				};
 
-				// Collect source files. BoxLang's DirectoryList() returns a fixed-size array, so copy into
-				// a fresh one before appending (invariant 20).
+				// BoxLang's DirectoryList() returns a fixed-size array, so copy before appending (invariant 20).
 				var files = [];
 				for (var listed in DirectoryList(root, true, "path", "*.cfc")) {
 					ArrayAppend(files, listed);
@@ -54,114 +57,25 @@ component extends="wheels.WheelsTest" {
 				}
 
 				var offenders = [];
-
 				for (var filePath in files) {
 					var rel = Replace(Replace(filePath, root, "", "one"), "\", "/", "all");
 					if (ListLast(rel, "/") == selfName) {
 						continue;
 					}
-					// Scope to production framework source: the test suites run in the harness, not a
-					// production request, so a try/catch/finally there is not an abort-skip risk.
 					if (FindNoCase("/tests/", rel) || FindNoCase("/wheelstest/", rel)) {
 						continue;
 					}
-
 					var content = FileRead(filePath);
-					// Only files with BOTH keywords can possibly hold a try/catch/finally.
+					// Only files with BOTH keywords can hold a single try/catch/finally.
 					if (!FindNoCase("catch", content) || !FindNoCase("finally", content)) {
 						continue;
 					}
-
-					// ── Blank comments and string literals (single pass, state carried across lines) ──
-					var lines = ListToArray(content, Chr(10), true);
-					var inBlockComment = false;
-					var inString = false;
-					var stringChar = "";
-					var depth = 0;
-					// Stack of open try frames: each {owner: brace depth the try sits at, hasCatch: boolean}.
-					var frames = [];
-					var lineNo = 0;
-
-					for (var rawLine in lines) {
-						lineNo++;
-						var line = Replace(rawLine, Chr(13), "", "all");
-						var clean = "";
-						var i = 1;
-						var n = Len(line);
-						while (i <= n) {
-							var ch = Mid(line, i, 1);
-							var two = (i < n) ? Mid(line, i, 2) : "";
-							if (inBlockComment) {
-								if (two == "*/") {
-									inBlockComment = false;
-									i += 2;
-									continue;
-								}
-								i++;
-								continue;
-							}
-							if (inString) {
-								// CFML escapes the quote by doubling it; treat a doubled quote as staying in.
-								if (ch == stringChar) {
-									if (two == stringChar & stringChar) {
-										i += 2;
-										continue;
-									}
-									inString = false;
-									stringChar = "";
-									i++;
-									continue;
-								}
-								i++;
-								continue;
-							}
-							if (two == "/*") {
-								inBlockComment = true;
-								i += 2;
-								continue;
-							}
-							if (two == "//") {
-								break;
-							}
-							if (ch == """" || ch == "'") {
-								inString = true;
-								stringChar = ch;
-								i++;
-								continue;
-							}
-							clean &= ch;
-							i++;
-						}
-
-						// Keyword detection on the cleaned line. catch/finally as statement continuations
-						// (preceded by line-start, whitespace, or a closing brace).
-						var hasTry = REFindNoCase("(^|[\s;}])try\s*\{", clean) > 0;
-						var hasCatchKw = REFindNoCase("(^|[\s}])catch\s*[({]", clean) > 0;
-						var hasFinallyKw = REFindNoCase("(^|[\s}])finally\s*\{", clean) > 0;
-
-						// A catch/finally continues the innermost open try (its body sits one level deeper,
-						// so at this point depth is owner+1 and the top frame owns it).
-						if (hasCatchKw && ArrayLen(frames)) {
-							frames[ArrayLen(frames)].hasCatch = true;
-						}
-						if (hasFinallyKw && ArrayLen(frames) && frames[ArrayLen(frames)].hasCatch) {
-							ArrayAppend(offenders, {file = rel, line = lineNo});
-						}
-						if (hasTry) {
-							ArrayAppend(frames, {owner = depth, hasCatch = false});
-						}
-
-						// Net brace change, then pop any frame whose block has fully closed.
-						var opens = Len(clean) - Len(Replace(clean, "{", "", "all"));
-						var closes = Len(clean) - Len(Replace(clean, "}", "", "all"));
-						depth += (opens - closes);
-						while (ArrayLen(frames) && depth <= frames[ArrayLen(frames)].owner) {
-							ArrayDeleteAt(frames, ArrayLen(frames));
-						}
+					for (var hitLine in $scanTryCatchFinally(content)) {
+						ArrayAppend(offenders, {file = rel, line = hitLine});
 					}
 				}
 
-				// Partition into allowlisted vs reported (inline so nothing is called out of the closure).
+				// Partition into allowlisted vs reported.
 				var reported = [];
 				var allowed = [];
 				for (var off in offenders) {
@@ -185,12 +99,190 @@ component extends="wheels.WheelsTest" {
 					& "On BoxLang the finally is SKIPPED when the request ends with abort (invariant 22). If the "
 					& "finally must run on abort, NEST instead: an outer catch-free try/finally holding the "
 					& "cleanup, wrapping an inner try/catch. If the pattern is intentional and abort-safe, add it "
-					& "to ALLOWLIST with a reason. Currently allowlisted (not failures): #ArrayToList(allowed, ', ')#."
+					& "to the allowlist with a reason. Currently allowlisted (not failures): #ArrayToList(allowed, ', ')#."
 				);
+			});
+
+			it("the try/catch/finally scanner classifies the known shapes correctly", () => {
+				var nl = Chr(10);
+				// OFFENDERS — a single try with both a catch and a finally, in the shapes the old
+				// line-based scan got wrong (rev1-r3) plus the plain multi-line case.
+				var offenderShapes = {
+					"multiline" = ["try {", "  a();", "} catch (any e) {", "  b();", "} finally {", "  c();", "}"],
+					"allman-own-line" = ["try {", "  a();", "}", "catch (any e) {", "  b();", "}", "finally {", "  c();", "}"],
+					"sameline-catch-then-finally" = ["try {", "  a();", "} catch (any e) { b(); }", "finally {", "  c();", "}"],
+					"one-line-full" = ["try { a(); } catch (any e) { b(); } finally { c(); }"]
+				};
+				// CLEAN — no single try owns both; includes the safe nested shapes.
+				var cleanShapes = {
+					"catch-free-try-finally" = ["try {", "  a();", "} finally {", "  c();", "}"],
+					"nested-one-line-inner" = ["try {", "  try { a(); } catch (any e) {}", "} finally {", "  c();", "}"],
+					"nested-multiline" = ["try {", "  try {", "    a();", "  } catch (any e) {", "    b();", "  }", "} finally {", "  c();", "}"],
+					"try-catch-no-finally" = ["try {", "  a();", "} catch (any e) {", "  b();", "}"]
+				};
+
+				for (var name in offenderShapes) {
+					var hits = $scanTryCatchFinally(ArrayToList(offenderShapes[name], nl));
+					expect(ArrayLen(hits) > 0).toBeTrue("scanner MISSED an offender shape: " & name);
+				}
+				for (var name in cleanShapes) {
+					var hits = $scanTryCatchFinally(ArrayToList(cleanShapes[name], nl));
+					expect(ArrayLen(hits)).toBe(0, "scanner FALSE-POSITIVED a clean shape: " & name & " -> lines " & ArrayToList(hits, ","));
+				}
 			});
 
 		});
 
+	}
+
+	/**
+	 * Return the 1-based line numbers of every single try that has BOTH a catch and a finally in its
+	 * own chain. Comments and strings are blanked first; detection is whole-file brace matching.
+	 */
+	public array function $scanTryCatchFinally(required string source) {
+		var src = $blankCommentsAndStrings(arguments.source);
+		var n = Len(src);
+		var offenders = [];
+		var pos = 1;
+		while (pos <= n) {
+			var m = REFind("(^|[^A-Za-z0-9_$])try[\s]*\{", src, pos, true);
+			if (!ArrayLen(m.pos) || m.pos[1] == 0) {
+				break;
+			}
+			var bodyOpen = m.pos[1] + m.len[1] - 1; // position of the try body's '{'
+			var bodyClose = $matchBrace(src, bodyOpen);
+			if (bodyClose == 0) {
+				break; // unbalanced; stop scanning this file
+			}
+			var hasCatch = false;
+			var hasFinally = false;
+			var cur = bodyClose + 1;
+			while (cur <= n) {
+				var rest = Mid(src, cur, n - cur + 1);
+				var cm = REFind("^[\s]*(catch[\s]*\([^)]*\)|finally)[\s]*\{", rest, 1, true);
+				if (!ArrayLen(cm.pos) || cm.pos[1] == 0) {
+					break; // no further catch/finally continuation
+				}
+				var kw = Mid(rest, cm.pos[2], cm.len[2]);
+				if (Left(kw, 5) == "catch") {
+					hasCatch = true;
+				} else {
+					hasFinally = true;
+				}
+				var blockOpen = cur + (cm.pos[1] + cm.len[1] - 1) - 1; // the continuation block's '{'
+				var blockClose = $matchBrace(src, blockOpen);
+				if (blockClose == 0) {
+					break;
+				}
+				cur = blockClose + 1;
+				if (hasFinally) {
+					break; // finally is always last in a try chain
+				}
+			}
+			if (hasCatch && hasFinally) {
+				ArrayAppend(offenders, $lineOf(src, bodyOpen));
+			}
+			pos = bodyOpen + 1; // advance past this try's '{' so nested trys are found on their own
+		}
+		return offenders;
+	}
+
+	/**
+	 * Blank CFML line/block comments and string literals to spaces, preserving length and newlines so
+	 * positions and line numbers are unchanged. Single char pass — no global regex (Lucee 7 hang).
+	 */
+	public string function $blankCommentsAndStrings(required string src) {
+		var n = Len(arguments.src);
+		var out = [];
+		var inBlock = false;
+		var inString = false;
+		var strChar = "";
+		var i = 1;
+		while (i <= n) {
+			var ch = Mid(arguments.src, i, 1);
+			var two = (i < n) ? Mid(arguments.src, i, 2) : "";
+			if (inBlock) {
+				if (two == "*/") {
+					ArrayAppend(out, "  ");
+					i += 2;
+					inBlock = false;
+					continue;
+				}
+				ArrayAppend(out, ch == Chr(10) ? Chr(10) : " ");
+				i++;
+				continue;
+			}
+			if (inString) {
+				if (ch == strChar) {
+					if (two == strChar & strChar) {
+						ArrayAppend(out, "  ");
+						i += 2;
+						continue;
+					}
+					inString = false;
+					ArrayAppend(out, " ");
+					i++;
+					continue;
+				}
+				ArrayAppend(out, ch == Chr(10) ? Chr(10) : " ");
+				i++;
+				continue;
+			}
+			if (two == "/*") {
+				inBlock = true;
+				ArrayAppend(out, "  ");
+				i += 2;
+				continue;
+			}
+			if (two == "//") {
+				while (i <= n && Mid(arguments.src, i, 1) != Chr(10)) {
+					ArrayAppend(out, " ");
+					i++;
+				}
+				continue;
+			}
+			if (ch == """" || ch == "'") {
+				inString = true;
+				strChar = ch;
+				ArrayAppend(out, " ");
+				i++;
+				continue;
+			}
+			ArrayAppend(out, ch);
+			i++;
+		}
+		return ArrayToList(out, "");
+	}
+
+	/**
+	 * Index of the `}` that matches the `{` at openPos, or 0 if unbalanced. Operates on text whose
+	 * comments and strings are already blanked, so every brace is structural.
+	 */
+	public numeric function $matchBrace(required string src, required numeric openPos) {
+		var depth = 0;
+		var i = arguments.openPos;
+		var n = Len(arguments.src);
+		while (i <= n) {
+			var ch = Mid(arguments.src, i, 1);
+			if (ch == "{") {
+				depth++;
+			} else if (ch == "}") {
+				depth--;
+				if (depth == 0) {
+					return i;
+				}
+			}
+			i++;
+		}
+		return 0;
+	}
+
+	/**
+	 * 1-based line number of a character position (count of newlines before it, plus one).
+	 */
+	public numeric function $lineOf(required string src, required numeric pos) {
+		var prefix = arguments.pos > 1 ? Left(arguments.src, arguments.pos - 1) : "";
+		return 1 + (Len(prefix) - Len(Replace(prefix, Chr(10), "", "all")));
 	}
 
 }
