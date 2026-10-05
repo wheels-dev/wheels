@@ -1,0 +1,1 @@
+- On SQL Server, a condition on a `TIME` column works on every engine. It errored on Lucee ("The data types time and datetime are incompatible") and BoxLang, and on Adobe ColdFusion it dropped the value's fraction of a second, so only whole-second values matched (#4327)
