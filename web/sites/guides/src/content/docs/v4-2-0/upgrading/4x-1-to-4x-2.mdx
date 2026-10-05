@@ -364,7 +364,7 @@ On SQL Server, `withAdvisoryLock()` called outside a transaction failed with "Th
 
 On MySQL and PostgreSQL, `withAdvisoryLock()` on a tenant (non-shared) model now takes the lock on the active tenant's datasource, the database its queries use ([#4223](https://github.com/wheels-dev/wheels/issues/4223)). 4.1 took it on the application's default datasource. SQL Server and `withAdvisoryLock(transaction = true)` already worked this way.
 
-The consequence: two tenants on different databases that use the same lock name no longer exclude each other. Each one gets its own lock. If a lock must cover every tenant, call `withAdvisoryLock()` through a shared model (one with `sharedModel()` in its `config()`), which keeps the default datasource whichever tenant is active:
+The consequence: two tenants on different databases that use the same lock name no longer exclude each other, on one application server or across several. Each one gets its own lock. On MySQL, lock names are shared by every database on the same MySQL server, so tenant databases hosted on one MySQL server still exclude each other for the same name. If a lock must cover every tenant, call `withAdvisoryLock()` through a shared model (one with `sharedModel()` in its `config()`), which keeps the default datasource whichever tenant is active:
 
 ```cfm
 model("Plan").withAdvisoryLock(name = "nightly-billing", callback = function() {
