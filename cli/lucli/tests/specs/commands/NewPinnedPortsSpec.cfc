@@ -58,10 +58,35 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				pinProject(parent & "/newapp", port + 40, port + 1);
 				var m = moduleWithHome();
 				var context = contextFor(m, parent & "/newapp");
-				if (new cli.lucli.services.PortProbe().portInUse(port + 1)) {
-					skip("port #port + 1# is in use on this machine");
+				var said = printed(m);
+				// The app's own lucee.json is never reported as another project's pin.
+				expect(said).notToInclude("pinned by");
+				// Normally it keeps port + 1. Another process may hold port + 1 while
+				// the CLI probes it and let go before any check here could see it
+				// (a re-probe afterwards raced), so judge by the reason the CLI gives
+				// for moving it: a live listener ("in use"), never the pin.
+				if (context.shutdownPort != port + 1) {
+					expect(context.shutdownPort).toBeGT(port + 1);
+					expect(said).toInclude("Shutdown port #port + 1# is in use");
 				}
-				expect(context.shutdownPort).toBe(port + 1);
+			});
+
+			it("moves only for a live listener when port + 1 is briefly busy (the race)", () => {
+				pinProject(parent & "/newapp", port + 40, port + 1);
+				var m = moduleWithHome();
+				// Held only while the context is built, released before any assertion:
+				// the window that made the old re-probe-afterwards check flaky.
+				var holder = createObject("java", "java.net.ServerSocket").init(port + 1);
+				var context = {};
+				try {
+					context = contextFor(m, parent & "/newapp");
+				} finally {
+					holder.close();
+				}
+				var said = printed(m);
+				expect(context.shutdownPort).toBeGT(port + 1);
+				expect(said).toInclude("Shutdown port #port + 1# is in use");
+				expect(said).notToInclude("pinned by");
 			});
 
 		});
