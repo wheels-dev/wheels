@@ -60,8 +60,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("test runner endpoint returns JSON", () => {
 					if (skipIntegration) { debug(skipReason); return; }
 
+					// A small directory: this only checks the endpoint returns JSON. The model directory
+					// takes close to TestHelper.httpGet's 30s read timeout on a slow runner.
 					var response = testHelper.httpGet(
-						"#baseUrl#/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.model"
+						"#baseUrl#/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.di"
 					);
 					expect(len(response)).toBeGT(0);
 
