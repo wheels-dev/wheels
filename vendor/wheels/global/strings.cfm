@@ -214,12 +214,39 @@
 		local.rv = Replace(local.rv, "_", "\_", "all");
 		// `[` opens a character class in a LIKE pattern only on SQL Server. Escaping it is needed there,
 		// redundant on MySQL / PostgreSQL / SQLite / H2 / CockroachDB (where `[` is literal), and on
-		// Oracle `\[` is an illegal escape sequence (ORA-01424), so escape it only when the application's
-		// default adapter is SQL Server.
-		if ($get("adapterName") == "MicrosoftSQLServerModel") {
+		// Oracle `\[` is an illegal escape sequence (ORA-01424), so escape it only when the adapter is
+		// SQL Server.
+		if ($adapterNameForLike() == "MicrosoftSQLServerModel") {
 			local.rv = Replace(local.rv, "[", "\[", "all");
 		}
 		return local.rv;
+	}
+
+	/**
+	 * The adapter class name escapeForLike() uses to decide whether to escape `[`. On a model instance
+	 * it is that model's own adapter, so a multi-datasource app escapes `[` per the database the query
+	 * actually runs against; otherwise it is the application default.
+	 *
+	 * The default is guarded against the case $timestamp() also guards for — no model class has set
+	 * `adapterName` on the application scope yet (a fresh app, or right after a reload) — where a bare
+	 * `$get("adapterName")` would throw. There is no database type to read here without a model
+	 * ($getDBType() lives on the migrator, not on this mixin's host), so it returns "", which
+	 * escapeForLike treats as "not SQL Server": `[` is left unescaped. That is correct on every database
+	 * except an as-yet-uninitialised SQL Server app (a rare edge — call `model()` first), and it never
+	 * risks Oracle's ORA-01424.
+	 */
+	public string function $adapterNameForLike() {
+		if (
+			StructKeyExists(variables, "wheels")
+			&& StructKeyExists(variables.wheels, "class")
+			&& StructKeyExists(variables.wheels.class, "adapterName")
+		) {
+			return variables.wheels.class.adapterName;
+		}
+		if (StructKeyExists(application[$appKey()], "adapterName")) {
+			return $get("adapterName");
+		}
+		return "";
 	}
 
 	/**

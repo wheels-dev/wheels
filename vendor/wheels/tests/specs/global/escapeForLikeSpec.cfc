@@ -46,6 +46,46 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("escapeForLike adapter resolution", () => {
+
+			it("does not throw when no model class has set the application adapterName yet", () => {
+				var wo = application.wo;
+				var appScope = application[wo.$appKey()];
+				var hadKey = StructKeyExists(appScope, "adapterName");
+				var saved = hadKey ? appScope.adapterName : "";
+				// Simulate a fresh app / just-reloaded state: no adapterName set yet. escapeForLike must
+				// resolve it via the $getDBType() fallback, not let $get() throw. Restore in a catch-free
+				// finally (no loop) so the shared application scope is left intact.
+				try {
+					StructDelete(appScope, "adapterName");
+					expect(wo.escapeForLike("a%b")).toBe("a\%b");
+				} finally {
+					if (hadKey) {
+						appScope.adapterName = saved;
+					}
+				}
+			});
+
+			it("prefers a model instance's own adapter over the global default", () => {
+				var wo = application.wo;
+				var appScope = application[wo.$appKey()];
+				var saved = StructKeyExists(appScope, "adapterName") ? appScope.adapterName : "";
+				var modelAdapter = model("post").$adapterNameForLike();
+				// Point the global at a DIFFERENT adapter; a model still resolves its own (so a
+				// multi-datasource app escapes `[` per the model's database, not the last-initialised one).
+				var bogus = (modelAdapter == "MicrosoftSQLServerModel") ? "SQLiteModel" : "MicrosoftSQLServerModel";
+				try {
+					appScope.adapterName = bogus;
+					expect(model("post").$adapterNameForLike()).toBe(modelAdapter);
+				} finally {
+					if (Len(saved)) {
+						appScope.adapterName = saved;
+					}
+				}
+			});
+
+		});
+
 	}
 
 }
