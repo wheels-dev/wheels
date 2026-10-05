@@ -70,3 +70,19 @@ private string function csrfToken(required any testClient) {
     return match.len[1] ? ReReplaceNoCase(Mid(html, match.pos[1], match.len[1]), '.*content="([^"]*)".*', "\1") : "";
 }
 ```
+
+## Saving and restoring route state in specs
+
+A spec that redefines the route table leaks stale routes into every spec that runs after it (wrong `linkTo`/`urlFor` output, phantom named routes). `wheels.WheelsTest` provides three helpers so a route-manipulating spec cleans up after itself: `$snapshotRoutes()` captures the full route state, `$restoreRoutes(snapshot)` puts it back, and `$clearRoutes()` empties it so you can define a fresh table. Snapshot in `beforeEach`, restore in `afterEach`:
+
+```cfm
+beforeEach(() => {
+    variables._routes = $snapshotRoutes();
+    $clearRoutes();
+    g.mapper().resources("widgets").end();
+    g.$setNamedRoutePositions();
+});
+afterEach(() => $restoreRoutes(variables._routes));
+```
+
+`$snapshotRoutes()` captures everything a redefinition touches — the route list, the static-route index, named-route positions, and the `urlFor` caches — so `$restoreRoutes()` leaves the table byte-for-byte as it was, with no leakage into later specs.

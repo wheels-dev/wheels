@@ -86,8 +86,7 @@ The runner compiles every CFC under the spec directory, so one compilation error
 
 - **Test infra scope**: Wheels internals (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files the test runner includes, such as `tests/populate.cfm`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
 - **`#` escape**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiter. In string literals, escape: `&##111;`. Comments (`//`) are fine. Unescaped `#` in strings crashes the **entire** test suite, not just that file.
-- **Route-state save/restore in test specs**: `wheels.WheelsTest` provides `$snapshotRoutes()`, `$restoreRoutes(snapshot)`, and `$clearRoutes()`. A spec that redefines the route table MUST snapshot in `beforeEach` and restore in `afterEach`, or it leaks stale route state into later specs:
-  `beforeEach(() => { variables._routes = $snapshotRoutes(); $clearRoutes(); g.mapper()...end(); g.$setNamedRoutePositions(); }); afterEach(() => $restoreRoutes(variables._routes));`
+- **Route state in specs**: `wheels.WheelsTest` has `$snapshotRoutes()` / `$restoreRoutes()` / `$clearRoutes()`; snapshot in `beforeEach`, restore in `afterEach` (see `.ai/testing.md`).
 
 ### Running tests locally
 
