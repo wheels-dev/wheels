@@ -18,6 +18,7 @@
 		"./components/starlight/EditLink.astro": "./src/components/starlight/EditLink.astro",
 		"./components/starlight/VersionSwitcher.astro": "./src/components/starlight/VersionSwitcher.astro",
 		"./data/versions": "./src/data/versions.ts",
+		"./data/llms": "./src/data/llms.ts",
 		"./styles/tokens.css": "./src/styles/tokens.css",
 		"./styles/fonts.css": "./src/styles/fonts.css",
 		"./styles/base.css": "./src/styles/base.css",
