@@ -48,7 +48,22 @@ That's the whole configuration. The first `wheels` is the binary name; the secon
 Don't try `wheels mcp` on its own to see this snippet: on the released launcher, LuCLI reserves the `mcp` verb and a bare invocation exits with `mcp: missing module name` instead of reaching the Wheels Module's help text. To check the server from a shell, use the `--once` smoke test below.
 
 <Aside type="note" title="IDE-specific paths">
-Claude Code reads `.mcp.json` from the project root. OpenCode reads `.opencode.json`, in its own shape: an `mcp` key, `"type": "local"`, and the command and its arguments as one array (`["wheels", "mcp", "wheels"]`); `wheels new` and `wheels setup agents` write it that way. Cursor reads from its settings UI. Check your IDE's MCP documentation for the exact location; the server definition itself is identical across clients.
+Claude Code reads `.mcp.json` from the project root. OpenCode reads `.opencode.json`, in its own shape: an `mcp` key, `"type": "local"`, `"enabled": true`, and the command and its arguments as one array. `wheels new` and `wheels setup agents` write it like this:
+
+```json title=".opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "wheels": {
+      "type": "local",
+      "command": ["wheels", "mcp", "wheels"],
+      "enabled": true
+    }
+  }
+}
+```
+
+Cursor reads from its settings UI. Check your IDE's MCP documentation for the exact location; the command, `wheels mcp wheels`, is the same for every client.
 </Aside>
 
 ### Verifying the server responds
