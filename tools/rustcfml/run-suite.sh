@@ -192,6 +192,40 @@ print(f"RustCFML {version}: {totals['totalPass']} pass, {totals['totalFail']} fa
       f"{totals['totalError']} error, {totals['totalSkipped']} skipped "
       f"({len(failing)} distinct failing entries)")
 
+# Watched specs: specs whose RESULT, pass or fail, must be visible in this
+# lane's log and step summary, because the lane uploads no per-spec artifact
+# and only lists failures. One "<bundle> :: <spec name>" substring per line in
+# tools/rustcfml/watched-specs.txt; NOT RUN flags a spec that never reported
+# (e.g. its bundle failed to compile).
+watched_lines = []
+watched_path = os.path.join(repo_root, "tools", "rustcfml", "watched-specs.txt")
+if os.path.exists(watched_path):
+    wanted = [
+        line.strip() for line in open(watched_path, encoding="utf-8")
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+
+    def _all_specs(node, bundle):
+        for spec in node.get("specStats", []) or []:
+            yield bundle, spec.get("name", ""), spec.get("status", "?")
+        for child in node.get("suiteStats", []) or []:
+            yield from _all_specs(child, bundle)
+
+    every_spec = [
+        entry
+        for b in data.get("bundleStats", []) or []
+        for entry in _all_specs(b, b.get("name", "?"))
+    ]
+    for want in wanted:
+        hits = [e for e in every_spec if want in f"{e[0]} :: {e[1]}"]
+        if hits:
+            watched_lines += [f"  {status}: {bundle} :: {name}" for bundle, name, status in hits]
+        else:
+            watched_lines.append(f"  NOT RUN: {want} (no matching spec reported)")
+    print("WATCHED SPECS:")
+    for line in watched_lines:
+        print(line)
+
 if totals["totalPass"] == 0:
     print("BOOT BREAK: zero passing specs — the engine could not run the suite.")
     print("Response head (the suite likely returned an error payload):")
@@ -307,6 +341,10 @@ if step_summary:
                  f"baseline {baseline.get('engineVersion', '?')}\n\n")
         for line in summary_lines:
             fh.write(line + "\n")
+        if watched_lines:
+            fh.write("\nWatched specs:\n")
+            for line in watched_lines:
+                fh.write(line + "\n")
         if not new and not totals_worse:
             fh.write("\nNo new failures versus baseline.\n")
 

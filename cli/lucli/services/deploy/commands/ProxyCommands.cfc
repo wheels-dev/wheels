@@ -32,7 +32,12 @@ component extends="Base" {
         );
     }
 
-    public string function deploy(required any role, required string target) {
+    /**
+     * @healthCheckTimeout Seconds, overriding proxy.healthcheck.timeout for this
+     *                     one call: the migrate host's health check waits while
+     *                     the migrations run (#4063). 0 keeps the configured value.
+     */
+    public string function deploy(required any role, required string target, numeric healthCheckTimeout = 0) {
         var p = variables.config.proxy();
         var hc = p.healthcheck();
         var innerArgs = [
@@ -49,7 +54,7 @@ component extends="Base" {
         arrayAppend(innerArgs, [
             "--health-check-path", shellEscape(hc.path ?: "/up"),
             "--health-check-interval", $duration(hc.interval ?: 1),
-            "--health-check-timeout", $duration(hc.timeout ?: 30)
+            "--health-check-timeout", $duration(arguments.healthCheckTimeout > 0 ? arguments.healthCheckTimeout : (hc.timeout ?: 30))
         ], true);
         return docker("exec", variables.PROXY_CONTAINER_NAME) & " " & arrayToList(innerArgs, " ");
     }
