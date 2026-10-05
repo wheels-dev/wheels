@@ -33,7 +33,7 @@ service, image, servers, registry, builder, env, ssh, proxy, boot, accessories, 
 ```
 
 <Aside type="caution" title="Some sub-keys are still parsed but ignored">
-Within the allowed blocks, several **sub-keys** are parsed and then never read by the runtime: `builder.arch` / `builder.args` / `builder.remote`, `ssh.proxy` / `ssh.keys_only`, `proxy.forward_headers` / `proxy.buffering`, role-map `options:` / `labels:` / `env:`, and accessory `files:`. Setting them has no effect today. Each one is flagged in its section below; the umbrella issue is [#3088](https://github.com/wheels-dev/wheels/issues/3088).
+Within the allowed blocks, several **sub-keys** are parsed and then never read by the runtime: `ssh.proxy` / `ssh.keys_only`, `proxy.forward_headers` / `proxy.buffering`, role-map `options:` / `labels:` / `env:`, and accessory `files:`. Setting them has no effect today. Each one is flagged in its section below; the umbrella issue is [#3088](https://github.com/wheels-dev/wheels/issues/3088).
 </Aside>
 
 ## `service`
@@ -145,9 +145,11 @@ builder:
 
 - `context:` — build context. Default `.`.
 - `dockerfile:` — path relative to context. Default `Dockerfile`.
-- `arch:` — parsed but **currently ignored**: no `--platform` flag is emitted, so builds target whatever the host running the build is ([#3088](https://github.com/wheels-dev/wheels/issues/3088)). `wheels deploy build create` does set up a `docker buildx` builder.
-- `args:` — parsed but **currently ignored**: no `--build-arg` flags are emitted ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
-- `remote:` — parsed but **currently ignored**: the build always runs locally; no remote builder endpoint is used ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
+- `arch:` — the platforms to build for, as one `--platform` list (`amd64` becomes `linux/amd64`; a value that already names its OS, such as `linux/arm/v7`, is used as is). A scalar or a list. Default `amd64`, so an image built on an arm64 workstation still runs on amd64 hosts. Building for more than one platform needs a buildx builder that supports it: run [`wheels deploy build create`](/v4-2-0/command-line-tools/commands/deploy/build/create/) once.
+- `args:` — passed as one `--build-arg KEY=value` per entry.
+- `remote:` — a Docker endpoint such as `ssh://deploy@builder.example.com`. `wheels deploy build create` creates the service's buildx builder there, and `build push` builds on it (`--builder kamal-<service>`). Without it, the build runs on the control machine's default builder.
+
+`build push` also labels the image `service=<service>`, which is what `wheels deploy prune images` filters on.
 
 ## `env`
 
