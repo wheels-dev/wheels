@@ -194,4 +194,63 @@ component extends="Model" {
 		return false;
 	}
 
+
+	// Saved-change helpers (F49). They read request.$scTag / request.$scNames and append to
+	// request.$scLog, so specs can assert what each callback saw.
+	function recordSavedChangesOnCommit() {
+		$recordSavedChanges("commit");
+	}
+
+	function recordSavedChangesOnRollback() {
+		$recordSavedChanges("rollback");
+	}
+
+	function recordSavedChangesInAfterSave() {
+		$recordSavedChanges("afterSave");
+		return true;
+	}
+
+	public void function $recordSavedChanges(required string phase) {
+		if (!StructKeyExists(request, "$scLog")) {
+			request.$scLog = [];
+		}
+		ArrayAppend(request.$scLog, {
+			phase = arguments.phase,
+			changed = hasSavedChange("name"),
+			from = savedChangeFrom("name"),
+			name = this.name,
+			properties = savedChangedProperties()
+		});
+	}
+
+	// Announces only when this save changed the name AND the committed name is the live one.
+	function announceIfLive() {
+		if (!StructKeyExists(request, "$scAnnounced")) {
+			request.$scAnnounced = 0;
+		}
+		if (hasSavedChange("name") && this.name == "savedch-live") {
+			request.$scAnnounced++;
+		}
+	}
+
+	// An afterSave that saves the object again, once.
+	function saveDescriptionOnce() {
+		if (!Len(this.description ?: "")) {
+			this.description = "savedch-nested";
+			this.save(transaction = "none");
+		}
+		return true;
+	}
+
+	function txnRenameTwice() {
+		request.$scTag.update(name = request.$scNames[1]);
+		request.$scTag.update(name = request.$scNames[2]);
+		return true;
+	}
+
+	function txnRenameThenThrow() {
+		request.$scTag.update(name = request.$scNames[1]);
+		Throw(type = "Wheels.TestSavedChangesBoom", message = "rename then throw");
+	}
+
 }

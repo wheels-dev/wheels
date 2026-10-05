@@ -292,6 +292,41 @@ component extends="Model" {
 - On RustCFML, the raw block can't be detected, so what fires is up to the engine and isn't guaranteed.
 
 Keep writes that have these callbacks out of raw `transaction {}` blocks.
+
+### What a save changed: `savedChanges()`
+
+`hasChanged()`, `changedFrom()`, `changedProperties()` and `allChanges()` describe changes that are *not yet* saved, so a successful save resets them. From Wheels 4.2, four counterparts describe what the last successful save *wrote*:
+
+| Before the save | After the save |
+|---|---|
+| `allChanges()` | `savedChanges()`: `{property: {changedFrom, changedTo}}` |
+| `hasChanged(property)` | `hasSavedChange(property)`; any property when omitted |
+| `changedFrom(property)` | `savedChangeFrom(property)` |
+| `changedProperties()` | `savedChangedProperties()` |
+
+They're set as soon as the row is written, so `afterCreate`, `afterUpdate`, `afterSave`, `afterCommit` and the code after `save()` all see the same thing.
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        afterCommit(methods="announceIfPublished", on="create,update");
+    }
+
+    private void function announceIfPublished() {
+        // Announce a book each time it ends up published, never twice for one publication.
+        if (hasSavedChange("published") && this.published) {
+            enqueueAnnouncement(this.id);
+        }
+    }
+}
+```
+
+- **Each `afterCommit` sees the save that queued it.** When one object is saved twice in a transaction, each of the two `afterCommit` calls reports its own save's changes, while the object's properties hold the committed, final values. A book published and unpublished in one transaction is therefore not announced.
+- **An `afterRollback` sees the save that was rolled back.** Once the rollback is done, `savedChanges()` reports what it did before that save.
+- **On a create**, every property the insert wrote is listed, from an empty value, including the generated key.
+- **A save that changed nothing** reports nothing. **A save that fails** keeps what the previous save reported.
+- **`reload()` and `clearChangeInformation()` clear it.** `save(reload=true)` keeps it.
+- **A save inside one of the object's own callbacks** (say, an `afterSave` that sets a property and calls `save()` again) replaces it with that inner save's changes. Because the outer save hasn't reset its baseline yet when the inner one runs, the inner save's changes include the outer save's too: after `title` is saved and an `afterSave` then sets and saves `slug`, `savedChanges()` lists both `title` and `slug`.
 </Aside>
 
 ## Custom methods
