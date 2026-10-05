@@ -348,6 +348,7 @@ component output="false" displayName="CLI Bridge" {
 		local.rv = {};
 		local.rv.success = true;
 		local.rv.released = local.releaseResult.released;
+		local.rv.heldBy = local.releaseResult.heldBy;
 		local.rv.lock = local.releaseResult.lock;
 		return local.rv;
 	}

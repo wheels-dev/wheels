@@ -328,7 +328,7 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.positional(name = "action", default = "latest", choices = "latest,up,down,info,doctor,forget,pretend,unlock,rename-system-tables,diff", description = "Migration action: latest, up, down, info, doctor, forget, pretend, unlock, rename-system-tables, diff")
 			.positional(name = "version", default = "", description = "Version for forget/pretend")
-			.flag(name = "yes", default = false, description = "Confirm forget/pretend (for unlock, the same as force)")
+			.flag(name = "yes", default = false, description = "Confirm forget/pretend")
 			.flag(name = "force", default = false, description = "unlock: remove the migration lock even when an instance holds it")
 			.flag(name = "dry-run", default = false, description = "Preview rename-system-tables without writing")
 			.positional(name = "model", default = "", description = "Model to diff (diff action; omit for all models)")
@@ -7578,12 +7578,14 @@ component extends="modules.BaseModule" {
 	 * `wheels migrate unlock [--force]` (#4209). Without --force it only reports
 	 * the migration lock: exit 0 when nothing live holds it, a refusal naming
 	 * --force when an instance does, so nobody clears a running migration by
-	 * habit. --force (or --yes) removes the lease row and says what it removed.
+	 * habit. --force removes the lease row and says what it removed. --yes is
+	 * not an alias: an MCP client confirming out of habit (it confirms
+	 * forget/pretend) must not remove a live lock without naming force.
 	 */
 	private string function runMigrationUnlock(required array args) {
 		var force = false;
 		for (var i = 2; i <= arrayLen(arguments.args); i++) {
-			if (listFind("--force,--yes,-y", arguments.args[i])) {
+			if (arguments.args[i] == "--force") {
 				force = true;
 			}
 		}
@@ -7634,10 +7636,14 @@ component extends="modules.BaseModule" {
 			out("No migration lock was held, so there was nothing to remove.", "green");
 			return "";
 		}
-		throw(
-			type = "MigrationError",
-			message = "The migration lock changed hands while it was being removed. Run wheels migrate unlock to see who holds it now."
-		);
+		var heldBy = parsed.heldBy ?: "";
+		if (len(heldBy) && heldBy != parsed.lock.owner) {
+			throw(
+				type = "MigrationError",
+				message = "The migration lock changed hands while it was being removed: owner #heldBy# holds it now, and it was left in place. Run wheels migrate unlock to see who holds it."
+			);
+		}
+		throw(type = "MigrationError", message = "The migration lock held by #$migrationLockDescription(parsed.lock)# was not removed.");
 	}
 
 	/**

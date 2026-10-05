@@ -2,8 +2,9 @@
  * `wheels migrate unlock [--force]` (#4209). Plain `unlock` is read-only: it
  * reads the migrator lock's status over the bridge (GET), exits 0 when nothing
  * live holds it, and refuses non-zero when an instance does, naming
- * `--force`. `--force` (or `--yes`) POSTs migrationUnlock, which removes the
- * lease row, and prints what it removed. The framework half (the status and
+ * `--force`. `--force` POSTs migrationUnlock, which removes the lease row, and
+ * prints what it removed. `--yes` is not an alias, so an MCP client that
+ * confirms out of habit never removes a live lock. The framework half (the status and
  * the delete) is covered by the core suite's MigrationLockSpec.
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
@@ -106,10 +107,25 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(said).toInclude("abc123");
 			});
 
-			it("accepts --yes as --force", () => {
-				var m = unlockModule(liveLock(), {success: true, released: true, lock: liveLock()});
-				m.migrate(arg1 = "unlock", yes = true);
-				expect(m.$count("makeBridgePost")).toBe(1);
+			it("doesn't treat --yes as --force", () => {
+				var m = unlockModule(liveLock());
+				expect(thrownType(() => m.migrate(arg1 = "unlock", yes = true))).toBe("Wheels.MigrationLocked");
+				expect(m.$count("makeBridgePost")).toBe(0);
+			});
+
+			it("fails non-zero, naming the new holder, when the lock changed hands", () => {
+				var m = unlockModule(liveLock(), {success: true, released: false, heldBy: "def456", lock: liveLock()});
+				var state = {type: "", message: ""};
+				try {
+					m.migrate(arg1 = "unlock", force = true);
+				} catch (any e) {
+					state.type = e.type;
+					state.message = e.message;
+				}
+				expect(state.type).toBe("MigrationError");
+				expect(state.message).toInclude("changed hands");
+				expect(state.message).toInclude("def456");
+				expect(printed(m)).notToInclude("Removed the migration lock");
 			});
 
 			it("says so when --force finds nothing to remove", () => {
@@ -137,6 +153,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("is read-only without force: a named action alone never POSTs", () => {
 				var m = unlockModule(liveLock());
 				expect(thrownType(() => m.migrate(action = "unlock"))).toBe("Wheels.MigrationLocked");
+				expect(m.$count("makeBridgePost")).toBe(0);
+			});
+
+			it("doesn't remove the lock for yes=true without force", () => {
+				var m = unlockModule(liveLock());
+				expect(thrownType(() => m.migrate(action = "unlock", yes = true))).toBe("Wheels.MigrationLocked");
 				expect(m.$count("makeBridgePost")).toBe(0);
 			});
 

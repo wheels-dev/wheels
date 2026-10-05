@@ -698,7 +698,9 @@ component output="false" extends="wheels.Global"{
 	 * Removes the migration lock's lease row (#4209), for when the instance holding it is gone.
 	 * Without `force` only an expired lease is removed; with it the row goes whoever holds it, and
 	 * a holder that is still running fails its next renewal with Wheels.MigrationLockLost. Returns
-	 * `released` and `lock`, the migrationLockStatus() from before the removal.
+	 * `lock`, the migrationLockStatus() from before the removal; `heldBy`, the owner holding the lock
+	 * after it ("" when free, another owner when an instance took it meanwhile); and `released`,
+	 * true when the lock is free afterwards.
 	 *
 	 * @force Remove a lease that hasn't expired.
 	 *
@@ -706,7 +708,7 @@ component output="false" extends="wheels.Global"{
 	 * [category: General Functions]
 	 */
 	public struct function releaseMigrationLock(boolean force = false) {
-		local.rv = {"released" = false, "lock" = migrationLockStatus()};
+		local.rv = {"released" = false, "heldBy" = "", "lock" = migrationLockStatus()};
 		if (!local.rv.lock.held) {
 			return local.rv;
 		}
@@ -718,7 +720,10 @@ component output="false" extends="wheels.Global"{
 			local.params.now = $migrationLockMs(GetTickCount());
 		}
 		$migrationLockQuery(sql = local.sql, params = local.params);
-		local.rv["released"] = $migrationLockOwner() != local.rv.lock.owner;
+		// Read back, not compared with the old owner: an instance that took the lease between the
+		// read and the DELETE keeps it, and that is not a release.
+		local.rv["heldBy"] = $migrationLockOwner();
+		local.rv["released"] = !Len(local.rv.heldBy);
 		return local.rv;
 	}
 

@@ -97,13 +97,14 @@ component extends="wheels.WheelsTest" {
 				var seen = {force = ""};
 				var release = function(boolean force = false) {
 					seen.force = arguments.force;
-					return {released = true, lock = {held = true, expired = false, owner = "abc", host = "web-1", heldForSeconds = 5, expiresInSeconds = 3595}};
+					return {released = true, heldBy = "", lock = {held = true, expired = false, owner = "abc", host = "web-1", heldForSeconds = 5, expiresInSeconds = 3595}};
 				};
 				var fakeMigrator = {releaseMigrationLock = release};
 				var rv = bridge.dispatch(command = "migrationUnlock", context = {migrator = fakeMigrator}, params = {force = "true"});
 				expect(seen.force).toBeTrue();
 				expect(rv.success).toBeTrue();
 				expect(rv.released).toBeTrue();
+				expect(rv.heldBy).toBe("");
 				expect(rv.lock.owner).toBe("abc");
 			});
 
@@ -111,7 +112,7 @@ component extends="wheels.WheelsTest" {
 				var seen = {force = ""};
 				var release = function(boolean force = false) {
 					seen.force = arguments.force;
-					return {released = false, lock = {held = false, expired = false, owner = "", host = "", heldForSeconds = 0, expiresInSeconds = 0}};
+					return {released = false, heldBy = "", lock = {held = false, expired = false, owner = "", host = "", heldForSeconds = 0, expiresInSeconds = 0}};
 				};
 				var fakeMigrator = {releaseMigrationLock = release};
 				bridge.dispatch(command = "migrationUnlock", context = {migrator = fakeMigrator}, params = {force = "nonsense"});

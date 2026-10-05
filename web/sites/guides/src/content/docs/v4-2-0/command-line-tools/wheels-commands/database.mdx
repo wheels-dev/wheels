@@ -72,10 +72,10 @@ Shows who holds the migration lock: the host, its owner id, how long it has held
 
 ```bash
 wheels migrate unlock           # who holds the lock; changes nothing
-wheels migrate unlock --force   # remove it (--yes works too)
+wheels migrate unlock --force   # remove it
 ```
 
-`--force` removes the lock whoever holds it and prints what it removed. Use it only when that instance is gone: a holder that is still running fails its next migration step with `Wheels.MigrationLockLost`. Through MCP, the `migrate` tool's `unlock` action only reports unless `force` is true.
+`--force` removes the lock whoever holds it and prints what it removed. Use it only when that instance is gone: a holder that is still running fails its next migration step with `Wheels.MigrationLockLost`. `--yes` doesn't remove it: only `--force` does, on the command line and through MCP, where the `migrate` tool's `unlock` action only reports unless `force` is true.
 
 ##### `rename-system-tables`
 

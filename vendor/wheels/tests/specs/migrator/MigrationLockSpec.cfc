@@ -379,6 +379,7 @@ component extends="wheels.WheelsTest" {
 				holdAsAnotherInstance(60000);
 				var result = variables.migrator.releaseMigrationLock();
 				expect(result.released).toBeFalse();
+				expect(result.heldBy).toBe("spec-other-instance");
 				expect(result.lock.owner).toBe("spec-other-instance");
 				expect(rawQuery("SELECT lockowner FROM #lockTable()#").lockowner).toBe("spec-other-instance");
 			});
@@ -394,9 +395,26 @@ component extends="wheels.WheelsTest" {
 				holdAsAnotherInstance(60000);
 				var result = variables.migrator.releaseMigrationLock(force = true);
 				expect(result.released).toBeTrue();
+				expect(result.heldBy).toBe("");
 				expect(result.lock.owner).toBe("spec-other-instance");
 				expect(result.lock.host).toBe("spec-host");
 				expect(lockRows()).toBe(0);
+			});
+
+			// Another instance takes the lease between the read and the DELETE: the DELETE is keyed
+			// on the owner read, so nothing of the new holder's is removed, and that isn't a release.
+			it("doesn't report a release when the lock changed hands before the delete", () => {
+				holdAsAnotherInstance(-5000);
+				var m = CreateObject("component", "wheels.Migrator").init(
+					migratePath = "/wheels/tests/_assets/migrator/migrations_4134/",
+					sqlPath = "/wheels/tests/_assets/migrator/sql_4134/"
+				);
+				prepareMock(m);
+				m.$("$migrationLockOwner", "spec-new-holder");
+				var result = m.releaseMigrationLock(force = true);
+				expect(result.released).toBeFalse();
+				expect(result.lock.owner).toBe("spec-other-instance");
+				expect(result.heldBy).toBe("spec-new-holder");
 			});
 
 			it("succeeds with force when nothing holds the lock", () => {
