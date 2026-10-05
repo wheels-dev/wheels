@@ -27,15 +27,15 @@ publish(channel="user.#user.id#", event="notification", data=SerializeJSON({text
 
 // Subscribe action: streams the channel and blocks this request until timeout (default 300s) or disconnect.
 function stream() {
-    subscribeToChannel(channel="user.#session.userId#", events="notification,alert", lastEventId=params.lastEventId ?: "");
+    subscribeToChannel(channel="user.#session.userId#", events="notification,alert");
 }
 
 // View: an EventSource for the action; each message is dispatched on document as a "wheels:sse" CustomEvent.
 #channelSSETag(channel="user.#session.userId#", route="notificationStream")#
 ```
 
-- `subscribeToChannel(channel, events, lastEventId, adapter, pollInterval=2, timeout=300, heartbeatInterval=15)`. `events` is an exact, case-sensitive list: write `"a,b"`, not `"a, b"`. There are no wildcard channels; one connection subscribes to one channel.
-- Resume: it reads the `Last-Event-ID` header itself. The `wheels-sse` JS client sends `lastEventId` as a URL parameter instead, so pass `lastEventId=params.lastEventId ?: ""` as above.
+- `subscribeToChannel(channel, events, lastEventId, adapter, pollInterval=2, timeout=300, heartbeatInterval=15)`. `events` limits delivery to those event names. There are no wildcard channels; one connection subscribes to one channel.
+- Resume: a reconnecting browser sends its last event ID and the subscriber continues after it.
 - Adapters: `set(channelAdapter="memory")` (default) or `"database"`, or `adapter=` per call. Memory lives in one application instance (no cross-server delivery, lost on restart) and keeps the last 100 events per channel for resume. Database stores events in `wheels_events` (created on first use, no migration), works across servers, delivers within `pollInterval` seconds, and deletes events older than 60 minutes as you publish. A new database subscriber without a `lastEventId` first receives the last 5 minutes of events.
 - Errors: an empty channel name throws `Wheels.Channel.InvalidName`; a failed database publish throws `Wheels.Channel.PublishFailed`; `channelSSETag()` without `route` or `controller` throws `Wheels.Channel.MissingEndpoint`.
 

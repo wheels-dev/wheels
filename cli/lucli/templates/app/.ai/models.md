@@ -126,8 +126,6 @@ On `hasOne`, `delete` and `deleteAll` both load the child and call `delete()`; `
 
 Order inside the parent's `delete()` transaction: the parent's `beforeDelete`, then the dependents, then the parent row, then `afterDelete`. If `beforeDelete` returns `false` nothing is deleted; if the parent delete fails, the children's changes roll back with it. `deleteAll()` on the parent without `instantiate=true` runs no callbacks and no `dependent=`.
 
-Soft and permanent: dependents run for a soft delete too. Children with a `deletedAt` column are soft-deleted; children without one are deleted permanently; `remove` / `removeAll` clear the foreign key either way. `softDelete=false` on the parent is passed to `delete` / `deleteAll` dependents.
-
 ## Bulk writes: `insertAll` / `upsertAll`
 
 ```cfm
@@ -151,7 +149,7 @@ result = model("Product").upsertAll(records=rows, uniqueBy="sku");              
 ## `order=`
 
 - Property names are quoted for you, so a property named after a reserved word (`order="rank DESC"`) is safe. `ASC` / `DESC` may be any case.
-- `order="table.column"` is passed through as written (not quoted).
+- `order="comments.createdAt"` (table.column) orders by a column of an included association.
 - Raw expressions (anything with parentheses) throw `Wheels.InvalidOrderClause`: define a calculated property and order by its name instead.
   ```cfm
   property(name="lastActivity", sql="COALESCE(updatedAt, createdAt)");

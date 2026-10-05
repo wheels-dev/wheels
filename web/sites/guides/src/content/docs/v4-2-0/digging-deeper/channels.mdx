@@ -197,7 +197,7 @@ Call from a controller action to open a long-lived SSE connection streaming a ch
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `channel` | string | required | Channel to subscribe to |
-| `events` | string | `""` | Comma-delimited event types to deliver; empty delivers all. Names match exactly and case-sensitively, so don't put spaces after the commas |
+| `events` | string | `""` | Comma-delimited event types to deliver; empty delivers all |
 | `lastEventId` | string | `""` | Resume after this event ID; auto-detected from the `Last-Event-ID` header when empty |
 | `adapter` | string | `""` | Per-call adapter override |
 | `pollInterval` | numeric | `2` | Seconds between table polls (database adapter only) |
@@ -256,7 +256,7 @@ sse.close();
 const orders = WheelsSSE.subscribe('/orders/stream', {channel: 'orders'});
 ```
 
-`channel`, `events`, and `lastEventId` are appended to the URL as query parameters. `subscribeToChannel()` reads only the `Last-Event-ID` header by itself, so an action behind `WheelsSSE` should pass `lastEventId = params.lastEventId ?: ""` to resume after a reconnect. Event data is `JSON.parse`d when possible; otherwise handlers receive the raw string.
+`channel`, `events`, and `lastEventId` are appended to the URL as query parameters. Event data is `JSON.parse`d when possible; otherwise handlers receive the raw string.
 
 ### Constructor options
 
