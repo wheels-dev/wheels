@@ -113,7 +113,7 @@ component extends="wheels.WheelsTest" {
 		describe("Job Configuration Override", function() {
 
 			it("subclass can override default configuration", function() {
-				local.job = new app.jobs.ProcessOrdersJob();
+				local.job = new wheels.tests._assets.jobs.ProcessOrdersJob();
 				expect(local.job.queue).toBe("default");
 				expect(local.job.maxRetries).toBe(3);
 			});
@@ -208,7 +208,7 @@ component extends="wheels.WheelsTest" {
 
 			it("does not execute a job already claimed by another worker", function() {
 				// Enqueue using a concrete subclass so jobClass resolves correctly
-				local.testJob = new app.jobs.ProcessOrdersJob();
+				local.testJob = new wheels.tests._assets.jobs.ProcessOrdersJob();
 				local.enqueued = local.testJob.enqueue(data = {}, queue = "test_claim_guard");
 				expect(local.enqueued).toHaveKey("persisted");
 				expect(local.enqueued.persisted).toBeTrue();
@@ -223,7 +223,7 @@ component extends="wheels.WheelsTest" {
 				// Build the job row as processQueue's SELECT would have seen it pre-claim
 				local.jobRow = {
 					id = local.enqueued.id,
-					jobClass = "app.jobs.ProcessOrdersJob",
+					jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
 					queue = "test_claim_guard",
 					data = "{}",
 					attempts = 0,
@@ -283,18 +283,18 @@ component extends="wheels.WheelsTest" {
 		describe("Example Job (ProcessOrdersJob)", function() {
 
 			it("can be instantiated", function() {
-				local.job = new app.jobs.ProcessOrdersJob();
+				local.job = new wheels.tests._assets.jobs.ProcessOrdersJob();
 				expect(local.job).toBeInstanceOf("wheels.Job");
 			});
 
 			it("has a perform method", function() {
-				local.job = new app.jobs.ProcessOrdersJob();
+				local.job = new wheels.tests._assets.jobs.ProcessOrdersJob();
 				expect(local.job).toHaveKey("perform");
 			});
 
 			it("perform executes without error", function() {
 				var performed = {ok = true, error = ""};
-				local.job = new app.jobs.ProcessOrdersJob();
+				local.job = new wheels.tests._assets.jobs.ProcessOrdersJob();
 				try {
 					local.job.perform(data = {batchSize: 5});
 				} catch (any e) {
@@ -306,7 +306,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("can be enqueued", function() {
-				local.job = new app.jobs.ProcessOrdersJob();
+				local.job = new wheels.tests._assets.jobs.ProcessOrdersJob();
 				local.result = local.job.enqueue(data = {batchSize: 10});
 				expect(local.result).toBeStruct();
 				expect(local.result).toHaveKey("id");

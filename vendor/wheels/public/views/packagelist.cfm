@@ -162,9 +162,8 @@ for (local.key in packageMeta) {
 							<cfelse>
 								<!--- rp.name is registry-schema-constrained to ^[a-z0-9][a-z0-9-]*$, so both id and JS string are already safe.
 								      JSStringFormat() is applied in the onclick defensively in case that invariant ever loosens.
-								      `add` (not `install`) is the canonical verb — LuCLI's built-in extension
-								      installer intercepts the literal subcommand `install`, so `wheels packages
-								      install <name>` never reaches Module.cfc. See PR #2374 / cli/lucli/services/packages/PackagesMainCli.cfc. --->
+								      `add` is the canonical verb and works on every 4.x CLI; `install` is an alias of it
+								      in Wheels 4.2 (#4206). See cli/lucli/services/packages/PackagesMainCli.cfc. --->
 								<code id="install-#EncodeForHTML(local.rpKey)#">wheels packages add #EncodeForHTML(local.rp.name)#</code>
 								<button type="button"
 									class="ui tiny button"

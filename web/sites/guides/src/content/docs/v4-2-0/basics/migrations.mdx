@@ -73,7 +73,12 @@ The CLI is a convenience, not a requirement — CommandBox teams and manual inst
 
 - **Browser GUI** — `/wheels/migrator` shows applied and pending migrations with run/rollback controls. Like all `/wheels/*` surfaces it's **development-only** (hard allowlist since 4.0.4, [#2903](https://github.com/wheels-dev/wheels/pull/2903)).
 - **Programmatic** — `application.wheels.migrator.migrateToLatest()` and `.migrateTo(version)` run the same runner from any server-side code path in **any environment**: a deploy hook, a protected admin action, a one-off script. `application.wheels.migrator.getCurrentMigrationVersion()` reads the current state.
-- **At startup** — `set(autoMigrateDatabase=true)` in `config/settings.cfm` applies pending migrations when the application starts. Handy for single-node setups where "deploy then migrate" ordering is a chore; think twice on multi-node deployments (every node races to migrate on boot).
+- **At startup** — two settings in `config/settings.cfm` (or an environment's `settings.cfm`) migrate to the latest version when the application starts:
+  - `set(autoMigrateDatabase=true)` is lenient: a migration that fails is logged and the application starts anyway.
+  - `set(migrateOnBoot=true)` (4.2.0) is strict: if a migration is still pending after the attempt, the application doesn't start. It throws `Wheels.BootMigrationFailed` and writes the reason to the `wheels` log, so a health check fails instead of the app serving an old schema.
+  - A boolean `WHEELS_MIGRATE_ON_BOOT` environment variable overrides both: `true` migrates strictly, `false` never migrates at start. Without it, the two settings behave as above.
+
+  Either setting is fine for a single app host. With several hosts sharing one database, every host would migrate at start at the same time: with `wheels deploy`, use its [`migrate:` step](/v4-2-0/deployment/config-reference/#migrate), which migrates on one host only.
 - **Writing the files** — a migration is a plain CFC in `app/migrator/migrations/` named `YYYYMMDDHHMMSS_description.cfc` with `up()`/`down()` methods; the generator below just saves you the boilerplate. Copy an existing file as your starting point.
 
 The full no-CLI task map lives at [Working Without the CLI](/v4-2-0/start-here/working-without-the-cli/).

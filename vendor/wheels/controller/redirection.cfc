@@ -168,6 +168,22 @@ component {
 	}
 
 	/**
+	 * Returns `true` when `redirectUrl` stays on this site: a relative URL, or an absolute or
+	 * protocol-relative URL whose host is the current server. This is the same rule
+	 * `redirectTo(url=...)` applies before it redirects, so use it to check a return-to URL
+	 * (for example `params.return_to`) before storing it or building a link from it.
+	 *
+	 * [section: Controller]
+	 * [category: Miscellaneous Functions]
+	 *
+	 * @redirectUrl The URL to check.
+	 * @serverName The host to compare against. Defaults to the current request's server name.
+	 */
+	public boolean function isSafeRedirectUrl(required string redirectUrl, string serverName = request.cgi.server_name) {
+		return $isSafeRedirectUrl(url = arguments.redirectUrl, serverName = arguments.serverName);
+	}
+
+	/**
 	 * Validates that a URL is safe for redirection (relative or same-domain).
 	 * Prevents open redirect attacks by extracting the hostname from absolute URLs
 	 * and comparing it exactly to the current server name.

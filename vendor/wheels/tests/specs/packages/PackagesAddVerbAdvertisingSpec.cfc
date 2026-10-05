@@ -1,7 +1,9 @@
 /**
  * User-facing surfaces must advertise `wheels packages add`, not
- * `wheels packages install`. LuCLI intercepts the literal `install`
- * subcommand before Module.cfc runs (#2610, #2706, #3378).
+ * `wheels packages install`. Older LuCLI runtimes intercept the literal
+ * `install` subcommand before Module.cfc runs (#2610, #2706, #3378); the
+ * current one passes it through as an alias (#4206), but `add` works on
+ * every CLI version.
  *
  * Mentions of `install` that explicitly say it is not the verb are fine;
  * copy-to-clipboard snippets and recommended commands are not.
@@ -29,6 +31,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("the packages website copy snippets use `add`, not `install`", () => {
+				$requireRepoPath("web/sites/packages/src/pages/index.astro");
 				var files = [
 					ctx.repoRoot & "/web/sites/packages/src/pages/index.astro",
 					ctx.repoRoot & "/web/sites/packages/src/pages/[name].astro",
@@ -51,6 +54,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("the packages website index recommends `wheels packages add`", () => {
+				$requireRepoPath("web/sites/packages/src/pages/index.astro");
 				var path = ctx.repoRoot & "/web/sites/packages/src/pages/index.astro";
 				var source = fileRead(path);
 				expect(source contains "wheels packages add &lt;name&gt;").toBeTrue(

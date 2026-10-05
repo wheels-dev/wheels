@@ -41,6 +41,7 @@ component extends="Base" {
 				local.options[local.argumentName] = this[local.argumentName];
 			}
 		}
+		this.adapter.$assertColumnTypeSupported(this.type);
 		local.sql = this.adapter.typeToSQL(type = this.type, options = local.options);
 		return local.sql;
 	}

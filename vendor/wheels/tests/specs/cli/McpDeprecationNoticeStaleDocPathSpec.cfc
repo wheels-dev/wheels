@@ -34,6 +34,10 @@ component extends="wheels.WheelsTest" {
 				// current value, not the final iteration's value.
 				(function(relPath) {
 					it("references " & canonical & " in " & relPath, () => {
+						// Framework files ship in every app; the CLI source only in the repo.
+						if (Left(relPath, 7) != "vendor/") {
+							$requireRepoPath(relPath);
+						}
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 

@@ -126,7 +126,11 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		// The numeric IN-list branch is a single character class, not a repeated
 		// group: the regex engine recursed once per repeated group, so a list of
 		// a few thousand integers overflowed the stack (#3907).
-		variables.wheels.class.RESQLWhere = "\s*(#variables.wheels.class.RESQLOperators#)\s*(\('.+?'\)|\(([0-9\.,+-]+)\)|'.+?'()|''|((?:\+|-)?[0-9\.]+)()|NULL|[Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])((\s*$|\s*\)|\s+(AND|OR)))";
+		// A quoted value is one masked literal ($maskWhereLiterals leaves no quote inside
+		// it), so it can't run on past its closing quote into the next literal. The value
+		// ends at the end of the clause, a closing parenthesis, AND/OR in any case, or a
+		// LIKE ... ESCAPE clause, which stays in the SQL after the bound value.
+		variables.wheels.class.RESQLWhere = "\s*(#variables.wheels.class.RESQLOperators#)\s*(\('.+?'\)|\(([0-9\.,+-]+)\)|'[^']+'()|''|((?:\+|-)?[0-9\.]+)()|NULL|[Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])((\s*$|\s*\)|\s+([Aa][Nn][Dd]|[Oo][Rr])(?![A-Za-z0-9_$])|\s+[Ee][Ss][Cc][Aa][Pp][Ee](?![A-Za-z0-9_$])))";
 		variables.wheels.class.mapping = {};
 		variables.wheels.class.properties = {};
 		variables.wheels.class.accessibleProperties = {};

@@ -42,6 +42,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		f.sourceDir = f.root & "/bundled/vendor/wheels";
 		f.vendorParent = f.root & "/app/vendor";
 		f.vendorDir = f.vendorParent & "/wheels";
+		f.backupsDir = f.root & "/app/.wheels/backups";
 		directoryCreate(f.sourceDir, true, true);
 		directoryCreate(f.vendorParent, true, true);
 		directoryCreate(f.vendorDir, true, true);
@@ -197,17 +198,94 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			afterEach(() => $cleanupTempDirs());
 
-			it("returns <vendorDir>.bak-<timestamp> and never an existing path", () => {
+			it("returns <project>/.wheels/backups/wheels.bak-<timestamp>, outside vendor/, never an existing path", () => {
 				var dir = newTempDir("rbp");
-				var vendorDir = dir & "/wheels";
+				var vendorDir = dir & "/vendor/wheels";
 				directoryCreate(vendorDir, true, true);
 				var first = upgrader.reserveBackupPath(vendorDir);
-				expect(reFindNoCase("/wheels\.bak-\d{8}-\d{6}", first)).toBeGT(0);
+				expect(first).toBe(dir & "/.wheels/backups/" & listLast(first, "/"));
+				expect(reFindNoCase("^wheels\.bak-\d{8}-\d{6}$", listLast(first, "/"))).toBeGT(0);
+				expect(first).notToInclude("/vendor/");
 				// Occupy the first reservation — the next one must dodge it.
 				directoryCreate(first, true, true);
 				var second = upgrader.reserveBackupPath(vendorDir);
 				expect(second).notToBe(first);
 				expect(directoryExists(second)).toBeFalse();
+			});
+		});
+
+		describe("FrameworkUpgrader box.json wheels-core pin", () => {
+
+			afterEach(() => $cleanupTempDirs());
+
+			it("reads the pin from dependencies or devDependencies", () => {
+				var dir = newTempDir("pin");
+				expect(upgrader.readBoxJsonCorePin(dir & "/box.json").declared).toBeFalse();
+				fileWrite(dir & "/box.json", '{"dependencies":{"wheels-core":"^3.0.1"}}');
+				var pin = upgrader.readBoxJsonCorePin(dir & "/box.json");
+				expect(pin.declared).toBeTrue();
+				expect(pin.value).toBe("^3.0.1");
+				fileWrite(dir & "/box.json", '{"devDependencies":{"wheels-core":"4.1.2"}}');
+				expect(upgrader.readBoxJsonCorePin(dir & "/box.json").value).toBe("4.1.2");
+				fileWrite(dir & "/box.json", '{"installPaths":{"wheels-core":"vendor/wheels/"}}');
+				expect(upgrader.readBoxJsonCorePin(dir & "/box.json").declared).toBeFalse();
+			});
+
+			it("reports a box.json that isn't a JSON object", () => {
+				var dir = newTempDir("pin");
+				fileWrite(dir & "/box.json", '{"dependencies":');
+				expect(upgrader.readBoxJsonCorePin(dir & "/box.json").error).toInclude("not valid JSON");
+				fileWrite(dir & "/box.json", '[1,2]');
+				expect(upgrader.readBoxJsonCorePin(dir & "/box.json").error).toInclude("not valid JSON");
+			});
+
+			it("lists each section's pin with its own value", () => {
+				var dir = newTempDir("pin");
+				fileWrite(dir & "/box.json", '{"dependencies":{"wheels-core":"^3.0.1"},"devDependencies":{"wheels-core":"~3.0.0"}}');
+				var pins = upgrader.readBoxJsonCorePin(dir & "/box.json").pins;
+				expect(arrayLen(pins)).toBe(2);
+				expect(pins[1].section).toBe("dependencies");
+				expect(pins[1].value).toBe("^3.0.1");
+				expect(pins[2].section).toBe("devDependencies");
+				expect(pins[2].value).toBe("~3.0.0");
+			});
+
+			it("doesn't rewrite a range, channel or forgebox spec", () => {
+				for (var spec in ["4.x", ">=4.0.0", "be", "stable", "forgebox:wheels-core@3.0.1", "*", ""]) {
+					expect(upgrader.boxJsonCorePinFor(spec, "4.2.0")).toBe("", "spec: " & spec);
+				}
+			});
+
+			it("rewrites only the named section", () => {
+				var dir = newTempDir("pin");
+				var before = '{"dependencies":{"wheels-core":"^3.0.1"},"devDependencies":{"wheels-core":"~3.0.0"}}';
+				fileWrite(dir & "/box.json", before);
+				expect(upgrader.writeBoxJsonCorePin(dir & "/box.json", "~4.2.0", "devDependencies")).toBe(1);
+				expect(fileRead(dir & "/box.json")).toBe(replace(before, '"~3.0.0"', '"~4.2.0"'));
+			});
+
+			it("keeps a ^ or ~ range for a release and pins a prerelease exactly", () => {
+				expect(upgrader.boxJsonCorePinFor("^3.0.1", "4.2.0")).toBe("^4.2.0");
+				expect(upgrader.boxJsonCorePinFor("~3.0.1", "4.2.0")).toBe("~4.2.0");
+				expect(upgrader.boxJsonCorePinFor("3.0.1", "4.2.0")).toBe("4.2.0");
+				expect(upgrader.boxJsonCorePinFor("^3.0.1", "4.2.0-snapshot.2867")).toBe("4.2.0-snapshot.2867");
+			});
+
+			it("rewrites only the dependency values and leaves the rest of the file as it was", () => {
+				var dir = newTempDir("pin");
+				var before = '{' & chr(10)
+					& '  "name": "app",' & chr(10)
+					& '  "dependencies": { "wheels-core": "^3.0.1", "other": "1.0.0" },' & chr(10)
+					& '  "devDependencies": {"wheels-core" :"3.0.1"},' & chr(10)
+					& '  "installPaths": { "wheels-core": "vendor/wheels/" }' & chr(10)
+					& '}' & chr(10);
+				fileWrite(dir & "/box.json", before);
+				// A version starting with a digit right after the kept prefix
+				// must not be read as a regex group reference.
+				var count = upgrader.writeBoxJsonCorePin(dir & "/box.json", "14.2.0");
+				expect(count).toBe(2);
+				var expected = replace(replace(before, '"wheels-core": "^3.0.1"', '"wheels-core": "14.2.0"'), '"wheels-core" :"3.0.1"', '"wheels-core" :"14.2.0"');
+				expect(fileRead(dir & "/box.json")).toBe(expected);
 			});
 		});
 
@@ -288,10 +366,17 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileRead(f.vendorDir & "/marker.txt")).toBe("new-framework");
 			});
 
-			it("uses a vendor/wheels.bak-<timestamp> naming pattern for the backup", () => {
+			it("parks the backup at .wheels/backups/wheels.bak-<timestamp>, leaving only wheels/ in vendor/", () => {
 				var f = buildFixture();
 				var result = upgrader.applyUpgrade(f.sourceDir, f.vendorDir, true);
-				expect(reFindNoCase("/wheels\.bak-\d{8}-\d{6}", result.backupDir)).toBeGT(0);
+				expect(result.backupDir).toBe(f.backupsDir & "/" & listLast(result.backupDir, "/"));
+				expect(reFindNoCase("^wheels\.bak-\d{8}-\d{6}$", listLast(result.backupDir, "/"))).toBeGT(0);
+				expect(fileRead(result.backupDir & "/marker.txt")).toBe("old-framework");
+				// The framework loads every vendor/ folder as a package, so the
+				// backup must not sit beside vendor/wheels/.
+				expect(directoryList(f.vendorParent, false, "name")).toBe(["wheels"]);
+				// And it ignores itself in git, whatever the app's .gitignore says.
+				expect(fileRead(f.backupsDir & "/.gitignore")).toInclude("*");
 			});
 
 			it("honors a caller-reserved backupPath so pre-swap announcements match reality", () => {
@@ -312,6 +397,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var result = upgrader.applyUpgrade(f.sourceDir, f.vendorDir, false);
 				expect(result.success).toBeTrue();
 				expect(result.backupDir).toBe("");
+				expect(directoryExists(f.backupsDir)).toBeFalse();
 				// No sibling .bak-* directory should exist.
 				var sibs = directoryList(f.vendorParent, false, "name");
 				for (var name in sibs) {
@@ -416,6 +502,57 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(result.error).toInclude("Parent");
 			});
 
+			it("throws RenameFailed naming the --nobackup workaround when the rename is refused", () => {
+				// An unwritable backups directory stands in for a separately
+				// mounted vendor/. POSIX-only, like the CopyFailed spec below.
+				var f = buildFixture();
+				directoryCreate(f.backupsDir, true, true);
+				fileWrite(f.backupsDir & "/.gitignore", "*");
+				var handle = createObject("java", "java.io.File").init(f.backupsDir);
+				if (!handle.setWritable(false, false) || handle.canWrite()) {
+					handle.setWritable(true, false);
+					return;
+				}
+				var state = {type = "", message = ""};
+				try {
+					upgrader.applyUpgrade(f.sourceDir, f.vendorDir, true);
+				} catch (any e) {
+					state.type = e.type;
+					state.message = e.message;
+				}
+				handle.setWritable(true, false);
+
+				expect(state.type).toBe("Wheels.FrameworkUpgrader.RenameFailed");
+				expect(state.message).toInclude("nothing was changed");
+				expect(state.message).toInclude("wheels upgrade apply --nobackup");
+				expect(fileRead(f.vendorDir & "/marker.txt")).toBe("old-framework");
+			});
+
+			it("throws RenameFailed, not a raw error, when the backup directory can't be prepared", () => {
+				// An unwritable backups directory stands in for a separately
+				// mounted vendor/. POSIX-only, like the CopyFailed spec below.
+				var f = buildFixture();
+				directoryCreate(f.backupsDir, true, true);
+				var handle = createObject("java", "java.io.File").init(f.backupsDir);
+				if (!handle.setWritable(false, false) || handle.canWrite()) {
+					handle.setWritable(true, false);
+					return;
+				}
+				var state = {type = "", message = ""};
+				try {
+					upgrader.applyUpgrade(f.sourceDir, f.vendorDir, true);
+				} catch (any e) {
+					state.type = e.type;
+					state.message = e.message;
+				}
+				handle.setWritable(true, false);
+
+				expect(state.type).toBe("Wheels.FrameworkUpgrader.RenameFailed");
+				expect(state.message).toInclude("nothing was changed");
+				expect(state.message).toInclude("wheels upgrade apply --nobackup");
+				expect(fileRead(f.vendorDir & "/marker.txt")).toBe("old-framework");
+			});
+
 			it("throws CopyFailed naming the backup to restore when the copy fails after the rename", () => {
 				// An unreadable file inside the source makes directoryCopy
 				// blow up AFTER the backup rename already ran — the exact
@@ -443,7 +580,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(state.type).toBe("Wheels.FrameworkUpgrader.CopyFailed");
 				// The rename ran before the copy, so the backup exists on
 				// disk and the message must name it (quoted) for the restore.
-				var backups = directoryList(f.vendorParent, false, "name", "wheels.bak-*");
+				var backups = directoryList(f.backupsDir, false, "name", "wheels.bak-*");
 				expect(arrayLen(backups)).toBe(1);
 				expect(state.message).toInclude(backups[1]);
 				expect(state.message).toInclude('"' & f.vendorDir & '"');
