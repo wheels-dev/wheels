@@ -264,6 +264,7 @@ jobs:
       matrix:
         # macos-latest is Apple Silicon (arm64); ubuntu-latest exercises the
         # Linuxbrew path (amd64). Both are documented install targets.
+        # Deliberately *-latest (unlike the pinned jobs): this tests what users get.
         os: [macos-latest, ubuntu-latest]
     env:
       EXPECTED: ${{ needs.resolve.outputs.version }}
@@ -423,6 +424,7 @@ jobs:
       matrix:
         include:
           - arch: amd64
+            # Deliberately ubuntu-latest (unlike the pinned jobs): this tests what users get.
             runner: ubuntu-latest
           - arch: arm64
             runner: ubuntu-24.04-arm
