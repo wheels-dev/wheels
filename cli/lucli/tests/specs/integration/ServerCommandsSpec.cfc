@@ -66,10 +66,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						"#baseUrl#/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.di"
 					);
 					expect(len(response)).toBeGT(0);
+					expect(isJSON(response)).toBeTrue("the test runner returned something other than JSON: #left(response, 200)#");
 
-					if (isJSON(response)) {
-						var data = deserializeJSON(response);
-						expect(structKeyExists(data, "totalPass")).toBeTrue();
+					var data = deserializeJSON(response);
+					for (var key in ["totalPass", "totalFail", "totalError", "bundleStats"]) {
+						expect(structKeyExists(data, key)).toBeTrue("missing key #key#");
 					}
 				});
 
