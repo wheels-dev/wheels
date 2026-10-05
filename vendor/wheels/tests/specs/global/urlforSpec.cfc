@@ -9,6 +9,14 @@ component extends="wheels.WheelsTest" {
 			beforeEach(() => {
 				config = {path = "wheels", fileName = "Mapper", method = "$init"}
 				_params = {controller = "test", action = "index"}
+				// urlForCache is a lazily-created, persistent app-scope memo (see
+				// routing.cfm). Ensure it exists before the full-state snapshot so
+				// $restoreRoutes() preserves the key rather than deleting it when it
+				// happens to be absent — otherwise the issue-2955 tests, which assert
+				// the memo survives across requests, see it removed by the restore.
+				if (!StructKeyExists(application.wheels, "urlForCache")) {
+					application.wheels.urlForCache = {}
+				}
 				_routeSnapshot = $snapshotRoutes()
 				_originalUrlRewriting = application.wheels.URLRewriting
 				_originalObfuscateUrls = application.wheels.obfuscateUrls
