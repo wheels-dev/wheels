@@ -16,18 +16,4 @@ component extends="Model" {
 		return true;
 	}
 
-	// Outer unit: one product (and job) kept, then a savepoint unit that rolls back.
-	public boolean function txnKeepThenFailingUnit() {
-		request.tenantJobQueue = "deferred_kept";
-		model("TenantJobProduct").create(name = "kept", transaction = "none");
-		model("TenantJobProduct").invokeWithTransaction(method = "txnFailingUnit", transaction = "savepoint");
-		return true;
-	}
-
-	public boolean function txnFailingUnit() {
-		request.tenantJobQueue = "deferred_unit";
-		model("TenantJobProduct").create(name = "unit", transaction = "none");
-		return false;
-	}
-
 }

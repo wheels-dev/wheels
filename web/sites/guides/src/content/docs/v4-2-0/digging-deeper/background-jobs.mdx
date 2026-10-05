@@ -125,6 +125,7 @@ Under `wheels.middleware.TenantResolver`, the tenant's work runs on the tenant d
 
 - `enqueue()` returns `{status: "deferred", deferred: true, persisted: false}`, with the job's `id`.
 - The job still runs against the tenant's datasource.
+- The same applies to a model with its own `dataSource()` that isn't the application's.
 - A raw `transaction {}` block isn't tracked by Wheels. Under a tenant datasource, enqueue after the block ends, or do the work through a model save or `invokeWithTransaction()`.
 
 When a job can't be written, the enqueue methods throw `Wheels.Job.EnqueueFailed`. If an enqueue is best-effort, catch that type.
