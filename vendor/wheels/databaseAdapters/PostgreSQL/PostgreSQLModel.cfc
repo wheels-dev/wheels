@@ -1,5 +1,14 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
+	/**
+	 * Internal function. PostgreSQL (and CockroachDB, which extends this adapter) take a
+	 * high-precision decimal exactly as cf_sql_other, which the driver passes untyped for the
+	 * server to parse; a varchar bind is rejected against a numeric column (#4172).
+	 */
+	public string function $wideDecimalBindType() {
+		return "cf_sql_other";
+	}
+
 	variables.postgresTypeMap = {
 		"bigint": "cf_sql_bigint",
 		"int8": "cf_sql_bigint",
