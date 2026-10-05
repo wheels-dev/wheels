@@ -21,6 +21,11 @@
 		}
 		application.$wheels.cacheActionIndex = {};
 
+		// Apply a per-class cached result when mixing the controller and view methods into
+		// each controller instance (#4149). Off in development, where controller methods
+		// are edited without a reload.
+		application.$wheels.cacheControllerIntegration = application.$wheels.environment != "development";
+
 		// Other caching settings.
 		application.$wheels.maximumItemsToCache = 5000;
 		application.$wheels.cacheCullPercentage = 10;

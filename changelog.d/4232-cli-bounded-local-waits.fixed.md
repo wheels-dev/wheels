@@ -1,0 +1,1 @@
+- `wheels docs fetch` gives the bundle's checksum download 30 s instead of 300 s (the bundle keeps 300 s), and the CLI's server-detection commands (`lsof`, `netstat`) are stopped after 15 s instead of waiting indefinitely (#4232)

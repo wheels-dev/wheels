@@ -127,10 +127,11 @@ The package ships its CSS+JS bundle at `vendor/wheels-basecoat/assets/basecoat/`
 1. Copy the bundled assets into `public/`:
 
    ```bash title="your shell"
+   mkdir -p public/assets
    cp -r vendor/wheels-basecoat/assets/basecoat public/assets/basecoat
    ```
 
-   This is a one-shot operation. If you upgrade the package later (`wheels packages update wheels-basecoat`), re-run the copy to refresh the bundled CSS+JS.
+   A new app has no `public/assets/` yet, hence the `mkdir`. This is a one-shot operation. If you upgrade the package later (`wheels packages update wheels-basecoat`), re-run the copy to refresh the bundled CSS+JS.
 
 2. Confirm the copy:
 
@@ -336,7 +337,7 @@ The package ships a full component gallery under `vendor/wheels-basecoat/example
    xcopy /E /I vendor\wheels-basecoat\examples\showcase\views\showcase app\views\showcase
    ```
 
-3. Add a named route in `config/routes.cfm` (before `.wildcard()`):
+3. Add a named route in `config/routes.cfm` (above `.root()`):
 
    ```cfm title="config/routes.cfm"
    .get(name="basecoatShowcase", pattern="/basecoat-showcase", to="showcase##index")

@@ -27,8 +27,10 @@ component extends="wheels.WheelsTest" {
 				_controller = application.wo.controller("verifies", params)
 				_controller.processAction("actionGet", params)
 
+				// A failed verification without a handler/redirect now ends the
+				// request with a 400 (previously it was a silent abort with no render).
 				expect(_controller.$abortIssued()).toBeTrue()
-				expect(_controller.$performedRenderOrRedirect()).toBeFalse()
+				expect(_controller.$statusCode()).toBe(400)
 			})
 
 			it("redirects invalid", () => {
@@ -97,6 +99,48 @@ component extends="wheels.WheelsTest" {
 				_controller.processAction("actionPostWithString", params)
 
 				expect(_controller.$abortIssued()).toBeTrue()
+			})
+
+			it("returns 400 with an empty body for a failed verification without handler or redirect (html)", () => {
+				// A bare abort (no handler, no redirect) previously left a 200 with an
+				// empty text/html body for an unmet precondition. It now ends as a 400.
+				request.cgi.request_method = "post"
+				params = {controller = "verifies", action = "actionGet"}
+				_controller = application.wo.controller("verifies", params)
+				_controller.processAction("actionGet", params)
+
+				expect(_controller.$abortIssued()).toBeTrue()
+				expect(_controller.$statusCode()).toBe(400)
+				expect(_controller.response()).toBe("")
+			})
+
+			it("returns a 400 JSON error body for a json-format failed verification", () => {
+				request.cgi.request_method = "post"
+				params = {controller = "verifies", action = "actionGet", format = "json"}
+				_controller = application.wo.controller("verifies", params)
+				_controller.processAction("actionGet", params)
+
+				expect(_controller.$abortIssued()).toBeTrue()
+				expect(_controller.$statusCode()).toBe(400)
+				expect(IsJSON(_controller.response())).toBeTrue()
+				expect(_controller.response()).toInclude("error")
+			})
+
+			it("leaves the handler branch unchanged (no 400) when a handler is declared", () => {
+				// A declared handler owns the failed-verification response; the 400 path
+				// must not run. Here the handler redirects, so no abort and no 400.
+				request.cgi.request_method = "get"
+				params = {controller = "verifies", action = "actionPostWithHandler"}
+				_controller = application.wo.controller("verifies", params)
+				_controller.processAction("actionPostWithHandler", params)
+
+				// The handler branch never sets the abort flag, so the 400 path is not
+				// taken — the handler owns the response (here, a redirect to login).
+				// (Status code is request-global in the test runner and leaks between
+				// specs, so the abort flag is the reliable discriminator here.)
+				expect(_controller.$abortIssued()).toBeFalse()
+				expect(_controller.$performedRedirect()).toBeTrue()
+				expect(_controller.getRedirect().$args.action).toBe("login")
 			})
 
 			it("throws at declaration time when a types list length does not match its variable list", () => {

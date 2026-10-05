@@ -87,6 +87,29 @@ component extends="wheels.WheelsTest" {
 				expect(model("OraBigId").count(where = "id = 7")).toBe(0);
 			});
 
+			// NUMBER(38) holds values beyond 64 bits. No numeric bind is exact for them, so they bind
+			// as text, which Oracle converts exactly (##4162).
+			it("stores and finds a value beyond 64 bits exactly", () => {
+				if (!variables.isOracle) {
+					skip("Oracle only.");
+				}
+				model("OraBigId").updateAll(where = "id = 7", counter = "123456789012345678901234567890", callbacks = false);
+				var raw = QueryExecute("SELECT TO_CHAR(counter) AS c FROM c_o_r_e_orabigids WHERE id = 7", [], {datasource = variables.ds});
+				expect(raw.c).toBe("123456789012345678901234567890");
+				expect(model("OraBigId").count(where = "counter = 123456789012345678901234567890")).toBe(1);
+				expect(model("OraBigId").count(where = "counter = 123456789012345678901234567891")).toBe(0);
+			});
+
+			it("compares an aggregate against a value beyond 64 bits", () => {
+				if (!variables.isOracle) {
+					skip("Oracle only.");
+				}
+				model("OraBigId").updateAll(where = "id = 7", counter = "123456789012345678901234567890", callbacks = false);
+				var totals = model("OraBigId").findAll(select = "label, counterTotal", group = "label", where = "counterTotal > 123456789012345678901234567889");
+				expect(totals.recordCount).toBe(1);
+				expect(totals.label).toBe("small");
+			});
+
 			// A cf_sql_bigint bind compared with an expression, not a column.
 			it("compares an aggregate against a small value", () => {
 				if (!variables.isOracle) {

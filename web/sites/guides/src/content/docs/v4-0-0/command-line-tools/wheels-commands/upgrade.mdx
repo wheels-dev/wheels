@@ -107,7 +107,7 @@ The checks are hard-coded in the CLI and keyed by the major-version transition:
 
 - Existence of `plugins/` at the project root (deprecated plugin location).
 - `extends="wheels.Test"` or `extends="wheels.Testbox"` (either quote style) anywhere under `tests/`.
-- `application.wirebox` or `wirebox.system.ioc` references under `app/`, `config/`, and the root `Application.cfc` — these must move to `service()` / `application.wheelsdi`, and `new wirebox.system.ioc.Injector(...)` bootstraps to `new wheels.Injector()` (#1888).
+- `application.wirebox` or `wirebox.system.ioc` references under `app/`, `config/`, and the root `Application.cfc` — these must move to `service()` / `application.wheelsdi`, and `new wirebox.system.ioc.Injector(...)` bootstraps to `new wheels.Injector("wheels.Bindings")` (#1888).
 - `renderPage()` / `renderPageToString()` under `app/` — removed in 4.0; replace with `renderView()` / `renderView(returnAs="string")`, or install `wheels-legacy-adapter` for a soft landing.
 - `new wheels.middleware.Cors()` without `allowOrigins` in `config/` — the 4.0 default changed from wildcard to deny-all (#2039).
 - `new wheels.middleware.RateLimiter` in `config/` — prompts the user to verify `trustProxy` and `proxyStrategy`, whose defaults hardened in 4.0 (#2024, #2088).

@@ -10,13 +10,10 @@
  *   update --all --yes
  *   remove <name>
  *
- * `add` (not `install`!) is the install verb because LuCLI's built-in
- * extension installer intercepts the literal subcommand `install`
- * across all modules — same trap that bit `wheels browser install`
- * (renamed to `wheels browser setup` in #2345). User input
- * `wheels packages install <name>` never reaches Module.cfc; LuCLI
- * runs its own dependency installer against `lucee.json` instead and
- * prints "No git or extension dependencies to install".
+ * `add` is the documented install verb; `install` is an alias (see
+ * install() below). Older LuCLI runtimes intercepted the literal
+ * subcommand `install` before Module.cfc dispatched it (#2713); the
+ * runtime the CLI ships on now passes it through (#4206).
  *
  * Outputs plain text suitable for a terminal. Exit-code semantics are
  * the caller's job (Module.cfc throws to signal non-zero on fatal error;
@@ -168,12 +165,8 @@ component {
 		return $doInstall(local.parsed.name, local.parsed.pin, local.force);
 	}
 
-	// `install` is preserved as an alias for any in-process callers
-	// (specs, scripted clients) that haven't migrated to `add`. Note
-	// that the public CLI surface — `wheels packages install <name>` —
-	// never reaches this method because LuCLI's built-in extension
-	// installer intercepts the literal `install` subcommand before
-	// Module.cfc dispatches. See the component header.
+	// `install` is an alias for `add` on every path: the CLI, the MCP
+	// server, specs and scripted clients. See the component header.
 	public string function install(struct opts = {}) {
 		return add(argumentCollection = arguments);
 	}

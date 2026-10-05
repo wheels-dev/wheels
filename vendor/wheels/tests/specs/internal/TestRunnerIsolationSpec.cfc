@@ -107,6 +107,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("demo and wheels-new Application.cfc include testcontext.cfm after config/app.cfm", () => {
+					$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 					// Resolve the demo app via the /config mapping. Do not walk
 					// GetDirectoryFromPath() on an already-directory path —
 					// a trailing slash is a no-op walk on Lucee, which left
@@ -161,34 +162,32 @@ component extends="wheels.WheelsTest" {
 				// App-runner fails closed when the test DB is requested but absent.
 				it("app-runner.cfm fails closed when the requested test database is not registered", () => {
 					var source = FileRead(ExpandPath("/wheels/tests/app-runner.cfm"));
-					// the default (omitted flag) is the test DB: true unless explicit false
-					expect(FindNoCase("local.useTestDB = !(local.testDBValidBool", source) > 0).toBeTrue(
-						"app-runner must default an omitted useTestDB to the test database (false only on explicit valid false)"
+					var helpers = FileRead(ExpandPath("/wheels/global/util.cfm"));
+					// app-runner takes its decision from the shared rule
+					var decidePos = FindNoCase("$testDataSourceDecision(primary = local.originalDataSource, requestUrl = url)", source);
+					expect(decidePos).toBeGT(0, "app-runner must decide with $testDataSourceDecision()");
+					// and refuses (no silent real-DB run) before running anything
+					var window = Mid(source, decidePos, 1500);
+					expect(FindNoCase("local.decision.action == ""refuse""", window) > 0).toBeTrue(
+						"app-runner must refuse when the decision is refuse"
 					);
-					// and there must be an else-branch that refuses (no silent real-DB run)
-					var swapPos = FindNoCase("StructKeyExists(local.registered, local.candidate)", source);
-					expect(swapPos).toBeGT(0);
-					var window = Mid(source, swapPos, 4000);
-					expect(FindNoCase("Test database not available", window) > 0).toBeTrue(
-						"app-runner must refuse when <datasource>_test is absent"
-					);
+					expect(FindNoCase("$testDataSourceRefusal(", window) > 0).toBeTrue();
 					expect(FindNoCase("abort", window) > 0).toBeTrue(
 						"the refusal must abort before running specs against the primary datasource"
 					);
-					// Precedence: an explicit useTestDB=true can never be weakened by the
-					// compatibility setting; only an omitted flag consults it.
-					expect(FindNoCase("testDBExplicitTrue", source) > 0).toBeTrue(
-						"app-runner must distinguish an explicit useTestDB=true from an omitted flag"
+					expect(FindNoCase('"error" = "Test database not available"', helpers) > 0).toBeTrue();
+					// the shared rule: only an explicit, valid useTestDB=false skips the test DB
+					expect(FindNoCase("if (local.validBoolean && !arguments.requestUrl.useTestDB)", helpers) > 0).toBeTrue(
+						"an omitted useTestDB must default to the test database (false only on explicit valid false)"
 					);
-					// Presence must be separate from validity: a present-but-invalid value
-					// is NOT omitted and cannot use the compat fallback.
-					expect(FindNoCase("testDBParamPresent", source) > 0).toBeTrue(
-						"app-runner must track parameter PRESENCE separately from boolean validity"
+					// presence is separate from validity: a present-but-invalid value is not omitted
+					expect(FindNoCase("local.paramPresent = StructKeyExists(arguments.requestUrl, ""useTestDB"")", helpers) > 0).toBeTrue(
+						"the rule must track parameter PRESENCE separately from boolean validity"
 					);
-					expect(FindNoCase("allowTestsAgainstPrimaryDatasource", window) > 0).toBeTrue(
+					expect(FindNoCase("allowTestsAgainstPrimaryDatasource", helpers) > 0).toBeTrue(
 						"the omitted-flag path must consult allowTestsAgainstPrimaryDatasource"
 					);
-					expect(FindNoCase("local.testDBOmitted && local.allowPrimary", window) > 0).toBeTrue(
+					expect(FindNoCase("if (!local.paramPresent && local.allowPrimary)", helpers) > 0).toBeTrue(
 						"run-against-primary must require a TRULY-OMITTED flag AND the opt-out setting"
 					);
 				});

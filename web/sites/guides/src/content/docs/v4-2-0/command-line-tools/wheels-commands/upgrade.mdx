@@ -16,6 +16,17 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 - Confirming an upgrade is "clean" — same major version, no code changes expected — `check`.
 - Pinning the scan to a specific target with `--to=<version>` when you're not chasing the latest release — `check`.
 - Swapping `vendor/wheels/` from the CLI bundle without a manual zip dance — `apply`.
+- Installing `vendor/wheels/` into an app that has **none** (for example one moving off CommandBox) — `wheels framework install` (see the note below).
+
+<Aside type="note" title="Fresh install: wheels framework install">
+`wheels upgrade apply` replaces an *existing* `vendor/wheels/`. For an app that has **no** `vendor/wheels/` yet — e.g. one installed via CommandBox's `box install` and moving onto the `wheels` CLI — run `wheels framework install` instead:
+
+```txt title="
+wheels framework install [--to=<version>]
+```
+
+It writes the CLI's bundled framework into `vendor/wheels/` (creating `vendor/` if needed), pins `box.json`'s `wheels-core` when a `box.json` is present, and **refuses** (pointing you back to `wheels upgrade apply`) if a framework is already installed. `--to=<version>` must match the bundled version — there are no downloads. After it finishes: `wheels start`, then `wheels migrate latest`.
+</Aside>
 
 ### Synopsis
 
@@ -106,9 +117,9 @@ The checks are hard-coded in the CLI and keyed by the major-version transition:
 
 **3.x → 4.x**
 
-- Existence of `plugins/` at the project root (deprecated plugin location).
+- Legacy plugins (deprecated plugin system): a non-empty `plugins/` at the project root, plugin packages in `box.json` (an install path under `plugins/`, or a `cfwheels-*` package with no install path), and code that reads `application.wheels.plugins`. An empty `plugins/` isn't enough to pass: 3.x deletes plugin folders at runtime by default, and `box install` brings them back.
 - `extends="wheels.Test"` or `extends="wheels.Testbox"` (either quote style) anywhere under `tests/`.
-- `application.wirebox` or `wirebox.system.ioc` references under `app/`, `config/`, and the root `Application.cfc` — these must move to `service()` / `application.wheelsdi`, and `new wirebox.system.ioc.Injector(...)` bootstraps to `new wheels.Injector()` (#1888).
+- `application.wirebox` or `wirebox.system.ioc` references under `app/`, `config/`, the root `Application.cfc` and `public/Application.cfc`, skipping third-party packages there (a `box.json` install path, or any folder with its own `box.json`, such as `app/lib/logbox/`) — these must move to `service()` / `application.wheelsdi`, and `new wirebox.system.ioc.Injector(...)` bootstraps to `new wheels.Injector("wheels.Bindings")` (#1888).
 - `renderPage()` / `renderPageToString()` under `app/` — removed in 4.0; replace with `renderView()` / `renderView(returnAs="string")`, or install `wheels-legacy-adapter` for a soft landing.
 - `new wheels.middleware.Cors()` without `allowOrigins` in `config/` — the 4.0 default changed from wildcard to deny-all (#2039).
 - `new wheels.middleware.RateLimiter` in `config/` — prompts the user to verify `trustProxy` and `proxyStrategy`, whose defaults hardened in 4.0 (#2024, #2088).
@@ -120,8 +131,35 @@ The checks are hard-coded in the CLI and keyed by the major-version transition:
 - *(advisory)* `new wheels.middleware.SecurityHeaders` in `config/` — HSTS defaults on in production in 4.0; pass `hsts=false` if your load balancer already sets it (#2081).
 - *(advisory)* `protectsFromForgery` under `app/` — the CSRF cookie now sets `SameSite`; cross-site POSTs from third-party frames will break (#2035).
 
+**4.1 → 4.2** (an app below 4.2.0, a target of 4.2.0 or later)
+
+The report points at the [4.1 → 4.2 guide](/v4-2-0/upgrading/4x-1-to-4x-2/) instead of saying there are no breaking changes. Unmarked items fail the check; each one fails at runtime on 4.2.
+
+- `config/environment.cfm` that selects the environment from something other than `WHEELS_ENV` (for example `set(environment=application.env.environment)`): replacing it with the 4.2 template drops that selection, and a server without `WHEELS_ENV` then starts in `development`.
+- An association `joinType` other than `inner`, `outer`, `left` or `left outer` under `app/models/`: it throws `Wheels.InvalidJoinType` at application start.
+- A `condition` / `unless` under `app/models/` that uses `is`, `and` or `or` with `this.`, or puts `this.` on the right of a comparison: it throws `Wheels.InvalidValidationCondition`.
+- `renderNotFound` in `config/routes.cfm`: an action with that name now gets `Wheels.ActionNotAllowed`.
+- `tinyInt1isBit=false` in `config/`, `lucee.json`, `server.json` or `.env`: existing MySQL `TINYINT(1)` booleans fail validation.
+- *(advisory)* `config/environment.cfm` that hardcodes the environment.
+- *(advisory)* The seven event templates in `app/events/` that aren't wrapped in `cfsilent` or end with a newline.
+- *(advisory)* A `/vendor` line in `.gitignore`.
+- *(advisory)* `returnAs="structs"` under `app/` or `tests/`.
+- *(advisory)* `X-Forwarded-Proto` read under `app/` or `config/` without `set(trustProxyHeaders=true)`.
+- *(advisory)* Any `condition` / `unless` under `app/models/`.
+- *(advisory)* `withAdvisoryLock()` and `LocalDisk` under `app/` (and `config/` for `LocalDisk`).
+
+The database-specific changes (MySQL `BIT(1)` booleans and signed `t.bigInteger()`, Oracle integer precision, SQLite date columns) depend on your schema, not your source, so the report lists them as something to read in the guide.
+
 **Every run (any version)**
 
+- `public/Application.cfc` fixes. For each fix the target release's template carries, the check looks for that fix's code in your copy and names the ones it can't find, with the guide section that documents the edit:
+  - from 4.0.4: the session cookie settings, the DI container guard in `onError`;
+  - from 4.0.6: the isolated test context include;
+  - from 4.1.0: the jBCrypt load path, the reload helper functions;
+  - from 4.1.1: the `.env` boolean parser;
+  - from 4.2.0: the running-app `onError` message, the reload-password header fallback, the subfolder-preserving reload redirect.
+  
+  Routing `onApplicationEnd()` (from 4.0.6) and `onSessionEnd()` (from 4.1.0) through `arguments.applicationScope` fails the check: on Adobe ColdFusion, a shutdown that reads the bare `application` scope can leave the whole site erroring until a restart. The other fixes are advisory.
 - *(advisory)* App template drift (added in 4.1.0, #3379) — `public/Application.cfc` and `public/index.cfm` are compared byte-for-byte against the CLI's bundled app template (the one `wheels new` scaffolds from). A file that differs, or is missing, is reported by name only; no diff is printed. These files are app-owned, so a `vendor/wheels/` swap never updates them, and drift can mean the app is missing framework-side hardening such as the Adobe teardown guards in `onError`/`onSessionEnd`. Customized apps legitimately drift — diff the files yourself and reconcile, keeping your local changes.
 
 Each grep scan covers the file types relevant to that check (`.cfc` and `.cfm` for config and view checks; `Makefile`, `package.json`, `.yml`, `.yaml`, and `.sh` for the `wheels snippets` check) and reports `path:lineNumber` for every hit. Directory checks report only the top-level path when the directory exists and is non-empty.
@@ -135,17 +173,17 @@ The scanner catches the patterns that are most commonly missed during a major up
 `wheels upgrade apply` replaces the app's `vendor/wheels/` with the copy of the framework bundled inside the installed CLI binary. Before any file is touched, the command announces the plan — printing the reserved backup path and the exact one-liner to recover if the swap is interrupted:
 
 ```text title="illustrative — pre-swap announcement"
-Backing up vendor/wheels -> vendor/wheels.bak-20260611-141502
+Backing up vendor/wheels -> .wheels/backups/wheels.bak-20260611-141502/ (outside vendor/, ignored by git)
 If this is interrupted, restore with:
-  rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
+  rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/.wheels/backups/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
 ```
 
 After the swap, it reports the version transition, the backup location, and the recovery one-liner:
 
 ```text title="illustrative — swap summary"
 Framework upgraded: 3.5.1 -> 4.0.2
-Backup:  /path/to/app/vendor/wheels.bak-20260611-141502
-Recover with:  rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
+Backup:  /path/to/app/.wheels/backups/wheels.bak-20260611-141502
+Recover with:  rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/.wheels/backups/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
 ```
 
 If a safety check refuses the swap, the command prints only the refusal and exits non-zero — no backup is made and no restore command is shown, because there is nothing to restore.
@@ -179,7 +217,9 @@ wheels upgrade apply --nobackup
 
 **`check` verb:** Nothing — the scanner is read-only.
 
-**`apply` verb:** `vendor/wheels/` is replaced with the framework bundled in the installed CLI. By default, the old copy is moved to a timestamped `vendor/wheels.bak-*` directory before the swap, so recovery is a single `mv`.
+**`apply` verb:** `vendor/wheels/` is replaced with the framework bundled in the installed CLI. By default, the old copy is moved to a timestamped `.wheels/backups/wheels.bak-*` directory in the project before the swap, so recovery is a single `mv`. The backup sits outside `vendor/` because the framework loads every `vendor/` folder as a package, and `.wheels/backups/` carries its own `.gitignore`, so a backup is never committed. Backups an earlier version left at `vendor/wheels.bak-<timestamp>/` stay in `vendor/` and make the framework log an error on every start; `apply` lists any it finds. Move them to `.wheels/backups/` or delete them.
+
+If the app's `box.json` lists `wheels-core` under `dependencies` or `devDependencies` (a CommandBox-managed app), `apply` also sets that version to the framework it installed, and prints the change. Left at the old version, a later `box install` would copy the old framework back over `vendor/wheels/`. A `^` or `~` range is kept for a release version; a prerelease build is pinned exactly. If `box.json` isn't valid JSON, `apply` refuses before changing anything.
 
 To also update the CLI binary itself:
 - **Homebrew:** `brew upgrade wheels`
@@ -194,7 +234,7 @@ After each CLI upgrade, run `wheels upgrade apply` to update your app's vendored
 **`apply` verb:** The old `vendor/wheels/` is moved to a timestamped backup before the swap. The pre-swap announcement prints the exact recovery command — copy it before the swap completes if you want it on hand:
 
 ```bash title="recovery — from pre-swap announcement"
-rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
+rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/.wheels/backups/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
 ```
 
 If you passed `--nobackup`, recover from git instead:

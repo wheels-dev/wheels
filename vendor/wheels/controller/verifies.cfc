@@ -159,6 +159,11 @@ component {
 					if (!StructIsEmpty(local.redirectArgs)) {
 						redirectTo(argumentCollection = local.redirectArgs);
 					} else {
+						// No handler and no redirect: end the request with a 400 instead
+						// of a silent 200 + empty body — the declared precondition was not
+						// met. (A 405 with an Allow header for a failed HTTP-method
+						// verification is a later refinement.)
+						$renderFailedVerification();
 						variables.$instance.abort = true;
 					}
 				}
@@ -166,6 +171,24 @@ component {
 				// An abort was issued, no need to process further in the chain.
 				break;
 			}
+		}
+	}
+
+	/**
+	 * Render the response for a failed `verifies()` that declared no `handler` and
+	 * no redirect: HTTP 400, with a JSON error object for a JSON-format request and
+	 * an empty body for any other format (like Rails' `head :bad_request`). Before
+	 * this, such a failure set only the abort flag, so the client received a 200
+	 * with an empty `text/html` body for an unmet precondition. Public (`$`-prefixed)
+	 * so it is integrated onto controllers and is unit-testable.
+	 */
+	public void function $renderFailedVerification() {
+		if (CompareNoCase($requestContentType(), "json") == 0) {
+			local.formats = $get("formats");
+			$header(name = "content-type", value = local.formats["json"] & "; charset=utf-8", charset = "utf-8");
+			renderText(text = '{"error":"Verification failed"}', status = 400);
+		} else {
+			renderNothing(status = 400);
 		}
 	}
 

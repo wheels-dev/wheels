@@ -15,7 +15,14 @@ component extends="Base" {
         return this;
     }
 
-    public string function run(required any role, required string version) {
+    /**
+     * @migrateOnBoot "true" for the one container that runs the migrations
+     *                (#4063). Any other container gets "false" whenever
+     *                deploy.yml has a `migrate:` block, so `app boot` and the
+     *                other hosts never migrate at start; without the block the
+     *                variable is not set at all.
+     */
+    public string function run(required any role, required string version, string migrateOnBoot = "") {
         return docker(
             "run",
             "--detach",
@@ -25,9 +32,21 @@ component extends="Base" {
             $labelArgs(arguments.role, arguments.version),
             $volumeArgs(),
             $envArgs(arguments.role),
+            $migrateEnvArgs(arguments.migrateOnBoot),
             shellEscape(variables.config.absoluteImage(arguments.version)),
             arguments.role.cmd()
         );
+    }
+
+    private array function $migrateEnvArgs(required string migrateOnBoot) {
+        var value = arguments.migrateOnBoot;
+        if (!len(value) && variables.config.migrate().enabled()) {
+            value = "false";
+        }
+        if (!len(value)) {
+            return [];
+        }
+        return ["-e", shellEscape("WHEELS_MIGRATE_ON_BOOT=" & value)];
     }
 
     /**

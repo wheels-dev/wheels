@@ -15,6 +15,16 @@ component {
 	variables.oldest = "4.0";
 
 	/**
+	 * The full URL for a page fixed to one guide tree, for a page that exists
+	 * only there: link() clamps to the latest released tree, where such a page
+	 * would 404. Every pinned page is listed, with its reason, in
+	 * vendor/wheels/tests/specs/GuidesLinkSpec.cfc ($pinnedPages()).
+	 */
+	public string function pinned(required string treeSegment, required string path) {
+		return "https://guides.wheels.dev/" & arguments.treeSegment & "/" & arguments.path;
+	}
+
+	/**
 	 * The full URL for a guides path, e.g. link("upgrading/3x-to-4x/").
 	 */
 	public string function link(required string path, string version = "") {

@@ -11,14 +11,66 @@
 # Usage: bash tools/ci/ajp/run.sh [project-name]
 #   AJP_HTTPD_PORT  host port for httpd (default 9590)
 #   AJP_KEEP=1      leave the containers running
+#
+# Lucee's server.json and httpd's httpd.conf are generated here on every run, from
+# tools/docker/lucee7/server.json and the httpd image's own stock config, so a change to
+# either reaches this check without editing tools/ci/ajp/.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 PROJECT="${1:-wheels-ajp}"
 PORT="${AJP_HTTPD_PORT:-9590}"
 OUT="${AJP_RESULT_JSON:-$(mktemp)}"
+# compose.ajp.yml runs the same image the stock config is read from.
+export AJP_HTTPD_IMAGE="${AJP_HTTPD_IMAGE:-httpd:2.4}"
+GEN="$(mktemp -d "${TMPDIR:-/tmp}/wheels-ajp.XXXXXX")"
+export AJP_SERVER_JSON="$GEN/server-ajp.json"
+export AJP_HTTPD_CONF="$GEN/httpd.conf"
 dc() { docker compose -p "$PROJECT" --project-directory "$ROOT" -f "$ROOT/compose.yml" -f "$ROOT/tools/ci/ajp/compose.ajp.yml" "$@"; }
-cleanup() { [ "${AJP_KEEP:-0}" = 1 ] || dc down -v >/dev/null 2>&1; }
+cleanup() {
+  [ "${AJP_KEEP:-0}" = 1 ] || dc down -v >/dev/null 2>&1
+  rm -rf "$GEN"
+}
 trap cleanup EXIT
+
+# Lucee: the image's server.json plus an AJP connector on 8009.
+if ! python3 - "$ROOT/tools/docker/lucee7/server.json" "$AJP_SERVER_JSON" <<'PY'
+import json, sys
+config = json.load(open(sys.argv[1]))
+config.setdefault("web", {})["ajp"] = {"enable": True, "port": "8009"}
+json.dump(config, open(sys.argv[2], "w"), indent="\t")
+PY
+then
+  echo "::error::could not generate server-ajp.json from tools/docker/lucee7/server.json"; exit 1
+fi
+
+# httpd: the image's stock config with mod_proxy and mod_proxy_ajp loaded, forwarding every
+# request to Lucee's AJP connector.
+if ! docker run --rm "$AJP_HTTPD_IMAGE" cat /usr/local/apache2/conf/httpd.conf > "$GEN/httpd.stock.conf"; then
+  echo "::error::could not read the stock httpd.conf from $AJP_HTTPD_IMAGE"; exit 1
+fi
+if ! python3 - "$GEN/httpd.stock.conf" "$AJP_HTTPD_CONF" <<'PY'
+import sys
+conf = open(sys.argv[1]).read()
+for module in ("proxy_module modules/mod_proxy.so", "proxy_ajp_module modules/mod_proxy_ajp.so"):
+    commented = "#LoadModule " + module
+    if conf.count(commented) != 1:
+        sys.exit(f"expected one '{commented}' line in the stock httpd.conf, found {conf.count(commented)}")
+    conf = conf.replace(commented, "LoadModule " + module)
+conf = conf.rstrip("\n") + """
+
+# --- Wheels #4210: an AJP front end for the TestClient regression check -------
+# httpd shares Lucee's network namespace and forwards every request to Lucee's AJP
+# connector, the shape of IIS+BonCode or mod_jk deployments on the app server.
+ProxyPreserveHost On
+ProxyTimeout 900
+ProxyPass / ajp://127.0.0.1:8009/ timeout=900
+ProxyPassReverse / ajp://127.0.0.1:8009/
+"""
+open(sys.argv[2], "w").write(conf)
+PY
+then
+  echo "::error::could not generate httpd.conf from the stock config of $AJP_HTTPD_IMAGE"; exit 1
+fi
 
 if ! up_log=$(dc up -d lucee7 httpd 2>&1); then
   echo "compose up failed:"; echo "$up_log" | tail -5; exit 1

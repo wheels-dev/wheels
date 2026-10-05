@@ -59,6 +59,7 @@ component extends="wheels.WheelsTest" {
 			describe("bot-review.yml", () => {
 
 				it("threads the checked-out SHA into the /review-pr command", () => {
+					$requireRepoPath(".github/workflows/bot-review.yml");
 					expect(fileExists(review)).toBeTrue("Missing file: " & review);
 					var content = fileRead(review);
 					expect(
@@ -74,6 +75,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("never re-derives a SHA via `gh pr view --json headRefOid`", () => {
+					$requireRepoPath(".github/workflows/bot-review.yml");
 					expect(fileExists(review)).toBeTrue("Missing file: " & review);
 					var content = fileRead(review);
 					// The SHA is captured exactly once from the pull_request event
@@ -93,6 +95,7 @@ component extends="wheels.WheelsTest" {
 			describe("bot-review-fork.yml (fork PR review via pull_request_target)", () => {
 
 				it("checks out the BASE branch, never the fork ref (pwn-request hardening)", () => {
+					$requireRepoPath(".github/workflows/bot-review.yml");
 					expect(fileExists(reviewFork)).toBeTrue("Missing file: " & reviewFork);
 					var content = fileRead(reviewFork);
 					// pull_request_target runs in the base-repo context with secrets +
@@ -131,6 +134,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("threads the validated head SHA into the /review-pr command (##2848)", () => {
+					$requireRepoPath(".github/workflows/bot-review.yml");
 					expect(fileExists(reviewFork)).toBeTrue("Missing file: " & reviewFork);
 					var content = fileRead(reviewFork);
 					expect(
@@ -146,6 +150,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("is gated on a fork PR carrying the maintainer-applied bot-review label", () => {
+					$requireRepoPath(".github/workflows/bot-review.yml");
 					expect(fileExists(reviewFork)).toBeTrue("Missing file: " & reviewFork);
 					var content = fileRead(reviewFork);
 					expect(
@@ -175,6 +180,7 @@ component extends="wheels.WheelsTest" {
 				// false-passes because review-pr.md already uses it in an
 				// unrelated `git log origin/develop..<head-sha>` example.
 				it("no longer re-derives the SHA via `gh pr view --json headRefOid` in review-pr.md", () => {
+					$requireRepoPath(".github/workflows/bot-review.yml");
 					expect(fileExists(reviewPrompt)).toBeTrue("Missing file: " & reviewPrompt);
 					var content = fileRead(reviewPrompt);
 					expect(reFindNoCase("headRefOid", content) > 0).toBeFalse(
