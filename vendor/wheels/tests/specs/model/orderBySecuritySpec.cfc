@@ -112,6 +112,14 @@ component extends="wheels.WheelsTest" {
 					expect(author.$orderByClause(order="#posts.tableName()#.title", include="posts")).toBe(expected);
 				})
 
+				it("resolves a mapped property, by property or column name, to its real column", () => {
+					var photo = g.model("photo");
+					// Photo maps the DESCRIPTION1 property to the description column.
+					var expected = "ORDER BY " & photo.$quotedTableColumn(photo.tableName(), "description") & " DESC";
+					expect(photo.$orderByClause(order="#photo.tableName()#.DESCRIPTION1 DESC", include="")).toBe(expected);
+					expect(photo.$orderByClause(order="#photo.tableName()#.description DESC", include="")).toBe(expected);
+				})
+
 				it("leaves a qualifier it can't resolve (an alias) as written", () => {
 					expect(g.model("author").$orderByClause(order="a.id DESC", include="")).toBe("ORDER BY a.id DESC");
 				})
