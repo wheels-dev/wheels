@@ -192,7 +192,21 @@ component extends="wheels.WheelsTest" {
 				}
 				var thrown = errorOf(() => variables.g.model("post").whereIn("createdAt", dates).count());
 				expect(thrown.type).toBe("Wheels.TooManyParameters");
-				expect(thrown.extendedInfo).toInclude("a date or time list");
+				expect(thrown.extendedInfo).toInclude("Any other list (dates, times");
+			});
+
+			it("keeps Wheels.TooManyParameters for a float list past the limit, and says which lists it combines", () => {
+				if (!variables.isSqlServer) {
+					skip("SQL Server's parameter limit.");
+				}
+				var ratings = [];
+				for (var i = 1; i <= 2200; i++) {
+					ArrayAppend(ratings, i + 0.25);
+				}
+				var thrown = errorOf(() => variables.g.model("post").whereIn("averageRating", ratings).count());
+				expect(thrown.type).toBe("Wheels.TooManyParameters");
+				expect(thrown.extendedInfo).toInclude("integers, plain decimals (up to 38 digits), strings or uniqueidentifiers");
+				expect(thrown.extendedInfo).toInclude("float");
 			});
 
 			it("keeps Wheels.TooManyParameters below compatibility level 130", () => {

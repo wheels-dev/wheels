@@ -224,11 +224,11 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Internal function. Wheels.TooManyParameters advice for SQL Server: which long lists run as one
-	 * STRING_SPLIT parameter, and which (dates and times, or a database below level 130) don't.
+	 * STRING_SPLIT parameter, and that every other list (or a database below level 130) doesn't.
 	 */
 	public string function $tooManyParametersAdvice(required numeric limit) {
 		return super.$tooManyParametersAdvice(limit = arguments.limit)
-			& " On SQL Server 2016 and later (database compatibility level 130 or higher), Wheels runs a long integer, decimal, string or uniqueidentifier list as one parameter; a date or time list, or a database below level 130, still needs batching.";
+			& " On SQL Server 2016 and later (database compatibility level 130 or higher), Wheels runs a long list of integers, plain decimals (up to 38 digits), strings or uniqueidentifiers as one parameter. Any other list (dates, times, float, real, bit, text or binary values, or numbers written another way, such as +5, .5 or 1E5), or a database below level 130, still needs batching.";
 	}
 
 	/**
