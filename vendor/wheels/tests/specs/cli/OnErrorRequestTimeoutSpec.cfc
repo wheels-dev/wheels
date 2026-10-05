@@ -27,6 +27,7 @@ component extends="wheels.WheelsTest" {
 			for (var rel in targets) {
 				(function(relPath) {
 					it("in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);

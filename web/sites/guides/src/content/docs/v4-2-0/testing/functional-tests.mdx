@@ -107,16 +107,16 @@ component extends="wheels.WheelsTest" {
     function run() {
         describe("Rate limit on /api", () => {
             it("returns 429 after the window maxes out", () => {
-                var client = $testClient();
+                var testClient = $testClient();
 
                 // bust through the limit
                 for (var i = 1; i <= 61; i++) {
-                    client.get("/api/posts");
-                    if (client.statusCode() == 429) break;
+                    testClient.get("/api/posts");
+                    if (testClient.statusCode() == 429) break;
                 }
 
-                expect(client.statusCode()).toBe(429);
-                client.assertHeader("Retry-After");
+                expect(testClient.statusCode()).toBe(429);
+                testClient.assertHeader("Retry-After");
             });
         });
     }

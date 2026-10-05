@@ -100,7 +100,7 @@ Four files drive your test setup. Knowing what each one does saves a lot of head
 | `tests/_assets/models/` | Test-only models, often using `table()` to map to test tables. Not scaffolded — create it when you need one. |
 | `tests/specs/<category>/` | Where your actual specs live. |
 
-`populate.cfm` typically drops and recreates the test schema — it's idempotent by construction and runs by default on every runner-URL hit (pass `?populate=false` to opt out). This is a deliberate departure from Rails/Laravel-style per-spec rollback: the framework default is `transactionMode = "none"`, so writes persist across specs unless you explicitly wrap them in `transaction { ... transaction action="rollback"; }`. [Fixtures & Test Data](/v4-2-0/testing/fixtures-and-test-data/) walks through the real lifecycle and the per-spec isolation pattern.
+`populate.cfm` typically drops and recreates the test schema — it's idempotent by construction and runs by default on every runner-URL hit (pass `?populate=false` to opt out). This is a deliberate departure from Rails/Laravel-style per-spec rollback: the framework default is `transactionMode = "none"`, so writes persist across specs unless you explicitly wrap them in `transaction { ... transaction action="rollback"; }` (writes the spec makes itself only: a `$testClient()` request commits on its own). [Fixtures & Test Data](/v4-2-0/testing/fixtures-and-test-data/) walks through the real lifecycle and the per-spec isolation pattern.
 
 ## CI integration
 

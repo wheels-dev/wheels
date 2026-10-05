@@ -145,6 +145,20 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// (Cross-Engine Invariant #11): the old local.exception idiom made
 				// a failed migration take the COMMIT branch and get recorded as
 				// applied. Every shipped template must use the struct-field pattern.
+				it("vendor/wheels/migrator/templates show no empty-string default", () => {
+					// The migrator rejects default='' on string, text and char
+					// columns since 4.1.0. These .cfc templates aren't read at
+					// runtime (the Migrator reads app/snippets/dbmigrate/*.txt),
+					// but they ship in every app's vendor/.
+					var offenders = [];
+					for (var path in directoryList(expandPath("/vendor/wheels/migrator/templates"), false, "path", "*.cfc")) {
+						if (reFind("default\s*=\s*(''|"""")", fileRead(path))) {
+							arrayAppend(offenders, listLast(path, "/\"));
+						}
+					}
+					expect(arrayToList(offenders)).toBe("");
+				});
+
 				it("never use local.X-in-catch failure tracking", () => {
 					var templateFiles = [];
 					var templateDirs = [

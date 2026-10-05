@@ -5,6 +5,7 @@ component extends="wheels.WheelsTest" {
 		describe("wheels new --no-sqlite (issue 2621)", function() {
 
 			it("lucee.json template uses a datasourcesBlock placeholder so --no-sqlite can suppress SQLite", function() {
+				$requireRepoPath("cli/lucli/templates/app/lucee.json");
 				var templatePath = expandPath("/cli/lucli/templates/app/lucee.json");
 				expect(fileExists(templatePath)).toBeTrue(
 					"Template missing at " & templatePath
@@ -25,6 +26,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("Module.cfc threads opts.noSQLite into the datasourcesBlock template context", function() {
+				$requireRepoPath("cli/lucli/templates/app/lucee.json");
 				var modulePath = expandPath("/cli/lucli/Module.cfc");
 				expect(fileExists(modulePath)).toBeTrue();
 

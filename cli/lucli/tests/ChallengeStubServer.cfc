@@ -41,7 +41,10 @@ component {
 					sock = attributes.srv.accept();
 					attributes.conns.incrementAndGet();
 					try {
-						sock.setSoTimeout(javacast("int", 3000));
+						// Longer than the CLI's 3 s peer-identity check, which
+						// runs on an open connection before the next request is
+						// written: an equal timeout could close it first (#4232).
+						sock.setSoTimeout(javacast("int", 10000));
 						inStream = sock.getInputStream();
 						outStream = sock.getOutputStream();
 						keepServing = true;

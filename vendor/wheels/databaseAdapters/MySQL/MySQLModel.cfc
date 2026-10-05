@@ -1,5 +1,38 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
+	/**
+	 * Internal function. This database converts a high-precision decimal sent as text exactly,
+	 * in an insert and in a comparison (#4172).
+	 */
+	public string function $wideDecimalBindType() {
+		return "cf_sql_varchar";
+	}
+
+	/**
+	 * Internal function. MySQL compares a multi-element IN list of text values with a DECIMAL
+	 * column as doubles, so a high-precision decimal also binds inside an exact cast (#4172).
+	 */
+	public struct function $wideDecimalCastLimits() {
+		return {precision = 65, scale = 30};
+	}
+
+	/**
+	 * Internal function. Casts high-precision decimal params exactly before running the query.
+	 */
+	public struct function $performQuery(
+		required array sql,
+		required boolean parameterize,
+		numeric limit = 0,
+		numeric offset = 0,
+		string dataSource = variables.dataSource,
+		string $primaryKey = "",
+		string $debugName = "query",
+		boolean $captureResult = true
+	) {
+		$castWideDecimalParams(args = arguments);
+		return super.$performQuery(argumentCollection = arguments);
+	}
+
 	variables.mysqlTypeMap = {
 		"bigint": "cf_sql_bigint",
 		"binary": "cf_sql_binary",
@@ -101,8 +134,16 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * Throws if the lock could not be acquired within the timeout.
 	 */
 	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
+		$acquireAdvisoryLockSession(name = arguments.name, timeout = arguments.timeout);
+	}
+
+	/**
+	 * Internal function. Acquires the lock and returns the holding connection's id, read in the same
+	 * statement so it is the session that took the lock (#4197).
+	 */
+	public string function $acquireAdvisoryLockSession(required string name, numeric timeout = 10) {
 		local.result = queryExecute(
-			"SELECT GET_LOCK(?, ?) AS lockResult",
+			"SELECT GET_LOCK(?, ?) AS lockResult, CONNECTION_ID() AS sessionId",
 			[arguments.name, arguments.timeout],
 			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);
@@ -113,6 +154,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				extendedInfo = "The MySQL GET_LOCK function returned a non-1 result, indicating the lock could not be acquired."
 			);
 		}
+		return local.result.sessionId;
 	}
 
 	/**
@@ -124,6 +166,34 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			[arguments.name],
 			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);
+	}
+
+	/**
+	 * Internal function. RELEASE_LOCK returns 1 only on the session holding the lock (#4197).
+	 */
+	public boolean function $tryReleaseAdvisoryLock(required string name) {
+		local.result = queryExecute(
+			"SELECT RELEASE_LOCK(?) AS released",
+			[arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+		);
+		return IsQuery(local.result) && IsNumeric(local.result.released) && local.result.released == 1;
+	}
+
+	/**
+	 * Internal function. IS_USED_LOCK returns the holding connection's id, or NULL when free; with
+	 * `holder`, only that connection holding it counts (#4197).
+	 */
+	public boolean function $isAdvisoryLockHeld(required string name, string holder = "") {
+		local.result = queryExecute(
+			"SELECT IS_USED_LOCK(?) AS holder",
+			[arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+		);
+		if (!IsQuery(local.result) || !IsNumeric(local.result.holder)) {
+			return false;
+		}
+		return !Len(arguments.holder) || local.result.holder == arguments.holder;
 	}
 
 	/**

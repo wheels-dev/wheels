@@ -17,6 +17,11 @@ component {
         required string missingMethodName,
         required struct missingMethodArguments
     ) {
+        // BrowserTest sets this when the browser could not be started: that, not
+        // the describe() block, is why there is no browser.
+        if (StructKeyExists(this, "$launchError") && Len(this.$launchError)) {
+            throw(type = "Wheels.BrowserLaunchFailed", message = this.$launchError);
+        }
         throw(
             type="Wheels.BrowserTest.NotWired",
             message="this.browser is not wired. BrowserTest specs must use browserDescribe() blocks instead of describe() — the framework only populates this.browser inside browserDescribe() callbacks.",
