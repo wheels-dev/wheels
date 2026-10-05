@@ -37,10 +37,12 @@ expect(model("Post").findAll(reload = true).recordCount).toBe(3);
 - Clear the whole request cache when several later reads must not see anything cached earlier:
 
 ```cfm
-StructDelete(request.wheels, "$queryCache");
+model("Post").forgetCachedQueries();    // just that model's cached finder results
+forgetCachedQueries("Post");            // same, by name, from anywhere
+forgetCachedQueries(all = true);        // every model's cached results this request
 ```
 
-`$queryCache` is a reserved key under `request.wheels`; deleting it drops every model's cached finder results for the current request.
+`forgetCachedQueries()` drops the per-request finder cache (`cacheQueriesDuringRequest`). Called on a model it scopes to that model; from a controller/view/job pass a model name or `all = true` (a bare call outside a model throws rather than silently wiping everything). Prefer it over reaching into the reserved `request.wheels["$queryCache"]` key.
 
 ## Which environment app specs run in
 
