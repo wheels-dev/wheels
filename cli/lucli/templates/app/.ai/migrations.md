@@ -11,6 +11,7 @@ Part of the Wheels application guide; start with `../CLAUDE.md`.
 - `wheels migrate doctor` — single-command health report. Lists orphans + pending; pure read.
 - `wheels migrate forget <version> --yes` — delete a stale tracking row (refuses if a matching local file exists, refuses if version not in table).
 - `wheels migrate pretend <version> --yes` — record a version as applied without running `up()` (refuses if already applied or no matching file).
+- `wheels migrate unlock [--force]` — show who holds the cross-process migration lock (read-only; exits non-zero while a live instance holds it). `--force` removes it once that instance is gone.
 
 Tracking-table schema: `wheels_migrator_versions(version, core_level, name, applied_at)`. The `name` and `applied_at` columns are additive (NULL for legacy rows) and added automatically via `$ensureTrackingColumns()` on first migrator call after upgrade. Both columns are populated by `$setVersionAsMigrated(version, migrationName)` going forward; existing rows stay NULL and display version-only.
 
