@@ -43,7 +43,11 @@ component extends="wheels.WheelsTest" {
 				expect(variables.tc.$pathTriggersTestContext({path_info = "/wheels/core/tests?reload=true"})).toBeTrue();
 			});
 
-			// ── Not bound: the runner path is not what the request targets ──
+			it("matches a runner path whose query string contains // and .. (query is cut before the reject checks)", () => {
+					expect(variables.tc.$pathTriggersTestContext({path_info = "/wheels/core/tests?redirect=http://evil/../x"})).toBeTrue();
+				});
+
+				// ── Not bound: the runner path is not what the request targets ──
 
 			it("does NOT match a runner path embedded later in an application route", () => {
 				expect(variables.tc.$pathTriggersTestContext({path_info = "/files/x/wheels/app/tests"})).toBeFalse();
@@ -63,6 +67,10 @@ component extends="wheels.WheelsTest" {
 
 			it("does NOT match an empty path scope", () => {
 				expect(variables.tc.$pathTriggersTestContext({})).toBeFalse();
+			});
+
+			it("does NOT match a value that starts with a query marker (cut yields an empty path)", () => {
+				expect(variables.tc.$pathTriggersTestContext({path_info = "?/wheels/core/tests"})).toBeFalse();
 			});
 
 		});

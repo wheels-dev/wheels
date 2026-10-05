@@ -66,38 +66,26 @@
 			);
 
 			if (this.wheels.$testContext.envAllows) {
-				// (2) Path trigger — path_info or script_name must EQUAL a runner endpoint or start a
-				// path segment with one (runner path followed by "/"), matching whole path segments so a
-				// runner path merely embedded inside an application route does not bind the test context.
-				// Inline, constructor-safe copy of TestContext.$pathTriggersTestContext() (no vars/loops/
-				// CreateObject here) — keep the two in lockstep. Lengths: "/wheels/core/tests/" = 19,
-				// "/wheels/app/tests/" = 18.
-				this.wheels.$testContext.pInfo = IsDefined("cgi.path_info") ? LCase(Trim(ToString(cgi.path_info))) : "";
-				this.wheels.$testContext.pScript = IsDefined("cgi.script_name") ? LCase(Trim(ToString(cgi.script_name))) : "";
-				if (Find("?", this.wheels.$testContext.pInfo)) {
-					this.wheels.$testContext.pInfo = Left(this.wheels.$testContext.pInfo, Find("?", this.wheels.$testContext.pInfo) - 1);
-				}
-				if (Find("?", this.wheels.$testContext.pScript)) {
-					this.wheels.$testContext.pScript = Left(this.wheels.$testContext.pScript, Find("?", this.wheels.$testContext.pScript) - 1);
-				}
-				if (Find("..", this.wheels.$testContext.pInfo) || Find("//", this.wheels.$testContext.pInfo)) {
-					this.wheels.$testContext.pInfo = "";
-				}
-				if (Find("..", this.wheels.$testContext.pScript) || Find("//", this.wheels.$testContext.pScript)) {
-					this.wheels.$testContext.pScript = "";
-				}
-				if (
-					this.wheels.$testContext.pInfo == "/wheels/core/tests"
-					|| Left(this.wheels.$testContext.pInfo, 19) == "/wheels/core/tests/"
-					|| this.wheels.$testContext.pScript == "/wheels/core/tests"
-					|| Left(this.wheels.$testContext.pScript, 19) == "/wheels/core/tests/"
-					|| this.wheels.$testContext.pInfo == "/wheels/app/tests"
-					|| Left(this.wheels.$testContext.pInfo, 18) == "/wheels/app/tests/"
-					|| this.wheels.$testContext.pScript == "/wheels/app/tests"
-					|| Left(this.wheels.$testContext.pScript, 18) == "/wheels/app/tests/"
-				) {
-					this.wheels.$testContext.match = true;
-				}
+				// (2) Path trigger — path_info or script_name must START with a runner endpoint
+				// (/wheels/core/tests or /wheels/app/tests) at a whole-segment boundary, so a runner
+				// path merely embedded inside an application route does not bind the test context.
+				// For each value: lowercase/trim, then cut the query string off FIRST (so a '//' or
+				// '..' living inside a query cannot reject a legitimate runner URL), reject any
+				// remaining '..' traversal or '//' empty segment, then start-anchored match.
+				// Inline, constructor-safe copy of TestContext.$pathTriggersTestContext() (no vars/
+				// loops/CreateObject here) — keep the two in lockstep.
+				this.wheels.$testContext.pInfo = ReReplace(IsDefined("cgi.path_info") ? LCase(Trim(ToString(cgi.path_info))) : "", "\?.*$", "");
+				this.wheels.$testContext.pScript = ReReplace(IsDefined("cgi.script_name") ? LCase(Trim(ToString(cgi.script_name))) : "", "\?.*$", "");
+				this.wheels.$testContext.match = (
+					(
+						!ReFind("\.\.|//", this.wheels.$testContext.pInfo)
+						&& ReFindNoCase("^/wheels/(core|app)/tests(/|$)", this.wheels.$testContext.pInfo) > 0
+					)
+					|| (
+						!ReFind("\.\.|//", this.wheels.$testContext.pScript)
+						&& ReFindNoCase("^/wheels/(core|app)/tests(/|$)", this.wheels.$testContext.pScript) > 0
+					)
+				);
 
 				// (3) Header / cookie trigger — per-process secret (constant-time)
 				// AND a loopback socket peer. Skipped entirely until a runner has
