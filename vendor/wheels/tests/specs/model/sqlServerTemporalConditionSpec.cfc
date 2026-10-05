@@ -138,6 +138,20 @@ component extends="wheels.WheelsTest" {
 				expect(variables.g.model("temporal").whereIn("sdt", ["2026-01-02 10:00:29.000"]).count()).toBe(truthCount("sdt", "=", "SMALLDATETIME", "2026-01-02 10:00:29.000"));
 			});
 
+			// The value is compared at the column's precision, so <> and NOT IN can now leave out a row
+			// they used to return: .001 rounds to .000 in a DATETIME, as SQL Server does with a literal.
+			it("leaves out with <> and NOT IN a row whose stored value the cast value equals", () => {
+				if (!variables.isSqlServer) {
+					skip("SQL Server's DATETIME columns.");
+				}
+				var v = "2026-01-02 10:00:00.001";
+				var before = truthCount("dt", "<>", "DATETIME2(7)", v);
+				var got = variables.g.model("temporal").count(where = "dt <> '#v#'");
+				expect(got).toBe(truthCount("dt", "<>", "DATETIME", v));
+				expect(got).toBe(before - 1, "the row stored as 10:00:00.000 is left out");
+				expect(variables.g.model("temporal").whereNotIn("dt", [v]).count()).toBe(before - 1);
+			});
+
 			it("keeps ranges on DATETIME exact, as before", () => {
 				if (!variables.isSqlServer) {
 					skip("SQL Server's DATETIME columns.");
