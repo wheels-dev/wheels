@@ -23,18 +23,24 @@ component extends="wheels.WheelsTest" {
 			it("resolves the X-Wheels-Test-Remote-Addr header when the request is isolated", () => {
 				var tc = new wheels.events.TestContext();
 				var cgiScope = {"http_x_wheels_test_remote_addr" = "203.0.113.9"};
-				expect(tc.$testClientRemoteAddr(cgiScope = cgiScope, isolated = true)).toBe("203.0.113.9");
+				expect(tc.$testClientRemoteAddr(cgiScope = cgiScope, isolated = true, remoteAddr = "127.0.0.1")).toBe("203.0.113.9");
 			});
 
 			it("ignores the header when the request is NOT isolated (non-isolated request)", () => {
 				var tc = new wheels.events.TestContext();
 				var cgiScope = {"http_x_wheels_test_remote_addr" = "203.0.113.9"};
-				expect(tc.$testClientRemoteAddr(cgiScope = cgiScope, isolated = false)).toBe("");
+				expect(tc.$testClientRemoteAddr(cgiScope = cgiScope, isolated = false, remoteAddr = "127.0.0.1")).toBe("");
 			});
 
-			it("returns empty when the header is absent, even if isolated", () => {
+			it("ignores the header from a NON-loopback socket peer even when isolated", () => {
 				var tc = new wheels.events.TestContext();
-				expect(tc.$testClientRemoteAddr(cgiScope = {}, isolated = true)).toBe("");
+				var cgiScope = {"http_x_wheels_test_remote_addr" = "203.0.113.9"};
+				expect(tc.$testClientRemoteAddr(cgiScope = cgiScope, isolated = true, remoteAddr = "203.0.113.9")).toBe("");
+			});
+
+			it("returns empty when the header is absent, even if isolated and loopback", () => {
+				var tc = new wheels.events.TestContext();
+				expect(tc.$testClientRemoteAddr(cgiScope = {}, isolated = true, remoteAddr = "127.0.0.1")).toBe("");
 			});
 
 			it("the env gate the isolated bind depends on excludes production", () => {

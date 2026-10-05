@@ -207,15 +207,20 @@ component {
 
 	/**
 	 * F23 — the test-supplied client address (the X-Wheels-Test-Remote-Addr header, as the mapped
-	 * `http_x_wheels_test_remote_addr` CGI key) when the request is bound to the isolated test
-	 * context, or "" otherwise. `isolated` is passed by the caller (Dispatch) from
-	 * currentRequestIsIsolated(), which is true only inside the isolated test application AND when the
-	 * environment is development/testing — so production can never pass this gate, and the header is
-	 * silently ignored outside the isolated test context. The caller sets it on the middleware request
-	 * context's `remoteAddr` field; this never mutates the cgi scope.
+	 * `http_x_wheels_test_remote_addr` CGI key) when the request qualifies, or "" otherwise. Two gates,
+	 * both required:
+	 *   - `isolated`: the caller (Dispatch) passes currentRequestIsIsolated(), true only inside the
+	 *     isolated test application AND when the environment is development/testing (so production can
+	 *     never qualify);
+	 *   - `remoteAddr`: the REAL socket peer (raw cgi.remote_addr, never a forwarded header) must be a
+	 *     loopback address. TestClient always connects over loopback, so legitimate use is unaffected,
+	 *     and an outside (non-loopback) client cannot set the address no matter how its request reached
+	 *     the isolated context.
+	 * The caller sets the result on the middleware request context's `remoteAddr` field; this never
+	 * mutates the cgi scope.
 	 */
-	public string function $testClientRemoteAddr(required struct cgiScope, required boolean isolated) {
-		if (!arguments.isolated) {
+	public string function $testClientRemoteAddr(required struct cgiScope, required boolean isolated, required string remoteAddr) {
+		if (!arguments.isolated || !$isLoopbackPeer(arguments.remoteAddr)) {
 			return "";
 		}
 		var headerKey = "http_x_wheels_test_remote_addr";

@@ -720,9 +720,13 @@ component output="false" extends="wheels.Global"{
 			// development/testing) means it is impossible to honour outside the isolated test app.
 			if (StructKeyExists(local.requestContext.cgi, "http_x_wheels_test_remote_addr")) {
 				local.testContext = new wheels.events.TestContext();
+				// Pass the REAL socket peer (raw cgi.remote_addr, never a forwarded header): the override
+				// is honoured only from a loopback peer, so it cannot be set by an outside client.
+				local.rawPeer = (StructKeyExists(cgi, "remote_addr") ? ToString(cgi.remote_addr) : "");
 				local.testRemoteAddr = local.testContext.$testClientRemoteAddr(
 					cgiScope = local.requestContext.cgi,
-					isolated = local.testContext.currentRequestIsIsolated()
+					isolated = local.testContext.currentRequestIsIsolated(),
+					remoteAddr = local.rawPeer
 				);
 				if (Len(local.testRemoteAddr)) {
 					local.requestContext.remoteAddr = local.testRemoteAddr;
