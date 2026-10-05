@@ -1,0 +1,16 @@
+service: demo
+image: acme/demo
+servers:
+  - 1.2.3.4
+registry:
+  username: demo
+  password:
+    - REGISTRY_PASSWORD
+builder:
+  arch:
+    - amd64
+    - arm64
+  args:
+    RUBY_VERSION: "3.3"
+    APP_ENV: production
+  remote: ssh://deploy@builder.example.com

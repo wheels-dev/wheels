@@ -1,0 +1,1 @@
+- `wheels db status` and `wheels db version --detailed` show when each migration was applied. The migrator stored the time, but the status report always left it blank, so the CLI printed `-` / `applied unknown` (#4407)

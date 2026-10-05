@@ -212,7 +212,7 @@ component extends="wheels.migrator.Base" {
 	}
 
 	/**
-	 * Iterates all models registered in the application, calls diff() on each,
+	 * Iterates every model (see $diffableModelNames()), calls diff() on each,
 	 * and returns combined results. Skips tableless models and models that fail to load.
 	 *
 	 * @options Optional struct: hints (per-model rename hints keyed by model name), heuristicThreshold (0-1, default 0.7).
@@ -237,56 +237,93 @@ component extends="wheels.migrator.Base" {
 			);
 		}
 
-		if (StructKeyExists(application[local.appKey], "models")) {
-			for (local.modelName in application[local.appKey].models) {
-				try {
-					local.modelObj = model(local.modelName);
+		for (local.modelName in $diffableModelNames()) {
+			try {
+				local.modelObj = model(local.modelName);
 
-					local.tName = local.modelObj.tableName();
-					if (IsBoolean(local.tName) && !local.tName) {
-						continue;
-					}
-
-					// Build this model's options: {renames, heuristicThreshold}
-					local.modelOptions = {heuristicThreshold: local.threshold};
-					if (StructKeyExists(arguments.options, "allowColumnRemoval")) {
-						local.modelOptions.allowColumnRemoval = arguments.options.allowColumnRemoval;
-					}
-					if (StructKeyExists(local.perModelHints, local.modelName)
-						&& StructKeyExists(local.perModelHints[local.modelName], "renames")) {
-						local.modelOptions.renames = local.perModelHints[local.modelName].renames;
-					}
-
-					local.diffResult = diff(local.modelName, local.modelOptions);
-
-					if (
-						ArrayLen(local.diffResult.addColumns)
-						|| ArrayLen(local.diffResult.removeColumns)
-						|| ArrayLen(local.diffResult.changeColumns)
-						|| ArrayLen(local.diffResult.renameColumns)
-						|| ArrayLen(local.diffResult.suggestedRenames)
-					) {
-						local.results[local.modelName] = local.diffResult;
-					}
-				} catch (any e) {
-					// Skip models that fail to load (e.g. missing tables) — but
-					// deliberate validation throws (bad rename hints, type-mismatch
-					// hints, out-of-range thresholds) must surface to the caller
-					// instead of silently dropping the model from the results.
-					if (
-						ListFindNoCase(
-							"Wheels.InvalidThreshold,Wheels.InvalidRenameHint,Wheels.DuplicateRenameHint,Wheels.RenameHintTypeMismatch",
-							e.type
-						)
-					) {
-						rethrow;
-					}
+				local.tName = local.modelObj.tableName();
+				if (IsBoolean(local.tName) && !local.tName) {
 					continue;
 				}
+
+				// Build this model's options: {renames, heuristicThreshold}
+				local.modelOptions = {heuristicThreshold: local.threshold};
+				if (StructKeyExists(arguments.options, "allowColumnRemoval")) {
+					local.modelOptions.allowColumnRemoval = arguments.options.allowColumnRemoval;
+				}
+				if (StructKeyExists(local.perModelHints, local.modelName)
+					&& StructKeyExists(local.perModelHints[local.modelName], "renames")) {
+					local.modelOptions.renames = local.perModelHints[local.modelName].renames;
+				}
+
+				local.diffResult = diff(local.modelName, local.modelOptions);
+
+				if (
+					ArrayLen(local.diffResult.addColumns)
+					|| ArrayLen(local.diffResult.removeColumns)
+					|| ArrayLen(local.diffResult.changeColumns)
+					|| ArrayLen(local.diffResult.renameColumns)
+					|| ArrayLen(local.diffResult.suggestedRenames)
+				) {
+					local.results[local.modelName] = local.diffResult;
+				}
+			} catch (any e) {
+				// Skip models that fail to load (e.g. missing tables) — but
+				// deliberate validation throws (bad rename hints, type-mismatch
+				// hints, out-of-range thresholds) must surface to the caller
+				// instead of silently dropping the model from the results.
+				if (
+					ListFindNoCase(
+						"Wheels.InvalidThreshold,Wheels.InvalidRenameHint,Wheels.DuplicateRenameHint,Wheels.RenameHintTypeMismatch",
+						e.type
+					)
+				) {
+					rethrow;
+				}
+				continue;
 			}
 		}
 
 		return local.results;
+	}
+
+	/**
+	 * Internal function. The models the all-models diff covers: every model file in the
+	 * configured model paths (except _-prefixed files and the base Model.cfc), plus any
+	 * other model already loaded. Reading the files matters because the model cache only
+	 * holds models that a request has used, so diffing the cache alone gave answers that
+	 * depended on request history (4406).
+	 */
+	public array function $diffableModelNames() {
+		local.appKey = $appKey();
+		local.rv = [];
+		local.seen = {};
+		local.paths = StructKeyExists(application[local.appKey], "modelPath")
+			? ListToArray(application[local.appKey].modelPath)
+			: [];
+		for (local.path in local.paths) {
+			local.dir = ExpandPath(local.path);
+			if (!DirectoryExists(local.dir)) {
+				continue;
+			}
+			for (local.file in DirectoryList(local.dir, false, "name", "*.cfc")) {
+				local.name = Left(local.file, Len(local.file) - 4);
+				if (Left(local.name, 1) == "_" || local.name == "Model" || StructKeyExists(local.seen, LCase(local.name))) {
+					continue;
+				}
+				local.seen[LCase(local.name)] = true;
+				ArrayAppend(local.rv, local.name);
+			}
+		}
+		if (StructKeyExists(application[local.appKey], "models")) {
+			for (local.name in application[local.appKey].models) {
+				if (!StructKeyExists(local.seen, LCase(local.name))) {
+					local.seen[LCase(local.name)] = true;
+					ArrayAppend(local.rv, local.name);
+				}
+			}
+		}
+		return local.rv;
 	}
 
 	/**
@@ -441,15 +478,11 @@ component extends="wheels.migrator.Base" {
 
 		local.content = generateMigrationCFC(arguments.diffResult, arguments.migrationName);
 
-		// Use millisecond precision to reduce filename collision risk on rapid successive calls.
-		local.now = Now();
-		local.timestamp = DateFormat(local.now, "yyyymmdd") & TimeFormat(local.now, "HHmmssL");
-		local.fileName = local.timestamp & "_" & $sanitizeFileName(arguments.migrationName) & ".cfc";
-
 		local.migrationDir = ExpandPath("/app/migrator/migrations/");
 		if (!DirectoryExists(local.migrationDir)) {
 			DirectoryCreate(local.migrationDir);
 		}
+		local.fileName = $migrationFileName(arguments.migrationName, local.migrationDir);
 
 		$file(
 			action = "write",
@@ -457,6 +490,24 @@ component extends="wheels.migrator.Base" {
 			output = local.content,
 			addNewLine = false
 		);
+	}
+
+	/**
+	 * Internal function. The file name for a written migration: the same 14-digit
+	 * yyyymmddHHmmss version that generated migrations use (4419), moved on a second at
+	 * a time while a migration in the directory already has that version, so writing
+	 * several models' migrations in the same second still gives each its own version.
+	 */
+	public string function $migrationFileName(required string migrationName, required string migrationDir) {
+		local.when = Now();
+		for (local.i = 1; local.i <= 3600; local.i++) {
+			local.version = DateFormat(local.when, "yyyymmdd") & TimeFormat(local.when, "HHmmss");
+			if (!ArrayLen(DirectoryList(arguments.migrationDir, false, "name", local.version & "_*.cfc"))) {
+				break;
+			}
+			local.when = DateAdd("s", 1, local.when);
+		}
+		return local.version & "_" & $sanitizeFileName(arguments.migrationName) & ".cfc";
 	}
 
 	/**
@@ -626,6 +677,15 @@ component extends="wheels.migrator.Base" {
 			$getDBType() == "sqlite"
 			&& arguments.actualMigType == "text"
 			&& ListFindNoCase("string,text,datetime,date,time,boolean", arguments.expectedMigType)
+		) {
+			return arguments.expectedMigType;
+		}
+		// Since 4093 SQLite binds DATETIME / DATE / TIME columns as cf_sql_varchar, so the
+		// model side reads "string" for a column the probe reports by its declared type (4405).
+		if (
+			$getDBType() == "sqlite"
+			&& arguments.expectedMigType == "string"
+			&& ListFindNoCase("datetime,date,time", arguments.actualMigType)
 		) {
 			return arguments.expectedMigType;
 		}
