@@ -1,0 +1,23 @@
+# Wheels
+
+> Wheels is an open-source MVC framework for CFML (Lucee, Adobe ColdFusion, BoxLang and RustCFML), inspired by Ruby on Rails: convention over configuration, an ORM, database migrations and a command-line tool.
+
+Code examples are CFML, not Ruby: models extend "Model", controllers extend "Controller", and model associations, validations and callbacks are declared in a config() method. Wheels functions take either all positional or all named arguments, never a mix. Model finders return query objects by default, not arrays.
+
+## Documentation
+
+- [Wheels Guides](https://guides.wheels.dev/llms.txt): narrative guides for the current release: installation, the tutorial, models, controllers, views, routing, migrations, testing and deployment
+- [Wheels API Reference](https://api.wheels.dev/llms.txt): every framework function with its signature, parameters, return type and examples
+
+## Blog
+
+- [Wheels blog](https://blog.wheels.dev/): release notes, tutorials and community news
+- [Blog RSS feed](https://blog.wheels.dev/rss.xml): the same, as a feed
+
+## Packages
+
+- [Wheels packages](https://packages.wheels.dev/): first-party and community packages, installed with `wheels packages add <name>`
+
+## Optional
+
+- [Source on GitHub](https://github.com/wheels-dev/wheels): code, issues and discussions
