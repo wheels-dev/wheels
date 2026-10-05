@@ -293,13 +293,17 @@
 						$invoke(componentReference = this, method = "remove#local.all##local.key#", invokeArgs = local.invokeArgs);
 						break;
 					case "deleteAll":
+						// a hasOne's deleteAll still instantiates (deleteOne), so it needs callbacks too
 						local.invokeArgs = {};
+						local.invokeArgs.callbacks = arguments.callbacks;
 						local.invokeArgs.softDelete = arguments.softDelete;
 						local.invokeArgs.includeSoftDeletes = arguments.includeSoftDeletes;
 						$invoke(componentReference = this, method = "delete#local.all##local.key#", invokeArgs = local.invokeArgs);
 						break;
 					case "removeAll":
-						$invoke(componentReference = this, method = "remove#local.all##local.key#");
+						local.invokeArgs = {};
+						local.invokeArgs.callbacks = arguments.callbacks;
+						$invoke(componentReference = this, method = "remove#local.all##local.key#", invokeArgs = local.invokeArgs);
 						break;
 					default:
 						Throw(

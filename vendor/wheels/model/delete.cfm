@@ -37,6 +37,7 @@
 		if (arguments.instantiate) {
 			local.rv = 0;
 			local.objects = findAll(
+				callbacks = arguments.callbacks,
 				include = arguments.include,
 				includeSoftDeletes = arguments.includeSoftDeletes,
 				parameterize = arguments.parameterize,
@@ -145,6 +146,7 @@
 	) {
 		$args(name = "deleteOne", args = arguments);
 		local.object = findOne(
+			callbacks = arguments.callbacks,
 			includeSoftDeletes = arguments.includeSoftDeletes,
 			order = arguments.order,
 			reload = arguments.reload,

@@ -7,6 +7,18 @@ component extends="Model" {
 		table("c_o_r_e_posts");
 		beforeDelete("logDelete");
 		beforeSave("logSave");
+		afterFind("logFind");
+		afterRollback("logRollback");
+	}
+
+	function logFind() {
+		$logDependentCallback("find");
+		return true;
+	}
+
+	function logRollback() {
+		$logDependentCallback("rollback");
+		return true;
 	}
 
 	function logDelete() {
