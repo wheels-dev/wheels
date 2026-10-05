@@ -12,11 +12,14 @@
  * databases skip. The lock-held check uses the adapter's own $isAdvisoryLockHeld (the same
  * canonical free-check the release verification uses), on a fresh adapter/connection.
  *
- * The two transaction = true cases run only on adapters whose transactional advisory lock is
- * SESSION-scoped ($transactionalAdvisoryLockIsSessionScoped() == true: MySQL, SQL Server). On
- * PostgreSQL the transactional lock is pg_advisory_xact_lock, which the database auto-releases when
- * the transaction ends regardless of how the request exits — so there is no session-held lock to
- * leak and the assertion would be vacuous. Those cases skip on PostgreSQL with an explanatory note.
+ * The transaction = true abort case runs on every advisory-lock database, but means something
+ * different per lock scope. On SESSION-scoped engines ($transactionalAdvisoryLockIsSessionScoped()
+ * == true: MySQL, SQL Server) it proves the session lock is released on abort. On PostgreSQL the
+ * transactional lock is pg_advisory_xact_lock, which the database auto-releases when the transaction
+ * ends — so it can't leak, but a request that never ends keeps it held; there the case becomes a
+ * hang detector, driven with a bounded $testClient timeout so a stuck request fails THIS case rather
+ * than timing out the whole engine leg. The transaction = true redirect case skips on PostgreSQL
+ * (redirect/cflocation completes the transaction normally, so there is nothing new to prove there).
  *
  * Fixtures: vendor/wheels/tests/_assets/controllers/AdvisoryLockProbe.cfc + the /_advisorylock
  * routes in vendor/wheels/tests/routes.cfm.
@@ -112,14 +115,15 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("transaction = true: frees the lock after the callback aborts", () => {
-				if (!freshAdapter().$transactionalAdvisoryLockIsSessionScoped()) {
-					skip("transaction=true uses a transaction-scoped advisory lock on " & variables.adapterName & " (PostgreSQL's pg_advisory_xact_lock), auto-released by the database at transaction end — there is no session-held lock to leak when the callback aborts.");
-					return;
-				}
 				var tc = $testClient();
 				StructDelete(server, "wheelsAdvisoryProbe_probe_abort_tx");
-				tc.get("/_advisorylock/abort-tx");
-				expect(tc.statusCode()).toBe(200, "the abort probe request did not complete with 200");
+				// Bounded timeout: on a transaction-scoped-lock engine (PostgreSQL) the lock is held for
+				// as long as the transaction is open, so a request that never returns keeps the lock held.
+				// A short timeout makes such a hang fail THIS assertion (statusCode != 200) instead of
+				// timing out the whole engine leg. Session-lock engines complete in milliseconds, so the
+				// bound never bites them.
+				tc.get(path = "/_advisorylock/abort-tx", timeout = 20);
+				expect(tc.statusCode()).toBe(200, "the abort probe request did not return 200 within the 20s bound (a transaction-scoped-lock engine that hangs here would keep the lock held)");
 				expect(StructKeyExists(server, "wheelsAdvisoryProbe_probe_abort_tx")).toBeTrue(
 					"the probe callback never ran — the request did not reach withAdvisoryLock"
 				);

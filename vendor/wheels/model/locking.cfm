@@ -289,9 +289,9 @@
 			// Roll back ONLY on the ABORT path — not committed, and not a caught throw. An aborting
 			// callback is never caught, so invokeWithTransaction's catch never runs and the engine would
 			// otherwise decide the open transaction's fate at block exit. This rollback is a
-			// transaction-action, so BoxLang skips it when the abort leaves the cftransaction (the writes
-			// then commit there — a separate BoxLang data issue); the LOCK release above is in a finally
-			// with no transaction-action, so it still runs on every engine. Lucee/Adobe run this normally.
+			// transaction-action, and BoxLang skips a finally that contains one when an abort leaves the
+			// cftransaction; the LOCK release above sits in a separate finally with no transaction-action,
+			// so it still runs on every engine on abort. Lucee/Adobe run this finally normally.
 			if (!local.committed.flag && !threw.flag) {
 				try {
 					transaction action="rollback";
