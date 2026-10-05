@@ -1,0 +1,1 @@
+- Specs that mock (`createStub()`, `createMock()`, `createEmptyMock()`, `prepareMock()` with `$()`) work in an app made with `wheels new`. MockBox writes its generated stubs to `public/testbox/system/stubs`, which such an app doesn't have, so every mocked method errored with "parent directory … does not exist". `WheelsTest` now creates the directory when it is missing.

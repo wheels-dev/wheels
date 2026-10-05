@@ -1,0 +1,1 @@
+- App test runs keep the runner's 30-minute request timeout: the `tests/populate.cfm` that `wheels new` creates no longer lowers it to 300 seconds, and the runner restores its own limit after an app's `populate.cfm` runs. A run that is stopped before it finishes reports an error (and says when the request timeout stopped it) instead of 0 passed, 0 failed, 0 errors.

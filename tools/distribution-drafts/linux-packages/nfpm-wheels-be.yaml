@@ -73,7 +73,8 @@ contents:
 overrides:
   deb:
     depends:
-      - openjdk-21-jre-headless | openjdk-21-jre
+      # Java 21 or newer: 21 first, then 25 (the default JRE on newer Ubuntu/Debian).
+      - openjdk-21-jre-headless | openjdk-21-jre | openjdk-25-jre-headless | openjdk-25-jre
       - tar
       # Unpacks the offline docs bundle on first run.
       - unzip
@@ -83,7 +84,9 @@ overrides:
       - wheels
   rpm:
     depends:
-      - java-21-openjdk-headless
+      # Java 21 or newer. Rocky/RHEL's java-21 provides java-21-headless; Fedora's
+      # java-25/latest provides java-headless = 1:25 (Fedora 44 has no java-21).
+      - (java-21-headless or java-headless >= 1:21)
       # Rocky Linux 10 minimal cloud images do not ship tar. See #2700.
       - tar
       # Unpacks the offline docs bundle on first run.

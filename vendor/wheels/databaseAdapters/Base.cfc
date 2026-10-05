@@ -804,6 +804,34 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * A CFML date passed where a string is expected (the query builder, a dynamic finder)
+	 * arrives as its CFML literal: {ts 'yyyy-mm-dd HH:mm:ss'}, {d 'yyyy-mm-dd'} or
+	 * {t 'HH:mm:ss'}. In SQL that literal is just text, which never matches a date stored
+	 * as text (SQLite). Returns the same yyyy-mm-dd HH:mm:ss text that save() writes for a
+	 * date. Only the exact shapes a date produces are unwrapped (regardless of column type,
+	 * since SQLite date columns are often declared TEXT); any other value, such as text that
+	 * merely looks like {d 'abc'}, is returned unchanged.
+	 */
+	public string function $unwrapDateLiteral(required string str) {
+		local.match = ReFind(
+			"^\{(?:ts '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,9})?)'|d '(\d{4}-\d{2}-\d{2})'|t '(\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?)')\}$",
+			arguments.str,
+			1,
+			true
+		);
+		if (local.match.pos[1] == 0) {
+			return arguments.str;
+		}
+		if (local.match.len[2] > 0) {
+			return Mid(arguments.str, local.match.pos[2], local.match.len[2]);
+		}
+		if (local.match.len[3] > 0) {
+			return Mid(arguments.str, local.match.pos[3], local.match.len[3]) & " 00:00:00";
+		}
+		return "1899-12-30 " & Mid(arguments.str, local.match.pos[4], local.match.len[4]);
+	}
+
+	/**
 	 * Internal function.
 	 *
 	 * For integer/float/boolean columns this returns the value unquoted so the
@@ -819,6 +847,7 @@ component output=false extends="wheels.Global"{
 	 * value, so classic single-quote payloads land harmlessly inside a literal.
 	 */
 	public string function $quoteValue(required string str, string sqlType = "CF_SQL_VARCHAR", string type) {
+		arguments.str = $unwrapDateLiteral(arguments.str);
 		if (!StructKeyExists(arguments, "type")) {
 			arguments.type = $getValidationType(arguments.sqlType);
 		}

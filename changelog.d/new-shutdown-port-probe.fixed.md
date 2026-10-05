@@ -1,0 +1,1 @@
+- `wheels new --port=N` no longer pins the shutdown port to N+1 when another process is already listening there; it writes the first free port above N into `lucee.json` and says so. `wheels start` still moves a pinned shutdown port that is taken later.

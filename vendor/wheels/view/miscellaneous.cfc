@@ -280,7 +280,7 @@ component {
 	 *
 	 * @partial The name of the partial file to be used. Prefix with a leading slash (`/`) if you need to build a path from the root `views` folder. Do not include the partial filename's underscore and file extension. If you want to have Wheels display the partial for a single model object, array of model objects, or a query, pass a variable containing that data into this argument.
 	 * @group If passing a query result set for the partial argument, use this to specify the field to group the query by. A new query will be passed into the partial template for you to iterate over.
-	 * @cache Number of minutes to cache the content for.
+	 * @cache Number of minutes to cache the content for. The cache key is a hash of every argument passed to the partial, including the full contents (all rows) of a `query` argument, so editing a row produces a new cache key automatically. Pass any viewer state the output depends on (for example `editable=true`) as an argument so it becomes part of the key. Partial caching runs only when the `cachePartials` setting is on — on in production, off in development and testing.
 	 * @layout The layout to wrap the content in. Prefix with a leading slash (`/`) if you need to build a path from the root `views` folder. Pass `false` to not load a layout at all.
 	 * @spacer HTML or string to place between partials when called using a query.
 	 * @dataFunction Name of controller function to load data from.

@@ -119,7 +119,7 @@ fi
 #    native binary relied on) and (b) is architecture-independent, so the package
 #    installs on amd64 AND arm64. See issue #2700 (routing) and the arch-independent
 #    refactor.
-curl -fsSL -o "${BUILD_DIR}/build/lucli.jar" "${LUCLI_JAR_URL}"
+curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "${BUILD_DIR}/build/lucli.jar" "${LUCLI_JAR_URL}"
 verify_sha256 "${BUILD_DIR}/build/lucli.jar" "${LUCLI_JAR_SHA256}" "LuCLI jar"
 LUCLI_JAR_REPORTED=$(unzip -p "${BUILD_DIR}/build/lucli.jar" lucli/version.properties | sed -n 's/^lucli\.version=//p' | tr -d '\r')
 if [ -z "${LUCLI_JAR_URL_OVERRIDDEN:-}" ] && [ "${LUCLI_JAR_REPORTED}" != "${LUCLI_VERSION}" ]; then
@@ -128,7 +128,7 @@ if [ -z "${LUCLI_JAR_URL_OVERRIDDEN:-}" ] && [ "${LUCLI_JAR_REPORTED}" != "${LUC
 fi
 
 # 4. Download SQLite JDBC
-curl -fsSL -o "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_URL}"
+curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_URL}"
 verify_sha256 "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_SHA256}" "SQLite JDBC jar"
 
 # 5. Generate the user-facing /usr/bin/wheels wrapper
@@ -203,7 +203,7 @@ if [ -n "${JAVA_HOME:-}" ] && ! _wheels_java_ok "${JAVA_HOME}"; then
   fi
   unset JAVA_HOME
 fi
-# Probe for OpenJDK 21 across the Debian/Ubuntu AND RHEL/Fedora layouts, on
+# Probe for Java 21+ (OpenJDK 21 named dirs first) across the Debian/Ubuntu AND RHEL/Fedora layouts, on
 # amd64 and arm64. default-java may point at an older JDK, hence the check.
 if [ -z "${JAVA_HOME:-}" ]; then
   for candidate in \
@@ -234,15 +234,17 @@ if [ -z "${JAVA_HOME:-}" ] && command -v java >/dev/null 2>&1; then
   _jh="${_j%/bin/java}"
   _wheels_java_ok "${_jh}" && export JAVA_HOME="${_jh}"
 fi
-# Last resort: glob the version-stamped RHEL/Fedora directories directly.
+# Last resort: glob the version-stamped RHEL/Fedora directories directly, Java 21 first,
+# then any other JDK under /usr/lib/jvm (e.g. a 25-only box whose /usr/bin/java
+# alternative points at an older JDK). _wheels_java_ok filters out anything below 21.
 if [ -z "${JAVA_HOME:-}" ]; then
-  for d in /usr/lib/jvm/java-21-openjdk-* /usr/lib/jvm/*jre-21* /usr/lib/jvm/*-21-*; do
+  for d in /usr/lib/jvm/java-21-openjdk-* /usr/lib/jvm/*jre-21* /usr/lib/jvm/*-21-* /usr/lib/jvm/*; do
     if _wheels_java_ok "${d}"; then export JAVA_HOME="${d}"; break; fi
   done
 fi
 if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
-  echo "wheels: cannot find a Java 21 runtime. Install openjdk-21-jre-headless (apt)" >&2
-  echo "        or java-21-openjdk-headless (yum/dnf)." >&2
+  echo "wheels: cannot find a Java 21 or newer runtime. Install openjdk-21-jre-headless (apt)" >&2
+  echo "        or java-21-openjdk-headless (Rocky/RHEL) / java-25-openjdk-headless (Fedora); any Java 21+ works." >&2
   exit 1
 fi
 # --- java-resolve end -----------------------------------------------------

@@ -104,8 +104,12 @@ component extends="wheels.WheelsTest" {
 				expect(FindNoCase("Compare(local.requestRunToken, local.activeRunToken) == 0", source) > 0).toBeTrue(
 					"app-runner.cfm must only skip the shared lock when the request's token matches the in-progress run's token"
 				);
-				expect(Find("structDelete(application, ""$$$appTestRunToken"")", source) > 0).toBeTrue(
+				expect(FindNoCase("application.wo.$clearTestRunSwapMarkers()", source) > 0).toBeTrue(
 					"app-runner.cfm must clear the run token when the owning run finishes"
+				);
+				var helpers = FileRead(ExpandPath("/wheels/global/util.cfm"));
+				expect(Find("StructDelete(application, ""$$$appTestRunToken"")", helpers) > 0).toBeTrue(
+					"$clearTestRunSwapMarkers() must clear the run token"
 				);
 			});
 
@@ -114,8 +118,13 @@ component extends="wheels.WheelsTest" {
 				expect(Find("finally", source) > 0).toBeTrue(
 					"app-runner.cfm must restore the datasource in a finally block so an erroring run can no longer leave the test datasource live"
 				);
-				expect(Find("structDelete(application, ""$$$appTestOriginalDataSource"")", source) > 0).toBeTrue(
-					"app-runner.cfm must clear the swap marker after restoring"
+				var finallyPos = Find("finally", source);
+				expect(FindNoCase("application.wo.$clearTestRunSwapMarkers()", Mid(source, finallyPos, Len(source))) > 0).toBeTrue(
+					"app-runner.cfm must clear the swap markers after restoring"
+				);
+				var helpers = FileRead(ExpandPath("/wheels/global/util.cfm"));
+				expect(Find("StructDelete(application, ""$$$appTestOriginalDataSource"")", helpers) > 0).toBeTrue(
+					"$clearTestRunSwapMarkers() must clear the swap marker"
 				);
 			});
 
