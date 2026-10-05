@@ -22,7 +22,15 @@ LuCLI ships a generic `mcp` subcommand that wraps any installed module's public 
 
 ## Setup
 
-Add an `.mcp.json` file to your project root (or wherever your IDE expects it). Most AI IDEs auto-load this file when the project opens:
+`wheels new` writes the configuration for you: a new app's root has `.mcp.json` (Claude Code) and `.opencode.json` (OpenCode), unless you created it with `--no-agents`. For an existing app, run this from its root:
+
+```bash
+wheels setup agents
+```
+
+It writes the same two files, merging the `wheels` entry into any servers they already list. (The command is `setup agents`, not `setup mcp`: LuCLI intercepts the token `mcp` in any argument position.)
+
+To write it by hand, add an `.mcp.json` file to your project root (or wherever your IDE expects it). Most AI IDEs auto-load this file when the project opens:
 
 ```json title=".mcp.json"
 {
@@ -37,10 +45,10 @@ Add an `.mcp.json` file to your project root (or wherever your IDE expects it). 
 
 That's the whole configuration. The first `wheels` is the binary name; the second is the module name to expose. The IDE launches the subprocess on demand — you don't need to keep `wheels mcp wheels` running yourself, and the server exits when the IDE disconnects.
 
-Don't try `wheels mcp` on its own to see this snippet: on the released launcher, LuCLI reserves the `mcp` verb and a bare invocation exits with `mcp: missing module name` instead of reaching the Wheels Module's help text. To check the server from a shell, use the `--once` smoke test below. There is no setup wizard and no generated file — add the `.mcp.json` snippet manually.
+Don't try `wheels mcp` on its own to see this snippet: on the released launcher, LuCLI reserves the `mcp` verb and a bare invocation exits with `mcp: missing module name` instead of reaching the Wheels Module's help text. To check the server from a shell, use the `--once` smoke test below.
 
 <Aside type="note" title="IDE-specific paths">
-Claude Code reads `.mcp.json` from the project root. OpenCode uses `.opencode.json` with the same `mcpServers` shape. Cursor reads from its settings UI. Check your IDE's MCP documentation for the exact location; the server definition itself is identical across clients.
+Claude Code reads `.mcp.json` from the project root. OpenCode reads `.opencode.json`, in its own shape: an `mcp` key, `"type": "local"`, and the command and its arguments as one array (`["wheels", "mcp", "wheels"]`); `wheels new` and `wheels setup agents` write it that way. Cursor reads from its settings UI. Check your IDE's MCP documentation for the exact location; the server definition itself is identical across clients.
 </Aside>
 
 ### Verifying the server responds
