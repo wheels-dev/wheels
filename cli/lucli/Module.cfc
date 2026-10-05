@@ -530,7 +530,7 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.positional(name = "type", default = "", choices = "resource,model,controller,view", description = "What to remove: resource, model, controller, or view")
 			.positional(name = "name", default = "", description = "Name of the artifact to remove")
-			.flag(name = "force", default = false, description = "Skip the confirmation prompt");
+			.flag(name = "force", default = false, description = "Delete the files; without it, destroy only lists what it would delete");
 	}
 
 	// Feeds only the MCP inputSchema (mcpToolSpecs). `app` is no longer
@@ -1727,14 +1727,17 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Parse args for `wheels coverage`: --top N (report length) and
-	 * --no-test-db (test-db=false).
+	 * `wheels coverage` options: --top N (report length) and --no-test-db
+	 * (test-db=false). Named <command>ArgSpec so `--help` lists them.
 	 */
+	private any function coverageArgSpec() {
+		return new services.ArgSpec()
+			.option(name = "top", default = "15", description = "How many functions the CRAP ranking lists")
+			.flag(name = "test-db", default = true, description = "Run the suite against the test database");
+	}
+
 	private struct function parseCoverageArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.option(name = "top", default = "15")
-			.flag(name = "test-db", default = true)
-			.parse(arguments.coll);
+		var parsed = coverageArgSpec().parse(arguments.coll);
 		return {
 			top = Val(parsed.top),
 			useTestDb = parsed["test-db"]
@@ -3239,7 +3242,7 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.positional(name = "appName", description = "Name of the application and of the directory it's created in")
 			.option(name = "port", default = 8080, type = "numeric", description = "Server port (default: 8080, or the first port above it that is free and no other project pins)")
-			.option(name = "datasource", default = "", description = "Datasource name (default: the app name)")
+			.option(name = "datasource", default = "", description = "Datasource name (default: the app name, lowercased)")
 			.option(name = "reload-password", default = "", description = "Reload password (default: random)")
 			.flag(name = "setup-h2", default = false, description = "Use the H2 embedded database instead of SQLite")
 			.flag(name = "sqlite", default = true, description = "Set up the zero-config SQLite database")
@@ -5536,7 +5539,7 @@ component extends="modules.BaseModule" {
 		help &= "  add <name>[@<version>] [--force]        Install a package into vendor/<name>/ (canonical)" & nl;
 		help &= "  update <name> --yes                     Update an installed package" & nl;
 		help &= "  update --all --yes                      Update every installed package" & nl;
-		help &= "  remove <name>                           Delete an installed package from vendor/" & nl;
+		help &= "  remove <name> --yes                     Delete an installed package from vendor/" & nl;
 		help &= "  registry refresh                        Bust the 24-hour registry cache" & nl;
 		help &= "  registry info                           Show the registry URL and cache state" & nl;
 		help &= "  help, --help, -h                        Show this help" & nl & nl;
@@ -7519,7 +7522,7 @@ component extends="modules.BaseModule" {
 			"seed-data": {
 				name: "Seed Data",
 				description: "Database seeding template with seedOnce() examples",
-				hint: "Run seeds with: wheels seed.",
+				hint: "wheels seed reads app/db/: move seeds.cfm to app/db/seeds.cfm and seeds-development.cfm to app/db/seeds/development.cfm, then run: wheels seed.",
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
