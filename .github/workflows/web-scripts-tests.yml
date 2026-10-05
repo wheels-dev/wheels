@@ -5,6 +5,11 @@ name: Web Scripts Tests
 # sites/*/src/**/*.test.ts, so these never ran in CI, and a dedupe query that
 # matched nothing passed its mocked tests for weeks. This job runs them on every
 # PR that touches the scripts or the blog workflows that call them.
+#
+# It also tests tools/build/scripts/build-docs-index.mjs, which builds the
+# offline index `wheels lookup` reads, and builds that index from the PR's
+# guides and API JSON: a guide page the builder can't parse fails here, not at
+# release time.
 
 on:
   pull_request:
@@ -13,11 +18,15 @@ on:
       - '.github/workflows/blog-*.yml'
       - '.github/scripts/blog-*.sh'
       - '.github/workflows/web-scripts-tests.yml'
+      - 'tools/build/scripts/build-docs-index*.mjs'
+      - 'web/sites/guides/src/content/**'
+      - 'docs/api/**'
   push:
     branches: [develop]
     paths:
       - 'web/scripts/**'
       - '.github/workflows/web-scripts-tests.yml'
+      - 'tools/build/scripts/build-docs-index*.mjs'
 
 permissions:
   contents: read
@@ -36,3 +45,9 @@ jobs:
       # treated as one file and fails).
       - name: Run node tests
         run: node --test 'web/scripts/**/*.test.mjs'
+      - name: Run the docs index builder's tests
+        run: node --test 'tools/build/scripts/*.test.mjs'
+      # Not --strict: a PR tree may not have its version's API JSON yet (it is
+      # generated at the snapshot build and committed at the release cut).
+      - name: Build the docs index from this tree
+        run: node tools/build/scripts/build-docs-index.mjs --out "$RUNNER_TEMP/docs-index.json"

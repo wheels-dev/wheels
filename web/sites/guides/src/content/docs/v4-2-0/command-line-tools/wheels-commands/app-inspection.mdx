@@ -1,6 +1,6 @@
 ---
 title: "App Inspection"
-description: wheels routes, info, stats, notes, and doctor — read-only introspection commands for diagnosing a project, enumerating declared routes, counting artifacts, surfacing TODOs, and running health checks.
+description: wheels routes, info, stats, notes, doctor, and lookup — read-only commands for diagnosing a project, enumerating declared routes, counting artifacts, surfacing TODOs, running health checks, and looking up the API and guides offline.
 type: reference
 sidebar:
   order: 6
@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Five read-only commands cluster on this page. None of them mutate state — they read your project, print what they find, and exit. Reach for them when you're diagnosing an unfamiliar setup or getting a quick inventory of an app you haven't touched in a while.
+Six read-only commands cluster on this page. None of them mutate state — they read your project (or, for `wheels lookup`, the CLI's own docs index), print what they find, and exit. Reach for them when you're diagnosing an unfamiliar setup or getting a quick inventory of an app you haven't touched in a while.
 
 **You'll use this for:**
 
@@ -17,6 +17,7 @@ Five read-only commands cluster on this page. None of them mutate state — they
 - Counting models, controllers, views, and tests — and finding outliers with `--verbose`.
 - Sweeping the codebase for `TODO`, `FIXME`, and `OPTIMIZE` markers before a release.
 - Running a health check when something is misconfigured and you don't know where to start.
+- Looking up a framework function's parameters, or a guide topic, without a browser or a network connection.
 
 ### `wheels routes`
 
@@ -232,6 +233,42 @@ Recommendations:
 ```
 
 Status is one of `HEALTHY`, `WARNING`, or `CRITICAL`. Issues (red) indicate the project cannot run as configured; warnings (yellow) flag things that work but look off; recommendations (cyan) are optional suggestions keyed off what the checks found.
+
+### `wheels lookup`
+
+Look up the Wheels API reference and the guides offline. The CLI ships a docs index for its own framework version: every API function with its parameters and examples, and every guide section. It needs no network, no running server, and no project. AI assistants reach the same lookup through the `lookup` MCP tool.
+
+#### Synopsis
+
+```
+wheels lookup <query> [--kind=all|api|guides] [--limit=5] [--format=text|json]
+```
+
+#### Arguments and flags
+
+| Argument / flag | Default | Description |
+|---|---|---|
+| `<query>` | (required) | A function name (`findAll`, `findAll()`, `model.findAll`), a phrase (`nested resources`), or an id from an earlier result (`api:model.findAll`, `guides:basics/routing#nested-resources`). |
+| `--kind` | `all` | `api` searches only the API reference, `guides` only the guides. |
+| `--limit` | `5` | The most results to list, from 1 to 20. |
+| `--format` | `text` | `json` prints the result as JSON. |
+
+#### What it returns
+
+- **A function name** prints the whole API entry: the signature and return type, where it's available (model, controller, mapper, and so on), the description, every parameter with its type, default and description, the example, and the link to api.wheels.dev. A name that exists in several places (`delete` on a model object and on the route mapper) prints each one; `model.delete` narrows it to one.
+- **Anything else** lists the best matches, guide sections and API functions together, each with a snippet, its link, and an id. Pass that id back to print the whole entry.
+- **Nothing matching** prints `No matches` and exits 0.
+
+#### Examples
+
+```bash
+wheels lookup findAll
+wheels lookup "nested resources"
+wheels lookup "background job retry" --kind=guides --limit=3
+wheels lookup "guides:basics/routing#nested-resources"
+```
+
+The index describes the framework version the CLI was built with. When you run the CLI from a source checkout there's no index until you build one with `node tools/build/scripts/build-docs-index.mjs`; until then `wheels lookup` says so and exits non-zero. For the browsable HTML docs offline, use `wheels docs fetch`.
 
 ## Common workflows
 
