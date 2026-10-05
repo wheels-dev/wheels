@@ -1212,6 +1212,83 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. Reports whether this adapter supports transaction-scoped advisory locks —
+	 * the opt-in `withAdvisoryLock(transaction = true)` path (#4198). The lock is acquired on the
+	 * connection pinned by an enclosing transaction, so it covers the callback's own queries and
+	 * (where the lock is transaction-scoped) auto-releases when that transaction ends.
+	 *
+	 * Distinct from `$supportsAdvisoryLocks()`, which reports standalone (session) support. An
+	 * adapter may support one and not the other: SQL Server reports `$supportsAdvisoryLocks()` false
+	 * (its standalone `sp_getapplock @LockOwner = 'Transaction'` needs an open transaction) but
+	 * overrides this to true, taking a session-owned `sp_getapplock @LockOwner = 'Session'` lock on
+	 * the transaction-pinned connection.
+	 */
+	public boolean function $supportsTransactionalAdvisoryLock() {
+		return false;
+	}
+
+	/**
+	 * Internal function. Reports whether this adapter's transaction-scoped lock is actually
+	 * session-scoped and so must be released explicitly before the transaction closes (#4198).
+	 * MySQL's `GET_LOCK` and SQL Server's `sp_getapplock @LockOwner = 'Session'` are session- not
+	 * transaction-scoped: pinning them to the transaction's connection still guards the callback, but
+	 * they do not auto-release at transaction end, so the caller releases them with
+	 * `$releaseAdvisoryLockTransactional()` first. PostgreSQL (`pg_advisory_xact_lock`) auto-releases
+	 * at transaction end and leaves this false.
+	 */
+	public boolean function $transactionalAdvisoryLockIsSessionScoped() {
+		return false;
+	}
+
+	/**
+	 * Internal function. Acquires a transaction-scoped advisory lock on the current (pinned)
+	 * connection (#4198). Called only inside an open transaction, and only after
+	 * `$supportsTransactionalAdvisoryLock()` has reported true, so the default is never reached in
+	 * practice; it throws for safety. Throws `Wheels.AdvisoryLockTimeout` when the lock cannot be
+	 * taken in time.
+	 */
+	public void function $acquireAdvisoryLockTransactional(required string name, numeric timeout = 10) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "Transaction-scoped advisory locks are not supported for this database adapter.",
+			extendedInfo = "The #GetMetaData(this).name# adapter does not implement transaction-scoped advisory locking. Call withAdvisoryLock() without transaction = true, or use a database that supports it (PostgreSQL, MySQL, or SQL Server)."
+		);
+	}
+
+	/**
+	 * Internal function. Releases a transaction-scoped advisory lock before the transaction closes
+	 * (#4198). Only session-scoped locks (MySQL, SQL Server) need this; a transaction-scoped lock
+	 * (PostgreSQL) auto-releases at transaction end, so the default is a no-op.
+	 */
+	public void function $releaseAdvisoryLockTransactional(required string name) {
+	}
+
+	/**
+	 * Internal function. The connection attributes for an advisory-lock query, built the SAME way the
+	 * model's own query path does (`$performQuery`): empty username/password are OMITTED (#4198). This
+	 * matters for the transaction-scoped path: on Adobe CF a query with `{datasource}` and one with
+	 * `{datasource, username:"", password:""}` resolve to DIFFERENT pooled connections, so a lock taken
+	 * with the always-on form lands on a different connection than the model's writes — the writes then
+	 * run outside the lock's transaction and are not rolled back with it. Matching the model's form
+	 * pins the lock and the callback's queries to one connection on every engine. Lucee treats the two
+	 * forms as the same connection, which is why this only surfaced on Adobe.
+	 *
+	 * The datasource is resolved through `$effectiveDataSource()`, exactly as `$performQuery` does, so a
+	 * non-shared (tenant) model takes the lock on its tenant datasource — the same one its writes use —
+	 * rather than on the default datasource.
+	 */
+	public struct function $advisoryLockConnection() {
+		local.conn = {datasource = $effectiveDataSource()};
+		if (Len(variables.username)) {
+			local.conn.username = variables.username;
+		}
+		if (Len(variables.password)) {
+			local.conn.password = variables.password;
+		}
+		return local.conn;
+	}
+
+	/**
 	 * Reports whether auto-derived property names should be lowercased.
 	 *
 	 * When a model declares no property() mappings, Wheels derives its
