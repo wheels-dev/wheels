@@ -47,3 +47,8 @@ error page includes a **Copy** button. One click copies a JSON payload
 (exception type and message, suggested action, file + line, source snippet,
 and stack frames tagged app vs framework) to the clipboard for pasting into
 a coding agent.
+
+In the `development` environment, an error response asked for as
+`Accept: application/json` (or `?format=json`) is that same payload as JSON,
+and `Accept: text/markdown` (or `?format=md`) gets it as Markdown, with the
+error page's status code. Testing and production responses are unchanged.

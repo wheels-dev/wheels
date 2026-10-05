@@ -67,6 +67,21 @@ component extends="wheels.WheelsTest" {
 				expect(frames[2].type).toBe("framework");
 			});
 
+			it("picks an app frame that is the throw site itself, as the error page does", () => {
+				var payload = CreateObject("component", "wheels.events.onerror.ErrorCopyPayload").build({
+					type = "Wheels.RecordNotFound",
+					message = "thrown by the app",
+					tagContext = [
+						{template = "/srv/app/controllers/Boom.cfc", line = 3},
+						{template = "/srv/vendor/wheels/global/tags.cfm", line = 220},
+						{template = "/srv/vendor/wheels/Dispatch.cfc", line = 40}
+					]
+				});
+				expect(payload.location.type).toBe("app");
+				expect(payload.location.line).toBe(3);
+				expect(payload.location.template).toInclude("Boom.cfc");
+			});
+
 			it("picks the first app frame after the innermost throw site as location", () => {
 				var builder = CreateObject("component", "wheels.events.onerror.ErrorCopyPayload");
 				var payload = builder.build({
@@ -161,6 +176,65 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("ErrorCopyPayload toMarkdown", () => {
+
+			it("renders the heading, status, request, suggested action, location and snippet", () => {
+				var builder = CreateObject("component", "wheels.events.onerror.ErrorCopyPayload");
+				var md = builder.toMarkdown($samplePayload());
+				var hash = Chr(35);
+				expect(Left(md, 35)).toBe(hash & " Wheels.RecordNotFound: No post 99");
+				expect(md).toInclude("**Status:** 404");
+				expect(md).toInclude("GET /posts/99");
+				expect(md).toInclude(hash & hash & " Suggested action");
+				expect(md).toInclude("Check the key.");
+				expect(md).toInclude("`app/controllers/Posts.cfc:42`");
+				expect(md).toInclude("> 42 | post = model(""Post"").findByKey(params.key);");
+				expect(md).toInclude("  41 | function show() {");
+			});
+
+			it("lists app frames and collapses framework frames to a count", () => {
+				var md = CreateObject("component", "wheels.events.onerror.ErrorCopyPayload").toMarkdown($samplePayload());
+				expect(md).toInclude("app `app/controllers/Posts.cfc:42`");
+				expect(md).notToInclude("vendor/wheels/model/read.cfc");
+				expect(md).toInclude("2 framework frames not shown");
+			});
+
+			it("renders a minimal payload without location or stack", () => {
+				var md = CreateObject("component", "wheels.events.onerror.ErrorCopyPayload").toMarkdown(
+					{"source" = "wheels-error-page", "exception" = {"type" = "X.Failure", "message" = "it broke"}}
+				);
+				expect(Left(md, 22)).toBe(Chr(35) & " X.Failure: it broke" & Chr(10));
+				expect(md).notToInclude("Location");
+			});
+
+		});
+
+	}
+
+	private struct function $samplePayload() {
+		return {
+			"source" = "wheels-error-page",
+			"statusCode" = 404,
+			"exception" = {"type" = "Wheels.RecordNotFound", "message" = "No post 99", "detail" = ""},
+			"suggestedAction" = "Check the key.",
+			"location" = {"file" = "app/controllers/Posts.cfc", "line" = 42, "type" = "app", "template" = "/x/app/controllers/Posts.cfc"},
+			"sourceSnippet" = {
+				"startLine" = 41,
+				"endLine" = 42,
+				"errorLine" = 42,
+				"lines" = [
+					{"line" = 41, "code" = "function show() {", "highlight" = false},
+					{"line" = 42, "code" = "post = model(""Post"").findByKey(params.key);", "highlight" = true}
+				]
+			},
+			"stack" = [
+				{"index" = 1, "file" = "vendor/wheels/model/read.cfc", "line" = 10, "type" = "framework", "template" = ""},
+				{"index" = 2, "file" = "app/controllers/Posts.cfc", "line" = 42, "type" = "app", "template" = ""},
+				{"index" = 3, "file" = "vendor/wheels/Dispatch.cfc", "line" = 99, "type" = "framework", "template" = ""}
+			],
+			"request" = {"method" = "GET", "path" = "/posts/99", "queryString" = ""},
+			"wheelsVersion" = "4.2.0"
+		};
 	}
 
 }

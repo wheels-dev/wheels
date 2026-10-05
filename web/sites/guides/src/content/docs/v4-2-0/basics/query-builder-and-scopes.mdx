@@ -135,6 +135,18 @@ Escaped is not the same as bound. Don't build those positions from request input
   A value containing a backslash is written as a `_utf8mb4` hex literal. Comparing it with a column of any character set or collation works as usual. Combining it with another literal (for example `CONCAT('a', ...)`) can raise `Illegal mix of collations` when the connection's collation differs from utf8mb4's default. Put the whole value in one literal, or bind it.
 </Aside>
 
+### Searching for a literal term
+
+A search box sends whatever the user typed, and a `%` or `_` in that text is a `LIKE` wildcard, not a literal character — a search for `50%` would match every row that merely contains `50`. `escapeForLike()` escapes the `\` escape character and the `%` and `_` wildcards (and, on SQL Server, `[`) so the term matches literally. On SQL Server, `[` is escaped only once a model has initialised the adapter — if you call `escapeForLike()` before any `model()` call in a fresh or just-reloaded app, `[` is left unescaped; every other database treats `[` as a literal anyway. Add your own surrounding wildcards and declare `ESCAPE '\'`:
+
+```cfm
+posts = model("Post").findAll(
+    where = "title LIKE '%#escapeForLike(params.q)#%' ESCAPE '\'"
+);
+```
+
+The quoted literal is bound as a parameter (`parameterize` is on), and the explicit `ESCAPE '\'` makes the escaped wildcards literal on every database. Always declare the clause: MySQL, PostgreSQL, CockroachDB and H2 default the `LIKE` escape character to `\`, but SQLite, Oracle and SQL Server have none, and the three-argument builder (`where("title", "LIKE", ...)`) emits no `ESCAPE` either, so without it a `\` is matched literally. `escapeForLike()` escapes `LIKE` metacharacters only, not SQL quotes — quote the value the same way you would any other `where`-string literal.
+
 ## Scopes — reusable query fragments
 
 Scopes are named pieces of a query that you declare once on a model and call as methods on the model class. `model("User").active()`. `model("Post").published().recent()`. They chain, compose with each other, and compose with the query builder. When the same filter shows up on two or more pages, turn it into a scope.

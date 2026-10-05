@@ -4,7 +4,10 @@
 	 * Inserts multiple records into the database in a single batch operation.
 	 * Accepts an array of structs where each struct represents a record to insert.
 	 * All structs must have the same set of keys (property names).
-	 * Batches in groups of 1000 to avoid database parameter limits.
+	 * Batches in groups of up to 1000 rows, fewer where the database limits the parameters per
+	 * statement (SQL Server). All batches run in one
+	 * transaction (see `transaction`), so a failing batch rolls back the ones before it. No
+	 * validations or callbacks run.
 	 *
 	 * [section: Model Class]
 	 * [category: Create Functions]
@@ -32,26 +35,60 @@
 			arguments.records = $addBulkTimestamps(records = arguments.records, isInsert = true);
 		}
 
-		local.mapped = $mapBulkProperties(arguments.records);
+		local.state = {count = 0};
+		local.batchArgs = {
+			method = "$insertAllBatches",
+			transaction = arguments.transaction,
+			records = arguments.records,
+			mapped = $mapBulkProperties(arguments.records),
+			state = local.state
+		};
+		if (StructKeyExists(arguments, "parameterize")) {
+			local.batchArgs.parameterize = arguments.parameterize;
+		}
+		// Every batch runs in one transaction (per `transaction`, like save()), so a failing batch
+		// rolls back the ones before it.
+		invokeWithTransaction(argumentCollection = local.batchArgs);
 
-		// Batch in groups of 1000 rows.
-		local.batchSize = 1000;
-		local.totalInserted = 0;
+		$markMigrationDidWork();
+		$clearRequestCache();
+		return {insertedCount: local.state.count};
+	}
+
+	/**
+	 * Internal function. Rows per bulk statement: 1000, or fewer when the statement would otherwise
+	 * bind more parameters than the database accepts (one per column per row). SQL Server accepts
+	 * about 2100, so a 5-column batch of 1000 rows used to throw Wheels.TooManyParameters there.
+	 * A row wider than the limit still gets one row per statement, which the adapter then refuses
+	 * with Wheels.TooManyParameters before running it. `limit` (default: the adapter's) is for specs.
+	 */
+	public numeric function $bulkBatchSize(required numeric columnCount, any parameterize = true, numeric limit = -1) {
+		local.rv = 1000;
+		local.limit = arguments.limit >= 0 ? arguments.limit : variables.wheels.class.adapter.$maxBoundParameters();
+		if (local.limit > 0 && arguments.columnCount > 0 && !(IsBoolean(arguments.parameterize) && !arguments.parameterize)) {
+			local.rv = Max(1, Min(local.rv, Int(local.limit / arguments.columnCount)));
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. Runs insertAll()'s INSERT statements, in batches of 1000 rows, inside the
+	 * transaction invokeWithTransaction() opened. Adds the row count to `state.count`.
+	 */
+	public boolean function $insertAllBatches(required array records, required struct mapped, required struct state, any parameterize) {
+		local.batchSize = $bulkBatchSize(columnCount = ArrayLen(arguments.mapped.columns), parameterize = StructKeyExists(arguments, "parameterize") ? arguments.parameterize : true);
 		local.totalRecords = ArrayLen(arguments.records);
-
 		for (local.batchStart = 1; local.batchStart <= local.totalRecords; local.batchStart += local.batchSize) {
 			local.batchEnd = Min(local.batchStart + local.batchSize - 1, local.totalRecords);
-
 			local.sql = variables.wheels.class.adapter.$bulkInsertSQL(
 				tableName = $quotedTableName(),
-				columns = local.mapped.columns,
-				validProperties = local.mapped.validProperties,
+				columns = arguments.mapped.columns,
+				validProperties = arguments.mapped.validProperties,
 				records = arguments.records,
 				batchStart = local.batchStart,
 				batchEnd = local.batchEnd,
 				propertyInfo = variables.wheels.class.properties
 			);
-
 			// Nothing here reads the result or a generated key, so don't request one:
 			// on Lucee that asks the driver for generated keys, and the Oracle driver
 			// then appends a RETURNING clause Oracle rejects (#3653).
@@ -60,13 +97,9 @@
 				sql = local.sql,
 				$captureResult = false
 			);
-
-			local.totalInserted += (local.batchEnd - local.batchStart + 1);
+			arguments.state.count += (local.batchEnd - local.batchStart + 1);
 		}
-
-		$markMigrationDidWork();
-		$clearRequestCache();
-		return {insertedCount: local.totalInserted};
+		return true;
 	}
 
 	/**
@@ -151,39 +184,63 @@
 			local.updateColumns = local.excludeColumns;
 		}
 
-		// Batch in groups of 1000 rows.
-		local.batchSize = 1000;
-		local.totalUpserted = 0;
-		local.totalRecords = ArrayLen(arguments.records);
+		local.state = {count = 0};
+		local.batchArgs = {
+			method = "$upsertAllBatches",
+			transaction = arguments.transaction,
+			records = arguments.records,
+			mapped = local.mapped,
+			uniqueByColumns = local.uniqueByColumns,
+			updateColumns = local.updateColumns,
+			state = local.state
+		};
+		if (StructKeyExists(arguments, "parameterize")) {
+			local.batchArgs.parameterize = arguments.parameterize;
+		}
+		// Same as insertAll(): every batch runs in one transaction, per `transaction`.
+		invokeWithTransaction(argumentCollection = local.batchArgs);
 
+		$markMigrationDidWork();
+		$clearRequestCache();
+		return {upsertedCount: local.state.count};
+	}
+
+	/**
+	 * Internal function. Runs upsertAll()'s statements, in batches of 1000 rows, inside the
+	 * transaction invokeWithTransaction() opened. Adds the row count to `state.count`.
+	 */
+	public boolean function $upsertAllBatches(
+		required array records,
+		required struct mapped,
+		required array uniqueByColumns,
+		required array updateColumns,
+		required struct state,
+		any parameterize
+	) {
+		local.batchSize = $bulkBatchSize(columnCount = ArrayLen(arguments.mapped.columns), parameterize = StructKeyExists(arguments, "parameterize") ? arguments.parameterize : true);
+		local.totalRecords = ArrayLen(arguments.records);
 		for (local.batchStart = 1; local.batchStart <= local.totalRecords; local.batchStart += local.batchSize) {
 			local.batchEnd = Min(local.batchStart + local.batchSize - 1, local.totalRecords);
-
 			local.sql = variables.wheels.class.adapter.$upsertSQL(
 				tableName = $quotedTableName(),
-				columns = local.mapped.columns,
-				uniqueBy = local.uniqueByColumns,
-				updateColumns = local.updateColumns,
-				validProperties = local.mapped.validProperties,
+				columns = arguments.mapped.columns,
+				uniqueBy = arguments.uniqueByColumns,
+				updateColumns = arguments.updateColumns,
+				validProperties = arguments.mapped.validProperties,
 				records = arguments.records,
 				batchStart = local.batchStart,
 				batchEnd = local.batchEnd,
 				propertyInfo = variables.wheels.class.properties
 			);
-
 			// Same as insertAll(): no result or generated key is read (#3653).
 			variables.wheels.class.adapter.$querySetup(
 				parameterize = arguments.parameterize,
 				sql = local.sql,
 				$captureResult = false
 			);
-
-			local.totalUpserted += (local.batchEnd - local.batchStart + 1);
+			arguments.state.count += (local.batchEnd - local.batchStart + 1);
 		}
-
-		$markMigrationDidWork();
-		$clearRequestCache();
-		return {upsertedCount: local.totalUpserted};
+		return true;
 	}
 
 	/**
