@@ -269,6 +269,12 @@ To pick up a schema change without killing the process, in order of preference:
   Don't reach into `application.wheels.models` and delete entries by hand to force a re-read — it is unsupported and races with in-flight requests. Use a reload; it rebuilds the metadata cleanly.
 </Aside>
 
+## Controller method integration cache
+
+Every request builds a controller instance and mixes the framework's controller and view helpers into it. Outside development, Wheels records once per controller class which helpers to add and which `super<name>` aliases to write, then applies that record to each new instance instead of walking every helper again. The setting is `cacheControllerIntegration`: `true` in every environment except development, where controller methods change without a reload. A reload clears the records.
+
+Turn it off with `set(cacheControllerIntegration=false)` if a controller defines a method conditionally while it's being constructed (for example, a pseudo-constructor that assigns a function to `variables` only in some cases) and calls `super<name>()` for it. The record is per class, so such an instance gets the method but not its `super<name>` alias.
+
 ## Per-user keys
 
 A cached action is shared across every request for the same URL — which is a problem the moment the rendered output depends on the logged-in user. Use `appendToKey` to mix more identifiers into the cache key:
