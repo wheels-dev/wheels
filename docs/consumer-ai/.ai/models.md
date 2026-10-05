@@ -26,7 +26,7 @@ component extends="Model" {
         // and invokeWithTransaction() blocks fire once together on the outermost
         // commit; with transactionMode="none" afterCommit fires immediately per op.
         // IMPORTANT: afterCommit/afterRollback are only reliable inside a Wheels-managed
-        // transaction — transaction() / invokeWithTransaction(). A write placed inside a
+        // transaction — invokeWithTransaction() or a save()/delete(). A write placed inside a
         // raw CFML `transaction {}` block is SKIPPED (with a one-time wheels.log warning)
         // on Lucee and BoxLang, and is NOT detectable on Adobe CF or RustCFML — there the
         // behaviour inside a raw transaction{} is left to the engine and is not guaranteed.
@@ -139,7 +139,7 @@ result = model("Product").upsertAll(records=rows, uniqueBy="sku");              
 - Every record must have the same keys, or `Wheels.InvalidRecordKeys` is thrown. Keys that aren't model properties are dropped.
 - `insertAll` has no "ignore duplicates" option: a unique violation throws. Use `upsertAll` when rows may already exist.
 - The count is the number of records you passed, not the number the database changed, and no generated keys come back. Read the rows back if you need their ids.
-- One call is one transaction by default (`transaction` works like `save()`'s): if any batch fails, none of the call's rows are kept, and inside an open `transaction()` the call joins it. `transaction="none"` commits batch by batch; `"rollback"` writes nothing.
+- One call is one transaction (`transaction` works like `save()`'s and defaults to the `transactionMode` setting, `commit` unless changed): if any batch fails, none of the call's rows are kept. Inside an open Wheels transaction (`invokeWithTransaction()`) the call joins it; inside a raw `transaction {}` block its rows belong to that block. `transaction="none"` commits batch by batch; `"rollback"` writes nothing.
 - Rows go in batches of up to 1000, fewer when the database caps the parameters per statement (SQL Server).
 
 ## `afterCommit` / `afterRollback` details
@@ -161,4 +161,4 @@ result = model("Product").upsertAll(records=rows, uniqueBy="sku");              
   ```
 - `order="random"` uses the database's random order.
 
-`updateAll` binds every value as a parameter, so `updateAll(position="position - 1")` is never evaluated as SQL. There is no increment/decrement API: for a value relative to its current one, use a parameterized `queryExecute("UPDATE ... SET position = position - 1 WHERE ...", {...})` (inside `transaction()` if it goes with other writes).
+`updateAll` binds every value as a parameter, so `updateAll(position="position - 1")` is never evaluated as SQL. There is no increment/decrement API: for a value relative to its current one, use a parameterized `queryExecute("UPDATE ... SET position = position - 1 WHERE ...", {...})` (inside the same `invokeWithTransaction()` as the writes it goes with).
