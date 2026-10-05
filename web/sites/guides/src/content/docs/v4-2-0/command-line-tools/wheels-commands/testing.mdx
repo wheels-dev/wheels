@@ -40,7 +40,7 @@ This page is a CLI reference. It covers flag syntax, subcommand shape, and invoc
 
 ### `wheels test`
 
-Run the Wheels BDD test suite. Auto-detects core tests when `vendor/wheels/tests/` exists; otherwise runs the app suite under `tests/specs/`.
+Run the Wheels BDD test suite. Runs the app suite under `tests/specs/` by default; pass `--core` to run the framework suite under `vendor/wheels/tests/specs/` instead.
 
 #### Synopsis
 
@@ -117,7 +117,7 @@ For full-matrix CI (every engine × every database), see [`tools/test-matrix.sh`
 
 ### `wheels browser setup`
 
-Download the Playwright Java JARs and a Chromium binary into `.wheels/browser/` so browser specs can run. This is a one-time setup per workspace — roughly 370MB on first install.
+Download the Playwright Java JARs and a Chromium binary into `~/.wheels/browser/` (or the directory in `WHEELS_BROWSER_HOME`) so browser specs can run. The install lives in your home directory, so it is a one-time setup per machine — roughly 370MB on first install.
 
 #### Synopsis
 
@@ -144,7 +144,7 @@ wheels browser setup
 Reads `vendor/wheels/browser-manifest.json`, downloads each missing or mismatched JAR, verifies SHA-256, and installs a matching Chromium build. Subsequent runs skip files that already match the manifest.
 
 <Aside type="note" title="When setup is required">
-Specs that extend `wheels.wheelstest.BrowserTest` short-circuit gracefully when the JARs aren't present — they mark themselves skipped rather than failing. Run `wheels browser setup` once per workspace before you expect browser specs to actually exercise the DSL. The [Browser Tests](../../../testing/browser-tests/) guide covers the `WHEELS_BROWSER_CI_ENABLE` gate that controls the same behavior in CI.
+Specs that extend `wheels.wheelstest.BrowserTest` short-circuit gracefully when the JARs aren't present — they mark themselves skipped rather than failing. Run `wheels browser setup` once per machine before you expect browser specs to actually exercise the DSL. The [Browser Tests](../../../testing/browser-tests/) guide covers the `WHEELS_BROWSER_CI_ENABLE` gate that controls the same behavior in CI.
 </Aside>
 
 ## Common workflows

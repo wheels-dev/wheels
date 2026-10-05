@@ -148,14 +148,14 @@ The `environments` object in `lucee.json` lets you override specific keys for a 
 }
 ```
 
-Select an environment with `--env` (or the short form `-e`) on any command that loads `lucee.json`:
+Select an environment with `--env` (or `--environment`) on any command that loads `lucee.json`:
 
 ```bash title="selecting an environment profile"
 wheels server start --env=prod
-wheels server run -e dev
+wheels server start --environment=dev
 ```
 
-If the environment name you pass isn't defined in `lucee.json`, the CLI fails fast with a message listing the environments that *are* defined. Environment overrides apply both to server-level keys (`port`, `jvm`, `admin`) and to `dependencySettings` (for example, `installDevDependencies: true` in `dev` and `false` in `prod`).
+If the environment name you pass isn't defined in `lucee.json`, the CLI prints `Environment '<name>' not found in lucee.json; using base configuration.` and continues with the base configuration. Environment overrides apply both to server-level keys (`port`, `jvm`, `admin`) and to `dependencySettings` (for example, `installDevDependencies: true` in `dev` and `false` in `prod`).
 
 ### Binary-name profiles (CLI branding)
 
@@ -170,7 +170,7 @@ The CLI reads a small set of environment variables and JVM system properties. Va
 | Name | Read by | Default | Purpose |
 |---|---|---|---|
 | `LUCLI_HOME` | LuCLI core (`LucliPaths`) | `~/.wheels` under the `wheels` binary; `~/.lucli` under `lucli` | Base directory for all user-level state — modules, servers, deps, secrets, settings. |
-| `LUCLI_BACKUPS_DIR` | LuCLI core (`LucliPaths`) | `<LUCLI_HOME>_backups` alongside home | Where backups are written. Override to point backups at a different disk or directory. |
+| `LUCLI_BACKUPS_DIR` | LuCLI core (`LucliPaths`) | `.wheels_backups` (`.lucli_backups` under `lucli`) in the directory that contains the home directory | Where backups are written. Override to point backups at a different disk or directory. `wheels system paths` prints the resolved value. |
 | `JAVA_HOME` | JVM (read by the wheels wrapper) | Set to `openjdk@21` by the Homebrew formula | The JDK the launcher invokes. The wrapper sets this explicitly so a missing shell-level `JAVA_HOME` doesn't break `wheels`. |
 | `LUCLI_LOCALE` | LuCLI (`StringOutput`) | Falls back to `LANG`, then the JVM default | Locale for CLI message output. |
 | `LUCLI_SECRETS_PASSPHRASE` | LuCLI secrets store | (none) | Unlock the encrypted local secrets store non-interactively. Used by CI. |
@@ -179,7 +179,7 @@ The CLI reads a small set of environment variables and JVM system properties. Va
 JVM system-property equivalents exist where relevant: `-Dlucli.home=…`, `-Dlucli.backups.dir=…`, `-Dlucli.locale=…`. These take precedence over the environment variable of the same name. There is no `WHEELS_HOME` — all user-level state uses `LUCLI_HOME` regardless of which binary name launched it.
 
 <Aside type="note" title="The wrapper owns LUCLI_HOME by default">
-The Homebrew formula's launcher (`bin/wheels`) always exports `LUCLI_HOME=$HOME/.wheels` before handing off to the LuCLI binary. That means a `LUCLI_HOME` you exported in your shell is overridden for `wheels` invocations. If you need a different home for a specific run, pass `-Dlucli.home=/path/to/home` as a JVM property instead.
+The Homebrew formula's launcher (`bin/wheels`) always exports `LUCLI_HOME=$HOME/.wheels` before handing off to the LuCLI binary. That means a `LUCLI_HOME` you exported in your shell is overridden for `wheels` invocations. If you need a different home for a specific run, pass it as a JVM property through `LUCLI_JAVA_ARGS`, which the launcher adds to the `java` command line: `LUCLI_JAVA_ARGS="-Dlucli.home=/path/to/home" wheels …`. A `-Dlucli.home=…` typed as a `wheels` argument is not read as a JVM property.
 </Aside>
 
 ## Verbose and timing
@@ -218,25 +218,25 @@ The CLI keeps two kinds of state in two distinct places.
 - `ai/` — AI helper settings and skills.
 - `settings.json` — CLI-level settings.
 
-`<LUCLI_HOME>_backups/` (default `~/.wheels_backups/` or `~/.lucli_backups/`) sits alongside the home directory and holds anything the CLI backed up before a destructive operation.
+The backups directory (default `~/.wheels_backups/` or `~/.lucli_backups/`) sits alongside the home directory and holds anything the CLI backed up before a destructive operation.
 
 ### Running wheels and lucli side by side
 
-Because `wheels` defaults to `~/.wheels` and `lucli` defaults to `~/.lucli`, the two installs are isolated by default — no action needed. If you want `wheels` to share state with a standalone LuCLI install anyway (unusual, but legitimate for debugging), point `LUCLI_HOME` at the shared directory:
+Because `wheels` defaults to `~/.wheels` and `lucli` defaults to `~/.lucli`, the two installs are isolated by default — no action needed. If you want `wheels` to share state with a standalone LuCLI install anyway (unusual, but legitimate for debugging), point the home at the shared directory. The Homebrew launcher overwrites an exported `LUCLI_HOME`, so pass it as the `lucli.home` JVM property:
 
 ```bash title="sharing home directories between wheels and lucli"
-LUCLI_HOME=$HOME/.lucli wheels server status
+LUCLI_JAVA_ARGS="-Dlucli.home=$HOME/.lucli" wheels server status
 ```
 
-If you want a single machine to juggle multiple Wheels installs — say, one for work and one for a personal project — override `LUCLI_HOME` per-shell:
+If you want a single machine to juggle multiple Wheels installs — say, one for work and one for a personal project — set the home per shell the same way:
 
 ```bash title="juggling multiple Wheels installs on one machine"
 # Project A
-export LUCLI_HOME=$HOME/.wheels-work
+export LUCLI_JAVA_ARGS="-Dlucli.home=$HOME/.wheels-work"
 wheels server start
 
 # Project B (new shell)
-export LUCLI_HOME=$HOME/.wheels-personal
+export LUCLI_JAVA_ARGS="-Dlucli.home=$HOME/.wheels-personal"
 wheels server start
 ```
 

@@ -109,6 +109,13 @@ A handful of public CLI commands are excluded from MCP discovery via `mcpHiddenT
 - `new` — scaffolds an entire new project. Destructive and requires interactive prompts for project context.
 - `create` — `create app` forwards to `new`, so it is hidden for the same reason. For the same reason `generate` does not advertise `app` as a `type` over MCP. Both stay available in a terminal. (4.1.2 and earlier list `create` as a tool.)
 - `browser` — multi-step browser testing flow with its own subcommand tree.
+- `coverage` — instruments `app/` on disk, then runs the suite; stateful rather than a single call.
+- `engines` — manages the RustCFML server backend, a dev-server lifecycle command like `start`/`stop`.
+- `framework` — `framework install` writes the framework into `vendor/wheels/`, a side-effecting install.
+- `setup` (and its deprecated forwarder `map`) — writes the agent configuration files described above.
+- `docs` — `docs fetch` downloads the offline documentation bundle.
+- `dbmigrate` — alias for `migrate`, excluded to avoid a duplicate tool entry.
+- `onMissingMethod` — the unknown-command handler; a CFML hook, not a command.
 - `jobs` — `jobs work` is a long-lived worker poll loop with no single-call MCP semantics.
 - `deploy` — Kamal-style production deploys. It reaches remote hosts over SSH, pushes images, and restarts containers, so its side effects land outside your machine. Run it from a terminal. (4.1.0 and earlier still list it as a tool.)
 - `mcpToolSpecs` — the per-tool inputSchema registry LuCLI reads; not itself a tool.
