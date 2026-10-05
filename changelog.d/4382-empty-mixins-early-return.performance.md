@@ -1,0 +1,1 @@
+- An app without plugins no longer pays for plugin mixins on every model and controller instance: `$initializeMixins` now returns early when the component's class has no mixins, instead of copying the whole `variables` scope into `variables.core` for nothing. `new()` and each row of a `returnAs="objects"` finder are about 12% faster on Lucee 7 and 8% faster on RustCFML (#4382)
