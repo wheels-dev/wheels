@@ -20,6 +20,7 @@ excerpt: >-
   one branch and one commit per step.
 coverImage: null
 announcement:
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/4445'
   title: 'From Wheels 2.x to 4.1: a new blog series'
   body: |
     New post: **[2.x to 4.x: why it's two passes, and the map](https://blog.wheels.dev/posts/from-2x-to-41-the-map/)** — the first post in *From 2.x to 4.1: the field guide*. We take a real CFWheels 2.2 app to Wheels 4.1.2 in two passes (2.x to 3.0, then 3.0 to 4.1), one branch and one commit per step, and this post maps what each pass touches. New posts follow on weekdays through October 13.
