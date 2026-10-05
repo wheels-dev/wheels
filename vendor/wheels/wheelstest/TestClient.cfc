@@ -24,6 +24,11 @@ component {
 	variables.contentCache = "";
 	variables.jsonCached = false;
 	variables.jsonCache = "";
+	// The session's authenticity token, picked up from a page this client fetched
+	// and sent on unsafe requests (see csrfToken()). Per instance, never shared.
+	variables.csrfTokenValue = "";
+	variables.csrfSessionFingerprint = "";
+	variables.csrfEnabled = true;
 
 	/**
 	 * Initialize the test client with a base URL.
@@ -41,6 +46,9 @@ component {
 		variables.defaultHeaders = {};
 		variables.cookies = {};
 		variables.sendAsJson = false;
+		variables.csrfTokenValue = "";
+		variables.csrfSessionFingerprint = "";
+		variables.csrfEnabled = true;
 		$clearResponseCaches();
 		if (arguments.testContext) {
 			$attachTestContext();
@@ -432,6 +440,82 @@ component {
 		return this;
 	}
 
+	// ─── CSRF ────────────────────────────────────────────────────────
+
+	/**
+	 * The authenticity token this client sends on POST/PUT/PATCH/DELETE: picked up
+	 * from the last page it fetched that had one (a csrf-token meta tag, else an
+	 * authenticityToken hidden field), as a browser would. It belongs to the
+	 * session: it is dropped when the session cookie changes (a login rotates it),
+	 * and the next page with a token refreshes it. "" when there is none.
+	 */
+	public string function csrfToken() {
+		return variables.csrfTokenValue;
+	}
+
+	/**
+	 * Use this authenticity token, for example one read from a JSON response.
+	 *
+	 * @token The token to send
+	 */
+	public TestClient function withCsrfToken(required string token) {
+		variables.csrfTokenValue = arguments.token;
+		variables.csrfSessionFingerprint = $sessionCookieFingerprint();
+		variables.csrfEnabled = true;
+		return this;
+	}
+
+	/**
+	 * Forget the token and stop picking one up, to test that a protected action
+	 * refuses a request without one. withCsrfToken() or fetchCsrfToken() turn it
+	 * back on.
+	 */
+	public TestClient function withoutCsrfToken() {
+		variables.csrfTokenValue = "";
+		variables.csrfEnabled = false;
+		return this;
+	}
+
+	/**
+	 * GET a page to pick up its authenticity token. Throws
+	 * Wheels.TestClient.CsrfTokenNotFound when the page has none.
+	 *
+	 * @path A page that renders csrfMetaTags() or a form
+	 */
+	public TestClient function fetchCsrfToken(string path = "/") {
+		variables.csrfEnabled = true;
+		get(path = arguments.path);
+		if (!Len(variables.csrfTokenValue)) {
+			Throw(
+				type = "Wheels.TestClient.CsrfTokenNotFound",
+				message = "No authenticity token on #arguments.path#: expected a <meta name=""csrf-token""> tag (csrfMetaTags()) or an authenticityToken hidden field (a form)."
+			);
+		}
+		return this;
+	}
+
+	/**
+	 * The authenticity token in an HTML page: the csrf-token meta tag's content,
+	 * else the first authenticityToken hidden field's value, HTML-decoded. "" when
+	 * there is neither. Public for specs ($-prefixed).
+	 */
+	public string function $extractCsrfToken(required string html) {
+		if (!FindNoCase("<meta", arguments.html) && !FindNoCase("<input", arguments.html)) {
+			return "";
+		}
+		for (var tag in ReMatchNoCase("<meta[^>]*>", arguments.html)) {
+			if (CompareNoCase($tagAttribute(tag, "name"), "csrf-token") == 0) {
+				return $decodeHtmlAttribute($tagAttribute(tag, "content"));
+			}
+		}
+		for (var tag in ReMatchNoCase("<input[^>]*>", arguments.html)) {
+			if (CompareNoCase($tagAttribute(tag, "name"), "authenticityToken") == 0) {
+				return $decodeHtmlAttribute($tagAttribute(tag, "value"));
+			}
+		}
+		return "";
+	}
+
 	// ─── Assertions ──────────────────────────────────────────────────
 
 	/**
@@ -773,6 +857,24 @@ component {
 		var mergedHeaders = StructCopy(variables.defaultHeaders);
 		StructAppend(mergedHeaders, arguments.headers, true);
 
+		// The session's authenticity token on unsafe requests: the X-CSRF-Token
+		// header, and the authenticityToken field on a form body. When the caller
+		// passed either one, that is the token: neither is added.
+		var requestBody = arguments.body;
+		if (
+			ListFindNoCase("POST,PUT,PATCH,DELETE", arguments.method)
+			&& variables.csrfEnabled
+			&& Len(variables.csrfTokenValue)
+			&& !$hasKeyNoCase(mergedHeaders, "X-CSRF-Token")
+			&& !$hasKeyNoCase(requestBody, "authenticityToken")
+		) {
+			mergedHeaders["X-CSRF-Token"] = variables.csrfTokenValue;
+			if (arguments.method != "DELETE" && !variables.sendAsJson) {
+				requestBody = StructCopy(requestBody);
+				requestBody["authenticityToken"] = variables.csrfTokenValue;
+			}
+		}
+
 		// The cookie jar goes out as one Cookie header, each value exactly as the
 		// server set it, as a browser sends it. Not cfhttpparam type="cookie": it
 		// URL-encodes the value again, so a value the server had already encoded
@@ -805,15 +907,15 @@ component {
 			// param for these methods — an empty body is valid — instead of
 			// skipping when the body struct is empty.
 			if (ListFindNoCase("POST,PUT,PATCH", arguments.method)) {
-				if (!StructIsEmpty(arguments.body) && !variables.sendAsJson) {
-					for (var fName in arguments.body) {
-						cfhttpparam(type = "formfield", name = fName, value = arguments.body[fName]);
+				if (!StructIsEmpty(requestBody) && !variables.sendAsJson) {
+					for (var fName in requestBody) {
+						cfhttpparam(type = "formfield", name = fName, value = requestBody[fName]);
 					}
 				} else {
 					// This branch covers both JSON posts (any body) and empty-body
 					// form posts — the latter still needs a body param so the POST
 					// isn't left with zero cfhttpparam tags.
-					cfhttpparam(type = "body", value = StructIsEmpty(arguments.body) ? "" : SerializeJSON(arguments.body));
+					cfhttpparam(type = "body", value = StructIsEmpty(requestBody) ? "" : SerializeJSON(requestBody));
 				}
 			}
 		}
@@ -825,6 +927,94 @@ component {
 		if (StructKeyExists(result, "responseHeader") && IsStruct(result.responseHeader)) {
 			$absorbSetCookies(result.responseHeader);
 		}
+
+		$syncCsrfToken();
+	}
+
+	/**
+	 * After a response: drop the token when the session cookie changed (a new
+	 * session has a new token), then pick up the token on this page, if any.
+	 */
+	private void function $syncCsrfToken() {
+		var fingerprint = $sessionCookieFingerprint();
+		if (Len(variables.csrfTokenValue) && Compare(fingerprint, variables.csrfSessionFingerprint) != 0) {
+			variables.csrfTokenValue = "";
+		}
+		if (!variables.csrfEnabled) {
+			return;
+		}
+		var found = $extractCsrfToken(content());
+		if (Len(found)) {
+			variables.csrfTokenValue = found;
+			variables.csrfSessionFingerprint = fingerprint;
+		}
+	}
+
+	/**
+	 * The values of the cookies that identify the session (CFID, CFTOKEN,
+	 * JSESSIONID, any *session* cookie), in name order, so a change to any of them
+	 * shows. Not the cookie-store CSRF cookie: it can be re-encrypted on every
+	 * response while the token inside it stays the same.
+	 */
+	private string function $sessionCookieFingerprint() {
+		var names = StructKeyArray(variables.cookies);
+		ArraySort(names, "textnocase");
+		var parts = [];
+		for (var name in names) {
+			if (ReFindNoCase("^(cfid|cftoken|jsessionid|bxid)$|session", name)) {
+				ArrayAppend(parts, LCase(name) & "=" & variables.cookies[name]);
+			}
+		}
+		return ArrayToList(parts, ";");
+	}
+
+	/**
+	 * An attribute's value from one HTML tag (double or single quotes), or "".
+	 */
+	private string function $tagAttribute(required string tag, required string attribute) {
+		var match = ReFindNoCase("[\s]" & arguments.attribute & "[\s]*=[\s]*(""([^""]*)""|'([^']*)')", arguments.tag, 1, true);
+		if (match.pos[1] == 0) {
+			return "";
+		}
+		if (ArrayLen(match.pos) >= 3 && match.pos[3] > 0) {
+			return Mid(arguments.tag, match.pos[3], match.len[3]);
+		}
+		if (ArrayLen(match.pos) >= 4 && match.pos[4] > 0) {
+			return Mid(arguments.tag, match.pos[4], match.len[4]);
+		}
+		return "";
+	}
+
+	/**
+	 * Decode the HTML entities an encoded attribute value can carry: numeric
+	 * (&#NN; and &#xHH;) and &amp; &quot; &lt; &gt; &apos;.
+	 */
+	private string function $decodeHtmlAttribute(required string value) {
+		var rv = arguments.value;
+		if (!Find(Chr(38), rv)) {
+			return rv;
+		}
+		var match = ReFind("&##(x[0-9A-Fa-f]+|[0-9]+);", rv, 1, true);
+		while (match.pos[1] > 0) {
+			var code = Mid(rv, match.pos[2], match.len[2]);
+			var charCode = Left(code, 1) == "x" ? InputBaseN(Mid(code, 2, Len(code) - 1), 16) : Val(code);
+			rv = (match.pos[1] > 1 ? Left(rv, match.pos[1] - 1) : "") & Chr(charCode) & Mid(rv, match.pos[1] + match.len[1], Len(rv));
+			match = ReFind("&##(x[0-9A-Fa-f]+|[0-9]+);", rv, match.pos[1] + 1, true);
+		}
+		rv = ReplaceNoCase(rv, "&quot;", """", "all");
+		rv = ReplaceNoCase(rv, "&lt;", "<", "all");
+		rv = ReplaceNoCase(rv, "&gt;", ">", "all");
+		rv = ReplaceNoCase(rv, "&apos;", "'", "all");
+		return ReplaceNoCase(rv, "&amp;", "&", "all");
+	}
+
+	private boolean function $hasKeyNoCase(required struct data, required string key) {
+		for (var existing in arguments.data) {
+			if (CompareNoCase(existing, arguments.key) == 0) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

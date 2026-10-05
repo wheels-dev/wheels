@@ -53,23 +53,18 @@ set(functionName = "sendEmail", deliver = false);
 
 To turn delivery off for a single spec instead, see `.ai/mailers.md`.
 
-## POSTs through the test client need the CSRF token
+## POSTs through the test client and CSRF
 
-Controllers extending the app's `Controller` call `protectsFromForgery()`, so a `$testClient()` POST, PUT or DELETE without the authenticity token gets a 403. Fetch a page first (the client keeps the session cookie), read the token from the `csrf-token` meta tag (`csrfMetaTags()` in the layout), and send it as `authenticityToken` or the `X-CSRF-Token` header:
+Controllers extending the app's `Controller` call `protectsFromForgery()`, so a POST, PUT, PATCH or DELETE needs the session's authenticity token. `$testClient()` handles it like a browser: fetch a page that has the token (a form, or `csrfMetaTags()` in the layout) and the client sends it on the next unsafe requests, as the `X-CSRF-Token` header and the `authenticityToken` form field:
 
 ```cfm
 var testClient = $testClient();
 testClient.get("/posts/new");
-testClient.post("/posts", {"authenticityToken": csrfToken(testClient), "post[title]": "T", "post[body]": "B"})
+testClient.post("/posts", {"post[title]": "T", "post[body]": "B"})
     .assertRedirect();  // redirectTo() answers a POST with 303
-
-// in the spec component:
-private string function csrfToken(required any testClient) {
-    var html = arguments.testClient.content();
-    var match = ReFindNoCase('<meta[^>]*name="csrf-token"[^>]*>', html, 1, true);
-    return match.len[1] ? ReReplaceNoCase(Mid(html, match.pos[1], match.len[1]), '.*content="([^"]*)".*', "\1") : "";
-}
 ```
+
+After a login, the session (and its token) changes: GET a page again before the next form post. Also `fetchCsrfToken(path)`, `csrfToken()`, `withCsrfToken(token)`, and `withoutCsrfToken()` to test the 403.
 
 ## Setting the client address
 
