@@ -171,6 +171,10 @@ component {
         // Port the app listens on inside the container — the kamal-proxy
         // --target. Resolved from proxy.app_port (default 80); see #3089.
         var appPort = cfg.proxy().appPort();
+        // The one host that migrates the database (#4063), resolved before the
+        // lock so a bad migrate: block fails without stranding it. {} when
+        // deploy.yml has no migrate: block.
+        var migrateTarget = $migrateTarget(cfg);
 
         // env.secret delivery (#2957): render the env-file content ONCE,
         // before the lock or any remote call, so an unresolvable secret
@@ -231,8 +235,10 @@ component {
                 // seconds apart. Without one, hosts boot back to back.
                 var bootConfigured = structKeyExists(cfg.raw(), "boot");
                 var boot = cfg.boot();
-                for (var role in cfg.roles()) {
-                    var roleHosts = role.hosts();
+                // With migrate: (#4063) the migrate host boots and cuts over
+                // first, so its health check gates every other host.
+                for (var role in $migrateOrderedRoles(cfg.roles(), migrateTarget)) {
+                    var roleHosts = $migrateOrderedHosts(role, migrateTarget);
                     var batchSize = bootConfigured ? boot.batchSize(arrayLen(roleHosts)) : arrayLen(roleHosts);
                     var hostNumber = 0;
                     for (var host in roleHosts) {
@@ -254,15 +260,25 @@ component {
                                 dryRun
                             );
                         }
-                        $dispatch([host], app.run(role, ver), dryRun);
+                        var isMigrateHost = $isMigrateHost(role, host, migrateTarget);
+                        $dispatch([host], app.run(role, ver, isMigrateHost ? "true" : ""), dryRun);
                         // Only proxy-fronted roles register with kamal-proxy —
-                        // job/worker roles serve no traffic (#2957).
+                        // job/worker roles serve no traffic (#2957). On the
+                        // migrate host the health check also waits out the
+                        // migrations, and a failed one stops the deploy here.
                         if (role.runningProxy()) {
                             $dispatch(
                                 [host],
-                                proxy.deploy(role, app.container_name(role, ver) & ":" & appPort),
+                                proxy.deploy(
+                                    role,
+                                    app.container_name(role, ver) & ":" & appPort,
+                                    isMigrateHost ? cfg.migrate().timeout() : 0
+                                ),
                                 dryRun
                             );
+                        }
+                        if (isMigrateHost) {
+                            $dispatch(hosts, auditor.record("migrated the database on " & host & " for version " & ver), dryRun, true);
                         }
                         // Post-cutover cleanup: stop superseded versions
                         // (#2957 DEP-11a). Best-effort (allowFail) — a failed
@@ -312,6 +328,102 @@ component {
             "Deployed " & cfg.service() & " version " & ver
                 & " to " & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", ")
         );
+    }
+
+    /**
+     * The role and host that migrate the database (#4063), or {} when
+     * deploy.yml has no migrate: block. The default is the first host of the
+     * first role; migrate.host picks another. It must belong to a proxy-fronted
+     * role, because that role's health check is what stops a deploy whose
+     * migration failed before any host cuts over.
+     */
+    private struct function $migrateTarget(required any cfg) {
+        var migrate = arguments.cfg.migrate();
+        if (!migrate.enabled()) {
+            return {};
+        }
+        var roles = arguments.cfg.roles();
+        if (!$hasProxyRole(roles)) {
+            throw(
+                type = "DeployMainCli.InvalidMigrateConfig",
+                message = "migrate: needs a proxy-fronted role (web, or a role with proxy: true), because its health check is what stops a deploy whose migration failed. This deploy.yml has only job/worker roles, so remove migrate: and run the migrations yourself."
+            );
+        }
+        var wanted = migrate.host();
+        if (!len(wanted)) {
+            if (!roles[1].runningProxy()) {
+                throw(
+                    type = "DeployMainCli.InvalidMigrateConfig",
+                    message = "migrate: defaults to the first host of the first role ('#roles[1].name()#'), which is not proxy-fronted. Set migrate.host to a host of a proxy-fronted role."
+                );
+            }
+            return {role: roles[1].name(), host: roles[1].hosts()[1]};
+        }
+        var foundInRole = "";
+        for (var role in roles) {
+            for (var host in role.hosts()) {
+                if (compare(trim(host), wanted) == 0) {
+                    if (role.runningProxy()) {
+                        return {role: role.name(), host: host};
+                    }
+                    foundInRole = role.name();
+                }
+            }
+        }
+        throw(
+            type = "DeployMainCli.InvalidMigrateConfig",
+            message = len(foundInRole)
+                ? "migrate.host '#wanted#' is in the '#foundInRole#' role, which is not proxy-fronted. Pick a host of a proxy-fronted role."
+                : "migrate.host '#wanted#' is not a host of any role in servers:."
+        );
+    }
+
+    private boolean function $hasProxyRole(required array roles) {
+        for (var role in arguments.roles) {
+            if (role.runningProxy()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The roles in deploy order: the migrate host's role first (#4063). */
+    private array function $migrateOrderedRoles(required array roles, required struct target) {
+        if (structIsEmpty(arguments.target)) {
+            return arguments.roles;
+        }
+        var first = [];
+        var rest = [];
+        for (var role in arguments.roles) {
+            if (role.name() == arguments.target.role) {
+                arrayAppend(first, role);
+            } else {
+                arrayAppend(rest, role);
+            }
+        }
+        arrayAppend(first, rest, true);
+        return first;
+    }
+
+    /** A role's hosts in deploy order: the migrate host first in its role (#4063). */
+    private array function $migrateOrderedHosts(required any role, required struct target) {
+        var hosts = arguments.role.hosts();
+        if (structIsEmpty(arguments.target) || arguments.role.name() != arguments.target.role) {
+            return hosts;
+        }
+        var ordered = [arguments.target.host];
+        for (var host in hosts) {
+            if (compare(host, arguments.target.host) != 0) {
+                arrayAppend(ordered, host);
+            }
+        }
+        return ordered;
+    }
+
+    private boolean function $isMigrateHost(required any role, required string host, required struct target) {
+        return !structIsEmpty(arguments.target)
+            && arguments.role.name() == arguments.target.role
+            && compare(arguments.host, arguments.target.host) == 0;
     }
 
     /**

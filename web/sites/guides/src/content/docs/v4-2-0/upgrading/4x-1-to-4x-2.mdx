@@ -222,9 +222,17 @@ A bare property or method name in a `condition` or `unless` expression now means
 
 With `showErrorInformation` off (the default outside development), the error page now returns the HTTP status that fits the Wheels error instead of `500` for every error ([#4238](https://github.com/wheels-dev/wheels/pull/4238)): `404` for an unknown route, record, view, file or action (`Wheels.RouteNotFound`, `RecordNotFound`, `ViewNotFound`, `FileNotFound`, `ActionNotAllowed`, `ActionParameterMissing`), `403` for `Wheels.NotAuthorized` or an invalid CSRF token, and `406` for `Wheels.FormatNotAcceptable`. Other `Wheels.*NotFound` errors, such as a missing table, datasource or model, still return `500`, so monitoring still sees server faults. Development already returned these statuses. Monitoring, alerts or log searches that count production `500`s will see fewer of them; if one keys on `500` for these cases, update it to the new statuses.
 
+### Controller method integration is cached per class
+
+Outside development, Wheels now works out once per controller class which framework helpers to mix into a controller and which `super<name>` aliases to create, and applies that to every new instance ([#4149](https://github.com/wheels-dev/wheels/issues/4149)). The new `cacheControllerIntegration` setting is `true` in every environment except development. One rare pattern changes: a controller that defines a method only in some cases while it's being constructed, and calls `super<name>()` for it, no longer gets that `super<name>` alias. Set `set(cacheControllerIntegration=false)` for such an app. See [Controller method integration cache](/v4-2-0/digging-deeper/caching/#controller-method-integration-cache).
+
 ### `renderNotFound` is a framework helper
 
 `renderNotFound(message, type, extendedInfo)` is a new public controller helper that produces a 404 from app code ([#3900](https://github.com/wheels-dev/wheels/issues/3900)). Because it is public, it is now a reserved action name: an existing controller **action** literally named `renderNotFound` gets `Wheels.ActionNotAllowed` instead of dispatching. Rename such an action. A controller that already defines its own `renderNotFound` helper overrides the framework one, and that keeps working.
+
+### `isSafeRedirectUrl` is a framework helper
+
+`isSafeRedirectUrl(redirectUrl)` is a new public controller helper that reports whether a URL stays on this site, by the same rule `redirectTo(url=…)` applies ([#4217](https://github.com/wheels-dev/wheels/issues/4217)). Like `renderNotFound` above, it is now a reserved action name: an existing controller **action** named `isSafeRedirectUrl` gets `Wheels.ActionNotAllowed` instead of dispatching. Rename such an action. A controller that already defines its own `isSafeRedirectUrl` helper overrides the framework one, and that keeps working.
 
 ### A failed `verifies()` without a handler returns 400
 
@@ -253,6 +261,15 @@ t.bigInteger(columnNames = "accountId", unsigned = true);
 On Oracle, new `t.integer()`, `t.references()` and `id` columns are `NUMBER(10)`, new `t.bigInteger()` columns are `NUMBER(19)`, and new `t.boolean()` columns before Oracle 23ai are `NUMBER(1)` ([#4097](https://github.com/wheels-dev/wheels/issues/4097)). Earlier releases created a bare `NUMBER`, which binds as a decimal and validates as a float. The new columns validate as integers, so a fractional value such as `1.5` now fails automatic validation instead of being stored. Existing columns are unchanged and keep their current typing, and `changeColumn()` without a `precision` argument keeps a column's current precision, so it never re-types one. To convert one, see [Integer columns on Oracle](/v4-2-0/basics/migrations/).
 
 On Oracle 23ai and later, new `t.boolean()` columns are a native `BOOLEAN` ([#4057](https://github.com/wheels-dev/wheels/pull/4057)), which the model maps to `cf_sql_bit`; earlier Oracle releases get `NUMBER(1)` as above. Existing numeric boolean columns are unchanged.
+
+### Wide numbers are stored and matched exactly
+
+Two kinds of number used to reach the database as a different value, and are now bound exactly:
+
+- On Oracle, a whole number outside the signed 64-bit range (above 9,223,372,036,854,775,807 or below -9,223,372,036,854,775,808) written to or compared against a `NUMBER` column. It was clamped, wrapped or rounded depending on the engine ([#4162](https://github.com/wheels-dev/wheels/issues/4162)).
+- On Lucee and BoxLang with PostgreSQL, SQL Server, MySQL or CockroachDB, a `DECIMAL` or `NUMERIC` value with more than 15 significant digits. It went through a double ([#4172](https://github.com/wheels-dev/wheels/issues/4172)). Values with up to 15 significant digits, which covers typical money amounts, bind as before.
+
+Nothing needs to change in your code. If your app stores such values, rows written before 4.2 may hold the altered number, and a `where` on the exact value now matches only rows that were stored exactly. Check those columns.
 
 ### SQLite date columns are validated as dates
 
@@ -323,13 +340,21 @@ A worker now records the `timeout` it claimed a job with, and a stale job is rea
 
 A valid `X-CSRF-Token` header now passes CSRF protection on any non-GET request ([#3959](https://github.com/wheels-dev/wheels/issues/3959)). In 4.1 the header was read only when the request also sent `X-Requested-With: XMLHttpRequest`, which Turbo and `fetch()` don't send. Nothing breaks: clients that send both keep working, and a request passes when either the form field or the header holds a valid token. `startFormTag()` and `buttonTo()` gain `authenticityToken=false` to leave the hidden field out of markup that is cached and shared.
 
+### Migrations run under a cross-process lock
+
+Instances that share a database now take turns running migrations ([#4134](https://github.com/wheels-dev/wheels/issues/4134)). The first `migrateTo()` creates a `wheels_migrator_locks` table, unless `createMigratorTable` is off, in which case there's no lock until you create the table. An instance that finds another one migrating waits up to `migrationLockTimeout` seconds (default 300), then fails with `Wheels.MigrationLockTimeout`. A long-running single migration step needs `migrationLockLease` (default 3600 seconds) set above its duration. If an instance died holding the lock, delete its row from `wheels_migrator_locks`, or wait for its lease to run out.
+
 ### An empty `default` on a non-string column means no default
 
 In a migration, `default=""` on a column that isn't string-like (`bigInteger`, `binary`, `uniqueidentifier`, `integer`, `decimal`, `float`, `date` and so on) now means "no default" ([#4248](https://github.com/wheels-dev/wheels/pull/4248)). It renders as `DEFAULT NULL` when the column allows null and as no `DEFAULT` clause on a `NOT NULL` column. In 4.1, `bigInteger` and `uniqueidentifier` emitted a bare `DEFAULT`, `binary` emitted `DEFAULT ''`, and a `NOT NULL` column got `DEFAULT NULL NOT NULL`, which MySQL rejects; those migrations failed. They now run. Migrations that already worked produce the same schema.
 
+### Unsupported migration column types fail at migrate time
+
+A migration that uses a column type the database adapter doesn't map, such as `t.column(columnName="payload", columnType="jsonb")`, now fails with `Wheels.Migrator.UnsupportedColumnType`, naming the type and the adapter ([#4095](https://github.com/wheels-dev/wheels/issues/4095)). Earlier releases emitted the column with no type. On most databases that was already a DDL error. On SQLite it created a typeless column whose model failed to load. If an existing SQLite migration relies on that, change the column to a supported type (for example `text` for JSON) before running it on a fresh database. The error's details list the supported types. Every type the `t.*()` column helpers emit is supported on every adapter.
+
 ### `withAdvisoryLock()` can throw `Wheels.AdvisoryLockReleaseFailed`
 
-On MySQL and PostgreSQL, `withAdvisoryLock()` now checks that the lock was released ([#4197](https://github.com/wheels-dev/wheels/issues/4197)). These locks belong to the pooled database session that took them, and on Lucee and BoxLang a busy pool can run the release on a different session, which frees nothing. Wheels retries the release for up to 5 seconds and then throws `Wheels.AdvisoryLockReleaseFailed`, naming the lock, if our session still holds it. The callback has already finished when this is thrown. If the callback itself threw, the failed release is logged instead and the callback's error is what you get. A lock left held stays held until that pooled connection closes, so other callers wait or time out on it. Before 4.2 this went unnoticed. The case is rare, but a scheduled job that relies on the lock should catch the exception and alert. Callers in the same application now also wait for each other, within `timeout`, before taking the database lock. Holding one connection for the whole call, which removes the case, is planned for 4.3 ([#4198](https://github.com/wheels-dev/wheels/issues/4198)).
+On MySQL and PostgreSQL, `withAdvisoryLock()` now checks that the lock was released ([#4197](https://github.com/wheels-dev/wheels/issues/4197)). These locks belong to the pooled database session that took them, and on Lucee and BoxLang a busy pool can run the release on a different session, which frees nothing. Wheels retries the release for up to 5 seconds and then throws `Wheels.AdvisoryLockReleaseFailed`, naming the lock, if our session still holds it. The callback has already finished when this is thrown. If the callback itself threw, the failed release is logged instead and the callback's error is what you get. A lock left held stays held until that pooled connection closes, so other callers wait or time out on it. Before 4.2 this went unnoticed. The case is rare, but a scheduled job that relies on the lock should catch the exception and alert. Callers in the same application now also wait for each other, within `timeout`, before taking the database lock. To hold one connection for the whole call, which removes this case, pass `transaction = true` to `withAdvisoryLock()` ([#4198](https://github.com/wheels-dev/wheels/issues/4198)): it pins the lock, the callback, and the release to one connection inside a transaction (PostgreSQL, MySQL, and SQL Server; other databases throw). The callback then runs inside a transaction, so prefer it for short critical sections. On MySQL and SQL Server, `transaction = true` inside a transaction that is already open throws `Wheels.AdvisoryLockNotSupported`, because their lock would be released before the outer transaction commits: take the lock outside the transaction. PostgreSQL joins the open transaction and holds the lock until it ends.
 
 ### `LocalDisk` storage keys are checked per segment
 
@@ -340,6 +365,12 @@ On MySQL and PostgreSQL, `withAdvisoryLock()` now checks that the lock was relea
 - **Normalised:** a leading `/`, a trailing `/`, a doubled `//` and a network-share prefix now become a relative key under the disk's root. Keys are never URL-decoded.
 
 If your app builds storage keys from user input or file names, check that none of them depend on the old behaviour.
+
+### `singularize()` corrects some `-ses` words
+
+`singularize()` now returns `psychoanalysis` for `psychoanalyses`, and likewise for any word that ends in `analyses` without starting with it ([#4187](https://github.com/wheels-dev/wheels/issues/4187)). 4.1 returned the misspelling `psychoanalyasis`. `singularize("databases")` now returns `database` rather than `databasis`, so `Databases` and `userDatabases` give `Database` and `userDatabase` ([#4189](https://github.com/wheels-dev/wheels/issues/4189)).
+
+`analyses`, `bases`, `cases`, `diagnoses`, `parentheses`, `phases`, `prognoses`, `purchases`, `synopses`, `theses` and `vases` are unchanged. Wheels derives model and table names with `singularize()` and `pluralize()`, so check any name you derived from such a word. A model class or table named after the old `databasis` output needs renaming.
 
 ## CLI and deployment changes
 
@@ -371,6 +402,7 @@ From [#3914](https://github.com/wheels-dev/wheels/issues/3914), [#3925](https://
 - **App containers can mount `volumes:`.** A top-level `volumes:` list (Kamal's `host:container` or `host:container:ro|rw` format) is mounted on every app container. For a SQLite app, mounting `db/` from the host (`/var/lib/<service>/db:/var/www/db`) keeps the database across redeploys, and `deploy init` now shows that entry. See the [config reference](/v4-2-0/deployment/config-reference/#volumes).
 - **Breaking: an accessory `port:` must name a bind address** ([#4067](https://github.com/wheels-dev/wheels/issues/4067)). A bare `port: 5432`, or `"5432:5432"`, now fails validation. In 4.1 it went to `docker run --publish` as written, which published on a random host port (bare) or on every interface (`5432:5432`). Write `"<address>:<host port>:<container port>"`: `"10.0.0.20:5432:5432"` for a private network address, `"127.0.0.1:5432:5432"` for the host only, or `"0.0.0.0:5432:5432"` to publish it on every interface.
 - **Volume host paths are passed as written.** Accessory `volumes:` / `directories:` arguments are now quoted like the other docker arguments, so paths with spaces or special characters work. In 4.1 they went through the remote shell unquoted, so a `~` or `$VAR` at the start of a host path happened to expand there. It isn't expanded any more, and a host path starting with `~` or `$` now fails validation with `… needs an absolute host path`. Write absolute paths: `/home/deploy/data:/data`, not `~/data:/data`.
+- **New `migrate:` step** ([#4063](https://github.com/wheels-dev/wheels/issues/4063)). `migrate: true` in `config/deploy.yml` migrates on one host per deploy and turns migration at start off on the others; see [`migrate`](/v4-2-0/deployment/config-reference/#migrate). The framework adds `set(migrateOnBoot=true)` (migrate strictly at start) and honours a `WHEELS_MIGRATE_ON_BOOT` environment variable, which overrides `autoMigrateDatabase` when set: if your environment already sets that name for something else, rename it.
 - **`deploy config` prints the whole resolved config** (proxy, env, volumes, accessories, ssh, builder). A `registry.password` entry is shown only when it names a key in `.kamal/secrets`.
 
 ## Verify

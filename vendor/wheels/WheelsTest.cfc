@@ -504,4 +504,98 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         }
     }
 
+    /**
+     * Snapshot EVERY route-derived structure into an opaque struct that
+     * $restoreRoutes() replays to reproduce byte-identical route state.
+     *
+     * Route specs that redefine the table must restore it in afterEach or
+     * they leak stale state into later specs (routes, staticRoutes, and
+     * namedRoutePositions are separate structures; $setNamedRoutePositions()
+     * APPENDS and mapper().end() rebuilds staticRoutes, so a partial restore
+     * is the #4192 bug class). These helpers centralise the full set:
+     *
+     *   beforeEach(() => { variables._routes = $snapshotRoutes(); $clearRoutes();
+     *                      g.mapper()...end(); g.$setNamedRoutePositions(); });
+     *   afterEach(() => $restoreRoutes(variables._routes));
+     *
+     * Managed keys (each guarded, so this works on develop now and auto-covers
+     * #4183's dynamicRouteIndex / routeTableGeneration once it merges):
+     *   application[appKey].{routes, staticRoutes, namedRoutePositions,
+     *                        urlForCache, dynamicRouteIndex, routeTableGeneration}
+     *   request.wheels.urlForCache  (the whole core suite runs in ONE request,
+     *                                so this request-scoped memo persists across specs)
+     */
+    public struct function $snapshotRoutes() {
+        return {
+            route = $captureRouteStateKeys(
+                application[$routeStateAppKey()],
+                "routes,staticRoutes,namedRoutePositions,urlForCache,dynamicRouteIndex,routeTableGeneration"
+            ),
+            request = StructKeyExists(request, "wheels")
+                ? $captureRouteStateKeys(request.wheels, "urlForCache")
+                : {}
+        };
+    }
+
+    /** Restore route state captured by $snapshotRoutes(), exactly — a managed key absent at snapshot time is deleted. */
+    public void function $restoreRoutes(required struct snapshot) {
+        $applyRouteStateKeys(application[$routeStateAppKey()], arguments.snapshot.route);
+        if (StructKeyExists(request, "wheels") && StructKeyExists(arguments.snapshot, "request")) {
+            $applyRouteStateKeys(request.wheels, arguments.snapshot.request);
+        }
+    }
+
+    /** Empty the route table and invalidate every route cache (for the snapshot -> clear -> rebuild -> restore idiom). */
+    public void function $clearRoutes() {
+        var scope = application[$routeStateAppKey()];
+        scope.routes = [];
+        scope.staticRoutes = {};
+        scope.namedRoutePositions = {};
+        StructDelete(scope, "dynamicRouteIndex");
+        if (StructKeyExists(scope, "urlForCache")) {
+            StructClear(scope.urlForCache);
+        }
+        if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "urlForCache")) {
+            StructClear(request.wheels.urlForCache);
+        }
+    }
+
+    /** The application key the route table and caches live under ("wheels" unless the framework reports otherwise). */
+    private string function $routeStateAppKey() {
+        if (StructKeyExists(application, "wo") && StructKeyExists(application.wo, "$appKey")) {
+            try {
+                var resolved = application.wo.$appKey();
+                if (Len(resolved) && StructKeyExists(application, resolved)) {
+                    return resolved;
+                }
+            } catch (any e) {
+            }
+        }
+        return "wheels";
+    }
+
+    /** Deep-copy each listed key from a scope, recording whether it was present (so restore can delete absent ones). */
+    private struct function $captureRouteStateKeys(required struct scope, required string keyList) {
+        var captured = {};
+        for (var key in ListToArray(arguments.keyList)) {
+            if (StructKeyExists(arguments.scope, key)) {
+                captured[key] = {present = true, value = Duplicate(arguments.scope[key])};
+            } else {
+                captured[key] = {present = false};
+            }
+        }
+        return captured;
+    }
+
+    /** Replay captured keys onto a scope: present -> deep-copy back; absent -> delete. */
+    private void function $applyRouteStateKeys(required struct scope, required struct captured) {
+        for (var key in arguments.captured) {
+            if (arguments.captured[key].present) {
+                arguments.scope[key] = Duplicate(arguments.captured[key].value);
+            } else {
+                StructDelete(arguments.scope, key);
+            }
+        }
+    }
+
 }

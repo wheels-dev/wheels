@@ -77,6 +77,11 @@ component {
 		return new Boot(b);
 	}
 
+	/** The `migrate:` block (#4063); disabled when absent. */
+	public any function migrate() {
+		return new Migrate(structKeyExists(variables.raw, "migrate") ? variables.raw.migrate : false);
+	}
+
 	public array function roles() {
 		var servers = variables.raw.servers;
 

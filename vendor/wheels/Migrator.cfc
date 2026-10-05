@@ -25,6 +25,19 @@ component output="false" extends="wheels.Global"{
 	 * @missingMigFlag Flag for any available missing migrations
 	 */
 	public string function migrateTo(string version = "", boolean missingMigFlag = false) {
+		local.migrationLock = $acquireMigrationLock();
+		try {
+			local.rv = $migrateToUnderLock(argumentCollection = arguments);
+		} finally {
+			$releaseMigrationLock(local.migrationLock);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. migrateTo(), run while holding the migration lock (#4134).
+	 */
+	public string function $migrateToUnderLock(string version = "", boolean missingMigFlag = false) {
 		local.rv = "";
 		local.appKey = $appKey();
 		$resetStepFailure();
@@ -221,6 +234,19 @@ component output="false" extends="wheels.Global"{
 	 * @version The version number of the specific migration to run
 	 */
 	public string function migrateIndividual(required string version) {
+		local.migrationLock = $acquireMigrationLock();
+		try {
+			local.rv = $migrateIndividualUnderLock(argumentCollection = arguments);
+		} finally {
+			$releaseMigrationLock(local.migrationLock);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. migrateIndividual(), run while holding the migration lock (#4134).
+	 */
+	public string function $migrateIndividualUnderLock(required string version) {
 		local.rv = "";
 		local.appKey = $appKey();
 		$resetStepFailure();
@@ -353,6 +379,19 @@ component output="false" extends="wheels.Global"{
 	 * @version The Database schema version to rerun
 	 */
 	public string function redoMigration(string version = "") {
+		local.migrationLock = $acquireMigrationLock();
+		try {
+			local.rv = $redoMigrationUnderLock(argumentCollection = arguments);
+		} finally {
+			$releaseMigrationLock(local.migrationLock);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. redoMigration(), run while holding the migration lock (#4134).
+	 */
+	public string function $redoMigrationUnderLock(string version = "") {
 		local.appKey = $appKey();
 		$resetStepFailure();
 		// Mutating entry point — bootstrap the system tables before any read.
@@ -380,6 +419,379 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. Takes the cross-process migration lock for the migrator's datasource
+	 * (#4134), so instances that share a database run its migrations one at a time. The lock is
+	 * a lease row in the migration lock table: an instance inserts it, or takes it over once its
+	 * lease has expired, and otherwise waits up to `migrationLockTimeout` seconds. Re-entrant per
+	 * datasource on one thread of execution; another request or a `cfthread` is a separate holder. Returns the migration lock to pass to $releaseMigrationLock(); `active`
+	 * is false where no lock is taken (SQL preview mode, or a missing lock table that the
+	 * migrator may not create).
+	 */
+	public struct function $acquireMigrationLock() {
+		local.dataSource = $migratorDataSource();
+		local.key = $migrationLockKey(local.dataSource);
+		local.held = $heldMigrationLocks();
+		if (Len(local.key) && StructKeyExists(local.held, local.key)) {
+			local.held[local.key].depth++;
+			return {dataSource = local.dataSource, key = local.key, active = true, reentered = true};
+		}
+		if (!$migrationLockAvailable(local.dataSource)) {
+			return {dataSource = local.dataSource, key = local.key, active = false, reentered = false};
+		}
+		local.owner = Replace(CreateUUID(), "-", "", "all");
+		// Without a thread identity every acquisition is its own holder and takes the database lock.
+		if (!Len(local.key)) {
+			local.key = local.dataSource & "|untracked-" & local.owner;
+		}
+		local.migrationLock = {
+			key = local.key,
+			dataSource = local.dataSource,
+			active = true,
+			reentered = false,
+			depth = 1,
+			owner = local.owner
+		};
+		$waitForMigrationLock(local.migrationLock);
+		local.held[local.key] = local.migrationLock;
+		return local.migrationLock;
+	}
+
+	/**
+	 * Internal function. Releases a migration lock from $acquireMigrationLock(). A failed release is logged,
+	 * never thrown, so it can't replace a migration's own error; the lease then expires.
+	 */
+	public void function $releaseMigrationLock(required struct migrationLock) {
+		if (!arguments.migrationLock.active) {
+			return;
+		}
+		local.held = $heldMigrationLocks();
+		if (arguments.migrationLock.reentered) {
+			// The outer holder may already have released it (it then deleted the entry).
+			if (StructKeyExists(local.held, arguments.migrationLock.key)) {
+				local.held[arguments.migrationLock.key].depth--;
+			}
+			return;
+		}
+		StructDelete(local.held, arguments.migrationLock.key);
+		try {
+			$migrationLockQuery(
+				sql = "DELETE FROM #$migrationLockTable()# WHERE lockname = :lockName AND lockowner = :owner",
+				params = {lockName = $migrationLockText($migrationLockName()), owner = $migrationLockText(arguments.migrationLock.owner)}
+			);
+		} catch (any e) {
+			WriteLog(type = "error", file = "wheels", text = "Migrator: could not release the migration lock: #e.message#");
+		}
+	}
+
+	/**
+	 * Internal function. Extends the lease of the lock this request holds for the migrator's
+	 * datasource (#4134). Throws Wheels.MigrationLockLost when the lease expired and another
+	 * instance took the lock over, so no further migration step runs.
+	 */
+	public void function $renewMigrationLock() {
+		local.held = $heldMigrationLocks();
+		local.key = $currentMigrationLockKey($migratorDataSource());
+		if (!Len(local.key)) {
+			return;
+		}
+		local.migrationLock = local.held[local.key];
+		$migrationLockQuery(
+			sql = "UPDATE #$migrationLockTable()# SET expiresat = :expiresAt WHERE lockname = :lockName AND lockowner = :owner",
+			params = {
+				expiresAt = $migrationLockMs($migrationLockExpiry()),
+				lockName = $migrationLockText($migrationLockName()),
+				owner = $migrationLockText(local.migrationLock.owner)
+			}
+		);
+		if ($migrationLockOwner() != local.migrationLock.owner) {
+			StructDelete(local.held, local.key);
+			Throw(
+				type = "Wheels.MigrationLockLost",
+				message = "The migration lock's lease expired and another instance took the lock, so no further migration was run.",
+				extendedInfo = "A single migration step ran longer than migrationLockLease (#$get("migrationLockLease")# seconds). Raise migrationLockLease above your longest migration step."
+			);
+		}
+	}
+
+	/**
+	 * Internal function. Waits for the migration lock until migrationLockTimeout, then throws
+	 * Wheels.MigrationLockTimeout naming the instance that holds it (#4134).
+	 */
+	public void function $waitForMigrationLock(required struct migrationLock) {
+		local.timeout = $get("migrationLockTimeout");
+		local.deadline = GetTickCount() + local.timeout * 1000;
+		while (!$tryTakeMigrationLock(arguments.migrationLock)) {
+			if (GetTickCount() >= local.deadline) {
+				local.holder = $migrationLockHolder();
+				Throw(
+					type = "Wheels.MigrationLockTimeout",
+					message = "Another instance has held the migration lock for longer than migrationLockTimeout (#local.timeout# seconds), so the migrations were not run.",
+					extendedInfo = "Held by #local.holder#. If that instance is gone, the lock frees itself when its lease expires; to clear it now, delete the row from #$migrationLockTable()#."
+				);
+			}
+			Sleep(1000);
+		}
+	}
+
+	/**
+	 * Internal function. One attempt to take the migration lock: insert the lease row, or take
+	 * it over when its lease has expired. True when this migration lock now owns the row.
+	 */
+	public boolean function $tryTakeMigrationLock(required struct migrationLock) {
+		local.now = GetTickCount();
+		// Insert only when no row exists, so the duplicate-key path (which aborts an enclosing
+		// PostgreSQL transaction) is left to two instances inserting at the same moment.
+		if (Len($migrationLockOwner())) {
+			return $takeOverExpiredMigrationLock(migrationLock = arguments.migrationLock, now = local.now);
+		}
+		try {
+			$migrationLockQuery(
+				sql = "INSERT INTO #$migrationLockTable()# (lockname, lockowner, lockhost, acquiredat, expiresat) VALUES (:lockName, :owner, :host, :acquiredAt, :expiresAt)",
+				params = {
+					lockName = $migrationLockText($migrationLockName()),
+					owner = $migrationLockText(arguments.migrationLock.owner),
+					host = $migrationLockText($migrationLockHost()),
+					acquiredAt = $migrationLockMs(local.now),
+					expiresAt = $migrationLockMs($migrationLockExpiry())
+				}
+			);
+			return true;
+		} catch (any e) {
+			// No row even now: the INSERT failed for another reason (a missing table, a lost
+			// connection), so report it instead of waiting out migrationLockTimeout.
+			if (!Len($migrationLockOwner())) {
+				rethrow;
+			}
+			// Another instance inserted it first: take it over only if its lease has expired.
+			return $takeOverExpiredMigrationLock(migrationLock = arguments.migrationLock, now = local.now);
+		}
+	}
+
+	/**
+	 * Internal function. Takes over a lease row whose lease expired before `now`. The UPDATE's
+	 * WHERE makes it atomic; reading the owner back tells whether this migration lock won.
+	 */
+	public boolean function $takeOverExpiredMigrationLock(required struct migrationLock, required numeric now) {
+		$migrationLockQuery(
+			sql = "UPDATE #$migrationLockTable()# SET lockowner = :owner, lockhost = :host, acquiredat = :now, expiresat = :expiresAt WHERE lockname = :lockName AND expiresat < :now",
+			params = {
+				owner = $migrationLockText(arguments.migrationLock.owner),
+				host = $migrationLockText($migrationLockHost()),
+				now = $migrationLockMs(arguments.now),
+				expiresAt = $migrationLockMs($migrationLockExpiry()),
+				lockName = $migrationLockText($migrationLockName())
+			}
+		);
+		return $migrationLockOwner() == arguments.migrationLock.owner;
+	}
+
+	/**
+	 * Internal function. True when the migration lock can be used for `dataSource`: not in SQL
+	 * preview mode, and the lock table exists or the migrator may create it (#4134).
+	 */
+	public boolean function $migrationLockAvailable(required string dataSource) {
+		if (StructKeyExists(request, "$wheelsDebugSQL")) {
+			return false;
+		}
+		local.table = $migrationLockTable();
+		if ($migratorTableExists(arguments.dataSource, local.table)) {
+			return true;
+		}
+		if (!application[$appKey()].createMigratorTable) {
+			$warnMigrationLockTableMissing(dataSource = arguments.dataSource, table = local.table);
+			return false;
+		}
+		try {
+			$query(
+				datasource = arguments.dataSource,
+				sql = "CREATE TABLE #local.table# (lockname VARCHAR(100) NOT NULL PRIMARY KEY, lockowner VARCHAR(64) NOT NULL, lockhost VARCHAR(255), acquiredat DECIMAL(15,0) NOT NULL, expiresat DECIMAL(15,0) NOT NULL)"
+			);
+		} catch (any e) {
+			// Tolerate "already exists" from another instance creating it at the same time.
+			if (!$migratorTableExists(arguments.dataSource, local.table)) {
+				rethrow;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Internal function. One log warning per datasource that migrations run without the
+	 * cross-process lock, because createMigratorTable is off and the lock table is missing.
+	 */
+	public void function $warnMigrationLockTableMissing(required string dataSource, required string table) {
+		local.app = application[$appKey()];
+		if (!StructKeyExists(local.app, "$migrationLockWarned")) {
+			local.app["$migrationLockWarned"] = {};
+		}
+		if (StructKeyExists(local.app["$migrationLockWarned"], arguments.dataSource)) {
+			return;
+		}
+		local.app["$migrationLockWarned"][arguments.dataSource] = true;
+		WriteLog(
+			type = "warning",
+			file = "wheels",
+			text = "Migrator: createMigratorTable is off and #arguments.table# is missing on #arguments.dataSource#, so migrations run without the cross-process lock. Create it to enable the lock: CREATE TABLE #arguments.table# (lockname VARCHAR(100) NOT NULL PRIMARY KEY, lockowner VARCHAR(64) NOT NULL, lockhost VARCHAR(255), acquiredat DECIMAL(15,0) NOT NULL, expiresat DECIMAL(15,0) NOT NULL)"
+		);
+	}
+
+	/**
+	 * Internal function. The owner id holding the migration lock, or "" when it is free.
+	 */
+	public string function $migrationLockOwner() {
+		local.rows = $migrationLockQuery(
+			sql = "SELECT lockowner FROM #$migrationLockTable()# WHERE lockname = :lockName",
+			params = {lockName = $migrationLockText($migrationLockName())}
+		);
+		return local.rows.recordCount ? local.rows.lockowner : "";
+	}
+
+	/**
+	 * Internal function. A description of the instance holding the migration lock, for errors.
+	 */
+	public string function $migrationLockHolder() {
+		local.rows = $migrationLockQuery(
+			sql = "SELECT lockowner, lockhost, acquiredat, expiresat FROM #$migrationLockTable()# WHERE lockname = :lockName",
+			params = {lockName = $migrationLockText($migrationLockName())}
+		);
+		if (!local.rows.recordCount) {
+			return "no instance any more";
+		}
+		local.heldFor = Int((GetTickCount() - Val(local.rows.acquiredat)) / 1000);
+		local.expiresIn = Int((Val(local.rows.expiresat) - GetTickCount()) / 1000);
+		return "host `#local.rows.lockhost#` (owner #local.rows.lockowner#) for #local.heldFor# seconds; its lease expires in #local.expiresIn# seconds";
+	}
+
+	/**
+	 * Internal function. Runs a query with named, typed parameters against the migrator's
+	 * datasource. Named, not positional: RustCFML binds a `{value, cfsqltype}` struct in a
+	 * positional array as its text, so the lease columns held "{value: ..., cfsqltype: ...}".
+	 */
+	public query function $migrationLockQuery(required string sql, required struct params) {
+		local.options = {datasource = $migratorDataSource()};
+		local.credentials = $migratorDataSourceCredentials();
+		if (Len(local.credentials.username)) {
+			local.options.username = local.credentials.username;
+		}
+		if (Len(local.credentials.password)) {
+			local.options.password = local.credentials.password;
+		}
+		local.rv = QueryExecute(arguments.sql, arguments.params, local.options);
+		// Adobe 2023 returns nothing at all for an UPDATE or DELETE, so `local.rv` is never created.
+		if (StructKeyExists(local, "rv") && IsQuery(local.rv)) {
+			return local.rv;
+		}
+		return QueryNew("");
+	}
+
+	/**
+	 * Internal function. The key a held migration lock is tracked under: the datasource and the
+	 * current thread. A `cfthread` shares its parent's request scope, so the datasource alone would
+	 * let a thread and its parent both think they hold the same lock.
+	 */
+	public string function $migrationLockKey(required string dataSource) {
+		local.threadId = $migrationLockThreadId();
+		return Len(local.threadId) ? arguments.dataSource & "|" & local.threadId : "";
+	}
+
+	/**
+	 * Internal function. The current thread's id, or "" on an engine without one (a JVM-free
+	 * engine). Without it there is no re-entrancy: every acquisition takes the database lock.
+	 */
+	public string function $migrationLockThreadId() {
+		try {
+			return CreateObject("java", "java.lang.Thread").currentThread().getId();
+		} catch (any e) {
+			return "";
+		}
+	}
+
+	/**
+	 * Internal function. The key of the migration lock this thread holds for `dataSource`, or "".
+	 * Without a thread identity it is the one untracked entry for the datasource: only one caller
+	 * can hold the database lock, so there is at most one.
+	 */
+	public string function $currentMigrationLockKey(required string dataSource) {
+		local.held = $heldMigrationLocks();
+		local.key = $migrationLockKey(arguments.dataSource);
+		if (Len(local.key)) {
+			return StructKeyExists(local.held, local.key) ? local.key : "";
+		}
+		local.prefix = arguments.dataSource & "|untracked-";
+		for (local.candidate in local.held) {
+			if (Left(local.candidate, Len(local.prefix)) == local.prefix) {
+				return local.candidate;
+			}
+		}
+		return "";
+	}
+
+	/**
+	 * Internal function. The locks this request's threads hold, keyed by $migrationLockKey().
+	 */
+	public struct function $heldMigrationLocks() {
+		if (!StructKeyExists(request, "wheels")) {
+			request.wheels = {};
+		}
+		if (!StructKeyExists(request.wheels, "migrationLocks")) {
+			request.wheels.migrationLocks = {};
+		}
+		return request.wheels.migrationLocks;
+	}
+
+	/**
+	 * Internal function. The migration lock table's name.
+	 */
+	public string function $migrationLockTable() {
+		return application[$appKey()].migratorLockTableName;
+	}
+
+	/**
+	 * Internal function. The lease row's key: one migration lock per database.
+	 */
+	public string function $migrationLockName() {
+		return "migrate";
+	}
+
+	/**
+	 * Internal function. A new lease's expiry, in epoch milliseconds. Lease times use GetTickCount(),
+	 * which is epoch milliseconds on Lucee, Adobe, BoxLang and RustCFML (the same contract the
+	 * RateLimiter's database store relies on), so hosts compare them on one clock.
+	 */
+	public numeric function $migrationLockExpiry() {
+		return GetTickCount() + $get("migrationLockLease") * 1000;
+	}
+
+	/**
+	 * Internal function. An epoch-milliseconds value as a typed query parameter: an untyped one
+	 * binds as text, which PostgreSQL won't compare with the lease row's numeric columns. Not
+	 * through Int(), which Lucee truncates to 32 bits (1791039632175 became 38269754).
+	 */
+	public struct function $migrationLockMs(required numeric value) {
+		return {value = arguments.value, cfsqltype = "cf_sql_bigint"};
+	}
+
+	/**
+	 * Internal function. A text value as a typed query parameter.
+	 */
+	public struct function $migrationLockText(required string value) {
+		return {value = arguments.value, cfsqltype = "cf_sql_varchar"};
+	}
+
+	/**
+	 * Internal function. This instance's host name, for the lease row and lock errors.
+	 */
+	public string function $migrationLockHost() {
+		// The machine's own name: CGI.SERVER_NAME is the same on every host behind a load balancer.
+		// A JVM-free engine has no java.net, so it falls back to the request's server name.
+		try {
+			return Left(CreateObject("java", "java.net.InetAddress").getLocalHost().getHostName(), 255);
+		} catch (any e) {
+			return Left(Len(CGI.SERVER_NAME) ? CGI.SERVER_NAME : "unknown", 255);
+		}
+	}
+
+	/**
 	 * Runs a single migration step (up, down, or redo) inside its own
 	 * transaction. Shared by migrateTo()'s up and down loops,
 	 * migrateIndividual() and redoMigration() so the transaction /
@@ -397,6 +809,8 @@ component output="false" extends="wheels.Global"{
 		required string direction,
 		string errorLabel = "Error migrating to"
 	) {
+		// Before each step: extend the lease, or stop if another instance took it (#4134).
+		$renewMigrationLock();
 		return $recordStepResult(
 			result = $runMigrationStepUnrecorded(
 				migration = arguments.migration,

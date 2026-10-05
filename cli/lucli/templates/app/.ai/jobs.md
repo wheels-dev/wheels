@@ -42,6 +42,6 @@ wheels jobs status [--queue=mailers] [--format=json]
 ```
 The `retry`/`purge`/`monitor` verbs are tracked follow-ups ([#3090](https://github.com/wheels-dev/wheels/issues/3090)). Invoking one errors and prints the programmatic equivalent: `retryFailed(queue=...)` or `purgeCompleted(days=7, queue=...)` on a `wheels.Job` instance.
 
-Backoff: `this.baseDelay = 2`, `this.maxDelay = 3600` in `config()`. Formula: `Min(baseDelay * 2^attempt, maxDelay)`. The `wheels_jobs` table is auto-created on first enqueue/processing — no migration needed.
+Retries: `this.maxRetries` counts the retries after the first run, so the default `3` means up to 4 runs. Backoff: `this.baseDelay = 2`, `this.maxDelay = 3600` in `config()`. Formula: `Min(baseDelay * 2^attempt, maxDelay)`. The `wheels_jobs` table is auto-created on first enqueue/processing — no migration needed.
 
 Under a tenant datasource, inside a Wheels-managed transaction (model save, `invokeWithTransaction()`), `enqueue()` returns `{status: "deferred", deferred: true}` and the job is written on commit, dropped on rollback. A raw `transaction {}` isn't tracked. A job that can't be written throws `Wheels.Job.EnqueueFailed`.

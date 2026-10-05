@@ -223,7 +223,7 @@ component {
 		Throw(
 			type = "Wheels.Job.EnqueueFailed",
 			message = "Job '#arguments.jobClass#' could not be written to the job store (datasource '#variables.$datasource#'): #arguments.error.message#",
-			extendedInfo = "The job was not enqueued. If this happened inside a transaction on another datasource (for example a tenant's), some engines refuse a second datasource in the same transaction; enqueue after the transaction commits."
+			extendedInfo = "The job was not enqueued. Inside a model save or invokeWithTransaction() on another datasource (a tenant's, or a model's own dataSource()), the job is written when that transaction commits, so this error comes after the commit. A raw transaction {} block isn't tracked, and some engines refuse a second datasource inside it: enqueue after the block ends, or do the work through a model save or invokeWithTransaction(). If an enqueue is best-effort, catch Wheels.Job.EnqueueFailed."
 		);
 	}
 
@@ -639,7 +639,7 @@ component {
 				);
 
 				writeLog(
-					text = "Job '#arguments.jobRow.jobClass#' [#arguments.jobRow.id#] permanently failed after #local.maxRetries# attempts: #e.message#",
+					text = "Job '#arguments.jobRow.jobClass#' [#arguments.jobRow.id#] permanently failed after #local.currentAttempts# attempts (#local.maxRetries# retries): #e.message#",
 					type = "error",
 					file = "wheels_jobs"
 				);

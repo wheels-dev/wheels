@@ -196,7 +196,7 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Declare public functions to hide from MCP tools/list.
+	 * Declare public functions to hide from MCP tools/list.
 	 *
 	 * These remain reachable as CLI subcommands. Hidden because they are
 	 * stateful (start/stop), destructive (new scaffolds a whole project),
@@ -506,7 +506,7 @@ component extends="modules.BaseModule" {
 			.option(name = "reporter",  default = "simple", choices = "simple,json,tap", description = "Output format")
 			.option(name = "db",        default = "sqlite", choices = "sqlite,h2,mysql,postgres,sqlserver,sqlserver_cicd,oracle,cockroachdb", description = "--core only: the database the framework core suite runs against. The app suite ignores it and uses the app's test datasource")
 			.option(name = "base-path", default = "", description = "URL prefix the app is mounted under (e.g. /myapp). Auto-derived from WHEELS_SUBPATH or set(subpath=...) when omitted.")
-			.option(name = "timeout",   default = "", description = "Seconds to wait for the suite to finish (default 900). Also settable with WHEELS_TEST_TIMEOUT. On the terminal use --test-timeout=<seconds>: it works on every LuCLI runtime, while a plain --timeout only reaches this command on LuCLI builds that include the module-timeout fix (LuCLI ##130)")
+			.option(name = "timeout",   default = "", description = "Seconds to wait for the suite to finish (default 900). Also settable with WHEELS_TEST_TIMEOUT. On the terminal use --test-timeout=<seconds>: it works on every LuCLI runtime, while a plain --timeout only reaches this command on LuCLI builds that include the module-timeout fix")
 			.flag(name = "verbose", default = false, description = "Print per-spec detail instead of the summary rollup")
 			.flag(name = "ci",      default = false, description = "CI mode output")
 			.flag(name = "core",    default = false, description = "Run the framework core suite (vendor/wheels/tests) instead of the app suite")
@@ -815,7 +815,7 @@ component extends="modules.BaseModule" {
 		help &= "  stats               Project statistics (lines of code, model counts, etc.)" & nl;
 		help &= "  notes               Find TODO / FIXME / OPTIMIZE comments (--annotations to customize)" & nl & nl;
 		help &= "Packages & Deployment:" & nl;
-		help &= "  packages            Add, update, search Wheels packages (verb is `add`, not `install`)" & nl;
+		help &= "  packages            Add (or install), update, search Wheels packages" & nl;
 		help &= "  upgrade             Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans, `apply` swaps" & nl;
 		help &= "  framework           Install the framework (vendor/wheels/) into an app that has none (e.g. moving off CommandBox)" & nl;
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
@@ -829,18 +829,20 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * The `hint:` of the public command function `fnName`, without the literal
-	 * "hint:" prefix Lucee keeps, or "". Walks up the component's `extends`
-	 * chain, because getMetaData() lists only the functions a component
-	 * declares itself: a subclass of Module (the spec fixtures) would
-	 * otherwise find no hint for any command.
+	 * The raw docblock hint of the public command function `fnName`, or "".
+	 * Kept as Lucee hands it over, including the literal "hint:" prefix:
+	 * $commandHelpParts() keys on that prefix to tell command help from any
+	 * other docblock. Walks up the component's `extends` chain, because
+	 * getMetaData() lists only the functions a component declares itself: a
+	 * subclass of Module (the spec fixtures) would otherwise find no hint for
+	 * any command.
 	 */
 	private string function $commandHint(required string fnName) {
 		var meta = getMetaData(this);
 		while (isStruct(meta)) {
 			for (var fn in (meta.functions ?: [])) {
 				if (lCase(fn.name ?: "") == arguments.fnName && (fn.access ?: "public") == "public") {
-					return trim(reReplaceNoCase(trim(fn.hint ?: ""), "^hint\s*:\s*", ""));
+					return trim(fn.hint ?: "");
 				}
 			}
 			meta = structKeyExists(meta, "extends") ? meta.extends : "";
@@ -860,13 +862,20 @@ component extends="modules.BaseModule" {
 		if (fnName == "g") { fnName = "generate"; }
 		if (fnName == "d") { fnName = "destroy"; }
 
-		var hint = $commandHint(fnName);
-		if (!len(hint)) {
+		var parts = $commandHelpParts($commandHint(fnName));
+		if (!len(parts.summary)) {
 			return "";
 		}
 
 		var help = "wheels " & lCase(trim(arguments.subcommand)) & nl & nl;
-		help &= "  " & hint & nl & nl;
+		help &= "  " & parts.summary & nl & nl;
+		for (var section in parts.sections) {
+			help &= section.heading & nl;
+			for (var line in section.lines) {
+				help &= "  " & line & nl;
+			}
+			help &= nl;
+		}
 		// Options come from the command's own ArgSpec (`<command>ArgSpec()`),
 		// the declaration the parser and the MCP schema already share (#3962).
 		var optionLines = $commandOptionLines(fnName);
@@ -882,6 +891,39 @@ component extends="modules.BaseModule" {
 		return help;
 	}
 
+
+	/**
+	 * Split a command function's metadata hint into what `--help` prints: the
+	 * one-line `hint:` summary, then any `Usage:` / `Examples:` sections. Lucee
+	 * hands the docblock over with blank lines and indentation removed, so a
+	 * section runs from its heading to the next heading or the end. Lines
+	 * between the summary and the first heading are returned as `stray` and
+	 * never printed; maintainer notes belong in `//` comments instead. A
+	 * docblock without a `hint:` key is not command help (summary is "").
+	 * Public so specs can check every command's docblock shape.
+	 */
+	public struct function $commandHelpParts(required string hint) {
+		var rv = {summary = "", sections = [], stray = []};
+		var lines = listToArray(replace(arguments.hint, chr(13), "", "all"), chr(10), true);
+		if (!arrayLen(lines) || !reFindNoCase("^\s*hint\s*:", lines[1])) {
+			return rv;
+		}
+		rv.summary = trim(reReplaceNoCase(lines[1], "^\s*hint\s*:\s*", ""));
+		for (var i = 2; i <= arrayLen(lines); i++) {
+			var line = trim(lines[i]);
+			if (!len(line)) {
+				continue;
+			}
+			if (line == "Usage:" || line == "Examples:") {
+				arrayAppend(rv.sections, {heading = line, lines = []});
+			} else if (arrayLen(rv.sections)) {
+				arrayAppend(rv.sections[arrayLen(rv.sections)].lines, line);
+			} else {
+				arrayAppend(rv.stray, line);
+			}
+		}
+		return rv;
+	}
 
 	/**
 	 * The Options lines for `wheels <command> --help`, rendered from the
@@ -1632,11 +1674,13 @@ component extends="modules.BaseModule" {
 		);
 	}
 
+	// Coverage: instrument app/ with function-level coverage counters, run the
+	// app test suite against the running server, and report a CRAP ranking
+	// (Change Risk Anti-Patterns: complexity^2 x (1 - coverage)^3 + complexity).
+	// The instrumentation is reverted afterward (originals restored exactly).
+	// Kept out of the docblock below: `wheels coverage --help` prints it.
 	/**
-	 * Coverage: instrument app/ with function-level coverage counters, run the
-	 * app test suite against the running server, and report a CRAP ranking
-	 * (Change Risk Anti-Patterns: complexity^2 x (1 - coverage)^3 + complexity).
-	 * The instrumentation is reverted afterward (originals restored exactly).
+	 * hint: Run the app test suite with function-level coverage and report a CRAP ranking (app/ is restored afterward)
 	 */
 	public string function coverage() {
 		var opts = parseCoverageArgs(structuredArgs(arguments));
@@ -1956,8 +2000,7 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Fetch the local offline documentation bundle (so the guides and
-	 * API reference work with no internet connection)
+	 * hint: Fetch the local offline documentation bundle (so the guides and API reference work with no internet connection)
 	 */
 	public string function docs() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
@@ -2404,16 +2447,16 @@ component extends="modules.BaseModule" {
 	//  reload — Reload application
 	// ─────────────────────────────────────────────────
 
+	// The reload password
+	// gates the HTTP `?reload=true` endpoint against remote attackers;
+	// the CLI reads it from `.env` or `config/settings.cfm` and forwards
+	// it because it runs locally with filesystem access. This matches
+	// how Rails, Laravel, Symfony, etc. treat CLI-vs-HTTP — the CLI is
+	// already trusted at the same level as the project on disk. See
+	// issue #2477 and `deployment/security-hardening.mdx`.
+	// Kept out of the docblock below: `wheels reload --help` prints it.
 	/**
 	 * hint: Reload the running Wheels application (the CLI forwards the reload password from .env or config/settings.cfm).
-	 *
-	 * The reload password
-	 * gates the HTTP `?reload=true` endpoint against remote attackers;
-	 * the CLI reads it from `.env` or `config/settings.cfm` and forwards
-	 * it because it runs locally with filesystem access. This matches
-	 * how Rails, Laravel, Symfony, etc. treat CLI-vs-HTTP — the CLI is
-	 * already trusted at the same level as the project on disk. See
-	 * issue #2477 and `deployment/security-hardening.mdx`.
 	 */
 	public string function reload() {
 		// Validate arguments before touching the server (#2963): an unknown or
@@ -2932,11 +2975,13 @@ component extends="modules.BaseModule" {
 	//  engines — manage the dev-server engine backend
 	// ─────────────────────────────────────────────────
 
+	// `wheels engines rustcfml install|start|stop|status` — the RustCFML
+	// (JVM-free CFML) engine backend. Deliberately separate from
+	// `start`/`stop` (Lucee via LuCLI) so the two lifecycles never share a
+	// registry. Hidden from MCP like the other stateful server commands.
+	// Kept out of the docblock below: `wheels engines --help` prints it.
 	/**
-	 * `wheels engines rustcfml install|start|stop|status` — the RustCFML
-	 * (JVM-free CFML) engine backend. Deliberately separate from
-	 * `start`/`stop` (Lucee via LuCLI) so the two lifecycles never share a
-	 * registry. Hidden from MCP like the other stateful server commands.
+	 * hint: `wheels engines rustcfml install|start|stop|status` — manage the RustCFML (JVM-free CFML) engine
 	 */
 	public string function engines() {
 		var spec = new services.ArgSpec();
@@ -3457,12 +3502,12 @@ component extends="modules.BaseModule" {
 	//  mcp — MCP server instructions
 	// ─────────────────────────────────────────────────
 
+	// `map setup` shipped in snapshot 2499 before we learned that the literal
+	// token `mcp` is intercepted by the runtime in any argv position. Kept as a
+	// thin forwarder so that spelling keeps working.
+	// Kept out of the docblock below: `wheels map --help` prints it.
 	/**
 	 * hint: Deprecated spelling — `wheels map setup` forwards to `setup agents`
-	 *
-	 * `map setup` shipped in snapshot 2499 before we learned that the literal
-	 * token `mcp` is intercepted by the runtime in any argv position. Kept as a
-	 * thin forwarder so that spelling keeps working.
 	 */
 	public string function map() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
@@ -5164,20 +5209,19 @@ component extends="modules.BaseModule" {
 	//  packages — registry-backed package manager
 	// ─────────────────────────────────────────────────
 
+	// `add` is the documented install verb and `install` is an alias for it
+	// (see the dispatch below). Older LuCLI runtimes intercepted the literal
+	// `install` verb before it reached this module (#2713); the runtime the
+	// CLI ships on now passes it through (#4206).
+	// Kept out of the docblock below: `wheels packages --help` prints it.
 	/**
-	 * hint: Add, update, and list Wheels packages (verb is `add`, not `install`)
-	 *
-	 * The verb is `add`, NOT `install`. Typing `wheels packages install <name>`
-	 * is intercepted by LuCLI's built-in extension installer before dispatch
-	 * reaches this module, and prints `[INFO] No git or extension dependencies
-	 * to install` without actually installing anything. See chapter 8 of the
-	 * tutorial for the explanation.
+	 * hint: Add, update, and list Wheels packages (`install` is an alias of `add`)
 	 *
 	 * Usage:
 	 *   wheels packages list [--tag=<tag>]
 	 *   wheels packages search <query>
 	 *   wheels packages show <name>
-	 *   wheels packages add <name>[@<version>] [--force]    ← install verb
+	 *   wheels packages add <name>[@<version>] [--force]    (alias: install)
 	 *   wheels packages update <name> --yes
 	 *   wheels packages update --all --yes
 	 *   wheels packages remove <name>
@@ -5210,8 +5254,7 @@ component extends="modules.BaseModule" {
 
 		// `--help` / `-h` short-circuits to a deterministic help string the
 		// module owns directly. LuCLI's auto-introspected help previously
-		// drifted from the real CLI surface — advertising the dead `install`
-		// verb that LuCLI itself intercepts (#2713). Owning the text here
+		// drifted from the real CLI surface (#2713). Owning the text here
 		// guarantees `wheels packages help`, `wheels packages --help`, and
 		// `wheels packages -h` all reach $packagesHelp().
 		//
@@ -5249,19 +5292,13 @@ component extends="modules.BaseModule" {
 				arguments.opts.name = $packagesRequireArg(arguments.positional, "show requires a name: wheels packages show <name>");
 				return $packagesMainCli().show(arguments.opts);
 			case "install":
-				// LuCLI's built-in extension installer intercepts the
-				// literal verb `install` on the user-facing CLI surface
-				// — same trap that bit `wheels browser install` (renamed
-				// to `wheels browser setup` in #2345). But every other
-				// caller path reaches this dispatch directly: the
-				// stdio MCP server (`wheels mcp wheels`), scripted
-				// in-process clients, and the bundle's own spec suite.
-				// `PackagesMainCli.install()` has been a transparent
-				// alias for `add()` since #2729, so the dispatch layer
-				// must match — otherwise `install <name>` silently
-				// no-ops on the only paths LuCLI does NOT intercept.
-				// Fall through to the `add` branch (same validation,
-				// same error shape, same install behavior).
+				// `install` is an alias of `add` on every path: the CLI
+				// (older LuCLI runtimes intercepted the literal verb
+				// before dispatch; #2713, #4206), the stdio MCP server
+				// (`wheels mcp wheels`), scripted in-process clients and
+				// the spec suite. `PackagesMainCli.install()` is the same
+				// alias (#2729). Fall through to the `add` branch (same
+				// validation, same error shape, same install behavior).
 			case "add":
 				arguments.opts.target = $packagesRequireArg(arguments.positional, "add requires a name: wheels packages add <name>[@<version>]");
 				return $packagesMainCli().add(arguments.opts);
@@ -5274,7 +5311,7 @@ component extends="modules.BaseModule" {
 			case "registry":
 				return $dispatchPackagesRegistry(arguments.positional, arguments.opts);
 			default:
-				throw(message="Unknown packages subcommand: #arguments.sub#. The install verb is `add` (not `install`): wheels packages add <name>");
+				throw(message="Unknown packages subcommand: #arguments.sub#. To install a package: wheels packages add <name>");
 		}
 	}
 
@@ -5312,10 +5349,7 @@ component extends="modules.BaseModule" {
 
 	// Hand-written help for `wheels packages`. Owned by the module rather than
 	// auto-derived from picocli introspection because the auto-help drifted
-	// from the real CLI surface (#2713 — advertised `install <name> [--force]`
-	// even though LuCLI's built-in extension installer intercepts the literal
-	// `install` verb before dispatch reaches this module). Same trap that hit
-	// `wheels browser install` (renamed to `setup` in #2345).
+	// from the real CLI surface (#2713).
 	private string function $packagesHelp() {
 		var nl = chr(10);
 		var help = "Usage: wheels packages <subcommand> [options]" & nl;
@@ -5331,12 +5365,8 @@ component extends="modules.BaseModule" {
 		help &= "  registry refresh                        Bust the 24-hour registry cache" & nl;
 		help &= "  registry info                           Show the registry URL and cache state" & nl;
 		help &= "  help, --help, -h                        Show this help" & nl & nl;
-		help &= "Note: the install verb is `add`, NOT `install`." & nl;
-		help &= "  Typing `wheels packages install <name>` is intercepted by LuCLI's built-in" & nl;
-		help &= "  extension installer before dispatch reaches this module, and prints" & nl;
-		help &= "  '[INFO] No git or extension dependencies to install' without installing" & nl;
-		help &= "  anything. Use `wheels packages add <name>` instead. Same trap that bit" & nl;
-		help &= "  `wheels browser install` (renamed to `wheels browser setup` in ##2345)." & nl & nl;
+		help &= "Note: `install` is an alias of `add`, so `wheels packages install <name>`" & nl;
+		help &= "  works the same way." & nl & nl;
 		help &= "Examples:" & nl;
 		help &= "  wheels packages list" & nl;
 		help &= "  wheels packages search ui" & nl;
@@ -5881,33 +5911,33 @@ component extends="modules.BaseModule" {
 		};
 	}
 
+	// `wheels upgrade apply` performs the framework swap (#3035): it
+	// replaces the app's vendor/wheels/ with the framework bundled inside
+	// the installed CLI, parking the old copy at .wheels/backups/wheels.bak-<timestamp>/
+	// (outside vendor/) unless --nobackup. Recovery is a single mv (announced, with the exact
+	// backup path, before anything is touched). Only the CLI's bundled
+	// framework is available as a source for now — pair it with your package
+	// manager (`brew upgrade wheels`, `brew install wheels-be`, `scoop update
+	// wheels`) to choose what gets bundled. Downloading arbitrary --to=
+	// targets is the planned follow-up.
+	//
+	// Bare `wheels upgrade` deliberately does nothing: it prints concise
+	// usage steering at the two verbs and exits 0. Destructive commands
+	// deserve an explicit verb, and MCP clients calling wheels_upgrade with
+	// {} must never mutate — requiring `apply` fixes that transport-
+	// independently, and exit 0 matches the pre-apply-mode bare behavior so
+	// existing CI invocations see usage text, not a new failure.
+	//
+	// `wheels upgrade check` keeps the read-only scan: it reports code paths
+	// that will break against a target framework version without modifying
+	// any files. Breaking findings throw Wheels.UpgradeCheckFailed after the
+	// report is printed, so the command exits non-zero and can gate CI.
+	// --strict escalates advisory findings the same way, and so does a failed
+	// latest-release lookup when no --to= is given. (--dry-run is not
+	// supported — `check` is the preview.)
+	// Kept out of the docblock below: `wheels upgrade --help` prints it.
 	/**
 	 * hint: Upgrade the Wheels framework in your app (vendor/wheels/) — `check` scans for breaking changes (read-only), `apply` performs the swap
-	 *
-	 * `wheels upgrade apply` performs the framework swap (#3035): it
-	 * replaces the app's vendor/wheels/ with the framework bundled inside
-	 * the installed CLI, parking the old copy at .wheels/backups/wheels.bak-<timestamp>/
-	 * (outside vendor/) unless --nobackup. Recovery is a single mv (announced, with the exact
-	 * backup path, before anything is touched). Only the CLI's bundled
-	 * framework is available as a source for now — pair it with your package
-	 * manager (`brew upgrade wheels`, `brew install wheels-be`, `scoop update
-	 * wheels`) to choose what gets bundled. Downloading arbitrary --to=
-	 * targets is the planned follow-up.
-	 *
-	 * Bare `wheels upgrade` deliberately does nothing: it prints concise
-	 * usage steering at the two verbs and exits 0. Destructive commands
-	 * deserve an explicit verb, and MCP clients calling wheels_upgrade with
-	 * {} must never mutate — requiring `apply` fixes that transport-
-	 * independently, and exit 0 matches the pre-apply-mode bare behavior so
-	 * existing CI invocations see usage text, not a new failure.
-	 *
-	 * `wheels upgrade check` keeps the read-only scan: it reports code paths
-	 * that will break against a target framework version without modifying
-	 * any files. Breaking findings throw Wheels.UpgradeCheckFailed after the
-	 * report is printed, so the command exits non-zero and can gate CI.
-	 * --strict escalates advisory findings the same way, and so does a failed
-	 * latest-release lookup when no --to= is given. (--dry-run is not
-	 * supported — `check` is the preview.)
 	 *
 	 * Examples:
 	 *   wheels upgrade apply                       - apply the swap, with backup
@@ -6270,21 +6300,14 @@ component extends="modules.BaseModule" {
 		var subcommand = lCase(args[1]);
 
 		switch (subcommand) {
-			// `setup` is the canonical verb. `install` is accepted but warned —
-			// LuCLI intercepts `install` as its built-in extension installer
-			// before it reaches a module's dispatch, so users typing
-			// `wheels browser install` actually invoke the LuCLI built-in and
-			// see "Reading lucee.json... No git or extension dependencies to
-			// install" instead of the Playwright fetch. The case branch here
-			// only fires if the user reaches us via some other path (e.g. an
-			// argument vector that bypasses LuCLI's parsing). See issue #2332.
+			// `setup` is the documented verb; `install` is an alias of it, as
+			// `wheels packages install` is of `add`. LuCLI intercepts `install`
+			// only as the FIRST argument (`wheels install`), so
+			// `wheels browser install` does reach this module (#4213; the
+			// original interception was #2332).
 			case "setup":
-				return browserInstall(args);
 			case "install":
-				out("'wheels browser install' is intercepted by LuCLI's built-in", "yellow");
-				out("extension installer and won't reach this module. Use:", "yellow");
-				out("  wheels browser setup", "bold");
-				return "";
+				return browserInstall(args);
 			case "test":
 				return browserTest(args);
 			default:
