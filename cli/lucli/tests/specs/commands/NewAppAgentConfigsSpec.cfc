@@ -27,6 +27,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		m.$("out");
 		m.$("printCreated");
 		m.$("$isOffline", true);
+		// The default-port probe connects to 8080, which CI's fallback-port sentinel
+		// guards. Every new() here passes an explicit port, so it must never run.
+		m.$(method = "$defaultNewPort", throwException = true, throwType = "Spec.DefaultPortProbed", throwMessage = "new() probed the default port");
 		return m;
 	}
 
@@ -36,6 +39,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			said &= call[1] & chr(10);
 		}
 		return said;
+	}
+
+	// An explicit, unguarded port: without one the scaffold's free-port probe
+	// connects to the default 8080, which CI's fallback-port sentinel watches.
+	private numeric function freePort() {
+		var socket = createObject("java", "java.net.ServerSocket").init(0);
+		var p = socket.getLocalPort();
+		socket.close();
+		return p > 65400 ? 50000 : p;
 	}
 
 	private string function appName() {
@@ -49,7 +61,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("writes .mcp.json and .opencode.json, in the shapes setup agents writes", () => {
 				var name = appName();
 				var m = newModule();
-				m.new(arg1 = name, "open-browser" = false);
+				m.new(arg1 = name, port = freePort(), "open-browser" = false);
 				var mcp = DeserializeJSON(FileRead(variables.tempRoot & "/" & name & "/.mcp.json"));
 				expect(mcp.mcpServers.wheels.command).toBe("wheels");
 				expect(mcp.mcpServers.wheels.args).toBe(["mcp", "wheels"]);
@@ -61,7 +73,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("names the files and the opt-out in its output", () => {
 				var name = appName();
 				var m = newModule();
-				m.new(arg1 = name, "open-browser" = false);
+				m.new(arg1 = name, port = freePort(), "open-browser" = false);
 				var said = printed(m);
 				expect(said).toInclude(".mcp.json");
 				expect(said).toInclude(".opencode.json");
@@ -78,7 +90,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var name = appName();
 				var m = newModule();
 				// LuCLI hands `--no-agents` over as agents=false.
-				m.new(arg1 = name, agents = false, "open-browser" = false);
+				m.new(arg1 = name, port = freePort(), agents = false, "open-browser" = false);
 				expect(FileExists(variables.tempRoot & "/" & name & "/.mcp.json")).toBeFalse();
 				expect(FileExists(variables.tempRoot & "/" & name & "/.opencode.json")).toBeFalse();
 				expect(DirectoryExists(variables.tempRoot & "/" & name & "/app")).toBeTrue();
@@ -88,7 +100,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var name = appName();
 				var m = newModule();
 				m.$(method = "$writeAgentConfigs", throwException = true, throwType = "Spec.WriteFailed", throwMessage = "disk full");
-				m.new(arg1 = name, "open-browser" = false);
+				m.new(arg1 = name, port = freePort(), "open-browser" = false);
 				var said = printed(m);
 				expect(said).toInclude("disk full");
 				expect(said).toInclude("wheels setup agents");
