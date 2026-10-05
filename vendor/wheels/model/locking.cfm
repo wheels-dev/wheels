@@ -237,37 +237,61 @@
 	public boolean function $advisoryLockTransactionBody(required string name, required numeric timeout, required any callback, required struct state) {
 		local.adapter = variables.wheels.class.adapter;
 		local.committed = {flag = false};
-		var release = {error = ""};
+		var release = {error = "", done = false};
 		var threw = {flag = false};
+		var cb = {done = false};
 		local.adapter.$acquireAdvisoryLockTransactional(name = arguments.name, timeout = arguments.timeout);
 		try {
-			local.cbResult = arguments.callback();
-			if (StructKeyExists(local, "cbResult")) {
-				arguments.state.hasResult = true;
-				arguments.state.result = local.cbResult;
+			try {
+				local.cbResult = arguments.callback();
+				if (StructKeyExists(local, "cbResult")) {
+					arguments.state.hasResult = true;
+					arguments.state.result = local.cbResult;
+				}
+				cb.done = true;
+			} finally {
+				// This inner finally holds the lock RELEASE and contains NO transaction-action statement,
+				// so BoxLang runs it even when the callback ends the request with `abort`: a `transaction
+				// action="…"` inside a finally is skipped by BoxLang when an abort leaves the surrounding
+				// cftransaction (#4219 — Lucee/Adobe run it either way). On an abnormal exit (abort or a
+				// throw -> cb.done stays false) the lock is released HERE; on the normal path cb.done is
+				// true and the commit-then-release below runs instead, preserving commit-before-release so
+				// the next holder reads committed state. Unscoped struct writes persist past the catch on
+				// BoxLang (invariant 11).
+				if (!cb.done) {
+					try {
+						$releaseTransactionalAdvisoryLock(adapter = local.adapter, name = arguments.name);
+					} catch (any releaseErr) {
+						WriteLog(type = "error", file = "wheels", text = "withAdvisoryLock(transaction=true): release on the abnormal-exit path also failed: " & releaseErr.message);
+					}
+					release.done = true;
+				}
 			}
-			// Commit on the pinned connection BEFORE the release, so the next holder reads committed
-			// state. The block stays open on the same connection for the release that follows;
-			// invokeWithTransaction's own block close then has nothing left to commit. `committed` flips
-			// only AFTER a clean commit, so a failing commit takes the failure path (rollback).
+			// Normal path only (abort/throw skipped past this via the inner finally). Commit on the pinned
+			// connection BEFORE the release, so the next holder reads committed state. `committed` flips
+			// only AFTER a clean commit, so a failing commit takes the catch/finally path below.
 			transaction action="commit";
 			local.committed.flag = true;
+			try {
+				$releaseTransactionalAdvisoryLock(adapter = local.adapter, name = arguments.name);
+			} catch (any releaseErr2) {
+				release.error = releaseErr2;
+			}
+			release.done = true;
 		} catch (any e) {
-			// Mark a caught throw (callback or commit) so the finally does NOT roll back here: on a
-			// throw, invokeWithTransaction's own catch rolls the transaction back after this method
-			// returns, so a rollback in the finally would be a redundant second one. Only the ABORT
-			// path needs the finally to roll back, because an abort is never caught and the wrapper's
-			// catch never runs (see the finally). Unscoped struct write so it persists out of the catch
-			// on BoxLang (invariant 11). The exception still propagates to invokeWithTransaction.
+			// A caught throw (callback or commit). On a throw, invokeWithTransaction's own catch rolls the
+			// transaction back after this method returns, so the finally does NOT roll back. Unscoped
+			// struct write persists past the catch on BoxLang (invariant 11). The exception still
+			// propagates to invokeWithTransaction.
 			threw.flag = true;
 			rethrow;
 		} finally {
 			// Roll back ONLY on the ABORT path — not committed, and not a caught throw. An aborting
 			// callback is never caught, so invokeWithTransaction's catch never runs and the engine would
-			// otherwise decide the open transaction's fate at block exit (a commit-at-exit would reopen
-			// the pre-commit window after the lock is freed). The rollback is in its own try/catch: a
-			// rollback that itself throws (a dead connection the server has already rolled back) must not
-			// skip the release below.
+			// otherwise decide the open transaction's fate at block exit. This rollback is a
+			// transaction-action, and BoxLang skips a finally that contains one when an abort leaves the
+			// cftransaction; the LOCK release above sits in a separate finally with no transaction-action,
+			// so it still runs on every engine on abort. Lucee/Adobe run this finally normally.
 			if (!local.committed.flag && !threw.flag) {
 				try {
 					transaction action="rollback";
@@ -275,16 +299,16 @@
 					WriteLog(type = "error", file = "wheels", text = "withAdvisoryLock(transaction=true): rollback on the abort path failed: " & rollbackErr.message);
 				}
 			}
-			// Always attempt the release, whatever the rollback did.
-			try {
-				$releaseTransactionalAdvisoryLock(adapter = local.adapter, name = arguments.name);
-			} catch (any releaseErr) {
-				// Unscoped struct write so it persists out of the catch on BoxLang (invariant 11).
-				if (local.committed.flag) {
-					release.error = releaseErr;
-				} else {
-					WriteLog(type = "error", file = "wheels", text = "withAdvisoryLock(transaction=true): release after a failed callback/commit also failed: " & releaseErr.message);
+			// Safety net for a commit failure: a throw AFTER the inner finally leaves cb.done true (so the
+			// inner finally did not release) and committed false (so the commit threw). A throw runs this
+			// finally on every engine, so release here if it has not happened yet.
+			if (!release.done) {
+				try {
+					$releaseTransactionalAdvisoryLock(adapter = local.adapter, name = arguments.name);
+				} catch (any releaseErr3) {
+					WriteLog(type = "error", file = "wheels", text = "withAdvisoryLock(transaction=true): release after a failed commit also failed: " & releaseErr3.message);
 				}
+				release.done = true;
 			}
 		}
 		// Reached only on the committed path (a callback / commit failure propagates past here). Hand a

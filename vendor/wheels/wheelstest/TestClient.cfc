@@ -287,13 +287,16 @@ component {
 	 * @path    URL path (appended to baseUrl)
 	 * @params  Query string parameters as a struct
 	 * @headers Additional headers for this request
+	 * @timeout cfhttp timeout in seconds (default 30). Lower it to bound a request that may hang so
+	 *          the caller's assertion fails rather than the whole test leg timing out.
 	 */
 	public TestClient function get(
 		required string path,
 		struct params = {},
-		struct headers = {}
+		struct headers = {},
+		numeric timeout = 30
 	) {
-		$makeRequest(method = "GET", path = arguments.path, params = arguments.params, headers = arguments.headers);
+		$makeRequest(method = "GET", path = arguments.path, params = arguments.params, headers = arguments.headers, timeout = arguments.timeout);
 		return this;
 	}
 
@@ -733,7 +736,8 @@ component {
 		required string path,
 		struct params = {},
 		struct body = {},
-		struct headers = {}
+		struct headers = {},
+		numeric timeout = 30
 	) {
 		$requireLeadingSlash(arguments.path);
 
@@ -755,7 +759,7 @@ component {
 
 		var result = {};
 
-		cfhttp(url = fullUrl, method = arguments.method, timeout = "30", result = "result", redirect = false) {
+		cfhttp(url = fullUrl, method = arguments.method, timeout = arguments.timeout, result = "result", redirect = false) {
 			// Add merged headers
 			for (var hName in mergedHeaders) {
 				cfhttpparam(type = "header", name = hName, value = mergedHeaders[hName]);
