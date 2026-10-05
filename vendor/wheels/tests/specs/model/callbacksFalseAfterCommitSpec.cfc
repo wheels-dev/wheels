@@ -50,6 +50,16 @@ component extends="wheels.WheelsTest" {
 				expect(ArrayLen(request.$acLog)).toBe(0);
 			});
 
+			it("still puts back savedChanges() when a callbacks = false save rolls back", () => {
+				var t = variables.g.model("tag").new(name = "cbfalse-saved");
+				t.save(callbacks = false, transaction = "commit");
+				var before = Duplicate(t.savedChanges());
+				t.name = "cbfalse-saved-undone";
+				t.save(callbacks = false, transaction = "rollback");
+				expect(t.savedChanges()).toBe(before);
+				expect(ArrayLen(request.$acLog)).toBe(0);
+			});
+
 			it("still runs them with callbacks = true", () => {
 				var t = variables.g.model("tag").new(name = "cbfalse-on");
 				t.save(transaction = "commit");
