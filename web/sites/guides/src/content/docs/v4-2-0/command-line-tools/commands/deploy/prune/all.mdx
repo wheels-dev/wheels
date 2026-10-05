@@ -25,7 +25,7 @@ wheels deploy prune all [--keep=<n>] [--destination=<name>] [--dry-run]
 
 ## Behavior
 
-Runs [`prune containers`](/v4-2-0/command-line-tools/commands/deploy/prune/containers/) then [`prune images`](/v4-2-0/command-line-tools/commands/deploy/prune/images/) on every host. The current live container and everything in the retention window survives.
+Runs [`prune containers`](/v4-2-0/command-line-tools/commands/deploy/prune/containers/) then [`prune images`](/v4-2-0/command-line-tools/commands/deploy/prune/images/) on every host, chained with `&&`. Running containers and the newest `<keep>` exited containers survive. See `prune images` for what the image step actually removes.
 
 ## Example
 

@@ -1763,6 +1763,38 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. When each applied migration at this level was applied, as
+	 * {version: "yyyy-mm-dd HH:nn:ss"}, for `wheels db status` and `db version --detailed`
+	 * (4407). Empty when the tracking table has no applied_at column yet (installs that
+	 * haven't run $maybeEnsureTrackingColumns), and versions applied before that column
+	 * existed have no entry.
+	 */
+	public struct function $appliedAtByVersion() {
+		local.rv = {};
+		local.appKey = $appKey();
+		if (!StructKeyExists(application[local.appKey], "$trackingColumnsEnsured")) {
+			return local.rv;
+		}
+		try {
+			local.rows = $query(
+				datasource = $migratorDataSource(),
+				sql = "SELECT version, applied_at FROM #application[local.appKey].migratorTableName# "
+					& "WHERE core_level = #application[local.appKey].migrationLevel#"
+			);
+			for (local.row in local.rows) {
+				local.when = $normalizeDbTimestamp(local.row.applied_at ?: "");
+				if (IsDate(local.when)) {
+					local.rv[local.row.version] = DateTimeFormat(local.when, "yyyy-mm-dd HH:nn:ss");
+				}
+			}
+		} catch (any e) {
+			// Same fallback as $getOrphanVersionsWithMeta(): status still renders, without dates.
+			local.rv = {};
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Returns orphan versions enriched with the `name` and `applied_at`
 	 * columns from the tracking table — when those columns exist (the
 	 * Plan 3 schema enrichment). Falls back to bare-version structs when

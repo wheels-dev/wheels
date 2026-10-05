@@ -25,15 +25,15 @@ wheels generate <type> <name> [attributes...] [flags]
 
 The `g` alias is supported for every form (`wheels g model User`). `wheels create <type>` exists as a forward-looking dispatcher but currently only accepts `type=app`, which forwards to `wheels new`; use `wheels generate` for everything else.
 
-Running `wheels generate` with no arguments prints the list of supported types and one-line examples. Unknown types print `Unknown generator type: <type>` and exit without writing anything.
+Running `wheels generate` with no arguments prints the list of supported types and one-line examples, and exits with a non-zero status. Unknown types print `Unknown generator type: <type>` and exit with a non-zero status without writing anything.
 
-Every generator accepts `--dry-run`, which prints the would-be file paths and generated content but writes nothing:
+Every generator accepts `--dry-run`, which prints the paths of the files it would write or modify but writes nothing:
 
 ```bash title="example"
 wheels generate model Post title:string --dry-run
 ```
 
-Previewing is the safe way to see exactly what a generator will create — files, injected config blocks, and all — before it touches the project.
+Previewing is the safe way to see which files a generator will create or modify before it touches the project.
 
 ### Supported types
 
@@ -50,13 +50,14 @@ Previewing is the safe way to see exactly what a generator will create — files
 | `test` | — | Model or controller spec file |
 | `property` | `prop` | Add-column migration for an existing model |
 | `helper` | `h` | Helper CFC under `app/helpers/` |
+| `policy` | — | Authorization policy CFC under `app/policies/` (every action denied until you grant it) |
 | `snippets` | — | Copies a named code pattern into the project |
 | `admin` | — | CRUD admin controller + views for an existing model (requires a running server) |
 | `auth` | — | Full authentication scaffold on the `wheels.auth` primitives (session, token, or JWT strategy) |
 
 ## Attribute syntax
 
-Property-aware generators — `model`, `scaffold`, `api-resource`, and `property` — accept a trailing list of `name:type` property pairs after the resource name. They also recognise `--belongsTo=`, `--hasMany=`, and `--hasOne=` flags for associations. Type names are normalised to Wheels migration column types — unknown types fall back to `string`.
+Property-aware generators — `model`, `scaffold`, `api-resource`, and `property` — accept a trailing list of `name:type` property pairs after the resource name. They also recognise `--belongsTo=`, `--hasMany=`, and `--hasOne=` flags for associations. Type names are normalised to Wheels migration column types. An unknown type is rejected with an error that lists the valid types (`string`, `text`, `integer`, `biginteger`, `float`, `decimal`, `boolean`, `date`, `datetime`, `time`, `binary`, `uuid`, `enum`, `email`, `url`), and nothing is written.
 
 Columns are **required by default**: an unmarked `name:type` column is created `allowNull=false` and added to the model's `validatesPresenceOf`, so the generated migration and model agree. Mark a column nullable with `name:type:optional` or give it a default with `name:type=value`; both exclude the column from `validatesPresenceOf` (a defaulted column never needs a presence check because the default fills an absent value). A `belongsTo` foreign-key column is required by default.
 
@@ -70,9 +71,10 @@ The other generators (`controller`, `view`, `migration`, `route`, `test`, `helpe
 | `body:text` | `text` | Also: `longtext`. |
 | `count:integer` | `integer` | Also: `int`. Default `limit=11`. |
 | `views:biginteger` | `bigInteger` | Also: `bigint`. |
-| `price:decimal` | `decimal` | Also: `float`, `numeric`. Default `precision=10`, `scale=2`. |
+| `price:decimal` | `decimal` | Also: `numeric`. Default `precision=10`, `scale=2`. |
+| `ratio:float` | `float` | No precision or scale is set. |
 | `price:decimal{10,2}` | `decimal` | Brace sets `precision=10`, `scale=2`. |
-| `status:enum:draft,published` | `enum` | Colon-separated values are unchanged — braces must not be used for the value list. |
+| `status:enum:draft,published` | `string` | The column is a `string`; the values go into `enum(property="status", values="draft,published")` in the model's `config()`. Braces must not be used for the value list. |
 | `active:boolean` | `boolean` | Also: `bool`. |
 | `publishedAt:datetime` | `datetime` | Also: `timestamp`. |
 | `publishedOn:date` | `date` | |
@@ -80,9 +82,9 @@ The other generators (`controller`, `view`, `migration`, `route`, `test`, `helpe
 | `payload:binary` | `binary` | |
 | `bio:text:optional` | `text` | `:optional` makes the column nullable (`allowNull=true`) and omits it from `validatesPresenceOf`. Use the word `optional`, not `?` — zsh (the macOS default shell) treats a bare `?` as a glob. |
 | `status:string=draft` | `string` | `=value` sets a column `DEFAULT` and omits the column from `validatesPresenceOf` (the default fills an absence). Combine the two as `status:string=draft:optional`. |
-| `--belongsTo=author` | — | Adds `belongsTo("author")` and an `author_id` or `authorId` FK column, according to `useUnderscoreReferenceColumns`. The FK column is required by default. |
-| `--hasMany=comments` | — | Adds `hasMany(name="comments")`. Pass multiple names comma-separated. |
-| `--hasOne=profile` | — | Adds `hasOne(name="profile")`. |
+| `--belongsTo=author` | — | Adds `belongsTo('author')` and an `author_id` or `authorId` FK column, according to `useUnderscoreReferenceColumns`. The FK column is required by default. |
+| `--hasMany=comments` | — | Adds `hasMany('comments')`. Pass multiple names comma-separated. |
+| `--hasOne=profile` | — | Adds `hasOne('profile')`. |
 
 <Aside type="note" title="Type aliases land on the same column type">
 The mapper folds aliases together — `varchar` and `string` both emit `t.string(...)`, `int` and `integer` both emit `t.integer(...)`, and so on. Pick whichever reads best; the generated migration is identical.
@@ -119,7 +121,7 @@ Writes `app/models/<Name>.cfc` with `belongsTo`/`hasMany`/`hasOne` associations 
 wheels generate model User name email:string active:boolean --hasMany=posts
 ```
 
-Writes `app/models/User.cfc` with `hasMany(name="posts")` in `config()`, plus a migration that creates the `users` table with `name`, `email`, and `active` columns (and the standard `timestamps()` trio).
+Writes `app/models/User.cfc` with `hasMany('posts')` in `config()`, plus a migration that creates the `users` table with `name`, `email`, and `active` columns (and the standard `timestamps()` trio).
 
 ### `wheels generate controller`
 
@@ -133,7 +135,7 @@ wheels generate controller <Name> [action ...]
 
 #### Description
 
-Writes `app/controllers/<Name>.cfc` with a stub method per action name you pass. For each action that isn't `create`, `update`, `delete`, or `destroy`, the generator also writes `app/views/<name>/<action>.cfm`. Passing no actions creates an empty controller with no view files. Action names may be space-separated or comma-separated — `index,show` is equivalent to `index show`.
+Writes `app/controllers/<Name>.cfc` with a stub method per action name you pass. For each action that isn't `create`, `update`, `delete`, or `destroy`, the generator also writes `app/views/<name>/<action>.cfm`. Passing no actions creates a controller with a stub `index()` action and no view files. Action names may be space-separated or comma-separated — `index,show` is equivalent to `index show`.
 
 #### Example
 
@@ -228,8 +230,8 @@ wheels generate scaffold Post title body:text publishedAt:datetime --belongsTo=a
 
 Writes:
 
-- `app/models/Post.cfc` with `belongsTo("author")`
-- `app/migrator/migrations/<timestamp>_create_posts_table.cfc` with `title`, `body`, `publishedAt`, `authorId`, and the `timestamps()` trio
+- `app/models/Post.cfc` with `belongsTo('author')`
+- `app/migrator/migrations/<timestamp>_create_posts_table.cfc` with `title`, `body`, `publishedAt`, `author_id` (`authorId` when `useUnderscoreReferenceColumns` is false), and the `timestamps()` trio
 - `app/controllers/Posts.cfc` with the seven CRUD actions
 - `app/views/posts/index.cfm`, `show.cfm`, `new.cfm`, `edit.cfm`, `_form.cfm`
 - `tests/specs/models/PostSpec.cfc`, `tests/specs/controllers/PostsControllerSpec.cfc` — the controller spec covers all seven CRUD actions (`index`, `new`, `create`, `show`, `edit`, `update`, `delete`) with `processRequest` assertions for status codes, redirects, and record-count deltas. Test data is created in `beforeEach` via `model().create()` (the Wheels-native stand-in for Rails YAML fixtures), so the specs pass on a fresh app after `wheels migrate latest`. Existing apps keep their hand-edited specs unless you re-generate with `--force`.
@@ -271,7 +273,7 @@ wheels generate route <name>
 
 #### Description
 
-Opens `config/routes.cfm`, checks that `.resources("<name>")` isn't already present, and inserts it into the mapper chain. Duplicate routes are detected by literal substring match — `generate route posts` is a no-op if `.resources("posts")` already appears in the file. If the mapper block can't be found, the command prints the line to add manually and exits.
+Opens `config/routes.cfm`, checks that `.resources("<name>")` isn't already present, and inserts it into the mapper chain. Duplicate routes are detected by literal substring match — if `.resources("posts")` already appears in the file, `generate route posts` changes nothing and exits with a non-zero status and `Route already exists: .resources("posts")`. If the mapper block can't be found, the command prints the line to add manually and exits.
 
 This is the one-line equivalent of the route step that `scaffold` and `api-resource` run for you.
 
@@ -343,7 +345,7 @@ wheels generate helper <name> [functionName ...] [--force]
 
 #### Description
 
-Writes `app/helpers/<Name>Helper.cfc` (the `Helper` suffix is appended automatically) with a stub method per function name you pass. Without any function names, an empty helper is created. The `--force` flag overwrites an existing file; without it, the command exits with an error if the file already exists.
+Writes `app/helpers/<Name>Helper.cfc` (the `Helper` suffix is appended automatically) with a stub method per function name you pass. Without any function names, the helper gets one sample `<name>Format()` method. The `--force` flag overwrites an existing file; without it, the command exits with an error if the file already exists.
 
 #### Example
 
@@ -487,7 +489,7 @@ Generates the model, migration, controller, views, tests, and route; migrates th
 wheels generate model Comment body:text --belongsTo=post
 ```
 
-Creates `Comment.cfc` with `belongsTo("post")`, plus a migration that includes a `postId` foreign-key column. Useful when you want the association wired up but don't need a controller or views yet.
+Creates `Comment.cfc` with `belongsTo('post')`, plus a migration that includes a `post_id` foreign-key column (`postId` when `useUnderscoreReferenceColumns` is false). Useful when you want the association wired up but don't need a controller or views yet.
 
 ### A blank migration for a hand-written schema change
 

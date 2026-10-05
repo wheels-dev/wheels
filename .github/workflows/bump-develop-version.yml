@@ -46,7 +46,7 @@ permissions:
 
 jobs:
   bump:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # repository_dispatch carries the version in client_payload.version
       # (set by release.yml's dispatch step). workflow_dispatch supplies it

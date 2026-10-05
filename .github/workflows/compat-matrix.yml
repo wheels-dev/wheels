@@ -68,7 +68,7 @@ jobs:
   # iteration on one engine or database.
   plan:
     name: Plan matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
       has_legs: ${{ steps.plan.outputs.has_legs }}
@@ -125,7 +125,7 @@ jobs:
     name: "${{ matrix.cfengine }} + ${{ matrix.database }}"
     needs: plan
     if: needs.plan.outputs.has_legs == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
@@ -656,7 +656,7 @@ jobs:
     # Full runs always include it; a narrowed dispatch only when `engines`
     # lists rustcfml.
     if: needs.plan.outputs.rustcfml == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -683,7 +683,7 @@ jobs:
     name: Publish Test Results
     needs: tests
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       checks: write
       pull-requests: write
@@ -720,7 +720,7 @@ jobs:
     name: Test Matrix Summary
     needs: tests
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pull-requests: write
     outputs:
@@ -854,7 +854,7 @@ jobs:
     name: Notify on failure
     needs: [tests, rustcfml, test-matrix-summary]
     if: always() && (github.event_name == 'schedule' || inputs.notify == true)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       issues: write
@@ -927,7 +927,7 @@ jobs:
     name: Compatibility Matrix Gate
     needs: [plan, tests, rustcfml]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions: {}
     steps:
       - name: Require every leg to pass

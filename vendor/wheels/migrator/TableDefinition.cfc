@@ -103,6 +103,7 @@ component extends="Base" {
 		numeric precision,
 		numeric scale
 	) {
+		$applyNullAlias(arguments);
 		arguments.adapter = this.adapter;
 		arguments.name = arguments.columnName;
 		arguments.type = arguments.columnType;
@@ -125,6 +126,40 @@ component extends="Base" {
 	}
 
 	/**
+	 * Internal function. `null` was the column option's name before 3.0, when it became `allowNull`.
+	 * It's read again as a deprecated alias, so an older migration's `null = false` still gives a
+	 * NOT NULL column. `allowNull` wins when both are passed. Read through arguments["null"]: `null`
+	 * is a keyword on some engines.
+	 */
+	public void function $applyNullAlias(required struct args) {
+		if (!StructKeyExists(arguments.args, "null")) {
+			return;
+		}
+		if (!StructKeyExists(arguments.args, "allowNull")) {
+			arguments.args.allowNull = arguments.args["null"];
+		}
+		StructDelete(arguments.args, "null");
+		$warnNullAlias();
+	}
+
+	/**
+	 * Internal function. Logs the `null` deprecation once per request (one migration run), not once
+	 * per column. Returns whether it logged.
+	 */
+	public boolean function $warnNullAlias() {
+		if (StructKeyExists(request, "$wheelsMigratorNullAliasWarned")) {
+			return false;
+		}
+		request.$wheelsMigratorNullAliasWarned = true;
+		writeLog(
+			file = "wheels",
+			type = "warning",
+			text = "Wheels: a migration column uses `null`, the option's name before Wheels 3.0. It's read as `allowNull` for now; rename it to `allowNull`."
+		);
+		return true;
+	}
+
+	/**
 	 * Shared implementation for the typed column helpers below: resolves the
 	 * columnNames/columnName alias, stamps the column type, and adds one column
 	 * per (comma-delimited) name. `args` is the caller's arguments scope, so
@@ -133,7 +168,9 @@ component extends="Base" {
 	 */
 	private any function $addTypedColumns(required string columnType, required struct args) {
 		$combineArguments(args = arguments.args, combine = "columnNames,columnName", required = true);
-		// The options column() and ColumnDefinition read; anything else (`null`, `limits`) is ignored.
+		// `null` (the option's pre-3.0 name) becomes allowNull first, so the check below doesn't report it.
+		$applyNullAlias(arguments.args);
+		// The options column() and ColumnDefinition read; anything else (`limits`, `nullable`) is ignored.
 		$checkArguments(
 			args = arguments.args,
 			name = arguments.columnType,
@@ -347,7 +384,7 @@ component extends="Base" {
 		string referenceNames,
 		string columnNames,
 		default,
-		boolean allowNull = "false",
+		boolean allowNull,
 		boolean polymorphic = "false",
 		boolean foreignKey = "true",
 		string onUpdate = "",
@@ -355,6 +392,10 @@ component extends="Base" {
 		string referenceColumn = "id"
 	) {
 		$combineArguments(args = arguments, combine = "referenceNames,columnNames", required = true);
+		$applyNullAlias(arguments);
+		if (!StructKeyExists(arguments, "allowNull")) {
+			arguments.allowNull = false;
+		}
 		local.idSuffix = $get("useUnderscoreReferenceColumns") ? "_id" : "id";
 		local.typeSuffix = $get("useUnderscoreReferenceColumns") ? "_type" : "type";
 		local.referenceNamesArray = ListToArray(arguments.referenceNames);

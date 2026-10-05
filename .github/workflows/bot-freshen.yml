@@ -23,7 +23,7 @@ jobs:
   freshen:
     name: Freshen open bot PRs
     if: vars.WHEELS_BOT_ENABLED == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       REPO: wheels-dev/wheels

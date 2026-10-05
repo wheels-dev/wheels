@@ -18,7 +18,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## Overview
 
-`destroy` mirrors a subset of the `generate` surface. For each supported type it removes the files the matching generator wrote, drops the corresponding `.resources()` line from `config/routes.cfm` when relevant, and stamps out a `remove_<table>_table` migration for types that own a schema. Files that weren't generated — or that have already been removed — are reported as skipped, not errors.
+`destroy` mirrors a subset of the `generate` surface. For each supported type it removes the files the matching generator wrote, drops the corresponding `.resources()` line from `config/routes.cfm` when relevant, and stamps out a `remove_<table>_table` migration for types that own a schema. Files that weren't generated — or that have already been removed — are reported as skipped, not errors, as long as at least one of the files exists.
 
 `wheels d` is the same function under a shorter name. Every example on this page works with either `destroy` or `d`.
 
@@ -73,7 +73,7 @@ The second command removes `app/models/Post.cfc`, `app/controllers/Posts.cfc`, `
 - `destroy model` and `destroy resource` generate a drop-table migration but do **not** execute it. Your database schema is unchanged until you run `wheels migrate latest`. If you want the schema back the way it was, delete the generated migration file before migrating.
 - `destroy resource` (the default form, no type) removes the views directory. `destroy controller` does NOT — it deletes only the controller `.cfc` and its spec, so a hand-written partial in `app/views/<name>/` is left in place. Use `destroy view` (or the resource form) when you want the views gone.
 - Pass a `controller/action` path to `destroy view` when you only want a single template deleted instead of the whole directory.
-- Files not found are reported as skipped, not errors — `destroy` succeeds even if the files you asked about were already gone.
+- Files not found are reported as skipped, not errors, while at least one matching file still exists. If nothing matching the name exists at all, `destroy` exits with a non-zero status and `nothing named '<Name>' was found to destroy`.
 </Aside>
 
 ## Common workflows

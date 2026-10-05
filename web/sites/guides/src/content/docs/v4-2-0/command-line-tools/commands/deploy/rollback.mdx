@@ -23,11 +23,11 @@ wheels deploy rollback <version> [--destination=<name>] [--dry-run]
 | `--destination=<name>` | Overlay `deploy.<name>.yml`. |
 | `--dry-run` | Print the commands without executing. |
 
-Omitting the version throws `DeployMainCli.MissingVersion`.
+Omitting the version fails with `rollback requires a version argument: wheels deploy rollback <version>` and exit code 1.
 
 ## Behavior
 
-For each role, for each host in sequence: `docker start <service>-<role>-<version>`, then `kamal-proxy deploy` to route fresh traffic to the resurrected container.
+For each role, for each host in sequence: `docker start <service>-<role>-<version>`, then `kamal-proxy deploy` to route fresh traffic to the resurrected container, then `docker stop` of the role's other containers. Finally appends a "rolled back" entry to the audit log.
 
 Success requires the target containers to still exist on each host. [`wheels deploy prune`](/v4-2-0/command-line-tools/commands/deploy/prune/) removes old containers, keeping the 5 most recent per host unless you pass `--keep=<n>` on the prune command line (there is no `deploy.yml` key for this — Kamal's `retain_containers:` is rejected by the config validator). If a target container has been pruned, the `docker start` step fails — re-deploy from that sha instead.
 
