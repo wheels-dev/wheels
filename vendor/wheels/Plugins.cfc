@@ -1037,7 +1037,13 @@ component output="false" extends="wheels.Global"{
 			} else {
 				local.className = Reverse(SpanExcluding(Reverse(local.metaData.name), "."));
 			}
-			if (StructKeyExists(application[local.appKey].mixins, local.className)) {
+			// A plugin-free app still has an (empty) entry per class, so the outer guard
+			// passes; without this check every instance copied its variables scope into
+			// `core` for nothing. `core` only serves plugin overrides calling the original.
+			if (
+				StructKeyExists(application[local.appKey].mixins, local.className)
+				&& !StructIsEmpty(application[local.appKey].mixins[local.className])
+			) {
 				if (!StructKeyExists(variablesScope, "core")) {
 					variablesScope.core = {};
 					StructAppend(variablesScope.core, variablesScope);
