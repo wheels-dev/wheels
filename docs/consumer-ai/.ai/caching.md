@@ -41,8 +41,9 @@ The rest: `appCacheRead(key, defaultValue="")`, `appCacheWrite(key, value, time)
 - Works in **every environment**, including development and testing, unlike `caches()` / `cache=` / `findAll(cache=N)`.
 - A cached `false`, `0` or `""` is a hit: `appCacheFetch()` won't recompute it. Never infer a miss from the value; use `appCacheExists()`.
 - Keys are case-sensitive strings, or a struct/array of values (struct key order ignored), e.g. `["user", userId, "orders"]`.
+- Keys are **shared by every user, session, tenant and host**. Nothing about the request is added. For per-user, per-role or per-tenant data, put that identity in the key (`"digest-" & userId`, `["orders", tenantId, userId]`), or one user's value is served to the next.
 - Values are copied in and out. A callback that returns nothing caches nothing (returns `""`); one that throws caches nothing and the error propagates.
 - No stampede guard: concurrent misses may each run the callback; the later write wins.
-- Entries live in their own `data` category: `appCacheClear()` never touches action/page/partial/query caches. They share `maximumItemsToCache`, are per server and in memory, and empty on reload/restart.
+- Entries live in their own `data` category: `appCacheClear()` never touches action/page/partial/query caches. They share `maximumItemsToCache` (when full, `appCacheWrite()` returns `false` and `appCacheFetch()` returns its value uncached, so it recomputes next time), are per server and in memory, and empty on reload/restart.
 - These names, like every public framework helper, can't be used as controller action names.
 - Invalidate with `appCacheDelete(key)` when the underlying data changes (e.g. from a model `afterSave`).

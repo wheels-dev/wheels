@@ -226,10 +226,11 @@ They're available in controllers, models, views, jobs and specs. How they behave
 - **`time`** is in `cacheDatePart` units, minutes by default, like `cache=N`. Leave it out to use `defaultCacheTime`.
 - **A cached `false`, `0` or `""` is a hit.** `appCacheFetch()` doesn't call `callback` again for it, and `appCacheExists()` returns `true`.
 - **Keys** are case-sensitive strings, or a struct or array of values, such as `["user", userId, "orders"]`. Struct key order doesn't matter.
+- **Keys are shared by every request.** The same key reads the same entry for every user, session, tenant and host name. Nothing about the current request is added to it. For anything that differs per user, role or tenant, put that identity in the key, for example `appCacheFetch("digest-" & userId, ...)` or `appCacheFetch(["orders", tenantId, userId], ...)`. Otherwise one user's or tenant's value is served to the next.
 - **Values are copied** in and out, so changing a struct you read doesn't change the cached one.
 - **A callback that returns nothing caches nothing**, and `appCacheFetch()` returns `""`. A callback that throws caches nothing and the error reaches you.
 - **No stampede protection.** The callback runs outside the cache lock, so two requests that miss at the same moment can both compute the value, and the later write wins.
-- **Its own space.** Entries live in a `data` category that the framework never writes to, so `appCacheClear()` never empties the action, page, partial or query caches, and clearing those never removes your entries. It does share the `maximumItemsToCache` limit, and the cache lives in this server's memory: an application reload or restart empties it, and each server behind a load balancer has its own.
+- **Its own space.** Entries live in a `data` category that the framework never writes to, so `appCacheClear()` never empties the action, page, partial or query caches, and clearing those never removes your entries. It does share the `maximumItemsToCache` limit: when the cache is full, `appCacheWrite()` returns `false`, and `appCacheFetch()` still returns the value it computed but doesn't cache it, so the next call computes it again. Like the rest of the cache, it lives in this server's memory: an application reload or restart empties it, and each server behind a load balancer has its own.
 
 Delete an entry when the data behind it changes, for example from a model callback (see [Invalidate from the model](#invalidate-from-the-model)):
 
