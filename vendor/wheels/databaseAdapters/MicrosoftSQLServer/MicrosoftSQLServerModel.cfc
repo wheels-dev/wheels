@@ -329,7 +329,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	/**
 	 * Internal function. True when the datasource's database has compatibility level 130 or higher,
 	 * which STRING_SPLIT needs. Read once per datasource and kept in the application's Wheels
-	 * settings, so an application reload reads it again.
+	 * settings, so an application reload reads it again. A failed read isn't kept: it is tried again
+	 * once $probeRetrySeconds() have passed, and until then the answer is false.
 	 */
 	public boolean function $supportsStringSplit(required string dataSource) {
 		local.appKey = $appKey();
@@ -339,7 +340,16 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		}
 		local.levels = application[local.appKey].sqlServerCompatibilityLevels;
 		if (!StructKeyExists(local.levels, local.dataSource)) {
-			local.levels[local.dataSource] = $readCompatibilityLevel(local.dataSource);
+			if ($probeFailedRecently(probe = "compatibilityLevel", dataSource = local.dataSource)) {
+				return false;
+			}
+			local.level = $readCompatibilityLevel(local.dataSource);
+			if (local.level <= 0) {
+				$noteProbeResult(probe = "compatibilityLevel", dataSource = local.dataSource, failed = true);
+				return false;
+			}
+			$noteProbeResult(probe = "compatibilityLevel", dataSource = local.dataSource, failed = false);
+			local.levels[local.dataSource] = local.level;
 		}
 		return local.levels[local.dataSource] >= 130;
 	}
@@ -367,7 +377,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * Internal function. The CAST each date or timestamp IN list is split with, keyed by cf_sql type:
 	 * the type the datasource's driver binds that cf_sql type as, so a split list matches exactly
 	 * the rows a list bound one parameter per value matches (#4318). Read once per datasource and
-	 * kept in the application's Wheels settings, like the compatibility level.
+	 * kept in the application's Wheels settings, like the compatibility level; a failed read is
+	 * tried again once $probeRetrySeconds() have passed, and until then no date list is split.
 	 */
 	public struct function $stringSplitDateCasts(required string dataSource) {
 		local.appKey = $appKey();
@@ -377,9 +388,60 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		}
 		local.bindTypes = application[local.appKey].sqlServerDateBindTypes;
 		if (!StructKeyExists(local.bindTypes, local.dataSource)) {
-			local.bindTypes[local.dataSource] = $readDateBindTypes(local.dataSource);
+			if ($probeFailedRecently(probe = "dateBindTypes", dataSource = local.dataSource)) {
+				return {};
+			}
+			local.read = $readDateBindTypes(local.dataSource);
+			$noteProbeResult(probe = "dateBindTypes", dataSource = local.dataSource, failed = StructIsEmpty(local.read));
+			if (StructIsEmpty(local.read)) {
+				return {};
+			}
+			local.bindTypes[local.dataSource] = local.read;
 		}
 		return $dateCastsFor(local.bindTypes[local.dataSource]);
+	}
+
+	/**
+	 * Internal function. True when `probe` failed for `dataSource` less than $probeRetrySeconds() ago,
+	 * so it isn't run again yet: a broken probe would otherwise run before every long statement.
+	 */
+	public boolean function $probeFailedRecently(required string probe, required string dataSource) {
+		local.failures = $probeFailures();
+		local.key = arguments.probe & "|" & arguments.dataSource;
+		return StructKeyExists(local.failures, local.key) && GetTickCount() - local.failures[local.key] < $probeRetrySeconds() * 1000;
+	}
+
+	/**
+	 * Internal function. Records when `probe` failed for `dataSource`, or forgets an earlier failure
+	 * once it succeeds.
+	 */
+	public void function $noteProbeResult(required string probe, required string dataSource, required boolean failed) {
+		local.failures = $probeFailures();
+		local.key = arguments.probe & "|" & arguments.dataSource;
+		if (arguments.failed) {
+			local.failures[local.key] = GetTickCount();
+		} else {
+			StructDelete(local.failures, local.key);
+		}
+	}
+
+	/**
+	 * Internal function. When each SQL Server probe last failed, keyed by `probe|dataSource`, kept in
+	 * the application's Wheels settings so a reload starts afresh.
+	 */
+	public struct function $probeFailures() {
+		local.appKey = $appKey();
+		if (!StructKeyExists(application[local.appKey], "sqlServerProbeFailures")) {
+			application[local.appKey].sqlServerProbeFailures = {};
+		}
+		return application[local.appKey].sqlServerProbeFailures;
+	}
+
+	/**
+	 * Internal function. How long a failed SQL Server probe waits before it is tried again.
+	 */
+	public numeric function $probeRetrySeconds() {
+		return 60;
 	}
 
 	/**
