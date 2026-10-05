@@ -225,7 +225,9 @@
 	 * `false` is a legitimate callback result, not a failure — a genuine failure (callback or commit)
 	 * throws, and invokeWithTransaction then rolls back and fires afterRollback. The callback's real
 	 * result is written into the shared `state` struct in the try body only (nothing written in a
-	 * catch — BoxLang invariant 11). `committed` flips only after a clean commit.
+	 * catch — BoxLang invariant 11). A request that ends with `abort` inside the callback is rolled
+	 * back by invokeWithTransaction() itself ($invokeTransactionMethod(), #4335); this method only
+	 * makes sure the lock is released on that path.
 	 *
 	 * A release failure must never reach invokeWithTransaction's rollback handler (which would fire
 	 * afterRollback on already-committed data and suppress afterCommit). So the release runs in its own
@@ -236,9 +238,7 @@
 	 */
 	public boolean function $advisoryLockTransactionBody(required string name, required numeric timeout, required any callback, required struct state) {
 		local.adapter = variables.wheels.class.adapter;
-		local.committed = {flag = false};
 		var release = {error = "", done = false};
-		var threw = {flag = false};
 		var cb = {done = false};
 		local.adapter.$acquireAdvisoryLockTransactional(name = arguments.name, timeout = arguments.timeout);
 		try {
@@ -269,40 +269,22 @@
 				}
 			}
 			// Normal path only (abort/throw skipped past this via the inner finally). Commit on the pinned
-			// connection BEFORE the release, so the next holder reads committed state. `committed` flips
-			// only AFTER a clean commit, so a failing commit takes the catch/finally path below.
+			// connection BEFORE the release, so the next holder reads committed state. A failing commit
+			// throws, and the finally below still releases the lock.
 			transaction action="commit";
-			local.committed.flag = true;
 			try {
 				$releaseTransactionalAdvisoryLock(adapter = local.adapter, name = arguments.name);
 			} catch (any releaseErr2) {
 				release.error = releaseErr2;
 			}
 			release.done = true;
-		} catch (any e) {
-			// A caught throw (callback or commit). On a throw, invokeWithTransaction's own catch rolls the
-			// transaction back after this method returns, so the finally does NOT roll back. Unscoped
-			// struct write persists past the catch on BoxLang (invariant 11). The exception still
-			// propagates to invokeWithTransaction.
-			threw.flag = true;
-			rethrow;
 		} finally {
-			// Roll back ONLY on the ABORT path — not committed, and not a caught throw. An aborting
-			// callback is never caught, so invokeWithTransaction's catch never runs. This outer try has a
-			// catch clause, so BoxLang skips this finally on abort (cross-engine invariant 22); there the
-			// rollback comes from $invokeTransactionMethod(), whose catch-free finally runs this method
-			// through invokeWithTransaction(), and the LOCK release above sits in a separate catch-free
-			// try/finally. Lucee/Adobe run this finally normally.
-			if (!local.committed.flag && !threw.flag) {
-				try {
-					transaction action="rollback";
-				} catch (any rollbackErr) {
-					WriteLog(type = "error", file = "wheels", text = "withAdvisoryLock(transaction=true): rollback on the abort path failed: " & rollbackErr.message);
-				}
-			}
-			// Safety net for a commit failure: a throw AFTER the inner finally leaves cb.done true (so the
-			// inner finally did not release) and committed false (so the commit threw). A throw runs this
-			// finally on every engine, so release here if it has not happened yet.
+			// Safety net for a commit failure: a throw AFTER the inner finally leaves cb.done true, so the
+			// inner finally did not release. Release here if it has not happened yet. This try is
+			// catch-free too (cross-engine invariant 22), so this finally runs on every engine, including
+			// on abort, where the inner finally has already released and this is a no-op. A failed
+			// callback or commit is rolled back by invokeWithTransaction() after the exception leaves this
+			// method; an abort is rolled back by its $invokeTransactionMethod() (#4335).
 			if (!release.done) {
 				try {
 					$releaseTransactionalAdvisoryLock(adapter = local.adapter, name = arguments.name);
