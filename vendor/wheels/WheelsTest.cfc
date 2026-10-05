@@ -302,27 +302,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             return this.testClientBaseUrl;
         }
 
-        try {
-            var setting = get(name = "testClientBaseUrl");
-            if (len(setting ?: "")) {
-                return setting;
-            }
-        } catch (any e) {
-            // Setting not registered — fall through to the next layer.
-        }
-
-        try {
-            var sys = createObject("java", "java.lang.System");
-            var prop = sys.getProperty("wheels.testClient.baseUrl");
-            if (!isNull(prop) && len(prop)) {
-                return prop;
-            }
-            var envValue = sys.getenv("WHEELS_TEST_CLIENT_BASE_URL");
-            if (!isNull(envValue) && len(envValue)) {
-                return envValue;
-            }
-        } catch (any e) {
-            // Best-effort: a SecurityManager could deny system access.
+        var configured = $configuredTestClientBaseUrl();
+        if (len(configured)) {
+            return configured;
         }
 
         try {
@@ -346,6 +328,42 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         }
 
         return "http://localhost:8080";
+    }
+
+    /**
+     * The configured (non-per-instance) TestClient base URL override: the
+     * `testClientBaseUrl` setting, then `-Dwheels.testClient.baseUrl`, then the
+     * `WHEELS_TEST_CLIENT_BASE_URL` env var, or "" when none is set. A public
+     * seam so resolver-level specs can neutralise every ambient override at
+     * once — the env var in particular cannot be unset from the JVM, so
+     * save/restore is not an option — and drive the probe/cgi path
+     * deterministically regardless of the CI environment.
+     */
+    public string function $configuredTestClientBaseUrl() {
+        try {
+            var setting = get(name = "testClientBaseUrl");
+            if (len(setting ?: "")) {
+                return setting;
+            }
+        } catch (any e) {
+            // Setting not registered — fall through to the next layer.
+        }
+
+        try {
+            var sys = createObject("java", "java.lang.System");
+            var prop = sys.getProperty("wheels.testClient.baseUrl");
+            if (!isNull(prop) && len(prop)) {
+                return prop;
+            }
+            var envValue = sys.getenv("WHEELS_TEST_CLIENT_BASE_URL");
+            if (!isNull(envValue) && len(envValue)) {
+                return envValue;
+            }
+        } catch (any e) {
+            // Best-effort: a SecurityManager could deny system access.
+        }
+
+        return "";
     }
 
     /**

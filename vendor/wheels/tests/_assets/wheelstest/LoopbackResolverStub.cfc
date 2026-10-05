@@ -41,4 +41,18 @@ component extends="wheels.wheelstest.BrowserTest" {
 		variables.probeCallCount = variables.probeCallCount + 1;
 		return variables.stubProbeAnswer;
 	}
+
+	// Neutralise every ambient base-URL override (the browserTestBaseUrl /
+	// testClientBaseUrl settings, the -D system properties, and the
+	// WHEELS_BROWSER_TEST_BASE_URL / WHEELS_TEST_CLIENT_BASE_URL env vars) so a
+	// scenario drives the probe/cgi path deterministically. The env vars in
+	// particular cannot be unset from the JVM, so overriding the resolver's
+	// configured-override seam is the only reliable isolation (#4195).
+	public string function $configuredBrowserBaseUrl() {
+		return "";
+	}
+
+	public string function $configuredTestClientBaseUrl() {
+		return "";
+	}
 }

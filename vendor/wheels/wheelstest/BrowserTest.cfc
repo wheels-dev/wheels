@@ -411,23 +411,8 @@ component extends="wheels.WheelsTest" {
     public string function $resolveBaseUrl() {
         if (len(this.baseUrl ?: "")) return this.baseUrl;
 
-        try {
-            var setting = get(name="browserTestBaseUrl");
-            if (len(setting ?: "")) return setting;
-        } catch (any e) {
-            // Setting not registered — fall through to next layer.
-        }
-
-        try {
-            var sys = createObject("java", "java.lang.System");
-            var prop = sys.getProperty("wheels.browserTest.baseUrl");
-            if (!isNull(prop) && len(prop)) return prop;
-            var env = sys.getenv("WHEELS_BROWSER_TEST_BASE_URL");
-            if (!isNull(env) && len(env)) return env;
-        } catch (any e) {
-            // Best-effort: a SecurityManager could deny system access.
-            // Falling through to CGI detection / default is correct.
-        }
+        var configured = $configuredBrowserBaseUrl();
+        if (len(configured)) return configured;
 
         try {
             var mapped = $resolveServletLoopbackBaseUrl(cgi);
@@ -445,6 +430,36 @@ component extends="wheels.WheelsTest" {
         }
 
         return "http://localhost:8080";
+    }
+
+    /**
+     * The configured (non-per-instance) browser base URL override: the
+     * `browserTestBaseUrl` setting, then `-Dwheels.browserTest.baseUrl`, then
+     * the `WHEELS_BROWSER_TEST_BASE_URL` env var, or "" when none is set. A
+     * public seam so resolver-level specs can neutralise every ambient
+     * override at once — the env var in particular cannot be unset from the
+     * JVM, so save/restore is not an option — and drive the probe/cgi path
+     * deterministically regardless of the CI environment.
+     */
+    public string function $configuredBrowserBaseUrl() {
+        try {
+            var setting = get(name="browserTestBaseUrl");
+            if (len(setting ?: "")) return setting;
+        } catch (any e) {
+            // Setting not registered — fall through to next layer.
+        }
+
+        try {
+            var sys = createObject("java", "java.lang.System");
+            var prop = sys.getProperty("wheels.browserTest.baseUrl");
+            if (!isNull(prop) && len(prop)) return prop;
+            var env = sys.getenv("WHEELS_BROWSER_TEST_BASE_URL");
+            if (!isNull(env) && len(env)) return env;
+        } catch (any e) {
+            // Best-effort: a SecurityManager could deny system access.
+        }
+
+        return "";
     }
 
     /**
