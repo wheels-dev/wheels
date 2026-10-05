@@ -182,7 +182,8 @@ component extends="wheels.WheelsTest" {
 				expect(variables.g.model("author").whereNotIn("id", paddedIds(5000)).count()).toBe(0);
 			});
 
-			it("keeps Wheels.TooManyParameters for a date list past the limit", () => {
+			// Date and timestamp lists are covered in detail by sqlServerDateStringSplitSpec (#4318).
+			it("runs an ISO date list past the limit", () => {
 				if (!variables.isSqlServer) {
 					skip("SQL Server's parameter limit.");
 				}
@@ -191,8 +192,7 @@ component extends="wheels.WheelsTest" {
 					ArrayAppend(dates, DateFormat(DateAdd("d", i, CreateDate(2000, 1, 1)), "yyyy-mm-dd"));
 				}
 				var thrown = errorOf(() => variables.g.model("post").whereIn("createdAt", dates).count());
-				expect(thrown.type).toBe("Wheels.TooManyParameters");
-				expect(thrown.extendedInfo).toInclude("Any other list (dates, times");
+				expect(thrown.type).toBe("");
 			});
 
 			it("keeps Wheels.TooManyParameters for a float list past the limit, and says which lists it combines", () => {
