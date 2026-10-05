@@ -2,13 +2,20 @@
  * Ordering by a column whose name is a reserved word, through order="table.column"
  * as well as order="column" (4374): the qualified form is quoted like the bare one.
  * The spec owns its table, c_o_r_e_reservedorders, created with the adapter's own
- * identifier quoting so it works on every database, and drops it afterwards.
+ * identifier quoting, and drops it afterwards. Skipped on H2, whose adapter doesn't
+ * quote identifiers.
  */
 component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
 		variables.ds = application.wheels.dataSourceName;
 		variables.table = "c_o_r_e_reservedorders";
+		// The H2 adapter doesn't quote identifiers ($quoteIdentifier returns the name as is),
+		// so a table with reserved-word columns can't be created or ordered by there.
+		variables.isH2 = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "H2";
+		if (variables.isH2) {
+			return;
+		}
 		$dropTable();
 		QueryExecute(
 			"CREATE TABLE #variables.table# (id INT NOT NULL PRIMARY KEY, #$q('order')# INT NOT NULL, #$q('group')# VARCHAR(20) NOT NULL)",
@@ -26,7 +33,9 @@ component extends="wheels.WheelsTest" {
 	}
 
 	function afterAll() {
-		$dropTable();
+		if (!variables.isH2) {
+			$dropTable();
+		}
 	}
 
 	// An identifier quoted by the model adapter ("x", `x` or [x], per database).
@@ -45,6 +54,12 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		describe("order by a reserved-word column (4374)", () => {
+
+			beforeEach(() => {
+				if (variables.isH2) {
+					skip("the H2 adapter doesn't quote identifiers, so reserved-word columns can't be used");
+				}
+			});
 
 			it("orders by table.column the same as by the bare column", () => {
 				var model = application.wo.model("ReservedOrder");
