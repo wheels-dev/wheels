@@ -1,0 +1,1 @@
+- A request that ends with `abort` inside a Wheels transaction (`invokeWithTransaction()`, a nested call that joins it, a savepoint unit, or `withAdvisoryLock(transaction = true)`) now rolls the transaction back on every engine, as it already did on Lucee and Adobe ColdFusion. On BoxLang the writes made before the abort were kept

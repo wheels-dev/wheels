@@ -273,11 +273,7 @@
 	public void function $transactionBody(required struct ctx) {
 		arguments.ctx.txnState.entered = true;
 		try {
-			arguments.ctx.rv = $invoke(
-				method = arguments.ctx.method,
-				componentReference = this,
-				invokeArgs = arguments.ctx.methodArgs
-			);
+			$invokeTransactionMethod(arguments.ctx);
 			if (
 				!IsBoolean(arguments.ctx.rv)
 				|| (!IsNumeric(arguments.ctx.rv) && !arguments.ctx.rv)
@@ -294,6 +290,34 @@
 				$resolveTransactionCallbacks(connection = arguments.ctx.connectionArgs, type = "afterRollback", propagateErrors = false);
 			}
 			rethrow;
+		}
+	}
+
+	/**
+	 * Internal. Runs a Wheels-owned transaction's method. When the request ends with `abort`
+	 * inside it, the method has neither returned nor thrown, and the transaction is rolled back
+	 * here, as it is after a failure. The rollback must stay in a try/finally with no catch clause:
+	 * on BoxLang, abort skips a finally whose try has a catch clause (cross-engine invariant 22 in
+	 * CLAUDE.md), and the transaction would then keep the writes made before the abort.
+	 */
+	public void function $invokeTransactionMethod(required struct ctx) {
+		var exitState = {completed = false, threw = false};
+		try {
+			try {
+				arguments.ctx.rv = $invoke(
+					method = arguments.ctx.method,
+					componentReference = this,
+					invokeArgs = arguments.ctx.methodArgs
+				);
+				exitState.completed = true;
+			} catch (any e) {
+				exitState.threw = true;
+				rethrow;
+			}
+		} finally {
+			if (!exitState.completed && !exitState.threw) {
+				transaction action="rollback";
+			}
 		}
 	}
 
