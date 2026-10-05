@@ -92,9 +92,8 @@ component {
 			return false;
 		}
 
-		// Path trigger — anchored to the request PATH (see $cgiHaystack).
-		var haystack = $cgiHaystack(arguments.cgiScope);
-		if (FindNoCase("/wheels/core/tests", haystack) || FindNoCase("/wheels/app/tests", haystack)) {
+		// Path trigger — the request path must be, or start a path segment with, a runner endpoint.
+		if ($pathTriggersTestContext(arguments.cgiScope)) {
 			return true;
 		}
 
@@ -224,22 +223,35 @@ component {
 	}
 
 	/**
-	 * Concatenate the CGI fields that carry the runner PATH: path_info and
-	 * script_name.
+	 * True when the request path targets a test-runner endpoint, anchored at the START of the path.
+	 * For each of `path_info` and `script_name`: lowercase/trim, cut the query string off FIRST (so a
+	 * `//` or `..` living inside a query cannot reject a legitimate runner URL), reject any remaining
+	 * `..` traversal or `//` empty segment, then start-anchored match against
+	 * `^/wheels/(core|app)/tests(/|$)` — i.e. the value must EQUAL `/wheels/core/tests` /
+	 * `/wheels/app/tests` or start with one followed by `/`. Because the match is anchored at position
+	 * 0 of a canonical path, a runner path that merely appears later in an application route
+	 * (`/files/x/wheels/app/tests`), or is reached via a traversal (`/wheels/app/tests/../../files/x`)
+	 * or a double slash, does NOT match. `path_info` is the post-context path, so a context-root-mounted
+	 * app's runner still matches there.
+	 *
+	 * Keep this rule in lockstep with the inline copy in events/testcontext.cfm, which cannot call this
+	 * method (it runs in Application.cfc's pseudo-constructor, before this.mappings is registered).
 	 */
-	public string function $cgiHaystack(required struct cgiScope) {
-		var haystack = "";
-		var keys = "path_info,script_name";
-		var i = 0;
-		var key = "";
-		var keyCount = ListLen(keys);
-		for (i = 1; i <= keyCount; i++) {
-			key = ListGetAt(keys, i);
-			if (StructKeyExists(arguments.cgiScope, key)) {
-				haystack &= " " & ToString(arguments.cgiScope[key]);
+	public boolean function $pathTriggersTestContext(required struct cgiScope) {
+		var keys = ["path_info", "script_name"];
+		for (var key in keys) {
+			if (!StructKeyExists(arguments.cgiScope, key)) {
+				continue;
+			}
+			var path = ReReplace(LCase(Trim(ToString(arguments.cgiScope[key]))), "\?.*$", "");
+			if (
+				!ReFind("\.\.|//", path)
+				&& ReFindNoCase("^/wheels/(core|app)/tests(/|$)", path) > 0
+			) {
+				return true;
 			}
 		}
-		return haystack;
+		return false;
 	}
 
 }
