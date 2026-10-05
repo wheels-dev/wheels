@@ -12,6 +12,7 @@
 	 * @joinKey Column name to join to if not the primary key (usually not needed if you follow Wheels conventions since the join key will be the table's primary key/keys).
 	 * @joinType Use to set the join type when joining associated tables. Possible values are `inner` (for `INNER JOIN`) and `outer` (for `LEFT OUTER JOIN`).
 	 * @polymorphic Set to `true` to declare a polymorphic `belongsTo` association. The foreign key defaults to `{name}Id` and a `{name}Type` column is used to store the owning model name at runtime.
+	 * @foreignType The column that stores the owning model's name in a polymorphic association. Defaults to `{name}Type`. Pass it, with `foreignKey`, when the columns are named differently, e.g. `notable_type` / `notable_id` as `t.references(polymorphic = true)` writes them when `useUnderscoreReferenceColumns` is on.
 	 */
 	public void function belongsTo(
 		required string name,
@@ -19,18 +20,21 @@
 		string foreignKey = "",
 		string joinKey = "",
 		string joinType,
-		boolean polymorphic = false
+		boolean polymorphic = false,
+		string foreignType = ""
 	) {
 		$args(name = "belongsTo", args = arguments);
 		arguments.type = "belongsTo";
 
 		// Polymorphic belongsTo: the name is the interface name (e.g. "commentable").
-		// foreignKey defaults to {name}Id, and we add a foreignType column {name}Type.
+		// foreignKey defaults to {name}Id and foreignType to {name}Type; both can be passed.
 		if (arguments.polymorphic) {
 			if (!Len(arguments.foreignKey)) {
 				arguments.foreignKey = "#arguments.name#id";
 			}
-			arguments.foreignType = "#arguments.name#type";
+			if (!Len(arguments.foreignType)) {
+				arguments.foreignType = "#arguments.name#type";
+			}
 			// Don't infer modelName — it's resolved at runtime from the type column.
 			arguments.modelName = "";
 		}
@@ -58,6 +62,7 @@
 	 * @shortcut Set this argument to create an additional dynamic method that gets the object(s) from the other side of a many-to-many association.
 	 * @through Set this argument if you need to override Wheels conventions when using the `shortcut` argument. Accepts a list of two association names representing the chain from the opposite side of the many-to-many relationship to this model.
 	 * @as Set this argument to declare a polymorphic `hasMany` association. The child model stores the parent type in a `{as}Type` column alongside the foreign key `{as}Id`.
+	 * @foreignType The child's column that stores the parent type in a polymorphic (`as`) association. Defaults to `{as}Type`. [see:belongsTo].
 	 */
 	public void function hasMany(
 		required string name,
@@ -68,7 +73,8 @@
 		string dependent,
 		string shortcut = "",
 		string through = "#singularize(arguments.shortcut)#,#arguments.name#",
-		string as = ""
+		string as = "",
+		string foreignType = ""
 	) {
 		$args(name = "hasMany", args = arguments);
 		local.singularizedName = capitalize(singularize(arguments.name));
@@ -76,12 +82,14 @@
 		arguments.type = "hasMany";
 
 		// Polymorphic hasMany: `as` is the polymorphic interface name on the child side.
-		// foreignKey defaults to {as}Id, and foreignType is {as}Type.
+		// foreignKey defaults to {as}Id and foreignType to {as}Type; both can be passed.
 		if (Len(arguments.as)) {
 			if (!Len(arguments.foreignKey)) {
 				arguments.foreignKey = "#arguments.as#id";
 			}
-			arguments.foreignType = "#arguments.as#type";
+			if (!Len(arguments.foreignType)) {
+				arguments.foreignType = "#arguments.as#type";
+			}
 		}
 
 		// The dynamic shortcut methods to add to this class (e.g. "comment", "commentCount", "addComment" etc).
@@ -114,6 +122,7 @@
 	 * @joinType [see:belongsTo].
 	 * @dependent [see:hasMany].
 	 * @as Set this argument to declare a polymorphic `hasOne` association. The child model stores the parent type in a `{as}Type` column alongside the foreign key `{as}Id`.
+	 * @foreignType The child's column that stores the parent type in a polymorphic (`as`) association. Defaults to `{as}Type`. [see:belongsTo].
 	 */
 	public void function hasOne(
 		required string name,
@@ -122,19 +131,22 @@
 		string joinKey = "",
 		string joinType,
 		string dependent,
-		string as = ""
+		string as = "",
+		string foreignType = ""
 	) {
 		$args(name = "hasOne", args = arguments);
 		local.capitalizedName = capitalize(arguments.name);
 		arguments.type = "hasOne";
 
 		// Polymorphic hasOne: `as` is the polymorphic interface name on the child side.
-		// foreignKey defaults to {as}Id, and foreignType is {as}Type.
+		// foreignKey defaults to {as}Id and foreignType to {as}Type; both can be passed.
 		if (Len(arguments.as)) {
 			if (!Len(arguments.foreignKey)) {
 				arguments.foreignKey = "#arguments.as#id";
 			}
-			arguments.foreignType = "#arguments.as#type";
+			if (!Len(arguments.foreignType)) {
+				arguments.foreignType = "#arguments.as#type";
+			}
 		}
 
 		// The dynamic shortcut methods to add to this class (e.g. "profile", "createProfile", "deleteProfile" etc).

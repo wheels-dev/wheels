@@ -60,6 +60,8 @@ component extends="Model" {
 Finders: `model("User").findAll()`, `findOne(where="...")`, `findByKey(params.key)`.
 Create: `model("User").new(params.user).save()`, or `model("User").create(params.user)`.
 Include associations: `findAll(include="role,orders")`. Pagination: `findAll(page=params.page, perPage=25)`.
+
+Polymorphic: `belongsTo(name="commentable", polymorphic=true)` on the child, `hasMany(name="comments", as="commentable")` on each parent. The columns default to `commentableid` / `commentabletype` (no underscore, whatever `useUnderscoreReferenceColumns` says); for other names pass `foreignKey="commentable_id", foreignType="commentable_type"` on every side.
 Opt a `select=false` calculated property into one call (additive): `findAll(includeCalculated="fullName")`. Unknown names throw `Wheels.CalculatedPropertyNotFound` in dev/testing.
 
 ## Scopes / Enums / Builder / Batch
