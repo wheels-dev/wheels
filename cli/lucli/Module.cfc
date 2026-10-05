@@ -7605,11 +7605,11 @@ component extends="modules.BaseModule" {
 			out("The next migration takes it over, so there is nothing to clear.");
 			return "";
 		}
-		out("The migration lock is held by #$migrationLockDescription(lock)#; its lease expires in #lock.expiresInSeconds# seconds.", "yellow");
+		// One self-contained message: an MCP client sees only the thrown message.
 		$refuse(
-			"The migration lock is held by another instance; nothing was removed.",
-			"Wheels.MigrationLocked",
-			["If that instance is gone, remove the lock with:", "  wheels migrate unlock --force"]
+			"The migration lock is held by #$migrationLockDescription(lock)#; its lease expires in #lock.expiresInSeconds# seconds. "
+				& "Nothing was removed. If that instance is gone, remove the lock with: wheels migrate unlock --force",
+			"Wheels.MigrationLocked"
 		);
 		return "";
 	}
