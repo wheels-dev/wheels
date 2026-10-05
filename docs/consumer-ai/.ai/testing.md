@@ -77,6 +77,7 @@ A spec that redefines the route table leaks stale routes into every spec that ru
 
 ```cfm
 beforeEach(() => {
+    var g = application.wo;
     variables._routes = $snapshotRoutes();
     $clearRoutes();
     g.mapper().resources("widgets").end();
@@ -85,4 +86,4 @@ beforeEach(() => {
 afterEach(() => $restoreRoutes(variables._routes));
 ```
 
-`$snapshotRoutes()` captures everything a redefinition touches — the route list, the static-route index, named-route positions, and the `urlFor` caches — so `$restoreRoutes()` leaves the table byte-for-byte as it was, with no leakage into later specs.
+`$snapshotRoutes()` captures everything a redefinition touches — the route list, the static-route index, named-route positions, the `urlFor` caches, and the dynamic route index and route-table generation — so `$restoreRoutes()` leaves the table byte-for-byte as it was, with no leakage into later specs.
