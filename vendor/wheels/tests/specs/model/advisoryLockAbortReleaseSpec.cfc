@@ -66,12 +66,24 @@ component extends="wheels.WheelsTest" {
 			}
 
 			afterEach(() => {
+				for (var probe in ListToArray(variables.probeNames)) {
+					StructDelete(server, "wheelsAdvisoryProbe_" & probe);
+				}
 				releaseProbeLocks();
 			});
 
 			it("default path: frees the lock after the callback aborts", () => {
 				var tc = $testClient();
+				StructDelete(server, "wheelsAdvisoryProbe_probe_abort_default");
 				tc.get("/_advisorylock/abort-default");
+				expect(tc.statusCode()).toBe(200, "the abort probe request did not complete with 200");
+				// positive control: the callback ran inside the lock, and a second connection saw it held
+				expect(StructKeyExists(server, "wheelsAdvisoryProbe_probe_abort_default")).toBeTrue(
+					"the probe callback never ran — the request did not reach withAdvisoryLock"
+				);
+				expect(server["wheelsAdvisoryProbe_probe_abort_default"]).toBeTrue(
+					"the lock was not observably held during the callback — nothing to prove released"
+				);
 				expect(freshAdapter().$isAdvisoryLockHeld(name = "probe_abort_default")).toBeFalse(
 					"a default-path lock stayed held after the callback aborted — the release did not run on abort"
 				);
@@ -79,7 +91,15 @@ component extends="wheels.WheelsTest" {
 
 			it("default path: frees the lock after the callback redirects", () => {
 				var tc = $testClient();
+				StructDelete(server, "wheelsAdvisoryProbe_probe_redirect_default");
 				tc.get("/_advisorylock/redirect-default");
+				tc.assertRedirect();
+				expect(StructKeyExists(server, "wheelsAdvisoryProbe_probe_redirect_default")).toBeTrue(
+					"the probe callback never ran — the request did not reach withAdvisoryLock"
+				);
+				expect(server["wheelsAdvisoryProbe_probe_redirect_default"]).toBeTrue(
+					"the lock was not observably held during the callback — nothing to prove released"
+				);
 				expect(freshAdapter().$isAdvisoryLockHeld(name = "probe_redirect_default")).toBeFalse(
 					"a default-path lock stayed held after the callback redirected — the release did not run on cflocation"
 				);
@@ -87,7 +107,15 @@ component extends="wheels.WheelsTest" {
 
 			it("transaction = true: frees the lock after the callback aborts", () => {
 				var tc = $testClient();
+				StructDelete(server, "wheelsAdvisoryProbe_probe_abort_tx");
 				tc.get("/_advisorylock/abort-tx");
+				expect(tc.statusCode()).toBe(200, "the abort probe request did not complete with 200");
+				expect(StructKeyExists(server, "wheelsAdvisoryProbe_probe_abort_tx")).toBeTrue(
+					"the probe callback never ran — the request did not reach withAdvisoryLock"
+				);
+				expect(server["wheelsAdvisoryProbe_probe_abort_tx"]).toBeTrue(
+					"the lock was not observably held during the callback — nothing to prove released"
+				);
 				expect(freshAdapter().$isAdvisoryLockHeld(name = "probe_abort_tx")).toBeFalse(
 					"a transaction-path lock stayed held after the callback aborted — the release did not run on abort"
 				);
@@ -95,7 +123,15 @@ component extends="wheels.WheelsTest" {
 
 			it("transaction = true: frees the lock after the callback redirects", () => {
 				var tc = $testClient();
+				StructDelete(server, "wheelsAdvisoryProbe_probe_redirect_tx");
 				tc.get("/_advisorylock/redirect-tx");
+				tc.assertRedirect();
+				expect(StructKeyExists(server, "wheelsAdvisoryProbe_probe_redirect_tx")).toBeTrue(
+					"the probe callback never ran — the request did not reach withAdvisoryLock"
+				);
+				expect(server["wheelsAdvisoryProbe_probe_redirect_tx"]).toBeTrue(
+					"the lock was not observably held during the callback — nothing to prove released"
+				);
 				expect(freshAdapter().$isAdvisoryLockHeld(name = "probe_redirect_tx")).toBeFalse(
 					"a transaction-path lock stayed held after the callback redirected — the release did not run on cflocation"
 				);
