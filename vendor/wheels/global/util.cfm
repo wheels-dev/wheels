@@ -1508,4 +1508,36 @@ public string function $testRunFailureMessage(required any runErr) {
 	}
 	return local.message;
 }
+
+/**
+ * The current wall-clock datetime, or the frozen test clock when a spec has called `travelTo()`.
+ * Framework code reads this instead of a bare `Now()` so a spec can freeze time (cache expiry,
+ * rate-limit windows) deterministically. In production no `travelTo()` runs, so it returns `Now()`
+ * and behaviour is unchanged. The override lives in request scope (`request.$wheelsClock`), set only
+ * by `wheels.WheelsTest.travelTo()`, so it can never leak past the request.
+ *
+ * [section: Miscellaneous Functions]
+ * [category: General Functions]
+ */
+public any function $now() {
+	if (StructKeyExists(request, "$wheelsClock")) {
+		return request.$wheelsClock.at;
+	}
+	return Now();
+}
+
+/**
+ * The millisecond tick counter (`GetTickCount()`), or the frozen test clock's epoch ms when
+ * `travelTo()` is active. Framework time-window logic (RateLimiter) reads this so a spec can freeze it.
+ * Returns `GetTickCount()` verbatim when no travel is active.
+ *
+ * [section: Miscellaneous Functions]
+ * [category: General Functions]
+ */
+public numeric function $tick() {
+	if (StructKeyExists(request, "$wheelsClock")) {
+		return request.$wheelsClock.tick;
+	}
+	return GetTickCount();
+}
 </cfscript>

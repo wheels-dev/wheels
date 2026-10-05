@@ -138,7 +138,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 */
 	public string function handle(required struct request, required any next) {
 		local.clientKey = $resolveKey(arguments.request);
-		local.now = GetTickCount() / 1000;
+		local.now = $clockTick() / 1000;
 
 		// Periodic cleanup for memory storage.
 		if (variables.storage == "memory") {
@@ -805,7 +805,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			{
 				storeKey: {value: arguments.storeKey, cfsqltype: "cf_sql_varchar"},
 				clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"},
-				expiresAt: {value: DateAdd("s", variables.windowSeconds, Now()), cfsqltype: "cf_sql_timestamp"}
+				expiresAt: {value: DateAdd("s", variables.windowSeconds, $clockNow()), cfsqltype: "cf_sql_timestamp"}
 			},
 			$queryOptions()
 		);
@@ -856,7 +856,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				{
 					storeKey: {value: arguments.storeKey, cfsqltype: "cf_sql_varchar"},
 					clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"},
-					expiresAt: {value: DateAdd("s", variables.windowSeconds, Now()), cfsqltype: "cf_sql_timestamp"}
+					expiresAt: {value: DateAdd("s", variables.windowSeconds, $clockNow()), cfsqltype: "cf_sql_timestamp"}
 				},
 				$queryOptions()
 			);
@@ -968,7 +968,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			clientKey = arguments.clientKey,
 			rowType = "anchor",
 			counter = 0,
-			expiresAt = DateAdd("s", variables.windowSeconds, Now())
+			expiresAt = DateAdd("s", variables.windowSeconds, $clockNow())
 		);
 	}
 
@@ -989,7 +989,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		}
 
 		local.outcome = {allowed: true, remaining: variables.maxRequests};
-		local.expiresAt = DateAdd("s", variables.windowSeconds, Now());
+		local.expiresAt = DateAdd("s", variables.windowSeconds, $clockNow());
 
 		// Global purge stays outside the lock and transaction (it never throws).
 		$dbPurgeExpired();
@@ -1006,7 +1006,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 						// Clean expired event rows for this client.
 						QueryExecute(
 							"DELETE FROM wheels_rate_limits WHERE client_key = :clientKey AND row_type = 'event' AND expires_at < :now",
-							{clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"}, now: {value: Now(), cfsqltype: "cf_sql_timestamp"}},
+							{clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"}, now: {value: $clockNow(), cfsqltype: "cf_sql_timestamp"}},
 							$queryOptions()
 						);
 
@@ -1098,7 +1098,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 								clientKey = arguments.clientKey,
 								rowType = "bucket",
 								counter = variables.maxRequests,
-								expiresAt = Now()
+								expiresAt = $clockNow()
 							);
 							local.qBucket = $dbRowLockSelect(local.bucketKey);
 							if (!local.qBucket.recordCount) {
@@ -1123,7 +1123,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 								"UPDATE wheels_rate_limits SET counter = :tokens, expires_at = :now WHERE store_key = :storeKey",
 								{
 									tokens: {value: Int(local.currentTokens), cfsqltype: "cf_sql_integer"},
-									now: {value: Now(), cfsqltype: "cf_sql_timestamp"},
+									now: {value: $clockNow(), cfsqltype: "cf_sql_timestamp"},
 									storeKey: {value: local.bucketKey, cfsqltype: "cf_sql_varchar"}
 								},
 								$queryOptions()
@@ -1158,9 +1158,31 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * treated as epoch milliseconds against GetTickCount() (epoch ms on both
 	 * Lucee and Adobe).
 	 */
+	/**
+	 * The framework clock, read through wheels.Global so a spec's travelTo() can freeze it (the seam is
+	 * what makes rate-limit window logic deterministically testable). Falls back to the built-in when the
+	 * application object isn't available yet — same defensiveness as $secondsSince()'s application.wo use.
+	 * application.wo is hoisted out of any closure by being reached only from this plain method body
+	 * (cross-engine invariant 16b: a zero-arg application-scope call inside a closure won't compile on
+	 * Adobe 2025); call sites use the bare $clockNow() / $clockTick() instead.
+	 */
+	private any function $clockNow() {
+		if (StructKeyExists(application, "wo")) {
+			return application.wo.$now();
+		}
+		return Now();
+	}
+
+	private numeric function $clockTick() {
+		if (StructKeyExists(application, "wo")) {
+			return application.wo.$tick();
+		}
+		return GetTickCount();
+	}
+
 	private numeric function $secondsSince(required any storedTime) {
 		if (IsDate(arguments.storedTime)) {
-			return DateDiff("s", arguments.storedTime, Now());
+			return DateDiff("s", arguments.storedTime, $clockNow());
 		}
 		// Oracle hands TIMESTAMP columns back as driver objects
 		// (oracle.sql.TIMESTAMP is not a java.util.Date), and some drivers append
@@ -1169,13 +1191,13 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		try {
 			local.normalized = application.wo.$normalizeDbTimestamp(arguments.storedTime);
 			if (IsDate(local.normalized)) {
-				return DateDiff("s", local.normalized, Now());
+				return DateDiff("s", local.normalized, $clockNow());
 			}
 		} catch (any e) {
 			// No application scope (or an older framework) — fall through to the
 			// numeric epoch-milliseconds branch.
 		}
-		return Int((GetTickCount() - arguments.storedTime) / 1000);
+		return Int(($clockTick() - arguments.storedTime) / 1000);
 	}
 
 	/**
@@ -1253,7 +1275,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * would wipe live buckets. For fixed/sliding window rows the extra lag is harmless.
 	 */
 	private void function $dbPurgeExpired() {
-		local.nowSeconds = GetTickCount() / 1000;
+		local.nowSeconds = $clockTick() / 1000;
 		if ((local.nowSeconds - variables.lastDbPurge) < variables.cleanupThrottleSeconds) {
 			return;
 		}
@@ -1262,7 +1284,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		try {
 			QueryExecute(
 				"DELETE FROM wheels_rate_limits WHERE expires_at < :cutoff",
-				{cutoff: {value: DateAdd("s", -variables.windowSeconds, Now()), cfsqltype: "cf_sql_timestamp"}},
+				{cutoff: {value: DateAdd("s", -variables.windowSeconds, $clockNow()), cfsqltype: "cf_sql_timestamp"}},
 				$queryOptions()
 			);
 		} catch (any e) {
@@ -1291,7 +1313,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
 		// Throttle re-attempts after a failure so a broken configuration doesn't
 		// probe and run DDL on every request.
-		local.nowSeconds = GetTickCount() / 1000;
+		local.nowSeconds = $clockTick() / 1000;
 		if (variables.lastTableAttempt > 0 && (local.nowSeconds - variables.lastTableAttempt) < variables.cleanupThrottleSeconds) {
 			return false;
 		}

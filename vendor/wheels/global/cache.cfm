@@ -213,7 +213,7 @@
 		local.currentCount = $cacheCount();
 		if (
 			application.wheels.cacheCullPercentage > 0
-			&& application.wheels.cacheLastCulledAt < DateAdd("n", -application.wheels.cacheCullInterval, Now())
+			&& application.wheels.cacheLastCulledAt < DateAdd("n", -application.wheels.cacheCullInterval, $now())
 			&& local.currentCount >= application.wheels.maximumItemsToCache
 		) {
 			// the cache is full so flush out expired items to make more room if possible
@@ -225,7 +225,7 @@
 			} else {
 				local.maxItemsToDelete = local.currentCount;
 			}
-			local.now = Now();
+			local.now = $now();
 			local.categories = StructKeyArray(application.wheels.cache);
 			local.iEnd = ArrayLen(local.categories);
 			for (local.i = 1; local.i <= local.iEnd && local.deletedItems < local.maxItemsToDelete; local.i++) {
@@ -245,11 +245,11 @@
 				}
 			}
 			local.currentCount -= local.deletedItems;
-			application.wheels.cacheLastCulledAt = Now();
+			application.wheels.cacheLastCulledAt = $now();
 		}
 		if (local.currentCount < application.wheels.maximumItemsToCache) {
 			local.cacheItem = {};
-			local.cacheItem.expiresAt = DateAdd(application.wheels.cacheDatePart, arguments.time, Now());
+			local.cacheItem.expiresAt = DateAdd(application.wheels.cacheDatePart, arguments.time, $now());
 			if (IsSimpleValue(arguments.value)) {
 				local.cacheItem.value = arguments.value;
 			} else {
@@ -291,7 +291,7 @@
 					local.storeKey = $actionCacheKey(arguments.key);
 				}
 				if (StructKeyExists(application.wheels.cache[arguments.category], local.storeKey)) {
-					if (Now() > application.wheels.cache[arguments.category][local.storeKey].expiresAt) {
+					if ($now() > application.wheels.cache[arguments.category][local.storeKey].expiresAt) {
 						$removeFromCache(key = local.storeKey, category = arguments.category);
 					} else {
 						if (IsSimpleValue(application.wheels.cache[arguments.category][local.storeKey].value)) {

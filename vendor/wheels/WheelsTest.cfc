@@ -616,4 +616,31 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         }
     }
 
+    /**
+     * Freezes the framework clock ($now() / $tick()) to `moment` for the duration of `callback`, then
+     * restores the previous clock. Use it to test time-dependent behaviour — cache expiry, rate-limit
+     * windows — deterministically:
+     *
+     *   travelTo("2026-10-04 12:00:00", function() { ... code under test sees that instant ... });
+     *
+     * The override is request-scoped, so it never leaks into another request, and it is restored in a
+     * catch-free finally, so a throwing or aborting callback still resets the clock. `moment` is a date
+     * string or a date object. Returns whatever the callback returns.
+     */
+    public any function travelTo(required any moment, required any callback) {
+        var instant = IsSimpleValue(arguments.moment) ? ParseDateTime(arguments.moment) : arguments.moment;
+        var hadClock = StructKeyExists(request, "$wheelsClock");
+        var previousClock = hadClock ? request.$wheelsClock : {};
+        request.$wheelsClock = {at = instant, tick = instant.getTime()};
+        try {
+            return arguments.callback();
+        } finally {
+            if (hadClock) {
+                request.$wheelsClock = previousClock;
+            } else {
+                StructDelete(request, "$wheelsClock");
+            }
+        }
+    }
+
 }
