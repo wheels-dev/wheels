@@ -45,6 +45,63 @@ component extends="wheels.WheelsTest" {
 				expect(wo.$get(functionName = "sendFile", name = "deliver")).toBe(before.file, "sendFile deliver flag leaked");
 			});
 
+			it("restores the PREVIOUS request method exactly, not a hard-coded GET", () => {
+				// The runner's own method is GET, and toBe compares strings case-insensitively, so a
+				// restore that just writes "get" back would pass the case above. Set a non-GET prior
+				// method and assert it comes back exactly (case-sensitive Compare) — this is also the
+				// nested-call semantics in miniature. Reset it afterwards so this spec can't leak.
+				var wo = application.wo;
+				var original = (StructKeyExists(request, "cgi") && StructKeyExists(request.cgi, "request_method")) ? request.cgi.request_method : "get";
+				request.cgi.request_method = "put";
+				var state = {threw = false};
+				try {
+					try {
+						wo.processRequest(
+							params = {controller = "ProcessRequestProbe", action = "boom"},
+							method = "post",
+							rollback = true,
+							returnAs = "struct"
+						);
+					} catch (any e) {
+						state.threw = true;
+					}
+					expect(state.threw).toBeTrue("the probe action should have thrown");
+					expect(Compare(request.cgi.request_method, "put")).toBe(
+						0,
+						"processRequest() must restore the previous method exactly ('put'), not a hard-coded 'get'"
+					);
+				} finally {
+					request.cgi.request_method = original;
+				}
+			});
+
+			it("a GET redirect answers 302 after a caught POST whose action threw", () => {
+				// The reported symptom, end to end: if the caught POST leaked request_method = post, the
+				// later GET redirect would be upgraded to 303. With the method restored it is 302.
+				var wo = application.wo;
+				var state = {threw = false};
+				try {
+					wo.processRequest(
+						params = {controller = "ProcessRequestProbe", action = "boom"},
+						method = "post",
+						returnAs = "struct"
+					);
+				} catch (any e) {
+					state.threw = true;
+				}
+				expect(state.threw).toBeTrue("the probe action should have thrown");
+
+				var result = wo.processRequest(
+					params = {controller = "ProcessRequestProbe", action = "goHome"},
+					method = "get",
+					returnAs = "struct"
+				);
+				expect(result.status).toBe(
+					302,
+					"a GET redirect after a caught POST should answer 302, not 303 from a leaked POST method"
+				);
+			});
+
 		});
 
 	}

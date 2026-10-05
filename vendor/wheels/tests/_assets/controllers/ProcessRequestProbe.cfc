@@ -10,4 +10,8 @@ component extends="Controller" {
 		Throw(type = "Wheels.ProcessRequestProbe.Boom", message = "boom on purpose");
 	}
 
+	function goHome() {
+		redirectTo(url = "/");
+	}
+
 }

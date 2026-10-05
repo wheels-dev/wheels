@@ -817,9 +817,15 @@
 			$set(functionName = "sendEmail", deliver = local.restore.deliverEmail);
 			$set(functionName = "sendFile", deliver = local.restore.deliverFile);
 			// Reset the status code and Content-Type so a later processAction / assertion starts clean
-			// (the test suite sets 500 later if it fails).
-			$header(statusCode = 200);
-			$header(name = "Content-Type", value = "text/html", charset = "UTF-8");
+			// (the test suite sets 500 later if it fails). These now also run on the throw path, where an
+			// action that flushed the response and then threw would make the header write fail (Adobe:
+			// "Failed to add HTML header"); swallow that so it never replaces the action's own exception.
+			// This inner try has no finally, so the outer try stays catch-free (invariant 22 / the guard).
+			try {
+				$header(statusCode = 200);
+				$header(name = "Content-Type", value = "text/html", charset = "UTF-8");
+			} catch (any headerRestoreError) {
+			}
 		}
 	}
 </cfscript>
