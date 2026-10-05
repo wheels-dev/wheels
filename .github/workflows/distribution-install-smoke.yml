@@ -433,11 +433,10 @@ jobs:
       - name: Add apt.wheels.dev + install
         run: |
           set -euo pipefail
-          # The published wheels.gpg is ASCII-armored, so dearmor it into the
-          # keyring. (The apt-wheels README still shows a bare `tee` of the
-          # armored key — the user-facing docs should be updated to dearmor to
-          # match this; tracked as a follow-up.)
-          curl -fsSL https://apt.wheels.dev/wheels.gpg | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
+          # The documented command: the published wheels.gpg is ASCII-armored,
+          # so it is dearmored into the keyring; --batch --yes lets a re-run
+          # overwrite it without a TTY (guides, apt-wheels README + landing page).
+          curl -fsSL https://apt.wheels.dev/wheels.gpg | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/wheels.gpg
           echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
             | sudo tee /etc/apt/sources.list.d/wheels.list >/dev/null
           sudo apt-get update
@@ -548,8 +547,8 @@ jobs:
     name: "yum (rocky 9)"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # RHEL-family, dnf4 — matches the documented `dnf config-manager --add-repo`
-    # path. The release ships a noarch rpm; dnf serves it on this amd64 container.
+    # RHEL-family, dnf4 — runs the documented commands (the .repo file is
+    # downloaded into /etc/yum.repos.d/, which works on dnf4 and dnf5). The release ships a noarch rpm; dnf serves it on this amd64 container.
     # Gates (hard-fail): as of 4.0.5 the rpm's wrapper resolves the RHEL/Fedora
     # Java-21 layout, so `wheels --version` works on Rocky 9 (was the 4.0.4 bug).
     container:
@@ -560,8 +559,7 @@ jobs:
       - name: Add yum.wheels.dev + install (the documented path)
         run: |
           set -euo pipefail
-          dnf -y install dnf-plugins-core
-          dnf -y config-manager --add-repo https://yum.wheels.dev/wheels.repo
+          curl -fsSL https://yum.wheels.dev/wheels.repo -o /etc/yum.repos.d/wheels.repo
           dnf -y install wheels
       - name: Assert wheels --version == GA
         env:
@@ -609,4 +607,47 @@ jobs:
           printf '%s\n' "$OUT" | head -20
           if ! grep -q "Wheels CLI" <<<"$OUT"; then
             echo "::error::${CHANNEL}: wheels info did not reach the Wheels module through LuCLI"; exit 1
+          fi
+
+  yum-fedora-be:
+    needs: resolve
+    name: "yum (fedora 44, bleeding-edge)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Fedora 44 (dnf5) ships Java 25, not 21: the rpm's Java 21-or-newer
+    # dependency (#4237) is what makes it installable. Bleeding-edge only for
+    # now; a stable Fedora leg is owed once 4.2.0 ships with that dependency.
+    container:
+      image: fedora:44
+    steps:
+      - name: Add yum.wheels.dev bleeding-edge + install (the documented path)
+        run: |
+          set -euo pipefail
+          curl -fsSL https://yum.wheels.dev/wheels-be.repo -o /etc/yum.repos.d/wheels-be.repo
+          dnf -y install wheels-be
+          java -version 2>&1 | head -1
+      - name: Assert wheels --version is a bleeding-edge snapshot
+        run: |
+          set -uo pipefail
+          RAW="$(wheels --version 2>&1 || true)"
+          FIRST="$(printf '%s\n' "$RAW" | head -1)"
+          echo "yum (fedora 44, bleeding-edge): wheels --version => '${FIRST}'"
+          # Snapshot numbers float, so assert the shape, not one version.
+          if ! printf '%s\n' "$FIRST" | grep -qE '^wheels [0-9]+\.[0-9]+\.[0-9]+-snapshot\.[0-9]+ \(bleeding-edge\)$'; then
+            echo "::error::Fedora bleeding-edge: unexpected wheels --version output"
+            printf '%s\n' "$RAW" | head -20
+            exit 1
+          fi
+      # `wheels --version` is answered by the wrapper; `wheels info` boots the
+      # JVM (Java 25 here) and the Wheels module through LuCLI.
+      - name: Assert the runtime boots on Fedora's Java
+        run: |
+          set -euo pipefail
+          if ! OUT="$(wheels info 2>&1)"; then
+            echo "::error::Fedora bleeding-edge: wheels info failed (the LuCLI runtime did not start)"
+            printf '%s\n' "$OUT" | tail -40; exit 1
+          fi
+          printf '%s\n' "$OUT" | head -20
+          if ! grep -q "Wheels CLI" <<<"$OUT"; then
+            echo "::error::Fedora bleeding-edge: wheels info did not reach the Wheels module through LuCLI"; exit 1
           fi

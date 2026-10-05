@@ -108,7 +108,9 @@ echo "Engine: $BIN"
 # --- serve the repo webroot ----------------------------------------------------
 SERVE_LOG="$(mktemp)"
 OUT="$(mktemp)"
-WHEELS_CI=true "$BIN" --serve "$REPO_ROOT/public" --port "$PORT" > "$SERVE_LOG" 2>&1 &
+# WHEELS_EXPECT_REPO: this is the framework repository, so specs that skip outside it
+# must not skip here (RequireRepoPathSpec fails instead).
+WHEELS_CI=true WHEELS_EXPECT_REPO=true "$BIN" --serve "$REPO_ROOT/public" --port "$PORT" > "$SERVE_LOG" 2>&1 &
 SERVE_PID=$!
 cleanup() {
   kill "$SERVE_PID" 2>/dev/null || true

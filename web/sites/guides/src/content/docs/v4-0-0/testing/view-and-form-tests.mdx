@@ -70,9 +70,9 @@ When the assertion you want isn't covered by the shortcuts, pull the body with `
 
 ```cfm {test:compile} title="tests/specs/views/PostsIndexSpec.cfc"
 it("renders exactly five article tags", () => {
-    var client = $testClient();
-    client.get("/posts").assertOk();
-    var body = client.content();
+    var testClient = $testClient();
+    testClient.get("/posts").assertOk();
+    var body = testClient.content();
     expect(body).toInclude("<article");
     expect(body).toMatch("<article[^>]*>.*?Newest post.*?<\/article>");
 });
@@ -131,24 +131,24 @@ A useful single-spec pattern: render the form, submit it, follow the redirect, a
 
 ```cfm {test:compile} title="tests/specs/views/PostsCreateSpec.cfc"
 it("round-trips through new → create → show", () => {
-    var client = $testClient();
+    var testClient = $testClient();
 
     // 1. Render the form — confirm the stable selector is present.
-    client.get("/posts/new")
+    testClient.get("/posts/new")
         .assertOk()
         .assertSee("data-auto-id=""post_title""");
 
     // 2. Submit — expect a redirect to the show page.
-    client.post("/posts", {"post[title]": "Hello", "post[body]": "World"})
+    testClient.post("/posts", {"post[title]": "Hello", "post[body]": "World"})
         .assertRedirect();
 
     // 3. Follow the redirect manually — TestClient does not auto-follow.
-    var target = client.headers()["Location"] ?: "";
-    client.get(target).assertOk().assertSee("<h1>Hello</h1>");
+    var target = testClient.headers()["Location"] ?: "";
+    testClient.get(target).assertOk().assertSee("<h1>Hello</h1>");
 });
 ```
 
-`assertRedirect()` with no argument asserts a 3xx response without pinning the target path. Read the `Location` header off `client.headers()` and request it explicitly — the spec is about what the user sees after the redirect, not the intermediate 302.
+`assertRedirect()` with no argument asserts a 3xx response without pinning the target path. Read the `Location` header off `testClient.headers()` and request it explicitly — the spec is about what the user sees after the redirect, not the intermediate redirect.
 
 ## Testing inline validation errors
 

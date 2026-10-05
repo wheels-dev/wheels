@@ -18,6 +18,7 @@ component extends="Controller" {
 			paramsTypes = "integer,guid"
 		);
 		verifies(only = "actionPostWithString", post = "true", params = "username,password", paramsTypes = "string,blank");
+		verifies(only = "actionPostWithHandler", post = "true", handler = "verificationHandler");
 	}
 
 	function actionGet() {
@@ -42,6 +43,16 @@ component extends="Controller" {
 
 	function actionPostWithString() {
 		renderText("actionPostWithString");
+	}
+
+	function actionPostWithHandler() {
+		renderText("actionPostWithHandler");
+	}
+
+	// A handler that ends the request itself (here, a redirect), so the failed
+	// verification goes through the handler branch and never reaches the 400 path.
+	function verificationHandler() {
+		redirectTo(action = "login");
 	}
 
 }

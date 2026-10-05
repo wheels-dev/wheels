@@ -8,9 +8,15 @@
  *
  * Techniques:
  *  - Guards whose containment argument is passed directly (dump output, package mapping
- *    path, resolved child path) are tested with SYNTHETIC non-existent case-distinct
- *    paths. getCanonicalPath() is lexical for a non-existent path, so it never folds
- *    case — these run on every engine, no filesystem fixtures.
+ *    path, resolved child path) are tested with SYNTHETIC case-distinct paths and run on
+ *    every engine (no symlinks). They still require a case-sensitive filesystem: on a
+ *    case-insensitive one (native macOS) a case-distinct sibling resolves to the same
+ *    directory, so the guard correctly admits it and the rejection cannot hold. Each such
+ *    test probes case-sensitivity on the filesystem its paths live on — the temp FS for
+ *    the directly-passed paths, the web root's FS for the dump-output guard — and skips if
+ *    insensitive. (This was missed initially because getCanonicalPath() is lexical for a
+ *    non-existent path on some engines but folds case against existing components on
+ *    others.)
  *  - Guards reachable only through an existing symlink (zip extraction, asset/docs
  *    serving) use a real symlink into a case-distinct sibling. That scenario exists only
  *    on a case-sensitive filesystem, and RustCFML does not resolve symlinks, so those
@@ -42,7 +48,12 @@ component extends="wheels.WheelsTest" {
 					expect(ctx.ctrl.$isResolvedPathInside(root & "/data/x.txt", root)).toBeTrue();
 				});
 
-				it("rejects a case-distinct sibling (synthetic, all engines)", function() {
+				it("rejects a case-distinct sibling (synthetic, case-sensitive FS)", function() {
+					// /app and /App are the same directory on a case-insensitive filesystem
+					// (native macOS), so $isResolvedPathInside correctly admits the path there
+					// and the rejection asserted below cannot hold. The fixtures live under the
+					// temp filesystem, so probe that (a probe failure runs the test, never skips).
+					if ($confirmedCaseInsensitiveAt(GetTempDirectory())) { skip("case-distinct siblings coincide on a case-insensitive filesystem"); }
 					var base = GetTempDirectory() & "pc-case-" & CreateUUID();
 					expect(ctx.ctrl.$isResolvedPathInside(base & "/app/secret", base & "/App")).toBeFalse();
 				});
@@ -119,7 +130,12 @@ component extends="wheels.WheelsTest" {
 					expect(loader.$mappingPathEscapesPackage(pkg, pkg & "/sub/file.cfc")).toBeFalse();
 				});
 
-				it("flags a case-distinct sibling as escaping (synthetic, all engines)", function() {
+				it("flags a case-distinct sibling as escaping (synthetic, case-sensitive FS)", function() {
+					// /Pkg and /pkg are the same directory on a case-insensitive filesystem
+					// (native macOS), so the mapping does not actually escape there and the
+					// assertion below cannot hold. Fixtures live under the temp filesystem (a
+					// probe failure runs the test, never skips).
+					if ($confirmedCaseInsensitiveAt(GetTempDirectory())) { skip("case-distinct siblings coincide on a case-insensitive filesystem"); }
 					var loader = new wheels.PackageLoader(vendorPath = GetTempDirectory(), componentPrefix = "vendor");
 					var base = GetTempDirectory() & "pc-pkgcase-" & CreateUUID();
 					expect(loader.$mappingPathEscapesPackage(base & "/Pkg", base & "/pkg/evil.cfc")).toBeTrue();
@@ -298,6 +314,13 @@ component extends="wheels.WheelsTest" {
 					var rootCanon = Replace(CreateObject("java", "java.io.File").init(ExpandPath("/")).getCanonicalPath(), "\", "/", "all");
 					var baseName = ListLast(rootCanon, "/");
 					if (!Len(baseName)) { skip("web root has no basename"); }
+					// On a case-insensitive filesystem a case-distinct sibling of the web root
+					// resolves to the web root itself, so $cliResolveDumpPath correctly returns
+					// the in-root path and the rejection asserted below cannot hold (seen on
+					// native macOS). The sibling resolves in the web root's parent, so probe that.
+					// A probe failure (e.g. the parent is not writable) runs the test — it must
+					// never be read as "case-insensitive, skip" for a security spec.
+					if ($confirmedCaseInsensitiveAt($parentDir(rootCanon))) { skip("web root is on a case-insensitive filesystem"); }
 					// Pick a case-DISTINCT spelling with Compare() (case-sensitive): CFML `==`
 					// is case-insensitive, so `baseName == UCase(baseName)` is always true.
 					var variant = "";
@@ -312,6 +335,26 @@ component extends="wheels.WheelsTest" {
 				});
 			});
 
+			// The case-sensitivity guard above must fail SAFE: if the filesystem probe cannot
+			// run (e.g. the directory is not writable), it must report "not confirmed
+			// insensitive" so the security spec RUNS rather than silently skipping. A probe
+			// error read as "case-insensitive" would quietly drop coverage on a locked-down CI
+			// filesystem (rev1-r3 / #4178).
+			describe("case-sensitivity probe fail-safe", function() {
+				it("treats a probe error as NOT-confirmed-insensitive so the guarded spec runs", function() {
+					// Probe "inside" a regular file: a directory cannot be created there, so the
+					// probe throws. The result must be false (=> run the guarded spec), never true
+					// (=> skip it).
+					var f = GetTempDirectory() & "pc-probefile-" & CreateUUID();
+					FileWrite(f, CharsetDecode("x", "utf-8"));
+					try {
+						expect($confirmedCaseInsensitiveAt(f)).toBeFalse();
+					} finally {
+						try { if (FileExists(f)) { FileDelete(f); } } catch (any e) {}
+					}
+				});
+			});
+
 		});
 	}
 
@@ -321,6 +364,31 @@ component extends="wheels.WheelsTest" {
 	// fixtures live). Behavioural probe, never an OS-name check.
 	function $caseSensitiveFS() {
 		return $caseSensitiveAt(GetTempDirectory());
+	}
+
+	// True ONLY when a filesystem probe at `dir` DEFINITIVELY confirms case-insensitivity
+	// (the probe dir was created and a differently-cased name resolves to it). A probe that
+	// cannot run — e.g. `dir` is not writable — returns false, NOT true. A security spec that
+	// guards itself with this therefore RUNS on a probe failure rather than silently skipping;
+	// a probe error must never be read as "case-insensitive, skip" (rev1-r3 / #4178).
+	function $confirmedCaseInsensitiveAt(required string dir) {
+		var probe = REReplace(Replace(arguments.dir, "\", "/", "all"), "/+$", "") & "/pc-fsprobe-" & CreateUUID();
+		var confirmedInsensitive = false;
+		try {
+			DirectoryCreate(probe);
+			DirectoryCreate(probe & "/AAAA");
+			confirmedInsensitive = DirectoryExists(probe & "/aaaa");
+		} catch (any e) {
+			confirmedInsensitive = false;
+		} finally {
+			try {
+				if (DirectoryExists(probe)) {
+					DirectoryDelete(probe, true);
+				}
+			} catch (any e) {
+			}
+		}
+		return confirmedInsensitive;
 	}
 
 	// Case-sensitivity of the filesystem that holds `dir`. Creates a self-owned,

@@ -9,8 +9,8 @@ sidebar:
 
 Adds a package into `vendor/<name>/` from the registry. To activate it, run `wheels reload` (or `wheels stop && wheels start`) — `PackageLoader` discovers the new `vendor/<name>/package.json` when `onApplicationStart` re-fires. An authorized `wheels reload` is sufficient; a missing or wrong reload password silently skips the restart.
 
-:::note[Why `add`, not `install`?]
-LuCLI's built-in extension installer intercepts the literal subcommand `install` across every module. Typing `wheels packages install <name>` runs LuCLI's own dependency resolver — it prints `No git or extension dependencies to install` and exits without touching `vendor/`. Use `add` instead. (The same rename happened to `wheels browser setup`, which was previously `wheels browser install`.)
+:::note[`add` or `install`?]
+`install` is an alias of `add`: `wheels packages install <name>` works the same way. `add` is the documented verb because earlier CLI releases could intercept the literal `install` subcommand in LuCLI's built-in extension installer, which printed `No git or extension dependencies to install` without touching `vendor/`. `add` works on every 4.x CLI.
 :::
 
 ## Synopsis

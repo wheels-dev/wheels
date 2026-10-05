@@ -1,0 +1,1 @@
+- A `where` string with a quoted pattern followed by `ESCAPE '...'`, or with lowercase or mixed-case `and` / `or` between quoted values, now runs instead of failing with an "invalid hexadecimal String" error

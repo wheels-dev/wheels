@@ -1545,7 +1545,9 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is working with include and identical columns", () => {
-				result = g.model("post").findAll(include = "c_o_r_e_comments", order = "createdAt,createdAt")
+				// createdAt ties across the seeded posts, so a primary-key tiebreak is needed
+				// for a deterministic first row (matches the sibling cases; #4179).
+				result = g.model("post").findAll(include = "c_o_r_e_comments", order = "createdAt,createdAt,id")
 
 				expect(result['title'][1]).toBe("Title for first test post")
 			})
@@ -1563,7 +1565,9 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is working with paginated include and identical columns", () => {
-				result = g.model("post").findAll(page = 1, perPage = 3, include = "c_o_r_e_comments", order = "createdAt")
+				// createdAt ties across the seeded posts; add the primary-key tiebreak so the
+				// first page's first row is deterministic (#4179).
+				result = g.model("post").findAll(page = 1, perPage = 3, include = "c_o_r_e_comments", order = "createdAt,id")
 
 				expect(result['title'][1]).toBe("Title for first test post")
 			})

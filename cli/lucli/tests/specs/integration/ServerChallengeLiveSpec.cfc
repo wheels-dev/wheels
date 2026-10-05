@@ -46,7 +46,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		});
 		var state = {result: {}, type: "", message: ""};
 		try {
-			state.result = m.$httpExchange(requestUrl = "http://127.0.0.1:#variables.port#/wheels/cli?command=routes&format=json");
+			// This server is the one running the suite: a short read bounds a
+			// stall to 15 s instead of $httpExchange's 120 s default (#4232).
+			state.result = m.$httpExchange(requestUrl = "http://127.0.0.1:#variables.port#/wheels/cli?command=routes&format=json", readTimeout = 15000);
 		} catch (any e) {
 			state.type = e.type;
 			state.message = e.message;

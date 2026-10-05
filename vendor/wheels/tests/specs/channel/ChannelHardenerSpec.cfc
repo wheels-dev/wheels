@@ -208,9 +208,6 @@ component extends="wheels.WheelsTest" {
 		describe("S6 Last-Event-ID header swallow", function() {
 
 			it("subscribeToChannel still reaches the memory loop when lastEventId is empty", function() {
-				var stubDir = ExpandPath("/testbox/system/stubs");
-				CreateObject("java", "java.io.File").init(stubDir).mkdirs();
-
 				params = {controller = "dummy", action = "dummy"};
 				_controller = g.controller("dummy", params);
 
