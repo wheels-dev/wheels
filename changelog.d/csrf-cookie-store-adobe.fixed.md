@@ -1,0 +1,1 @@
+- A `csrfStore="cookie"` app on Adobe CF returned HTTP 500 the first time it generated an authenticity token: the CSRF cookie was set with `encodeValue` and `preserveCase` of `""` (their defaults), which Adobe rejects for these boolean attributes. They are now left out unless configured.

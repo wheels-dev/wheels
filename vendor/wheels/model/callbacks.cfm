@@ -425,9 +425,18 @@
 	 * fire; or, with no real transaction (none/false mode), fires afterCommit now
 	 * because the write is already committed (decision B1). Inside a foreign raw
 	 * transaction{} (detectable engines only) it skips both callbacks and warns once.
+	 * With `callbacks = false` (a save or delete that skips its callbacks) only the saved-change
+	 * restore is queued.
 	 */
-	public void function $enqueueTransactionCallbacks(required string operation) {
-		if (!$hasTransactionCallbacks()) {
+	public void function $enqueueTransactionCallbacks(required string operation, struct savedBefore, boolean callbacks = true) {
+		// A delete changes no saved-change state, so a rollback puts back the current one.
+		if (!StructKeyExists(arguments, "savedBefore")) {
+			arguments.savedBefore = $savedChangesState();
+		}
+		if (!arguments.callbacks || !$hasTransactionCallbacks()) {
+			// No callbacks to fire, but a rollback must still put back what savedChanges() reported
+			// before this save (F49), so the save is queued for that alone.
+			$enqueueSavedChangesRestore(operation = arguments.operation, savedBefore = arguments.savedBefore);
 			return;
 		}
 		local.conn = this.$hashedConnectionArgs();
@@ -449,10 +458,44 @@
 		) {
 			ArrayAppend(
 				request.wheels.$txnCallbacks[local.conn].queue,
-				{object = this, operation = arguments.operation}
+				{
+					object = this,
+					operation = arguments.operation,
+					callbacks = true,
+					savedChanges = $savedChangesState(),
+					savedBefore = arguments.savedBefore
+				}
 			);
 		} else {
 			this.$runTransactionCallbacks(type = "afterCommit", operation = arguments.operation);
+		}
+	}
+
+	/**
+	 * Internal. Queues a save of a model with no afterCommit / afterRollback callbacks, inside a real
+	 * Wheels transaction only, so a rollback puts back the saved-change state from before it (F49).
+	 * Checked cheaply first: outside a Wheels transaction there is nothing to queue.
+	 */
+	public void function $enqueueSavedChangesRestore(required string operation, required struct savedBefore) {
+		if (
+			!StructKeyExists(request, "wheels")
+			|| !StructKeyExists(request.wheels, "$txnCallbacks")
+			|| StructIsEmpty(request.wheels.$txnCallbacks)
+		) {
+			return;
+		}
+		local.conn = this.$hashedConnectionArgs();
+		if (StructKeyExists(request.wheels.$txnCallbacks, local.conn) && request.wheels.$txnCallbacks[local.conn].real) {
+			ArrayAppend(
+				request.wheels.$txnCallbacks[local.conn].queue,
+				{
+					object = this,
+					operation = arguments.operation,
+					callbacks = false,
+					savedChanges = $savedChangesState(),
+					savedBefore = arguments.savedBefore
+				}
+			);
 		}
 	}
 
@@ -742,14 +785,63 @@
 	 * leave a stuck transaction marker or a leaked queue.
 	 */
 	public void function $runQueueCallbacks(required array queue, required string type, boolean propagateErrors = true) {
-		local.iEnd = ArrayLen(arguments.queue);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.entry = arguments.queue[local.i];
-			local.entry.object.$runTransactionCallbacks(
+		try {
+			local.iEnd = ArrayLen(arguments.queue);
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				local.entry = arguments.queue[local.i];
+				// An entry queued only to restore the saved-change state fires nothing (F49).
+				if (StructKeyExists(local.entry, "callbacks") && !local.entry.callbacks) {
+					continue;
+				}
+				$runQueueEntryCallbacks(entry = local.entry, type = arguments.type, propagateErrors = arguments.propagateErrors);
+			}
+		} finally {
+			// A rollback puts each object back to what savedChanges() reported before its first
+			// rolled-back save. A helper call: Lucee 7 miscompiles loops inside finally.
+			if (arguments.type == "afterRollback") {
+				$restoreSavedChangesBeforeQueue(arguments.queue);
+			}
+		}
+	}
+
+	/**
+	 * Internal. Fires one queue entry's callbacks with the object reporting the save that queued it
+	 * (savedChanges(), F49), then puts back the object's own state, also when a callback throws.
+	 */
+	public void function $runQueueEntryCallbacks(required struct entry, required string type, boolean propagateErrors = true) {
+		local.object = arguments.entry.object;
+		// Only a model save carries a snapshot; other entries (a deferred job enqueue) just fire.
+		if (!StructKeyExists(arguments.entry, "savedChanges")) {
+			local.object.$runTransactionCallbacks(
 				type = arguments.type,
-				operation = local.entry.operation,
+				operation = arguments.entry.operation,
 				propagateErrors = arguments.propagateErrors
 			);
+			return;
+		}
+		local.current = local.object.$savedChangesState();
+		local.object.$restoreSavedChanges(arguments.entry.savedChanges);
+		try {
+			local.object.$runTransactionCallbacks(
+				type = arguments.type,
+				operation = arguments.entry.operation,
+				propagateErrors = arguments.propagateErrors
+			);
+		} finally {
+			local.object.$restoreSavedChanges(local.current);
+		}
+	}
+
+	/**
+	 * Internal. After a rollback, puts each object in `queue` back to the saved-change state from before
+	 * its first rolled-back save (F49): walked last to first, so the earliest entry's state wins.
+	 */
+	public void function $restoreSavedChangesBeforeQueue(required array queue) {
+		for (local.i = ArrayLen(arguments.queue); local.i >= 1; local.i--) {
+			local.entry = arguments.queue[local.i];
+			if (StructKeyExists(local.entry, "savedBefore")) {
+				local.entry.object.$restoreSavedChanges(local.entry.savedBefore);
+			}
 		}
 	}
 

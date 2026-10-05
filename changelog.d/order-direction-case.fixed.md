@@ -1,0 +1,1 @@
+- A lowercase or mixed-case sort direction in an `order` string is now honoured: `order="createdAt desc"` (or `Desc`, or with extra spaces or a tab before it) sorts descending in `findAll()`, paginated finders, `table.column` items and the query builder's `orderBy()`. It used to sort ascending, and a `table.column desc` item threw `Wheels.InvalidOrderClause`

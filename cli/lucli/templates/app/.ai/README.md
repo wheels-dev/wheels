@@ -16,13 +16,14 @@ APPLICATION on Wheels — nothing about framework internals.
 - `middleware.md` — middleware and rate limiting.
 - `di.md` — the DI container.
 - `auth.md` — authentication and authorization.
-- `storage.md` — storage disks.
+- `storage.md` — storage disks, deleting files, files that belong to records.
 - `packages.md` — the package system.
 - `migrations.md` — migrations and seeding.
 - `jobs.md` — background jobs.
 - `mailers.md` — sending email: mailers, SMTP settings, testing a mailer.
-- `sse.md` — server-sent events.
+- `sse.md` — server-sent events and channels (publish/subscribe, authorising subscribers).
 - `testing.md` — changing framework settings inside a spec, and testing partial caching.
+- `upgrading.md` — `wheels upgrade check` and the APIs that changed in 4.x.
 
 ## Deeper content
 
@@ -43,5 +44,6 @@ For deeper application-side material use:
   — JSON docs optimized for AI consumption.
 - Offline API and guides lookup, no server needed: `wheels lookup findAll`,
   `wheels lookup "nested resources"` (MCP tool: `lookup`).
-- MCP: run `wheels setup agents` to write `.mcp.json` and `.opencode.json` (or add `{"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}` by hand)
+- MCP: `wheels new` writes `.mcp.json` and `.opencode.json` (skip with `--no-agents`); in an
+  existing app, run `wheels setup agents` to write them (or add `{"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}` by hand)
   and prefer `mcp__wheels__*` tools over CLI commands.
