@@ -2743,28 +2743,11 @@ component extends="modules.BaseModule" {
 		// recovery prompt referencing `lucli server start --force`, but `lucli`
 		// isn't on PATH after `brew install wheels` — the user gets an
 		// unactionable error from a fresh `wheels start`. Onboarding F1/F2.
-		var force = false;
-		var engine = "lucee";
-		var enginePort = 0;
-		var passThrough = [];
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var a = args[i];
-			if (a == "--force") {
-				force = true;
-			} else if (a == "--engine") {
-				engine = lCase($startFlagValue(args, i, "engine"));
-				i++;
-			} else if (left(a, 9) == "--engine=") {
-				engine = lCase(mid(a, 10, len(a) - 9));
-			} else if (a == "--port") {
-				enginePort = val($startFlagValue(args, i, "port"));
-				i++;
-			} else if (left(a, 7) == "--port=") {
-				enginePort = val(mid(a, 8, len(a) - 7));
-			} else {
-				arrayAppend(passThrough, a);
-			}
-		}
+		var opts = $parseStartArgs(args);
+		var force = opts.force;
+		var engine = opts.engine;
+		var enginePort = opts.enginePort;
+		var passThrough = opts.passThrough;
 
 		// An unknown engine used to fall through to Lucee silently (#3895).
 		if (!listFind("lucee,rustcfml", engine)) {
@@ -2786,8 +2769,17 @@ component extends="modules.BaseModule" {
 		// the warning emitted further down. `--port` used to be parsed and then
 		// dropped for Lucee projects — only the RustCFML branch consumed it — so
 		// `wheels start --port=8090` silently booted on the lucee.json port.
-		if (engine != "rustcfml") {
-			$resolveStartPorts(enginePort);
+		if (opts.dryRun) {
+			if (engine == "rustcfml") {
+				throw(type = "Wheels.InvalidArguments", message = "wheels start --dry-run isn't supported with --engine=rustcfml.");
+			}
+			// LuCLI's own --dry-run prints the config it would start with and changes nothing, so the
+			// port goes to it rather than into lucee.json.
+			if (enginePort > 0) {
+				arrayAppend(passThrough, "--port=" & enginePort);
+			}
+			executeCommand("server", $startCommandArgs(passThrough), variables.projectRoot);
+			return "";
 		}
 
 		// RustCFML backend — separate lifecycle from LuCLI (no JDK/Lucee
@@ -2816,6 +2808,10 @@ component extends="modules.BaseModule" {
 			out("To restart: wheels stop && wheels start", "cyan");
 			return "";
 		}
+
+		// Only now that a start will happen: resolving the ports can move the shutdown port and
+		// write lucee.json, which a start of a running server must not do (#4411).
+		$resolveStartPorts(enginePort);
 
 		// A failed start leaves a registration holding only LuCLI's config file
 		// and no project path. That exact shape is a leftover, not another
@@ -2882,8 +2878,7 @@ component extends="modules.BaseModule" {
 
 		// Delegate to LuCLI's server start command. Forward only args we
 		// haven't consumed ourselves (--force is wheels-side, not LuCLI-side).
-		var cmdArgs = ["start"];
-		cmdArgs.append(passThrough, true);
+		var cmdArgs = $startCommandArgs(passThrough);
 
 		try {
 			executeCommand("server", cmdArgs, variables.projectRoot);
@@ -12038,6 +12033,107 @@ component extends="modules.BaseModule" {
 			"openBrowser": arguments.opts.openBrowser ? "true" : "false",
 			"datasourcesBlock": arguments.opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(arguments.opts.datasource)
 		};
+	}
+
+	/**
+	 * The flags `wheels start` handles itself, out of its argv: `--force`, `--engine`, `--port`
+	 * (also `-p N` / `-p=N`, which LuCLI would otherwise take without moving the shutdown port off
+	 * it, #4411) and `--dry-run` (noted, and still passed on). Everything else is passed on to
+	 * LuCLI's `server start` in `passThrough`.
+	 */
+	private struct function $parseStartArgs(required array args) {
+		var rv = {force = false, engine = "lucee", enginePort = 0, dryRun = false, passThrough = []};
+		for (var i = 1; i <= arrayLen(arguments.args); i++) {
+			var a = arguments.args[i];
+			if (a == "--force") {
+				rv.force = true;
+			} else if (a == "--engine") {
+				rv.engine = lCase($startFlagValue(arguments.args, i, "engine"));
+				i++;
+			} else if (left(a, 9) == "--engine=") {
+				rv.engine = lCase(mid(a, 10, len(a) - 9));
+			} else if (a == "--port" || a == "-p") {
+				rv.enginePort = val($startFlagValue(arguments.args, i, "port"));
+				i++;
+			} else if (left(a, 7) == "--port=" || left(a, 4) == "--p=") {
+				rv.enginePort = val(listRest(a, "="));
+			} else {
+				if (a == "--dry-run") {
+					rv.dryRun = true;
+				}
+				arrayAppend(rv.passThrough, a);
+			}
+		}
+		return rv;
+	}
+
+	/**
+	 * The argv for LuCLI's `server start`: "start" and the flags `wheels start` passed on, plus the
+	 * environment LuCLI took from its root `--env` / `-e` option, which never reaches the module's
+	 * own arguments (#4412). An explicit `--env` / `--environment` that did reach them wins.
+	 */
+	private array function $startCommandArgs(required array passThrough) {
+		var rv = ["start"];
+		rv.append(arguments.passThrough, true);
+		var env = $lucliRootEnvironment();
+		if (len(env) && !$hasEnvironmentFlag(arguments.passThrough)) {
+			arrayAppend(rv, "--environment=" & env);
+		}
+		return rv;
+	}
+
+	/**
+	 * Whether the argv already names an environment for LuCLI's `server start`.
+	 */
+	private boolean function $hasEnvironmentFlag(required array argv) {
+		for (var a in arguments.argv) {
+			if (reFind("^--(env|environment)(=|$)", a)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * The environment LuCLI took from its root `--env` / `-e` option (or LUCLI_ENV), or "" when
+	 * there is none. LuCLI records LUCLI_ENV in LuCLI.getCurrentEnvironment(), but on the route
+	 * that runs a module under its binary name it parses `--env` / `-e` without recording them, so
+	 * those are read back from this process's own command line.
+	 */
+	private string function $lucliRootEnvironment() {
+		try {
+			var env = createObject("java", "org.lucee.lucli.LuCLI").getCurrentEnvironment();
+			if (!isNull(env) && len(trim(env))) {
+				return trim(env);
+			}
+		} catch (any e) {
+			// An older LuCLI without getCurrentEnvironment(): fall back to the command line.
+		}
+		try {
+			var processArgs = createObject("java", "java.lang.ProcessHandle").current().info().arguments();
+			return processArgs.isPresent() ? $environmentFromArgv(processArgs.get()) : "";
+		} catch (any e) {
+			return "";
+		}
+	}
+
+	/**
+	 * The value of a root `--env` / `-e` option in an argv (`--env=prod`, `--env prod`, `-e prod`,
+	 * `-e=prod`), or "". Public ONLY so StartSideEffectsSpec can unit-test it; hidden from MCP by the
+	 * $-prefix sweep in mcpHiddenTools().
+	 */
+	public string function $environmentFromArgv(required any argv) {
+		var n = arrayLen(arguments.argv);
+		for (var i = 1; i <= n; i++) {
+			var a = toString(arguments.argv[i]);
+			if (reFind("^(--env|-e)=.+", a)) {
+				return listRest(a, "=");
+			}
+			if ((a == "--env" || a == "-e") && i < n) {
+				return toString(arguments.argv[i + 1]);
+			}
+		}
+		return "";
 	}
 
 	/**
