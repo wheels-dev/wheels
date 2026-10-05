@@ -213,7 +213,8 @@
 			// Done before the main record is deleted to make sure eventual foreign key constraints does not prevent deletion.
 			$deleteDependents(
 				softDelete = arguments.softDelete,
-				includeSoftDeletes = arguments.includeSoftDeletes
+				includeSoftDeletes = arguments.includeSoftDeletes,
+				callbacks = arguments.callbacks
 			);
 
 			local.deleted = variables.wheels.class.adapter.$querySetup(

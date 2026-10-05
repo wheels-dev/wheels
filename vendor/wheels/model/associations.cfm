@@ -71,6 +71,9 @@
 		string as = ""
 	) {
 		$args(name = "hasMany", args = arguments);
+		if (StructKeyExists(arguments, "dependent")) {
+			$validateDependent(arguments.dependent);
+		}
 		local.singularizedName = capitalize(singularize(arguments.name));
 		local.capitalizedName = capitalize(arguments.name);
 		arguments.type = "hasMany";
@@ -125,6 +128,9 @@
 		string as = ""
 	) {
 		$args(name = "hasOne", args = arguments);
+		if (StructKeyExists(arguments, "dependent")) {
+			$validateDependent(arguments.dependent);
+		}
 		local.capitalizedName = capitalize(arguments.name);
 		arguments.type = "hasOne";
 
@@ -240,11 +246,30 @@
 		variables.wheels.class.associations[local.associationName] = arguments;
 	}
 
+	/**
+	 * Internal function. Throws Wheels.InvalidArgument for a `dependent` value hasMany() and hasOne()
+	 * don't support, so the mistake surfaces when the association is declared, not at the first delete.
+	 */
+	public void function $validateDependent(required any dependent) {
+		if (IsBoolean(arguments.dependent) && !arguments.dependent) {
+			return;
+		}
+		if (IsSimpleValue(arguments.dependent) && ListFindNoCase("delete,deleteAll,remove,removeAll", arguments.dependent)) {
+			return;
+		}
+		Throw(
+			type = "Wheels.InvalidArgument",
+			message = "'#IsSimpleValue(arguments.dependent) ? arguments.dependent : "(complex value)"#' is not a valid dependency.",
+			extendedInfo = "Use `delete`, `deleteAll`, `remove`, `removeAll` or `false`."
+		);
+	}
+
 	/*
 	 * Called when a model object is deleted (e.g. post.delete()).
-	 * Deletes all associated records (or sets their foreign key values to NULL).
+	 * Deletes all associated records (or sets their foreign key values to NULL). With
+	 * `callbacks = false` the instantiated dependents skip their callbacks too.
 	 */
-	public void function $deleteDependents(boolean softDelete = true, boolean includeSoftDeletes = false) {
+	public void function $deleteDependents(boolean softDelete = true, boolean includeSoftDeletes = false, boolean callbacks = true) {
 		for (local.key in variables.wheels.class.associations) {
 			local.association = variables.wheels.class.associations[local.key];
 			if (ListFindNoCase("hasMany,hasOne", local.association.type) && local.association.dependent != false) {
@@ -256,6 +281,7 @@
 					case "delete":
 						local.invokeArgs = {};
 						local.invokeArgs.instantiate = true;
+						local.invokeArgs.callbacks = arguments.callbacks;
 						local.invokeArgs.softDelete = arguments.softDelete;
 						local.invokeArgs.includeSoftDeletes = arguments.includeSoftDeletes;
 						$invoke(componentReference = this, method = "delete#local.all##local.key#", invokeArgs = local.invokeArgs);
@@ -263,6 +289,7 @@
 					case "remove":
 						local.invokeArgs = {};
 						local.invokeArgs.instantiate = true;
+						local.invokeArgs.callbacks = arguments.callbacks;
 						$invoke(componentReference = this, method = "remove#local.all##local.key#", invokeArgs = local.invokeArgs);
 						break;
 					case "deleteAll":

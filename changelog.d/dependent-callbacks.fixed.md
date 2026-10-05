@@ -1,0 +1,1 @@
+- `delete(callbacks=false)` now also skips the callbacks of the dependent records it deletes or removes through `dependent="delete"` or `dependent="remove"`. An invalid `dependent` value on `hasMany()` or `hasOne()` now throws `Wheels.InvalidArgument` when the association is declared, instead of at the first delete
