@@ -1,0 +1,1 @@
+- `processRequest()` now restores the request method, transaction mode and the `sendEmail` / `sendFile` deliver flags on every exit, including when the action throws and the spec catches it. Previously it restored them only on the success path, so a caught throw leaked that state into later specs in the same run (reported by a downstream app) (#4350)
