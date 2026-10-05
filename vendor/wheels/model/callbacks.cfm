@@ -425,13 +425,15 @@
 	 * fire; or, with no real transaction (none/false mode), fires afterCommit now
 	 * because the write is already committed (decision B1). Inside a foreign raw
 	 * transaction{} (detectable engines only) it skips both callbacks and warns once.
+	 * With `callbacks = false` (a save or delete that skips its callbacks) only the saved-change
+	 * restore is queued.
 	 */
-	public void function $enqueueTransactionCallbacks(required string operation, struct savedBefore) {
+	public void function $enqueueTransactionCallbacks(required string operation, struct savedBefore, boolean callbacks = true) {
 		// A delete changes no saved-change state, so a rollback puts back the current one.
 		if (!StructKeyExists(arguments, "savedBefore")) {
 			arguments.savedBefore = $savedChangesState();
 		}
-		if (!$hasTransactionCallbacks()) {
+		if (!arguments.callbacks || !$hasTransactionCallbacks()) {
 			// No callbacks to fire, but a rollback must still put back what savedChanges() reported
 			// before this save (F49), so the save is queued for that alone.
 			$enqueueSavedChangesRestore(operation = arguments.operation, savedBefore = arguments.savedBefore);

@@ -38,7 +38,7 @@ const SITE_TEXT: Record<LlmsSite, { name: string; what: string; origin: string }
 	},
 	api: {
 		name: 'Wheels API Reference',
-		what: 'the function reference: every framework function with its signature, parameters, return type and examples',
+		what: 'the function reference: every framework function with its signature, parameters, return type and examples where present',
 		origin: 'https://api.wheels.dev',
 	},
 };
@@ -160,7 +160,7 @@ export function llmsOutline(site: LlmsSite, heading: string, docs: LlmsDoc[]): s
 		'',
 		`> ${SITE_TEXT[site].name}, abridged: each page's title, description and section headings. Fetch a page's full text from its Markdown link.`,
 		'',
-		...DETAILS,
+		DETAILS.join('\n\n'),
 	];
 	for (const doc of docs) {
 		parts.push('', `## [${doc.data.title}](${origin}/${doc.id}.md)`);
@@ -181,7 +181,8 @@ export function llmsIndex(site: LlmsSite, versions: VersionMeta[], docs: LlmsDoc
 		'',
 		`> ${text.name} for Wheels ${current.label}: ${text.what}.`,
 		'',
-		...DETAILS,
+		DETAILS.join('\n\n'),
+		'',
 		'Every page is also available as Markdown: append ".md" to its URL (without the trailing slash).',
 		'',
 		'## Documentation sets',

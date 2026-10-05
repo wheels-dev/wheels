@@ -9,6 +9,8 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
+		// The post class's validations before any spec here runs, for the no-leftover check below.
+		variables.postValidationsAtStart = SerializeJSON(application.wo.$canonicalCacheValue(value = g.model("post").$classData().validations));
 
 		describe("M2 validatesUniquenessOf includeSoftDeletes default", () => {
 
@@ -23,14 +25,26 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("still treats a soft-deleted row as taken when includeSoftDeletes is true", () => {
-				transaction action="begin" {
-					var orgPost = g.model("post").findOne();
-					var newPost = g.model("post").new(orgPost.properties());
-					orgPost.delete();
-					newPost.validatesUniquenessOf(properties = "title", includeSoftDeletes = true);
-					expect(newPost.valid()).toBeFalse();
-					transaction action="rollback";
+				// validatesUniquenessOf() on an object registers on the shared post class, so put the
+				// class's validations back afterwards or every later post save carries this one too.
+				var postClass = g.model("post").$classData();
+				var savedValidations = Duplicate(postClass.validations);
+				try {
+					transaction action="begin" {
+						var orgPost = g.model("post").findOne();
+						var newPost = g.model("post").new(orgPost.properties());
+						orgPost.delete();
+						newPost.validatesUniquenessOf(properties = "title", includeSoftDeletes = true);
+						expect(newPost.valid()).toBeFalse();
+						transaction action="rollback";
+					}
+				} finally {
+					postClass.validations = savedValidations;
 				}
+			});
+
+			it("leaves the post class with only the validations it was configured with", () => {
+				expect(SerializeJSON(application.wo.$canonicalCacheValue(value = g.model("post").$classData().validations))).toBe(variables.postValidationsAtStart);
 			});
 
 		});

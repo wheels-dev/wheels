@@ -16,18 +16,20 @@ component output="false" {
 	 */
 	public struct function build(required any wheelsError) {
 		var exception = arguments.wheelsError;
+		// Quoted keys throughout: SerializeJSON keeps their case on every engine, so
+		// agents reading the JSON see `source`, `exception.type`, … not upper case.
 		var payload = {
-			source = "wheels-error-page",
-			exception = {
-				type = $structString(exception, "type"),
-				message = $structString(exception, "message"),
-				detail = $structString(exception, "detail")
+			"source" = "wheels-error-page",
+			"exception" = {
+				"type" = $structString(exception, "type"),
+				"message" = $structString(exception, "message"),
+				"detail" = $structString(exception, "detail")
 			},
-			suggestedAction = $structString(exception, "extendedInfo"),
-			location = {},
-			sourceSnippet = {},
-			stack = [],
-			request = $requestInfo()
+			"suggestedAction" = $structString(exception, "extendedInfo"),
+			"location" = {},
+			"sourceSnippet" = {},
+			"stack" = [],
+			"request" = $requestInfo()
 		};
 
 		var tagContext = [];
@@ -40,10 +42,10 @@ component output="false" {
 		var locationFrame = $locationFrame(frames);
 		if (!StructIsEmpty(locationFrame)) {
 			payload.location = {
-				file = locationFrame.file,
-				line = locationFrame.line,
-				type = locationFrame.type,
-				template = locationFrame.template
+				"file" = locationFrame.file,
+				"line" = locationFrame.line,
+				"type" = locationFrame.type,
+				"template" = locationFrame.template
 			};
 			payload.sourceSnippet = readSnippet(
 				templatePath = locationFrame.template,
@@ -52,7 +54,7 @@ component output="false" {
 		}
 
 		if (IsDefined("application.wheels.version") && Len(application.wheels.version)) {
-			payload.wheelsVersion = application.wheels.version;
+			payload["wheelsVersion"] = application.wheels.version;
 		}
 
 		return payload;
@@ -60,6 +62,108 @@ component output="false" {
 
 	public string function toJson(required any wheelsError) {
 		return SerializeJSON(build(wheelsError = arguments.wheelsError));
+	}
+
+	/**
+	 * The payload as Markdown, for a development error asked for as text/markdown:
+	 * a heading with the type and message, the status and request, the suggested
+	 * action, the location with its source snippet, then the stack with app, plugin
+	 * and library frames listed and framework frames collapsed to a count. Takes a
+	 * built payload (or the minimal fallback), so every key is optional.
+	 */
+	public string function toMarkdown(required struct payload) {
+		var nl = Chr(10);
+		var p = arguments.payload;
+		var exception = StructKeyExists(p, "exception") && IsStruct(p.exception) ? p.exception : {};
+		var type = $structString(exception, "type");
+		var message = $structString(exception, "message");
+		var md = Chr(35) & " " & (Len(type) ? type & ": " : "") & message & nl;
+		var detail = $structString(exception, "detail");
+		if (Len(detail)) {
+			md &= nl & detail & nl;
+		}
+
+		var facts = [];
+		if (StructKeyExists(p, "statusCode") && IsSimpleValue(p.statusCode) && Len(p.statusCode)) {
+			ArrayAppend(facts, "**Status:** " & p.statusCode);
+		}
+		var requestInfo = StructKeyExists(p, "request") && IsStruct(p.request) ? p.request : {};
+		var method = $structString(requestInfo, "method");
+		var path = $structString(requestInfo, "path");
+		if (Len(method) || Len(path)) {
+			ArrayAppend(facts, "**Request:** " & Trim(method & " " & path));
+		}
+		var version = $structString(p, "wheelsVersion");
+		if (Len(version)) {
+			ArrayAppend(facts, "**Wheels** " & version);
+		}
+		if (ArrayLen(facts)) {
+			md &= nl & ArrayToList(facts, " | ") & nl;
+		}
+
+		var suggested = $structString(p, "suggestedAction");
+		if (Len(suggested)) {
+			md &= nl & Chr(35) & Chr(35) & " Suggested action" & nl & suggested & nl;
+		}
+
+		var location = StructKeyExists(p, "location") && IsStruct(p.location) ? p.location : {};
+		var file = $structString(location, "file");
+		if (Len(file)) {
+			md &= nl & Chr(35) & Chr(35) & " Location" & nl & "`" & file & ":" & $structString(location, "line") & "`" & nl;
+			md &= $markdownSnippet(StructKeyExists(p, "sourceSnippet") && IsStruct(p.sourceSnippet) ? p.sourceSnippet : {});
+		}
+
+		md &= $markdownStack(StructKeyExists(p, "stack") && IsArray(p.stack) ? p.stack : []);
+		return md;
+	}
+
+	/**
+	 * A fenced snippet: each line numbered, the error line marked with ">".
+	 */
+	public string function $markdownSnippet(required struct snippet) {
+		if (!StructKeyExists(arguments.snippet, "lines") || !IsArray(arguments.snippet.lines) || !ArrayLen(arguments.snippet.lines)) {
+			return "";
+		}
+		var nl = Chr(10);
+		var width = Len($structString(arguments.snippet, "endLine"));
+		var fence = "````";
+		var rv = nl & fence & "cfml" & nl;
+		for (var entry in arguments.snippet.lines) {
+			var lineNumber = $structString(entry, "line");
+			var padded = RepeatString(" ", Max(0, width - Len(lineNumber))) & lineNumber;
+			var marker = StructKeyExists(entry, "highlight") && IsBoolean(entry.highlight) && entry.highlight ? ">" : " ";
+			rv &= marker & " " & padded & " | " & $structString(entry, "code") & nl;
+		}
+		return rv & fence & nl;
+	}
+
+	/**
+	 * The stack as a numbered list of app, plugin and library frames; framework
+	 * frames are counted, not listed, to keep the response short.
+	 */
+	public string function $markdownStack(required array stack) {
+		if (!ArrayLen(arguments.stack)) {
+			return "";
+		}
+		var nl = Chr(10);
+		var rv = nl & Chr(35) & Chr(35) & " Stack" & nl;
+		var shown = 0;
+		var hidden = 0;
+		for (var frame in arguments.stack) {
+			if (!IsStruct(frame)) {
+				continue;
+			}
+			if ($structString(frame, "type") == "framework") {
+				hidden++;
+				continue;
+			}
+			shown++;
+			rv &= shown & ". " & $structString(frame, "type") & " `" & $structString(frame, "file") & ":" & $structString(frame, "line") & "`" & nl;
+		}
+		if (hidden) {
+			rv &= hidden & " framework frame" & (hidden == 1 ? "" : "s") & " not shown" & nl;
+		}
+		return rv;
 	}
 
 	/**
@@ -91,11 +195,11 @@ component output="false" {
 			ArrayAppend(
 				frames,
 				{
-					index = ArrayLen(frames) + 1,
-					template = tpl,
-					file = Replace(tpl, root, ""),
-					line = frameLine,
-					type = $frameType(tpl)
+					"index" = ArrayLen(frames) + 1,
+					"template" = tpl,
+					"file" = Replace(tpl, root, ""),
+					"line" = frameLine,
+					"type" = $frameType(tpl)
 				}
 			);
 		}
@@ -104,10 +208,10 @@ component output="false" {
 
 	public struct function readSnippet(required string templatePath, required numeric lineNumber, numeric contextLines = 5) {
 		var snippet = {
-			startLine = 0,
-			endLine = 0,
-			errorLine = Val(arguments.lineNumber),
-			lines = []
+			"startLine" = 0,
+			"endLine" = 0,
+			"errorLine" = Val(arguments.lineNumber),
+			"lines" = []
 		};
 		if (!Len(arguments.templatePath) || !FileExists(arguments.templatePath)) {
 			return snippet;
@@ -156,7 +260,7 @@ component output="false" {
 			}
 			ArrayAppend(
 				snippet.lines,
-				{line = pos, code = code, highlight = (pos == errorLine)}
+				{"line" = pos, "code" = code, "highlight" = (pos == errorLine)}
 			);
 		}
 		return snippet;
@@ -192,29 +296,23 @@ component output="false" {
 	}
 
 	/**
-	 * Same location pick as wheelserror.cfm: ignore the first tagContext
-	 * entry (typically the framework throw site), prefer the first app
-	 * frame, otherwise the first remaining frame.
+	 * Same location pick as wheelserror.cfm: the first app frame, wherever it is
+	 * (an app that throws directly has it first); with no app frame, the first frame
+	 * after the innermost throw site, else the only frame.
 	 */
 	public struct function $locationFrame(required array frames) {
-		var candidates = [];
 		var count = ArrayLen(arguments.frames);
 		var i = 1;
+		for (i = 1; i <= count; i++) {
+			if (arguments.frames[i].type == "app") {
+				return arguments.frames[i];
+			}
+		}
 		if (count > 1) {
-			for (i = 2; i <= count; i++) {
-				ArrayAppend(candidates, arguments.frames[i]);
-			}
-		} else if (count == 1) {
-			ArrayAppend(candidates, arguments.frames[1]);
+			return arguments.frames[2];
 		}
-		var candidateCount = ArrayLen(candidates);
-		for (i = 1; i <= candidateCount; i++) {
-			if (candidates[i].type == "app") {
-				return candidates[i];
-			}
-		}
-		if (candidateCount) {
-			return candidates[1];
+		if (count == 1) {
+			return arguments.frames[1];
 		}
 		return {};
 	}
@@ -231,7 +329,7 @@ component output="false" {
 	}
 
 	private struct function $requestInfo() {
-		var info = {method = "", path = "", queryString = ""};
+		var info = {"method" = "", "path" = "", "queryString" = ""};
 		if (IsDefined("cgi.request_method")) {
 			info.method = cgi.request_method;
 		}
@@ -246,7 +344,7 @@ component output="false" {
 			info.queryString = cgi.query_string;
 		}
 		if (IsDefined("request.wheels.requestId") && Len(request.wheels.requestId)) {
-			info.requestId = request.wheels.requestId;
+			info["requestId"] = request.wheels.requestId;
 		}
 		return info;
 	}

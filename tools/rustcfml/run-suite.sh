@@ -104,6 +104,10 @@ if [ -z "$BIN" ]; then
   fi
 fi
 echo "Engine: $BIN"
+# The exact engine under test, for citing in upstream reports: the release tag, the
+# asset and its verified sha256 (none when RUSTCFML_BIN is given), and what the binary
+# itself reports.
+echo "RustCFML engine: $VERSION ($ASSET${WANT_SHA256:+, sha256 $WANT_SHA256}); binary reports: $("$BIN" --version 2>&1 | head -1)"
 
 # --- serve the repo webroot ----------------------------------------------------
 SERVE_LOG="$(mktemp)"

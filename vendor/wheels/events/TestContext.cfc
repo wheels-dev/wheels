@@ -68,6 +68,34 @@ component {
 	}
 
 	/**
+	 * Whether `events/testcontext.cfm` should mark the request as isolation-configured (set
+	 * `request.$wheelsTestContextConfigured`). True when the request is already in the isolated
+	 * application, or the include's own environment gate (WHEELS_ENV is development/testing) allows
+	 * isolation to bind. Deliberately NOT based on the runtime `application.wheels.environment`: an app
+	 * configured for development only in `config/environment.cfm`, with WHEELS_ENV unset, never binds
+	 * isolation in the constructor, so it must not be marked — otherwise the runner guard would refuse a
+	 * run the app can only do through the live-scope swap. The inline copy in events/testcontext.cfm sets
+	 * the marker in exactly these two spots; keep the two in lockstep.
+	 */
+	public boolean function requestIsTestContextConfigured(required boolean alreadyIsolated, required boolean environmentAllows) {
+		return arguments.alreadyIsolated || arguments.environmentAllows;
+	}
+
+	/**
+	 * True when a test-runner action (`testbox` / `tests_testbox`) must refuse to run in the current
+	 * application rather than execute specs against it. It refuses only when isolation is configured AND
+	 * could bind for this request — the `events/testcontext.cfm` include ran and its environment gate
+	 * allowed it (`isolationConfigured`, i.e. `request.$wheelsTestContextConfigured`) — but the request
+	 * did not bind the isolated `<name>_wheelsTest` scope, e.g. it arrived through a custom route the path
+	 * trigger does not cover. An app WITHOUT the include, or whose WHEELS_ENV did not allow isolation
+	 * (`isolationConfigured` false), is left alone: it keeps the existing live-scope test swap (with the
+	 * #4354 warning), so upgraded apps and non-dev environments are not broken.
+	 */
+	public boolean function testRunnerMustRefuse(required boolean isolationConfigured, required string applicationName) {
+		return arguments.isolationConfigured && !isIsolatedApplicationName(arguments.applicationName);
+	}
+
+	/**
 	 * True when this request should bind the isolated test application.
 	 *
 	 * Markers (any one is enough):
@@ -252,7 +280,7 @@ component {
 	 * For each of `path_info` and `script_name`: lowercase/trim, cut the query string off FIRST (so a
 	 * `//` or `..` living inside a query cannot reject a legitimate runner URL), reject any remaining
 	 * `..` traversal or `//` empty segment, then start-anchored match against
-	 * `^/wheels/(core|app)/tests(/|$)` — i.e. the value must EQUAL `/wheels/core/tests` /
+	 * `^/wheels/(core/tests|app/tests|testbox|tests_testbox)(/|$)` — i.e. the value must EQUAL `/wheels/core/tests` /
 	 * `/wheels/app/tests` or start with one followed by `/`. Because the match is anchored at position
 	 * 0 of a canonical path, a runner path that merely appears later in an application route
 	 * (`/files/x/wheels/app/tests`), or is reached via a traversal (`/wheels/app/tests/../../files/x`)
@@ -271,7 +299,7 @@ component {
 			var path = ReReplace(LCase(Trim(ToString(arguments.cgiScope[key]))), "\?.*$", "");
 			if (
 				!ReFind("\.\.|//", path)
-				&& ReFindNoCase("^/wheels/(core|app)/tests(/|$)", path) > 0
+				&& ReFindNoCase("^/wheels/(core/tests|app/tests|testbox|tests_testbox)(/|$)", path) > 0
 			) {
 				return true;
 			}

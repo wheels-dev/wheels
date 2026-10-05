@@ -11,6 +11,9 @@ component extends="wheels.WheelsTest" {
      */
     function run() {
 
+        // The post class's callbacks before any spec here runs, for the no-leftover check below.
+        variables.postCallbacksAtStart = SerializeJSON(application.wo.$canonicalCacheValue(value = application.wo.model("post").$classData().callbacks));
+
         describe("model layer surfaces", () => {
 
             describe("ScopeChain terminal methods", () => {
@@ -84,17 +87,27 @@ component extends="wheels.WheelsTest" {
 
                 it("registers the remaining lifecycle callbacks and clears them", () => {
                     var m = model("post");
-                    m.afterInitialization();
-                    m.afterNew();
-                    m.afterUpdate();
-                    m.afterValidation();
-                    m.afterValidationOnCreate();
-                    m.afterValidationOnUpdate();
-                    m.beforeUpdate();
-                    m.beforeValidationOnCreate();
-                    m.beforeValidationOnUpdate();
-                    // Revert so no phantom callback fires on later specs.
-                    m.$clearCallbacks();
+                    // Put back exactly what the class had: $clearCallbacks() with no type would also
+                    // drop callbacks the class was configured with.
+                    var postClass = m.$classData();
+                    var savedCallbacks = Duplicate(postClass.callbacks);
+                    try {
+                        m.afterInitialization();
+                        m.afterNew();
+                        m.afterUpdate();
+                        m.afterValidation();
+                        m.afterValidationOnCreate();
+                        m.afterValidationOnUpdate();
+                        m.beforeUpdate();
+                        m.beforeValidationOnCreate();
+                        m.beforeValidationOnUpdate();
+                    } finally {
+                        postClass.callbacks = savedCallbacks;
+                    }
+                });
+
+                it("leaves the post class with only the callbacks it was configured with", () => {
+                    expect(SerializeJSON(application.wo.$canonicalCacheValue(value = model("post").$classData().callbacks))).toBe(variables.postCallbacksAtStart);
                 });
 
                 it("$coerceOracleTimestamp delegates to the engine adapter", () => {
