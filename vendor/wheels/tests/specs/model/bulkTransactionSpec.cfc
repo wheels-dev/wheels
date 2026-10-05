@@ -110,6 +110,14 @@ component extends="wheels.WheelsTest" {
 					expect(rowsLike("BULKTXN-N-")).toBeGT(0);
 				});
 
+				it("joins an open transaction, so the outer rollback removes its rows", () => {
+					var records = [{code = "BULKTXN-J-1", name = "a", quantity = 1}, {code = "BULKTXN-J-2", name = "b", quantity = 2}];
+					variables.g.model("bulkItem").invokeWithTransaction(method = "insertAllInside", transaction = "rollback", records = records);
+					expect(rowsLike("BULKTXN-J-")).toBe(0);
+					variables.g.model("bulkItem").invokeWithTransaction(method = "insertAllInside", transaction = "commit", records = records);
+					expect(rowsLike("BULKTXN-J-")).toBe(2);
+				});
+
 				it("commits normally with transaction = commit", () => {
 					var result = variables.g.model("bulkItem").insertAll(
 						records = [{code = "BULKTXN-OK-1", name = "a", quantity = 1}, {code = "BULKTXN-OK-2", name = "b", quantity = 2}],
