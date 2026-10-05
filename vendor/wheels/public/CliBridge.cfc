@@ -1041,19 +1041,45 @@ component output="false" displayName="CLI Bridge" {
 	 * declaration doesn't count. "" when it extends nothing.
 	 */
 	public string function $sourceExtends(required string source) {
-		local.code = $stripBlockComments(arguments.source);
-		local.lines = [];
-		for (local.line in ListToArray(local.code, Chr(10), true)) {
-			if (!ReFind("^\s*//", local.line)) {
-				ArrayAppend(local.lines, local.line);
+		local.code = $stripComments(arguments.source);
+		local.at = $declarationStart(local.code);
+		return local.at > 0 ? $declarationAttribute(local.code, local.at, "extends") : "";
+	}
+
+	/**
+	 * Where the first component declaration (`component` or the tag form's
+	 * `cfcomponent`) starts in comment-free code, outside quoted strings; 0 if none.
+	 */
+	public numeric function $declarationStart(required string code) {
+		local.text = arguments.code;
+		local.length = Len(local.text);
+		local.quote = "";
+		for (local.i = 1; local.i <= local.length; local.i++) {
+			local.char = Mid(local.text, local.i, 1);
+			if (Len(local.quote)) {
+				if (local.char == local.quote) {
+					local.quote = "";
+				}
+				continue;
+			}
+			if (local.char == """" || local.char == "'") {
+				local.quote = local.char;
+				continue;
+			}
+			local.before = local.i > 1 ? Mid(local.text, local.i - 1, 1) : " ";
+			if (ReFind("[A-Za-z0-9_.$-]", local.before)) {
+				continue;
+			}
+			for (local.keyword in ["cfcomponent", "component"]) {
+				if (
+					LCase(Mid(local.text, local.i, Len(local.keyword))) == local.keyword
+					&& !ReFind("[A-Za-z0-9_.$-]", Mid(local.text, local.i + Len(local.keyword), 1))
+				) {
+					return local.i;
+				}
 			}
 		}
-		local.code = ArrayToList(local.lines, Chr(10));
-		local.found = ReFindNoCase("(^|[^A-Za-z0-9_])(cf)?component([^A-Za-z0-9_]|$)", local.code, 1, true);
-		if (local.found.pos[1] == 0) {
-			return "";
-		}
-		return $declarationAttribute(local.code, local.found.pos[1], "extends");
+		return 0;
 	}
 
 	/**
@@ -1125,30 +1151,79 @@ component output="false" displayName="CLI Bridge" {
 	}
 
 	/**
-	 * Source with script block comments and tag comments removed, by plain Find()
-	 * rather than a global non-greedy regex (which can hang Lucee 7 on large input).
+	 * Source with every comment replaced by a space: block comments, line comments
+	 * wherever they start on a line, and CFML tag comments, which nest. Quoted
+	 * strings are kept as they are, so comment markers inside them don't count.
 	 * The markers are built with Chr() so this file contains none of them literally.
 	 */
-	public string function $stripBlockComments(required string source) {
-		local.rv = arguments.source;
-		local.pairs = [
-			[Chr(47) & Chr(42), Chr(42) & Chr(47)],
-			[Chr(60) & Chr(33) & "---", "---" & Chr(62)]
-		];
-		for (local.pair in local.pairs) {
-			local.start = Find(local.pair[1], local.rv);
-			while (local.start > 0) {
-				local.stop = Find(local.pair[2], local.rv, local.start + Len(local.pair[1]));
-				if (local.stop == 0) {
-					// Left(str, 0) crashes Lucee 7.
-					local.rv = local.start > 1 ? Left(local.rv, local.start - 1) : "";
-					break;
+	public string function $stripComments(required string source) {
+		local.text = arguments.source;
+		local.length = Len(local.text);
+		local.tagOpen = Chr(60) & Chr(33) & "---";
+		local.tagClose = "---" & Chr(62);
+		local.blockOpen = Chr(47) & Chr(42);
+		local.blockClose = Chr(42) & Chr(47);
+		local.rv = "";
+		local.chunkStart = 1;
+		local.quote = "";
+		local.i = 1;
+		while (local.i <= local.length) {
+			local.char = Mid(local.text, local.i, 1);
+			if (Len(local.quote)) {
+				if (local.char == local.quote) {
+					local.quote = "";
 				}
-				local.rv = (local.start > 1 ? Left(local.rv, local.start - 1) : "") & Mid(local.rv, local.stop + Len(local.pair[2]), Len(local.rv));
-				local.start = Find(local.pair[1], local.rv);
+				local.i++;
+				continue;
+			}
+			local.skipTo = 0;
+			if (Mid(local.text, local.i, 5) == local.tagOpen) {
+				local.skipTo = $tagCommentEnd(local.text, local.i, local.tagOpen, local.tagClose);
+			} else if (Mid(local.text, local.i, 2) == local.blockOpen) {
+				local.stop = Find(local.blockClose, local.text, local.i + 2);
+				local.skipTo = local.stop > 0 ? local.stop + 2 : local.length + 1;
+			} else if (Mid(local.text, local.i, 2) == "//") {
+				local.stop = Find(Chr(10), local.text, local.i);
+				local.skipTo = local.stop > 0 ? local.stop : local.length + 1;
+			}
+			if (local.skipTo > 0) {
+				local.rv &= Mid(local.text, local.chunkStart, local.i - local.chunkStart) & " ";
+				local.i = local.skipTo;
+				local.chunkStart = local.i;
+				continue;
+			}
+			if (local.char == """" || local.char == "'") {
+				local.quote = local.char;
+			}
+			local.i++;
+		}
+		local.rv &= Mid(local.text, local.chunkStart, local.length - local.chunkStart + 1);
+		return local.rv;
+	}
+
+	/**
+	 * The position just after the tag comment opening at `start`, counting nested
+	 * tag comments; past the end when it is never closed.
+	 */
+	public numeric function $tagCommentEnd(required string text, required numeric start, required string tagOpen, required string tagClose) {
+		local.depth = 0;
+		local.i = arguments.start;
+		local.length = Len(arguments.text);
+		while (local.i <= local.length) {
+			if (Mid(arguments.text, local.i, Len(arguments.tagOpen)) == arguments.tagOpen) {
+				local.depth++;
+				local.i += Len(arguments.tagOpen);
+			} else if (Mid(arguments.text, local.i, Len(arguments.tagClose)) == arguments.tagClose) {
+				local.depth--;
+				local.i += Len(arguments.tagClose);
+				if (local.depth == 0) {
+					return local.i;
+				}
+			} else {
+				local.i++;
 			}
 		}
-		return local.rv;
+		return local.length + 1;
 	}
 
 	/**

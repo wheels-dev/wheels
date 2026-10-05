@@ -92,6 +92,17 @@ component extends="wheels.WheelsTest" {
 				expect(StructKeyExists(application, "$wheelsHintExtendsInstantiated")).toBeFalse();
 			});
 
+			it("refuses components whose only extends is inside a comment, without loading them", () => {
+				StructDelete(application, "$wheelsTagWrappedInstantiated");
+				StructDelete(application, "$wheelsNestedCommentInstantiated");
+				var wrapped = enqueue({job = "wheels.tests._assets.jobs.TagWrappedCommentSideEffect", queue = variables.queue});
+				var nested = enqueue({job = "wheels.tests._assets.jobs.NestedCommentSideEffect", queue = variables.queue});
+				expect(wrapped.success).toBeFalse();
+				expect(nested.success).toBeFalse();
+				expect(StructKeyExists(application, "$wheelsTagWrappedInstantiated")).toBeFalse();
+				expect(StructKeyExists(application, "$wheelsNestedCommentInstantiated")).toBeFalse();
+			});
+
 			it("enqueues a job whose declaration has { and > inside a quoted value", () => {
 				var rv = enqueue({job = "wheels.tests._assets.jobs.QuotedPunctuationJob", queue = variables.queue});
 				expect(rv.success).toBeTrue();
@@ -163,6 +174,26 @@ component extends="wheels.WheelsTest" {
 				expect(bridge.$sourceExtends('component hint="say ""extends=wheels.Job"" here" {}')).toBe("");
 				expect(bridge.$sourceExtends('component // extends="wheels.Job"' & Chr(10) & '{}')).toBe("");
 				expect(bridge.$sourceExtends('component output=false // a note' & Chr(10) & 'extends="wheels.Job" {}')).toBe("wheels.Job");
+			});
+
+			it("finds the declaration only in code, never in a comment or a string", () => {
+				// Tag names and comment markers are assembled from pieces. (Not a variable
+				// named after the less-than operator: Adobe fails to compile that.)
+				var openAngle = Chr(60);
+				var nl = Chr(10);
+				var scriptTag = "cf" & "script";
+				var componentTag = "cf" & "component";
+				var tagOpen = openAngle & Chr(33) & "---";
+				var tagClose = "---" & Chr(62);
+				var job = 'extends="wheels.Job"';
+				// An inline line comment that isn't at the start of its line.
+				expect(bridge.$sourceExtends(openAngle & scriptTag & "> // component " & job & nl & "component {}" & nl & openAngle & "/" & scriptTag & ">")).toBe("");
+				// Nested tag comments: the outer one only ends at its own closer.
+				expect(bridge.$sourceExtends(tagOpen & " a " & tagOpen & " b " & tagClose & " " & openAngle & componentTag & " " & job & "> " & tagClose & nl & openAngle & componentTag & ">" & openAngle & "/" & componentTag & ">")).toBe("");
+				// A block comment and a string before the real declaration.
+				expect(bridge.$sourceExtends(Chr(47) & Chr(42) & " component " & job & " " & Chr(42) & Chr(47) & nl & 'x = "component extends=wheels.Job";' & nl & 'component extends="ProbeJob" {}')).toBe("ProbeJob");
+				// A real tag-based job after a nested comment.
+				expect(bridge.$sourceExtends(tagOpen & " " & tagOpen & " " & tagClose & " " & tagClose & nl & openAngle & componentTag & " " & job & ">" & openAngle & "/" & componentTag & ">")).toBe("wheels.Job");
 			});
 
 			it("doesn't count an extends outside the declaration", () => {
