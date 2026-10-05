@@ -1,0 +1,1 @@
+- The test-context path trigger binds the isolated test application only for a request whose path targets a runner endpoint (`/wheels/core/tests` or `/wheels/app/tests`), matched at the start of the path after stripping the query string and rejecting `..` / `//` segments (#4348)

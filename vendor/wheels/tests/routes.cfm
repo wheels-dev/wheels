@@ -31,6 +31,12 @@ mapper()
     // with abort must be rolled back. Driven by
     // wheels.tests.specs.model.transactionAbortRollbackSpec. Must precede .wildcard().
     .get(name="transactionAbortProbe", pattern="/_txnabort/run", to="TransactionAbortProbe##run")
+    // Client-address fixture (F23) — reports the client address middleware see
+    // (request context remoteAddr). Driven by
+    // wheels.tests.specs.testclient.testClientRemoteAddrSpec. Must precede .wildcard().
+    .scope(path="/_remoteaddr")
+        .get(name="remoteAddrShow", pattern="/show", to="RemoteAddrProbe##show")
+    .end()
     .wildcard()
 	.get(name="wheelstestbox", pattern="wheels/core/tests", to="wheels##public##tests")
 	.get(name="sampleLinkToTest", pattern="sample/linktotest", to="sample##linktotest")
