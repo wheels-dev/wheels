@@ -375,7 +375,10 @@ component output="false" displayName="CLI Bridge" {
 	public struct function dbStatus(required struct context, required struct params) {
 		// Return migration status straight from the migrator's own status field.
 		local.rv = {};
-		local.statusReport = arguments.context.host.$cliFormatMigrationStatus(arguments.context.migrations);
+		local.statusReport = arguments.context.host.$cliFormatMigrationStatus(
+			migrations = arguments.context.migrations,
+			appliedAt = StructKeyExists(arguments.context, "migrator") ? arguments.context.migrator.$appliedAtByVersion() : {}
+		);
 		local.rv.success = true;
 		local.rv.migrations = local.statusReport.migrations;
 		local.rv.summary = local.statusReport.summary;
