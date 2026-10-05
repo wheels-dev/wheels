@@ -31,6 +31,7 @@ component extends="wheels.WheelsTest" {
 				// current value, not the final iteration's value.
 				(function(relPath) {
 					it("onError wraps the post-guard handling in try/catch with a shared fallback", () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 

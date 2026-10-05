@@ -14,6 +14,8 @@ component extends="wheels.WheelsTest" {
 
             beforeEach(() => {
                 mb = new wheels.wheelstest.system.MockBox();
+                // Built directly, not through getMockBox(), so its stub directory is ensured here.
+                $ensureMockStubDirectory(mb);
             });
 
             it("createEmptyMock() generates a stub with no methods", () => {

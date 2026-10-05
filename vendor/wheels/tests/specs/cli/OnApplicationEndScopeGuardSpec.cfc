@@ -43,6 +43,7 @@ component extends="wheels.WheelsTest" {
 			];
 
 			it("scans every shipped Application.cfc that declares onApplicationEnd", () => {
+				$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 				var discovered = $discoverShippedOnApplicationEndHandlers(repoRoot);
 				expect(ArrayLen(discovered) > 0).toBeTrue(
 					"Expected to discover at least one shipped Application.cfc "
@@ -70,6 +71,7 @@ component extends="wheels.WheelsTest" {
 				// current value, not the final iteration's value.
 				(function(relPath) {
 					it("routes onApplicationEnd through arguments.applicationScope.wo in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 

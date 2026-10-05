@@ -58,6 +58,23 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Makes what middleware attached to the request context available to the controller:
+	 * the whole context as `request.wheels.middlewareContext`, and the AuthMiddleware result
+	 * as `request.auth` (as AuthMiddleware documents). Its parameter is deliberately not named
+	 * `request`, which would shadow the request scope (and resolves inconsistently on Adobe
+	 * 2025, cross-engine invariant 15).
+	 */
+	public void function $exposeMiddlewareContext(required struct context) {
+		if (!StructKeyExists(request, "wheels")) {
+			request.wheels = {};
+		}
+		request.wheels.middlewareContext = arguments.context;
+		if (StructKeyExists(arguments.context, "auth")) {
+			request.auth = arguments.context.auth;
+		}
+	}
+
+	/**
 	 * Retrieve plugin-registered middleware from the application scope.
 	 * Returns the pluginMiddleware array or an empty array if not present.
 	 */
@@ -103,7 +120,19 @@ component output="false" extends="wheels.Global"{
 				application[local.appKey].$middlewareInstanceCache = {};
 			}
 			if (!StructKeyExists(application[local.appKey].$middlewareInstanceCache, arguments.middleware)) {
-				application[local.appKey].$middlewareInstanceCache[arguments.middleware] = CreateObject("component", arguments.middleware).init();
+				// MiddlewareInterface requires only handle(), so init() is optional:
+				// call it when the component has one (its own or inherited). As
+				// before, an object init() returns is what gets cached; anything
+				// else (nothing from a void init(), or a boolean, string or struct)
+				// leaves the component itself as the cached middleware.
+				local.instance = CreateObject("component", arguments.middleware);
+				if (StructKeyExists(local.instance, "init")) {
+					local.initResult = local.instance.init();
+					if (!IsNull(local.initResult) && IsObject(local.initResult)) {
+						local.instance = local.initResult;
+					}
+				}
+				application[local.appKey].$middlewareInstanceCache[arguments.middleware] = local.instance;
 			}
 		}
 		return application[local.appKey].$middlewareInstanceCache[arguments.middleware];
@@ -448,6 +477,9 @@ component output="false" extends="wheels.Global"{
 
 			// The core handler that middleware wraps around.
 			local.coreHandler = function(required struct request) {
+				// What middleware attached to the context (the AuthMiddleware result, ...)
+				// must reach the controller, not just the params.
+				$exposeMiddlewareContext(context = arguments.request);
 				local.ctrl = controller(name = arguments.request.params.controller, params = arguments.request.params);
 				local.ctrl.processAction();
 

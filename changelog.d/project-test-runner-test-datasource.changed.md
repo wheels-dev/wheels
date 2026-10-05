@@ -1,0 +1,1 @@
+- Test runs no longer use the app's primary datasource through a project `tests/runner.cfm`: a runner of your own, including one copied from an older Wheels release, now gets the same `<datasource>_test` requirement as the built-in runner. The run uses `<datasource>_test`, or is refused unless `useTestDB=false` (`wheels test --no-test-db`) asks for the primary datasource.

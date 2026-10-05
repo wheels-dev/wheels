@@ -1,0 +1,35 @@
+{
+  "name": "wheels-starter-app",
+  "lucee": {
+    "version": "7.0.0.395"
+  },
+  "port": 8080,
+  "shutdownPort": 8081,
+  "webroot": "./public",
+  "openBrowser": true,
+  "jvm": {
+    "maxMemory": "512m",
+    "minMemory": "128m"
+  },
+  "urlRewrite": {
+    "enabled": true,
+    "routerFile": "index.cfm"
+  },
+  "admin": {
+    "enabled": true,
+    "password": "#env:WHEELS_LUCEE_ADMIN_PASSWORD#"
+  },
+  "enableLucee": true,
+  "enableREST": false,
+  "monitoring": {
+    "enabled": false
+  },
+  "configuration": {
+    "mappings": {
+      "/wheels": "../vendor/wheels",
+      "/app": "../app",
+      "/config": "../config",
+      "/tests": "../tests"
+    }
+  }
+}
