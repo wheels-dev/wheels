@@ -9315,6 +9315,25 @@ component extends="modules.BaseModule" {
 			scanTargets: [{path: ".gitignore"}],
 			fix: "Remove the vendor line and commit vendor/, so a clone, CI run or image build has the framework and your packages. Guide: ""Commit vendor/"", #guide#"
 		});
+		// `null` was the migration column option's name before 3.0 renamed it allowNull, with no
+		// alias until 4.2. From 3.0 through 4.1 a null=false column was created nullable; 4.2 reads
+		// null=false again, so a database rebuilt on 4.2 can be stricter than one built earlier.
+		arrayAppend(arguments.checks, {
+			description: "Migrations use null=false, the column option's name before Wheels 3.0",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "[,(]\s*null\s*=\s*[""']?(false|no|0)[""']?\s*[,)]",
+			scanTargets: [{path: "app/migrator/migrations", extensions: "cfc", recurse: true}],
+			fix: "Wheels 3.0 through 4.1 ignored null=false, so a database built or rebuilt by them from these migrations has these columns NULLABLE, and they may now hold NULL rows. 4.2 reads null=false again: a database rebuilt on 4.2 gets NOT NULL columns, stricter than the one you run. Check each column for NULL rows before you tighten it with changeColumn(allowNull=false), and rename null to allowNull in the migrations. Guide: ""Migration column option null"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "Migrations use null=true, the column option's name before Wheels 3.0",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "[,(]\s*null\s*=\s*[""']?(true|yes|1)[""']?\s*[,)]",
+			scanTargets: [{path: "app/migrator/migrations", extensions: "cfc", recurse: true}],
+			fix: "4.2 reads null as a deprecated alias of allowNull and logs a warning. Rename it to allowNull. Guide: ""Migration column option null"", #guide#"
+		});
 		arrayAppend(arguments.checks, {
 			description: "findAll(returnAs=""structs"") now returns an array",
 			severity: "advisory",

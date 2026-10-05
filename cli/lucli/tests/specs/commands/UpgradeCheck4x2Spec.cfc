@@ -188,6 +188,30 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(found).toBe(["app/controllers/Signups.cfc:4"]);
 			});
 
+			it("lists migrations that use null=false and null=true separately", () => {
+				var nl = chr(10);
+				put("app/migrator/migrations/20180519_Users.cfc", "component extends=""wheels.migrator.Migration"" {" & nl
+					& "function up() {" & nl
+					& "t.string(columnNames='email', default='', null=false, limit='255');" & nl
+					& "t.text(columnNames='bio', null=true);" & nl
+					& "t.integer(columnNames='age', allowNull=false);" & nl
+					& "}" & nl & "}");
+				var report = runCheck();
+				expect(matchesFor(report.advisories, "use null=false")).toBe(["app/migrator/migrations/20180519_Users.cfc:3"]);
+				expect(matchesFor(report.advisories, "use null=true")).toBe(["app/migrator/migrations/20180519_Users.cfc:4"]);
+			});
+
+			it("doesn't list allowNull or a commented-out null=", () => {
+				var nl = chr(10);
+				put("app/migrator/migrations/20180519_Users.cfc", "component extends=""wheels.migrator.Migration"" {" & nl
+					& "// t.string(columnNames='email', null=false);" & nl
+					& "function up() { t.string(columnNames='email', allowNull=false); }" & nl
+					& "}");
+				var report = runCheck();
+				expect(has(report.advisories, "use null=false")).toBeFalse();
+				expect(has(report.advisories, "use null=true")).toBeFalse();
+			});
+
 			it("doesn't flag persisted in a comment or inside another name", () => {
 				put("app/controllers/Signups.cfc", "component {#chr(10)#// if (!result.persisted) {}#chr(10)#function create() { var persistedCount = 1; }#chr(10)#}");
 				expect(has(runCheck().advisories, "reads persisted from a job result")).toBeFalse();

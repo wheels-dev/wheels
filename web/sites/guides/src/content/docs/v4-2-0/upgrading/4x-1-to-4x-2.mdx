@@ -352,6 +352,16 @@ Instances that share a database now take turns running migrations ([#4134](https
 
 In a migration, `default=""` on a column that isn't string-like (`bigInteger`, `binary`, `uniqueidentifier`, `integer`, `decimal`, `float`, `date` and so on) now means "no default" ([#4248](https://github.com/wheels-dev/wheels/pull/4248)). It renders as `DEFAULT NULL` when the column allows null and as no `DEFAULT` clause on a `NOT NULL` column. In 4.1, `bigInteger` and `uniqueidentifier` emitted a bare `DEFAULT`, `binary` emitted `DEFAULT ''`, and a `NOT NULL` column got `DEFAULT NULL NOT NULL`, which MySQL rejects; those migrations failed. They now run. Migrations that already worked produce the same schema.
 
+### Migration column option `null`
+
+Before Wheels 3.0, a migration column's nullability option was called `null`. 3.0 renamed it `allowNull` and dropped the old name, so Wheels 3.0 through 4.1 ignored `null`. No `NULL` / `NOT NULL` clause was emitted, and the column got the database's default, nullable on most databases. 4.2 reads `null` again as a deprecated alias of `allowNull`: `allowNull` wins when both are passed, and a warning is logged once per migration run.
+
+This matters for `null=false`. A database built or rebuilt by 3.0 through 4.1 from such a migration has the column nullable, and it may hold `NULL` rows. A database rebuilt on 4.2 from the same migration gets a `NOT NULL` column, stricter than the one you run in production. `wheels upgrade check` lists the migrations that use `null=false` and `null=true`. For each `null=false` column:
+
+1. Check the running database for `NULL` rows in that column.
+2. Fix or backfill them, then tighten the column with a new migration (`changeColumn(..., allowNull=false)`), or change the old migration to `allowNull=true` if the column should allow `NULL`.
+3. Rename `null` to `allowNull` in the migrations.
+
 ### Unsupported migration column types fail at migrate time
 
 A migration that uses a column type the database adapter doesn't map, such as `t.column(columnName="payload", columnType="jsonb")`, now fails with `Wheels.Migrator.UnsupportedColumnType`, naming the type and the adapter ([#4095](https://github.com/wheels-dev/wheels/issues/4095)). Earlier releases emitted the column with no type. On most databases that was already a DDL error. On SQLite it created a typeless column whose model failed to load. If an existing SQLite migration relies on that, change the column to a supported type (for example `text` for JSON) before running it on a fresh database. The error's details list the supported types. Every type the `t.*()` column helpers emit is supported on every adapter.
