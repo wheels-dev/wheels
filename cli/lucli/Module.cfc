@@ -3730,11 +3730,11 @@ component extends="modules.BaseModule" {
 			if (a == "--force") force = true;
 		}
 
-		if (!$isWheelsProjectDir(variables.projectRoot)) {
-			out("Not in a Wheels project directory.", "yellow");
-			out("Run this from the root of a Wheels app (the directory holding config/settings.cfm).");
-			return "";
-		}
+		// Outside a Wheels project, `setup agents` has nothing to write .mcp.json beside. It used to
+		// print a note and return "" — exit 0, so a scripted `wheels setup agents` in the wrong directory
+		// looked like it succeeded (#4409). Guard with the shared project check (same throw/type/guidance
+		// as `wheels generate` and `wheels destroy`) so it exits non-zero.
+		$requireWheelsProject("wheels setup agents");
 
 		var changed = $writeAgentConfigs(variables.projectRoot, force);
 
@@ -4255,7 +4255,12 @@ component extends="modules.BaseModule" {
 				return "handled";
 
 			case "/routes":
-				if (!consoleExec(arguments.evalUrl, "application.wheels.routes.map(function(r){ return r.pattern & ' -> ' & r.controller & '##' & r.action; })", arguments.password)) {
+				// Not an eval expression: formatting each route needs a per-element loop, and the console's
+				// eval endpoint runs expressions through evaluate() (consoleeval.cfm), which has no closure
+				// or arrow grammar — `.map(function(r){...})` and `.map((r)=>...)` both fail to parse
+				// ("Closing )] for function [MAP] not found", #4410). Fetch the route table from the same
+				// CLI endpoint `wheels routes` uses and format it here instead.
+				if (!$consoleRoutes(arguments.evalUrl)) {
 					return "error";
 				}
 				return "handled";
@@ -4274,6 +4279,46 @@ component extends="modules.BaseModule" {
 				return "handled";
 		}
 		return "";
+	}
+
+	/**
+	 * Print the application route table for the console's `/routes` command as
+	 * `pattern -> controller#action` lines. The console's eval endpoint can't
+	 * format routes itself — evaluate() has no closure/arrow grammar to map over
+	 * them (#4410) — so this reads the route table from the same CLI endpoint
+	 * `wheels routes` uses (derived from evalUrl, which shares the server base)
+	 * and formats it here. Returns false, so the REPL records a failed command
+	 * and exits non-zero on EOF, when the fetch fails or the server refuses.
+	 */
+	private boolean function $consoleRoutes(required string evalUrl) {
+		try {
+			var routesUrl = replace(arguments.evalUrl, "/wheels/console/eval", "/wheels/cli?command=routes&format=json");
+			var httpResult = makeHttpRequest(routesUrl);
+			if (!isJSON(httpResult)) {
+				out("Failed to fetch routes: the server returned a non-JSON response.", "red");
+				verbose(httpResult);
+				return false;
+			}
+			var result = deserializeJSON(httpResult);
+			if (!(structKeyExists(result, "success") && result.success)) {
+				out("Failed to fetch routes: #result.message ?: 'unknown error'#", "red");
+				return false;
+			}
+			var routes = structKeyExists(result, "routes") && isArray(result.routes) ? result.routes : [];
+			if (!arrayLen(routes)) {
+				out("(no routes)");
+				return true;
+			}
+			// chr(35) is '#': built by concatenation so neither the value nor out() treats it as an
+			// interpolation delimiter.
+			for (var route in routes) {
+				out((route.pattern ?: "") & " -> " & (route.controller ?: "") & chr(35) & (route.action ?: ""));
+			}
+			return true;
+		} catch (any e) {
+			out("Failed to fetch routes: #e.message#", "red");
+			return false;
+		}
 	}
 
 	/**
@@ -6603,9 +6648,11 @@ component extends="modules.BaseModule" {
 			case "test":
 				return browserTest(args);
 			default:
-				out("Unknown browser command: #subcommand#", "red");
-				out("Valid commands: setup, test");
-				return "";
+				$refuse(
+					"Unknown browser command: #subcommand#",
+					"Wheels.InvalidArguments",
+					["Valid commands: setup, test"]
+				);
 		}
 	}
 
@@ -7206,9 +7253,11 @@ component extends="modules.BaseModule" {
 		// Look up the named snippet pattern
 		var snippets = getSnippetRegistry();
 		if (!structKeyExists(snippets, pattern)) {
-			out("Unknown snippet pattern: #pattern#", "red");
-			out("Run 'wheels generate snippets' for available patterns.");
-			return "";
+			$refuse(
+				"Unknown snippet pattern: #pattern#",
+				"Wheels.Generate.Refused",
+				["Run 'wheels generate snippets' for available patterns."]
+			);
 		}
 
 		var snippet = snippets[pattern];
@@ -10434,6 +10483,36 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The error message a failed test-runner response carries, or "" when it carries none. A run that
+	 * failed before producing counts returns {success:false, error, message} — e.g. the core runner's
+	 * "Test database not available" guard, or a test-db populate failure. Some engine errors instead
+	 * surface as a serialized exception document whose Message / RootCause.message holds the cause, so
+	 * those are checked as a fallback. Used to surface the real cause instead of "no test bundles ran"
+	 * (#4408). Public only so the CLI specs can reach it (cli/CLAUDE.md "public for specs" carve-out);
+	 * hidden from MCP via the $-prefix sweep.
+	 */
+	public string function $runnerErrorMessage(required any result) {
+		if (!isStruct(arguments.result)) {
+			return "";
+		}
+		for (var key in ["error", "message"]) {
+			if (structKeyExists(arguments.result, key) && isSimpleValue(arguments.result[key]) && len(trim(arguments.result[key]))) {
+				return trim(arguments.result[key]);
+			}
+		}
+		if (
+			structKeyExists(arguments.result, "RootCause")
+			&& isStruct(arguments.result.RootCause)
+			&& structKeyExists(arguments.result.RootCause, "message")
+			&& isSimpleValue(arguments.result.RootCause.message)
+			&& len(trim(arguments.result.RootCause.message))
+		) {
+			return trim(arguments.result.RootCause.message);
+		}
+		return "";
+	}
+
+	/**
 	 * True when a run of the DEFAULT scope (no --filter / --directory / path)
 	 * discovered no spec bundles, the spec root has no .cfc files on disk, and
 	 * nothing else went wrong: an app with no specs yet, such as a fresh
@@ -10593,7 +10672,7 @@ component extends="modules.BaseModule" {
 				out("", "yellow");
 				out("Warning: --db only applies to --core tests; ignoring for the app suite.", "yellow");
 				out("App tests run against the configured app datasource (or", "yellow");
-				out("<datasource>_test when --useTestDB is set). To test against a different", "yellow");
+				out("<datasource>_test when --test-db is set). To test against a different", "yellow");
 				out("engine, point your app's datasource env var at it (or use --core).", "yellow");
 				out("See: command-line-tools/wheels-commands/testing##testing-against-different-engines", "yellow");
 				out("", "yellow");
@@ -11158,6 +11237,16 @@ component extends="modules.BaseModule" {
 			};
 		}
 		if (isStruct(arguments.result) && $cliTestResultFailed(result = arguments.result)) {
+			// Surface the runner's own error when it carries one — a failed test-db populate, a missing
+			// datasource ("Datasource [...] doesn't exist") — instead of masking it as "no test bundles
+			// ran for this scope", which hid the real cause and read like an empty run (#4408).
+			var runnerError = $runnerErrorMessage(arguments.result);
+			if (len(runnerError)) {
+				return {
+					text = "Test run failed: #runnerError##arguments.duration#",
+					color = "red"
+				};
+			}
 			return {
 				text = "#arguments.totalPass# passed, but no test bundles ran for this scope#arguments.duration#",
 				color = "red"
@@ -12027,7 +12116,12 @@ component extends="modules.BaseModule" {
 			var why = structKeyExists(pins, arguments.opts.port + 1) ? "pinned by " & pins[arguments.opts.port + 1] : "in use";
 			out("Shutdown port #arguments.opts.port + 1# is #why#; using #shutdownPort#.", "yellow");
 		}
-		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
+		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621) or --setup-h2.
+		// With --setup-h2 the H2 datasources are written into config/app.cfm (configureH2Database), so
+		// lucee.json must not also carry the SQLite pair — otherwise the app keeps stale SQLite
+		// datasource entries alongside its H2 ones (#4413).
+		var noLuceeDatasources = arguments.opts.noSQLite
+			|| (structKeyExists(arguments.opts, "setupH2") && arguments.opts.setupH2);
 		return {
 			"appName": arguments.appName,
 			"datasourceName": arguments.opts.datasource,
@@ -12036,7 +12130,7 @@ component extends="modules.BaseModule" {
 			"port": arguments.opts.port,
 			"shutdownPort": shutdownPort,
 			"openBrowser": arguments.opts.openBrowser ? "true" : "false",
-			"datasourcesBlock": arguments.opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(arguments.opts.datasource)
+			"datasourcesBlock": noLuceeDatasources ? "{}" : buildSQLiteDatasourcesBlock(arguments.opts.datasource)
 		};
 	}
 
@@ -14378,11 +14472,9 @@ component extends="modules.BaseModule" {
 		var basePath = opts.basePath;
 		var directory = opts.directory;
 
-		// Pre-flight: verify Playwright JARs
+		// Pre-flight: verify Playwright JARs (throws Wheels.Browser.NotInstalled, exit non-zero, if not set up)
 		var manifestPath = variables.projectRoot & "/vendor/wheels/browser-manifest.json";
-		if (!$browserVerifyPlaywright(manifestPath)) {
-			return "";
-		}
+		$browserVerifyPlaywright(manifestPath);
 
 		out("Running browser tests...", "cyan");
 		out("Directory: #directory#");
@@ -14486,12 +14578,18 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * Pre-flight: verify the Playwright JARs in browser-manifest.json are
-	 * present and SHA-matched. Prints guidance and returns false when not.
+	 * present and SHA-matched. Throws Wheels.Browser.NotInstalled (which exits
+	 * non-zero) when the manifest is missing or a JAR is absent / SHA-mismatched,
+	 * so a scripted `wheels browser test` on an un-set-up host fails instead of
+	 * silently exiting 0 (#4409). Returns normally when everything is in place.
 	 */
-	private boolean function $browserVerifyPlaywright(required string manifestPath) {
+	private void function $browserVerifyPlaywright(required string manifestPath) {
 		if (!fileExists(arguments.manifestPath)) {
-			out("browser-manifest.json not found at: #arguments.manifestPath#", "red");
-			return false;
+			$refuse(
+				"browser-manifest.json not found at: #arguments.manifestPath#",
+				"Wheels.Browser.NotInstalled",
+				["Run: wheels browser setup"]
+			);
 		}
 		var manifest = deserializeJSON(fileRead(arguments.manifestPath));
 		var installDir = $resolveBrowserInstallDir();
@@ -14511,18 +14609,18 @@ component extends="modules.BaseModule" {
 		}
 
 		if (!allInstalled) {
-			out("Playwright not installed.", "red");
 			if (arrayLen(missingJars)) {
 				out("Missing: #arrayToList(missingJars, ', ')#", "yellow");
 			}
 			if (arrayLen(mismatchedJars)) {
 				out("SHA mismatch: #arrayToList(mismatchedJars, ', ')#", "yellow");
 			}
-			out("");
-			out("Run: wheels browser setup");
-			return false;
+			$refuse(
+				"Playwright not installed.",
+				"Wheels.Browser.NotInstalled",
+				["Run: wheels browser setup"]
+			);
 		}
-		return true;
 	}
 
 	/**
