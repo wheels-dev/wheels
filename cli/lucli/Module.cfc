@@ -5010,7 +5010,7 @@ component extends="modules.BaseModule" {
 		// Each command starts with an empty secret/warning registry, so a
 		// long-lived process never carries one command's secrets into the next.
 		new modules.wheels.services.deploy.lib.SecretRedaction().reset();
-		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		var args = $deployArgv(structuredArgs(arguments));
 		var opts = $deployArgsToOptions(args);
 		if (!structKeyExists(opts, "configPath") || !len(opts.configPath)) {
 			opts.configPath = expandPath("config/deploy.yml");
@@ -5048,6 +5048,32 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The deploy argv, with space-form values bound to their flags (#4417). LuCLI hands
+	 * `--release v8` over as release="true" plus a positional after a gap, so without binding `v8`
+	 * became the subcommand ("Unknown deploy subcommand: v8") and `--service myapp2` was dropped.
+	 * `bindSpaceFormValues()` binds only what it can match one-to-one; a value flag still left bare
+	 * (several space-form values it can't tell apart, or a flag given no value) is an error that
+	 * asks for the `--flag=value` form, rather than a silent misread.
+	 */
+	private array function $deployArgv(required struct coll) {
+		var valueFlags = "account,adapter,config,configPath,container,destination,from,host,image,keep,message,registry-username,release,role,service,tail,version";
+		var matchers = {};
+		for (var flag in listToArray(valueFlags)) {
+			matchers[flag] = listFind("keep,tail", flag) ? "^[0-9]+$" : "";
+		}
+		var bound = new services.ArgSpec().bindSpaceFormValues(arguments.coll, matchers);
+		for (var flag in listToArray(valueFlags)) {
+			if (structKeyExists(bound, flag) && isSimpleValue(bound[flag]) && compareNoCase(trim(toString(bound[flag])), "true") == 0) {
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "wheels deploy: --#flag# needs a value. Write it as --#flag#=<value>."
+				);
+			}
+		}
+		return new services.ArgSpec().toArgv(bound);
+	}
+
+	/**
 	 * Dispatch the direct DeployMainCli verbs. Extracted from deploy() to keep
 	 * its dispatcher under the complexity gate.
 	 */
@@ -5059,7 +5085,7 @@ component extends="modules.BaseModule" {
 				return arguments.dmc.redeploy(arguments.opts);
 			case "rollback":
 				if (arrayLen(arguments.positional) < 2) {
-					throw(message = "rollback requires a version argument: wheels deploy rollback <version>");
+					throw(type = "DeployMainCli.MissingVersion", message = "rollback requires a version argument: wheels deploy rollback <version>");
 				}
 				arguments.opts.version = arguments.positional[2];
 				return arguments.dmc.rollback(arguments.opts);
@@ -5268,7 +5294,7 @@ component extends="modules.BaseModule" {
 				return bootstrapCli.bootstrap(arguments.opts);
 			case "exec":
 				if (arrayLen(arguments.positional) < 2) {
-					throw(message = "wheels deploy exec requires a command");
+					throw(type = "DeployServerCli.MissingCommand", message = "wheels deploy exec requires a command");
 				}
 				// Preserve multi-token commands: join all positional args after `exec`.
 				var execCmdParts = [];
@@ -5288,7 +5314,7 @@ component extends="modules.BaseModule" {
 				var serverVerb = arguments.positional[2];
 				if (serverVerb == "exec") {
 					if (arrayLen(arguments.positional) < 3) {
-						throw(message = "wheels deploy server exec requires a command");
+						throw(type = "DeployServerCli.MissingCommand", message = "wheels deploy server exec requires a command");
 					}
 					// Preserve multi-token commands: join all positional args after the verb.
 					var cmdParts = [];
