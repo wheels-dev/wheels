@@ -586,13 +586,18 @@ component extends="modules.BaseModule" {
 
 	private any function jobsArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "action", default = "status", description = "work (long-lived worker loop) or status (queue snapshot). Defaults to status")
-			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. Empty = all queues")
+			.positional(name = "action", default = "status", description = "work (long-lived worker loop), status (queue snapshot) or enqueue (add a job). Defaults to status")
+			.positional(name = "job", default = "", description = "enqueue only: the job class under app/jobs/, e.g. SendWelcomeEmailJob or billing.InvoiceJob")
+			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. enqueue: the queue to put the job on (default: the job's own). Empty = all queues")
+			.option(name = "data", default = "", description = "enqueue only: the job's data, a JSON object passed to perform()")
+			.option(name = "priority", default = "", description = "enqueue only: a whole number; higher runs first (default: the job's own)")
+			.option(name = "in", default = "", description = "enqueue only: run it after this many seconds instead of now")
+			.option(name = "at", default = "", description = "enqueue only: run it at this time, ISO 8601 (2026-10-05T14:30:00Z, or 2026-10-05 14:30 for local time). A one-off delayed run, not a recurring schedule")
 			.option(name = "interval", default = 5, type = "numeric", description = "work only: seconds to wait between polls when no job is available")
 			.option(name = "max-jobs", default = 0, type = "numeric", description = "work only: stop after this many jobs (successes + failures count). 0 = run until stopped")
 			.flag(name = "stop-when-empty", default = false, description = "work only: exit when a poll finds no job ready to run, instead of waiting for more. For one-shot batches from cron or CI; combines with --max-jobs")
 			.flag(name = "quiet", default = false, description = "work only: suppress per-job completion output, only print failures")
-			.option(name = "format", default = "table", description = "status only: output format, table or json");
+			.option(name = "format", default = "table", description = "status and enqueue: output format, table or json");
 	}
 
 	private any function dbArgSpec() {
@@ -804,7 +809,7 @@ component extends="modules.BaseModule" {
 		help &= "  seed                Run database seeds" & nl;
 		help &= "  db                  Database management (reset, status, version)" & nl & nl;
 		help &= "Background Jobs:" & nl;
-		help &= "  jobs                Job queue worker and stats (work, status)" & nl & nl;
+		help &= "  jobs                Job queue worker, stats and enqueue (work, status, enqueue)" & nl & nl;
 		help &= "Testing & Inspection:" & nl;
 		help &= "  test                Run the test suite" & nl;
 		help &= "  browser             Browser-based tests (Playwright)" & nl;
@@ -5752,7 +5757,12 @@ component extends="modules.BaseModule" {
 			maxJobs = parsed["max-jobs"],
 			stopWhenEmpty = parsed["stop-when-empty"],
 			quiet = parsed.quiet,
-			format = lCase(trim(parsed.format))
+			format = lCase(trim(parsed.format)),
+			job = trim(parsed.job),
+			data = trim(parsed.data),
+			priority = trim(parsed.priority),
+			"in" = trim(parsed["in"]),
+			at = trim(parsed.at)
 		};
 		if (!len(opts.action)) {
 			opts.action = "status";
@@ -5779,7 +5789,7 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts (--format=json for machines). retry/purge/monitor are tracked follow-ups (issue 3090).
+	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts (--format=json for machines), `enqueue <JobName>` adds a job now or after a delay. retry/purge/monitor are tracked follow-ups (issue 3090).
 	 */
 	public string function jobs() {
 		var opts = $parseJobsArgs(structuredArgs(arguments));
@@ -5789,6 +5799,8 @@ component extends="modules.BaseModule" {
 				return runJobsWork(opts);
 			case "status":
 				return runJobsStatus(opts);
+			case "enqueue":
+				return runJobsEnqueue(opts);
 			// The framework bridge (vendor/wheels/public/views/cli.cfm) already
 			// implements jobsRetry/jobsPurge/jobsMonitor — the CLI verbs are
 			// deliberate follow-ups tracked in ##3090. Fail loudly with the
@@ -5807,7 +5819,7 @@ component extends="modules.BaseModule" {
 				);
 			default:
 				out("Unknown jobs action: #opts.action#", "red");
-				out("Usage: wheels jobs [work|status] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--format=table|json]");
+				out("Usage: wheels jobs [work|status|enqueue <JobName>] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--format=table|json]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
 		}
 	}
@@ -5913,6 +5925,116 @@ component extends="modules.BaseModule" {
 		out(arguments.reason, "green");
 		out("Processed: #arguments.counters.processed# | Failed: #arguments.counters.failed#");
 		return "";
+	}
+
+	/**
+	 * `wheels jobs enqueue <JobName>`: add a job to the queue, now or after a delay
+	 * (--in seconds, or --at a time). Everything that can be checked here is
+	 * checked before the server call; --at becomes a delay in seconds, so the
+	 * server never parses a date. The framework's jobsEnqueue command allowlists
+	 * the class. Enqueueing writes a row, so this is write-side: strict server
+	 * identity and POST + reload password, like `jobs work`.
+	 */
+	private string function runJobsEnqueue(required struct opts) {
+		var usage = "Usage: wheels jobs enqueue <JobName> [--data=<JSON object>] [--queue=<name>] [--priority=<n>] [--in=<seconds> | --at=<ISO 8601 time>]";
+		if (!len(arguments.opts.job)) {
+			$refuse("Missing the job to enqueue. " & usage);
+		}
+		if (len(arguments.opts.data)) {
+			var parsedData = isJSON(arguments.opts.data) ? deserializeJSON(arguments.opts.data) : "";
+			if (!isStruct(parsedData)) {
+				$refuse("--data must be a JSON object, like {""userId"":42}.");
+			}
+		}
+		if (len(arguments.opts.priority) && !reFind("^-?[0-9]+$", arguments.opts.priority)) {
+			$refuse("--priority must be a whole number.");
+		}
+		if (len(arguments.opts["in"]) && len(arguments.opts.at)) {
+			$refuse("Use either --in or --at, not both.");
+		}
+		var delay = 0;
+		if (len(arguments.opts["in"])) {
+			if (!reFind("^[0-9]+$", arguments.opts["in"])) {
+				$refuse("--in must be zero or a positive whole number of seconds.");
+			}
+			delay = val(arguments.opts["in"]);
+		} else if (len(arguments.opts.at)) {
+			delay = $jobsDelayUntil(arguments.opts.at, getTickCount());
+		}
+
+		var serverPort = $requireOwnRunningServer([
+			"Enqueueing a job requires a running server bound to this project.",
+			"Start this project's own server with: wheels start"
+		]);
+		var enqueueUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=jobsEnqueue&format=json&job=#URLEncodedFormat(arguments.opts.job)#"
+			& (len(arguments.opts.data) ? "&data=" & URLEncodedFormat(arguments.opts.data) : "")
+			& (len(arguments.opts.queue) ? "&queue=" & URLEncodedFormat(arguments.opts.queue) : "")
+			& (len(arguments.opts.priority) ? "&priority=" & arguments.opts.priority : "")
+			& (delay > 0 ? "&delaySeconds=" & delay : "");
+
+		var httpResult = "";
+		try {
+			httpResult = makeBridgePost(enqueueUrl);
+		} catch (any httpErr) {
+			throw(type = "Wheels.JobEnqueueFailed", message = "Enqueue failed (connection error): #httpErr.message#");
+		}
+		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {success: false, message: "Invalid response from the server."};
+		if (!(parsed.success ?: false) || !isStruct(parsed.job ?: "")) {
+			// Self-contained: the thrown message is all the caller may see.
+			throw(type = "Wheels.JobEnqueueFailed", message = "Enqueue failed: " & (parsed.message ?: "no reason given."));
+		}
+
+		var job = parsed.job;
+		if (arguments.opts.format == "json") {
+			out(serializeJSON(job));
+			return "";
+		}
+		var when = delay > 0
+			? "runs in #delay# seconds (#dateTimeFormat(dateAdd("s", delay, now()), "yyyy-mm-dd HH:nn:ss")# local time)"
+			: "runs now";
+		out("Enqueued #job.jobClass# (#job.id#) on queue #job.queue#, #when#.", "green");
+		out("A worker picks it up: wheels jobs work");
+		return "";
+	}
+
+	/**
+	 * Seconds from `nowMs` (epoch milliseconds) until an ISO 8601 time: with a Z or
+	 * an offset it is read in that offset, without one in this machine's local time
+	 * ("2026-10-05T14:30", "2026-10-05 14:30:00"). Refuses an unreadable or past
+	 * time. Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public numeric function $jobsDelayUntil(required string at, required numeric nowMs) {
+		var text = trim(arguments.at);
+		var epochMs = $parseIsoInstantMs(text);
+		if (epochMs < 0) {
+			$refuse("Can't read --at '#text#': use an ISO 8601 time like 2026-10-05T14:30:00Z, 2026-10-05T16:30:00+02:00, or 2026-10-05 14:30 for local time.");
+		}
+		var delayMs = epochMs - arguments.nowMs;
+		if (delayMs <= 0) {
+			$refuse("--at #text# is in the past. Leave out --in and --at to run the job now.");
+		}
+		return ceiling(delayMs / 1000);
+	}
+
+	/**
+	 * Epoch milliseconds for an ISO 8601 time (see $jobsDelayUntil), or -1.
+	 */
+	private numeric function $parseIsoInstantMs(required string text) {
+		try {
+			if (reFind("(Z|[+-][0-9]{2}:[0-9]{2})$", arguments.text)) {
+				return createObject("java", "java.time.OffsetDateTime").parse(arguments.text).toInstant().toEpochMilli();
+			}
+			var local8601 = replace(arguments.text, " ", "T");
+			if (reFind("T[0-9]{2}:[0-9]{2}$", local8601)) {
+				local8601 &= ":00";
+			}
+			return createObject("java", "java.time.LocalDateTime").parse(local8601)
+				.atZone(createObject("java", "java.time.ZoneId").systemDefault())
+				.toInstant()
+				.toEpochMilli();
+		} catch (any e) {
+			return -1;
+		}
 	}
 
 	/**

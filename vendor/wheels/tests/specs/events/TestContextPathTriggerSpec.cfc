@@ -47,10 +47,35 @@ component extends="wheels.WheelsTest" {
 					expect(variables.tc.$pathTriggersTestContext({path_info = "/wheels/core/tests?redirect=http://evil/../x"})).toBeTrue();
 				});
 
+			it("matches the testbox app-runner convention path", () => {
+				expect(variables.tc.$pathTriggersTestContext({path_info = "/wheels/testbox"})).toBeTrue();
+			});
+
+			it("matches the tests_testbox core-runner convention path", () => {
+				expect(variables.tc.$pathTriggersTestContext({path_info = "/wheels/tests_testbox"})).toBeTrue();
+			});
+
+			it("matches a runner path case-insensitively (path case varies by engine/web server)", () => {
+				expect(variables.tc.$pathTriggersTestContext({path_info = "/WHEELS/TestBox"})).toBeTrue();
+				expect(variables.tc.$pathTriggersTestContext({script_name = "/Wheels/Core/Tests"})).toBeTrue();
+			});
+
+			it("matches a testbox sub-path (runner followed by a slash)", () => {
+				expect(variables.tc.$pathTriggersTestContext({path_info = "/wheels/testbox/bundles"})).toBeTrue();
+			});
+
 				// ── Not bound: the runner path is not what the request targets ──
 
 			it("does NOT match a runner path embedded later in an application route", () => {
 				expect(variables.tc.$pathTriggersTestContext({path_info = "/files/x/wheels/app/tests"})).toBeFalse();
+			});
+
+			it("does NOT match a testbox path that is only a prefix of a longer segment", () => {
+				expect(variables.tc.$pathTriggersTestContext({path_info = "/wheels/testboxer"})).toBeFalse();
+			});
+
+			it("does NOT match a testbox runner embedded later in an application route", () => {
+				expect(variables.tc.$pathTriggersTestContext({path_info = "/files/x/wheels/testbox"})).toBeFalse();
 			});
 
 			it("does NOT match a path with a double slash", () => {

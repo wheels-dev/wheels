@@ -17,6 +17,10 @@ component output=false extends="wheels.Global"{
 		local.sqlArray = args.sql;
 		local.sqlLen   = arrayLen(sqlArray);
 		$assertBoundParameterCount(sql = args.sql, parameterize = args.parameterize);
+		// A spec recording queries (recordQueries() / assertQueries()) sees this statement (F4).
+		if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "$queryRecorders") && ArrayLen(request.wheels.$queryRecorders)) {
+			$recordQuery(sql = args.sql, queryAttributes = args.queryAttributes);
+		}
 
 		// Build query
 		cfquery(attributeCollection = args.queryAttributes) {
@@ -119,6 +123,33 @@ component output=false extends="wheels.Global"{
 
 		wheels.rv.result = wheels.result;
 		return wheels.rv;
+	}
+
+	/**
+	 * Internal function. Adds a statement to every active query recorder (F4): its SQL with a `?` for
+	 * each bound value (an IN list shows one `?` per list), never the values, so a failure message can't
+	 * leak data into a log. A recorder with a `dataSource` filter only takes that datasource's statements.
+	 */
+	public void function $recordQuery(required array sql, required struct queryAttributes) {
+		local.text = "";
+		for (local.part in arguments.sql) {
+			if (IsStruct(local.part)) {
+				local.text &= (StructKeyExists(local.part, "list") && local.part.list) ? "(?)" : "?";
+			} else {
+				local.text &= " " & Trim(local.part);
+			}
+		}
+		local.entry = {
+			sql = Trim(ReReplace(local.text, "\s+", " ", "all")),
+			dataSource = StructKeyExists(arguments.queryAttributes, "datasource") ? arguments.queryAttributes.datasource : ""
+		};
+		local.iEnd = ArrayLen(request.wheels.$queryRecorders);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.filter = request.wheels.$queryRecorders[local.i].dataSource;
+			if (!Len(local.filter) || CompareNoCase(local.filter, local.entry.dataSource) == 0) {
+				ArrayAppend(request.wheels.$queryRecorders[local.i].queries, Duplicate(local.entry));
+			}
+		}
 	}
 
 	/**
