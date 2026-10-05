@@ -40,6 +40,7 @@ mapper()
     // Cookie flash written and read in one request. Driven by
     // wheels.tests.specs.controller.FlashCookieSameRequestSpec. Must precede .wildcard().
     .get(name="flashCookieInsertRead", pattern="/_flashcookie/insertread", to="FlashCookieProbe##insertAndRead")
+    .get(name="flashCookieReadCount", pattern="/_flashcookie/readcount", to="FlashCookieProbe##readCount")
     .wildcard()
 	.get(name="wheelstestbox", pattern="wheels/core/tests", to="wheels##public##tests")
 	.get(name="sampleLinkToTest", pattern="sample/linktotest", to="sample##linktotest")

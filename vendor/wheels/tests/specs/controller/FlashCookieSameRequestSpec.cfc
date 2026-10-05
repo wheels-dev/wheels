@@ -14,6 +14,11 @@ component extends="wheels.WheelsTest" {
 				$testClient().get("/_flashcookie/insertread").assertOk().assertSee("notice=[saved]");
 			});
 
+			it("reads an empty flash cookie as an empty flash", () => {
+				// Before 4433 an empty cookie read as {action: ""}, a flash of one entry.
+				$testClient().withCookie("flash", "").get("/_flashcookie/readcount").assertOk().assertSee("count=0");
+			});
+
 		});
 
 		describe("$flashCookieScopeValue", () => {
