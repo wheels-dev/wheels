@@ -86,6 +86,7 @@ component extends="wheels.WheelsTest" {
 				(function(relPath) {
 
 					it("preserves reload+password on environment-switch redirects in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);
@@ -132,6 +133,7 @@ component extends="wheels.WheelsTest" {
 					});
 
 					it("breaks the restart loop once the requested environment is active in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);
@@ -159,6 +161,7 @@ component extends="wheels.WheelsTest" {
 					});
 
 					it("honors allowEnvironmentSwitchViaUrl on the preserve and handoff paths in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);
@@ -186,6 +189,7 @@ component extends="wheels.WheelsTest" {
 					});
 
 					it("hands the reloadPassword across the applicationStop() boundary in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);
@@ -223,6 +227,7 @@ component extends="wheels.WheelsTest" {
 					});
 
 					it("never shadows the url scope with a local named url in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);
@@ -277,6 +282,7 @@ component extends="wheels.WheelsTest" {
 					});
 
 					it("references the Application component case-exactly in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 						var content = fileRead(absolute);

@@ -129,7 +129,8 @@ component extends="wheels.WheelsTest" {
                 }
 
                 // Temp is gone — this spec saw it, later specs won't.
-                expect(model("Post").count(where="title='Temp'")).toBe(0);
+                // reload=true: the same count() inside the transaction is cached for this request.
+                expect(model("Post").count(where="title='Temp'", reload=true)).toBe(0);
             });
         });
     }
@@ -137,6 +138,8 @@ component extends="wheels.WheelsTest" {
 ```
 
 The outer `transaction { ... }` opens a savepoint; the `transaction action="rollback"` inside `finally` discards everything done inside the block. Every `create`, `update`, and `delete` reverses before the next `it` runs. Use this pattern for any spec that would otherwise leave detectable state behind — lingering rows, updated counters, deleted rows that populate needed.
+
+The rollback only reaches writes the spec makes itself. Writes made through `$testClient()` requests can't be rolled back this way: each request runs as its own request and commits on its own. Delete those in `afterEach` (see [Integration Tests](/v4-0-0/testing/integration-tests/#per-spec-isolation)).
 
 ## Test-only models
 

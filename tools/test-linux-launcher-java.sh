@@ -151,13 +151,22 @@ fake_jdk "${JVM}/temurin-21-jdk-amd64" "$(banner 21.0.12)"
 run_case -
 check "PATH java -> 17 skipped, probe finds 21" "$(is "${RC}:${OUT}" "0:${JVM}/temurin-21-jdk-amd64")"
 
+# 11. Only Java 25 installed (no 21 dirs) and the PATH java alternative points at 17:
+#     the last-resort glob over /usr/lib/jvm/* finds 25.
+new_case
+fake_jdk "${CASE}/opt/jdk17" "$(banner 17.0.20)"
+ln -s "${CASE}/opt/jdk17/bin/java" "${BIN}/java"
+fake_jdk "${JVM}/java-25-openjdk-arm64" "$(banner 25.0.4)"
+run_case -
+check "25-only box with PATH java -> 17: glob finds 25" "$(is "${RC}:${OUT}" "0:${JVM}/java-25-openjdk-arm64")"
+
 # 10. JAVA_HOME=17 and no Java 21 anywhere: notice + the final error, exit 1.
 new_case
 fake_jdk "${CASE}/temurin-17" "$(banner 17.0.20)"
 fake_jdk "${JVM}/default-java" "$(banner 17.0.20)"
 run_case "${CASE}/temurin-17"
 check "no Java 21 anywhere exits 1" "$(is "${RC}" "1")"
-check "no Java 21 anywhere keeps the final error" "$(has "${ERR}" "cannot find a Java 21 runtime")"
+check "no Java 21 anywhere keeps the final error" "$(has "${ERR}" "cannot find a Java 21 or newer runtime")"
 check "no Java 21 anywhere still prints the notice" "$(has "${ERR}" "ignoring JAVA_HOME=${CASE}/temurin-17 (Java 17)")"
 
 # 11. The generated wrapper as a whole still parses.

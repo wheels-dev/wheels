@@ -237,6 +237,7 @@ component extends="modules.BaseModule" {
 			"browser",  // multi-step browser testing flow
 			"jobs",     // `jobs work` is a long-lived poll loop — no single-call MCP semantics (like start/stop)
 			"coverage", // instruments app/ on disk then runs the suite — stateful, not single-call MCP semantics
+			"framework", // `framework install` writes the framework into vendor/wheels/ — a side-effecting install, not a query
 			// downloads a ~30 MB bundle from GitHub and unpacks it into the CLI
 			// home — a side-effecting install step, not a query
 			"docs",
@@ -539,7 +540,7 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.positional(name = "type", required = true, choices = "model,controller,view,scaffold,migration,api-resource,route,test,property,helper,policy,snippets,admin,auth", description = "What to generate: model, controller, view, scaffold, migration, api-resource, route, test, property, helper, policy, snippets, admin, or auth")
 			.positional(name = "name", description = "Artifact name (model, controller or resource name)")
-			.positional(name = "attributes", description = "Column definitions for model/scaffold (space- or comma-delimited name:type pairs, e.g. 'title:string body:text')")
+			.positional(name = "attributes", description = "Column definitions for model/scaffold (space- or comma-delimited name:type pairs, e.g. 'title:string body:text'). Columns are required by default; 'name:type:optional' makes one nullable and 'name:type=value' gives it a default (both omit it from validatesPresenceOf)")
 			.flag(name = "dry-run", default = false, description = "Print the would-be paths and write nothing");
 	}
 
@@ -560,7 +561,7 @@ component extends="modules.BaseModule" {
 			.option(name = "to", default = "", description = "Target Wheels version. check: version to scan against (default: latest). apply: must match the CLI's bundled framework version")
 			.option(name = "format", default = "", choices = "text,json", description = "check only: text (default) or json for machine-readable output")
 			.flag(name = "strict", default = false, description = "check only: escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them")
-			.flag(name = "nobackup", default = false, description = "apply only: skip the vendor/wheels.bak-<timestamp> backup of the existing framework")
+			.flag(name = "nobackup", default = false, description = "apply only: skip the .wheels/backups/wheels.bak-<timestamp> backup of the existing framework")
 			.flag(name = "allow-downgrade", default = false, description = "apply only: proceed even when the CLI's bundled framework is older than the app's vendor/wheels/ (refused by default)")
 			.flag(name = "offline", default = false, description = "check only: skip the latest-release lookup on GitHub (pass --to). Also set by WHEELS_OFFLINE=1")
 			// CLI-only spellings read by parseUpgradeArgs, deliberately NOT
@@ -573,12 +574,21 @@ component extends="modules.BaseModule" {
 			.accept("dry-run");
 	}
 
+	private any function frameworkArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "subcommand", default = "", choices = "install,help", description = "`install` installs the CLI's bundled framework into vendor/wheels/ for an app that has none (e.g. one moving off CommandBox). Omitted/empty prints usage and changes nothing")
+			.option(name = "to", default = "", description = "install only: target Wheels version. Must match the CLI's bundled framework version — no downloads")
+			.accept("help")
+			.accept("h");
+	}
+
 	private any function jobsArgSpec() {
 		return new services.ArgSpec()
 			.positional(name = "action", default = "status", description = "work (long-lived worker loop) or status (queue snapshot). Defaults to status")
 			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. Empty = all queues")
 			.option(name = "interval", default = 5, type = "numeric", description = "work only: seconds to wait between polls when no job is available")
 			.option(name = "max-jobs", default = 0, type = "numeric", description = "work only: stop after this many jobs (successes + failures count). 0 = run until stopped")
+			.flag(name = "stop-when-empty", default = false, description = "work only: exit when a poll finds no job ready to run, instead of waiting for more. For one-shot batches from cron or CI; combines with --max-jobs")
 			.flag(name = "quiet", default = false, description = "work only: suppress per-job completion output, only print failures")
 			.option(name = "format", default = "table", description = "status only: output format, table or json");
 	}
@@ -807,6 +817,7 @@ component extends="modules.BaseModule" {
 		help &= "Packages & Deployment:" & nl;
 		help &= "  packages            Add (or install), update, search Wheels packages" & nl;
 		help &= "  upgrade             Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans, `apply` swaps" & nl;
+		help &= "  framework           Install the framework (vendor/wheels/) into an app that has none (e.g. moving off CommandBox)" & nl;
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
 		help &= "  setup               Configure this app for external tools (setup agents: AI assistants)" & nl;
@@ -815,6 +826,28 @@ component extends="modules.BaseModule" {
 		help &= "For command-specific help: wheels <command> --help" & nl & nl;
 		help &= "More info: https://guides.wheels.dev";
 		return help;
+	}
+
+	/**
+	 * The raw docblock hint of the public command function `fnName`, or "".
+	 * Kept as Lucee hands it over, including the literal "hint:" prefix:
+	 * $commandHelpParts() keys on that prefix to tell command help from any
+	 * other docblock. Walks up the component's `extends` chain, because
+	 * getMetaData() lists only the functions a component declares itself: a
+	 * subclass of Module (the spec fixtures) would otherwise find no hint for
+	 * any command.
+	 */
+	private string function $commandHint(required string fnName) {
+		var meta = getMetaData(this);
+		while (isStruct(meta)) {
+			for (var fn in (meta.functions ?: [])) {
+				if (lCase(fn.name ?: "") == arguments.fnName && (fn.access ?: "public") == "public") {
+					return trim(fn.hint ?: "");
+				}
+			}
+			meta = structKeyExists(meta, "extends") ? meta.extends : "";
+		}
+		return "";
 	}
 
 	/**
@@ -829,15 +862,7 @@ component extends="modules.BaseModule" {
 		if (fnName == "g") { fnName = "generate"; }
 		if (fnName == "d") { fnName = "destroy"; }
 
-		var hint = "";
-		var meta = getMetaData(this);
-		for (var fn in (meta.functions ?: [])) {
-			if (lCase(fn.name ?: "") == fnName && (fn.access ?: "public") == "public") {
-				hint = trim(fn.hint ?: "");
-				break;
-			}
-		}
-		var parts = $commandHelpParts(hint);
+		var parts = $commandHelpParts($commandHint(fnName));
 		if (!len(parts.summary)) {
 			return "";
 		}
@@ -921,6 +946,12 @@ component extends="modules.BaseModule" {
 	/** Worked examples for `wheels <command> --help`, where a command has them. */
 	private array function $commandExamples(required string fnName) {
 		switch (arguments.fnName) {
+			case "new":
+				return [
+					"  wheels new myapp                              SQLite, port 8080",
+					"  wheels new myapp --port=3000 --setup-h2       H2 instead of SQLite",
+					"  wheels new myapp --datasource=mydb --no-sqlite  Your own datasource"
+				];
 			case "test":
 				return [
 					"  wheels test                                  Run every spec under tests/specs",
@@ -929,6 +960,11 @@ component extends="modules.BaseModule" {
 					"  wheels test --filter=UserSpec                Run one spec file, by name",
 					"  wheels test tests/specs/models/UserSpec.cfc  Run one spec file, by path",
 					"  wheels test --reporter=json                  Print the raw JSON result"
+				];
+			case "framework":
+				return [
+					"  wheels framework install             Install the CLI's bundled framework into vendor/wheels/",
+					"  wheels framework install --to=4.2.0  Install, asserting the bundled version"
 				];
 			default:
 				return [];
@@ -1123,6 +1159,14 @@ component extends="modules.BaseModule" {
 		out("  wheels generate admin User");
 		out("  wheels generate auth");
 		out("  wheels generate auth --strategy=jwt");
+		out("");
+		out("Property syntax:", "bold");
+		out("  name:type            required column: NOT NULL + validatesPresenceOf (the default)");
+		out("  name:type:optional   nullable column, excluded from validatesPresenceOf");
+		out("  name:type=value      column DEFAULT (also excluded from presence; the default fills an absence)");
+		out("  name:type{N}         string length / column size, e.g. title:string{120}");
+		out("  name:enum:a,b,c      enum column with the given allowed values");
+		out("  Example: wheels generate model Post title:string body:text:optional status:string=draft");
 	}
 
 	/**
@@ -2036,7 +2080,7 @@ component extends="modules.BaseModule" {
 		// string ("Can't cast Complex Object Type [URL scope] to String").
 		var bundleUrl = $docsBundleUrl(version);
 		var checksumUrl = bundleUrl & ".sha512";
-		var httpClient = new services.packages.HttpClient(timeoutSeconds = 300);
+		var timeouts = $docsFetchTimeouts();
 		out("Fetching docs for #version#...");
 		out("  #bundleUrl#");
 
@@ -2049,7 +2093,7 @@ component extends="modules.BaseModule" {
 		var checksumTmp = getTempDirectory() & "wheels-docs-#version#-#runId#.zip.sha512";
 		var checksumText = "";
 		try {
-			httpClient.download(checksumUrl, checksumTmp);
+			new services.packages.HttpClient(timeoutSeconds = timeouts.checksum).download(checksumUrl, checksumTmp);
 			checksumText = fileRead(checksumTmp, "utf-8");
 		} catch (any e) {
 			$docsFetchFail(
@@ -2075,7 +2119,7 @@ component extends="modules.BaseModule" {
 		var staging = home & "/docs/." & version & ".partial-" & runId;
 		try {
 			try {
-				httpClient.download(bundleUrl, tmp);
+				new services.packages.HttpClient(timeoutSeconds = timeouts.bundle).download(bundleUrl, tmp);
 			} catch (any e) {
 				$docsFetchFail("Download failed: #e.message#");
 			}
@@ -2378,6 +2422,18 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Seconds each `docs fetch` download may take (cfhttp's total timeout). The
+	 * checksum is a few hundred bytes; the bundle is about 40 MB, so its limit
+	 * allows roughly 1 Mbit/s. Keep both as short as a real transfer allows: on
+	 * Lucee, a cfhttp call whose response completes before the tag starts
+	 * waiting for it only returns when the whole timeout has passed (the
+	 * executor's notify can come first; seen against a local stub, #4232).
+	 */
+	private struct function $docsFetchTimeouts() {
+		return {checksum: 30, bundle: 300};
+	}
+
+	/**
 	 * Snapshots publish to the snapshots repo and releases to the main repo,
 	 * mirroring how the Homebrew formulae resolve their artifacts.
 	 */
@@ -2653,17 +2709,12 @@ component extends="modules.BaseModule" {
 		// 127.0.0.1-bound databases) and `wheels start` would boot on top of it.
 		// That is fixed upstream, but older LuCLI binaries still ship the bug, so
 		// when lucee.json pins a port we connect-probe it (both address families)
-		// and warn before delegating. We only reach here when our own server is
+		// and refuse before delegating. We only reach here when our own server is
 		// NOT already running (the reg.alive early-return above), so an in-use
 		// pinned port is a genuine foreign collision.
 		var pinnedPort = $readPinnedPort(variables.projectRoot);
 		if (pinnedPort > 0 && getService("portProbe").portInUse(pinnedPort)) {
-			out("");
-			out("Warning: port " & pinnedPort & " (configured in lucee.json) is already in use", "yellow");
-			out("by another process. The server may fail to start, or silently share the port", "yellow");
-			out("(IPv4 clients reaching the other process while localhost reaches Wheels).", "yellow");
-			out("Fix: stop the other process, or change the 'port' in lucee.json.", "yellow");
-			out("");
+			$refuseTakenHttpPort(pinnedPort);
 		}
 
 		out("Starting Wheels server...", "cyan");
@@ -3041,6 +3092,20 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * The arguments `wheels new` accepts. Also what `wheels new --help` lists.
+	 */
+	private any function newArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "appName", description = "Name of the application and of the directory it's created in")
+			.option(name = "port", default = 8080, type = "numeric", description = "Server port (default: 8080, or the first port above it that is free and no other project pins)")
+			.option(name = "datasource", default = "", description = "Datasource name (default: the app name)")
+			.option(name = "reload-password", default = "", description = "Reload password (default: random)")
+			.flag(name = "setup-h2", default = false, description = "Use the H2 embedded database instead of SQLite")
+			.flag(name = "sqlite", default = true, description = "Set up the zero-config SQLite database")
+			.flag(name = "open-browser", default = true, description = "Open the browser when the server starts");
+	}
+
+	/**
 	 * Parse `wheels new` arguments from LuCLI's structured argCollection.
 	 *
 	 * `--no-sqlite` arrives as `sqlite=false`; the command's `noSQLite` flag is
@@ -3050,15 +3115,7 @@ component extends="modules.BaseModule" {
 	 * name → error" (GH #2214).
 	 */
 	private struct function parseNewArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.positional(name = "appName")
-			.option(name = "port", default = 8080, type = "numeric")
-			.option(name = "datasource", default = "")
-			.option(name = "reload-password", default = "")
-			.flag(name = "setup-h2", default = false)
-			.flag(name = "sqlite", default = true)
-			.flag(name = "open-browser", default = true)
-			.parse(arguments.coll);
+		var parsed = newArgSpec().parse(arguments.coll);
 
 		return {
 			appName = parsed.appName,
@@ -3085,23 +3142,8 @@ component extends="modules.BaseModule" {
 		);
 
 		if (opts.isEmpty) {
-			out("Usage: wheels new <appname> [options]", "yellow");
-			out("");
-			out("Creates a new Wheels application in the specified directory.");
-			out("By default, SQLite is configured as the zero-config database.");
-			out("");
-			out("Options:", "bold");
-			out("  --port=<number>           Server port (default: 8080)");
-			out("  --datasource=<name>       Datasource name (default: app name)");
-			out("  --reload-password=<pw>    Reload password (default: random)");
-			out("  --no-sqlite               Skip default SQLite database setup");
-			out("  --setup-h2                Use H2 embedded database instead of SQLite");
-			out("  --no-open-browser         Don't open browser on server start");
-			out("");
-			out("Examples:", "bold");
-			out("  wheels new myapp");
-			out("  wheels new myapp --port=3000 --setup-h2");
-			out("  wheels new myapp --datasource=mydb --no-sqlite");
+			// The same text as `wheels new --help`, so the two can't drift.
+			out($commandHelp("new"));
 			return "";
 		}
 
@@ -3117,7 +3159,8 @@ component extends="modules.BaseModule" {
 			);
 		}
 		var options = {
-			port: opts.port,
+			// 0 = not given: scaffoldNewApp() picks a free, unpinned port.
+			port: structKeyExists(newColl, "port") ? opts.port : 0,
 			datasource: opts.datasource,
 			reloadPassword: opts.reloadPassword,
 			setupH2: opts.setupH2,
@@ -5537,6 +5580,7 @@ component extends="modules.BaseModule" {
 			queue = trim(parsed.queue),
 			interval = parsed.interval,
 			maxJobs = parsed["max-jobs"],
+			stopWhenEmpty = parsed["stop-when-empty"],
 			quiet = parsed.quiet,
 			format = lCase(trim(parsed.format))
 		};
@@ -5593,7 +5637,7 @@ component extends="modules.BaseModule" {
 				);
 			default:
 				out("Unknown jobs action: #opts.action#", "red");
-				out("Usage: wheels jobs [work|status] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--quiet] [--format=table|json]");
+				out("Usage: wheels jobs [work|status] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--format=table|json]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
 		}
 	}
@@ -5621,6 +5665,9 @@ component extends="modules.BaseModule" {
 		out("Poll interval: #arguments.opts.interval#s");
 		if (arguments.opts.maxJobs > 0) {
 			out("Max jobs: #arguments.opts.maxJobs#");
+		}
+		if (arguments.opts.stopWhenEmpty) {
+			out("Stops when no job is ready to run");
 		}
 		out("Press Ctrl+C to stop");
 		out("");
@@ -5669,10 +5716,13 @@ component extends="modules.BaseModule" {
 			}
 
 			if (arguments.opts.maxJobs > 0 && (counters.processed + counters.failed) >= arguments.opts.maxJobs) {
-				out("");
-				out("Reached max jobs limit (#arguments.opts.maxJobs#). Shutting down.", "green");
-				out("Processed: #counters.processed# | Failed: #counters.failed#");
-				return "";
+				return $jobsWorkStop("Reached max jobs limit (#arguments.opts.maxJobs#). Shutting down.", counters);
+			}
+			// --stop-when-empty: an idle poll means nothing is ready to run, so
+			// a cron or CI batch is done. Without it the worker waits for more,
+			// which is what a supervised long-lived worker wants.
+			if (idle && arguments.opts.stopWhenEmpty) {
+				return $jobsWorkStop("No job ready to run. Shutting down.", counters);
 			}
 
 			// Only sleep when the queue was empty — back-to-back pending jobs
@@ -5682,6 +5732,17 @@ component extends="modules.BaseModule" {
 				sleep(arguments.opts.interval * 1000);
 			}
 		}
+	}
+
+	/**
+	 * Print why the worker loop is ending, plus its counts, and return "" for
+	 * runJobsWork() to return.
+	 */
+	private string function $jobsWorkStop(required string reason, required struct counters) {
+		out("");
+		out(arguments.reason, "green");
+		out("Processed: #arguments.counters.processed# | Failed: #arguments.counters.failed#");
+		return "";
 	}
 
 	/**
@@ -5852,8 +5913,8 @@ component extends="modules.BaseModule" {
 
 	// `wheels upgrade apply` performs the framework swap (#3035): it
 	// replaces the app's vendor/wheels/ with the framework bundled inside
-	// the installed CLI, parking the old copy at vendor/wheels.bak-<timestamp>/
-	// unless --nobackup. Recovery is a single mv (announced, with the exact
+	// the installed CLI, parking the old copy at .wheels/backups/wheels.bak-<timestamp>/
+	// (outside vendor/) unless --nobackup. Recovery is a single mv (announced, with the exact
 	// backup path, before anything is touched). Only the CLI's bundled
 	// framework is available as a source for now — pair it with your package
 	// manager (`brew upgrade wheels`, `brew install wheels-be`, `scoop update
@@ -5968,6 +6029,173 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Install the Wheels framework into an existing app that has no vendor/wheels/.
+	 */
+	public string function framework() {
+		var coll = structuredArgs(arguments);
+		var opts = frameworkArgSpec().parse(coll);
+		var wantsHelp = !len(opts.subcommand)
+			|| opts.subcommand == "help"
+			|| (structKeyExists(opts, "help") && isBoolean(opts.help) && opts.help)
+			|| (structKeyExists(opts, "h") && isBoolean(opts.h) && opts.h);
+		if (wantsHelp) {
+			return $printFrameworkHelp();
+		}
+		// frameworkArgSpec()'s choices="install,help" has already rejected any
+		// other subcommand with a non-zero exit before we get here.
+		return runFrameworkInstall(opts.to);
+	}
+
+	// Fresh-install path: drop the CLI's bundled framework into an app that has
+	// no vendor/wheels/. Replacing an EXISTING framework is `wheels upgrade
+	// apply`'s job (one path for that), so this refuses when vendor/wheels/ is
+	// already present. Prints progress via out() and returns "" — out() is the
+	// display, and returning the text too would double it in MCP results (the
+	// U4 convention for runUpgradeApply). Refusals print-then-throw (#2941).
+	private string function runFrameworkInstall(string targetVersion = "") {
+		var nl = chr(10);
+		var vendorDir = variables.projectRoot & "/vendor/wheels";
+		var upgrader = new services.FrameworkUpgrader();
+
+		// Refuse unless we're at a Wheels app root — otherwise this would create a
+		// vendor/wheels/ in whatever directory the user happened to run it from.
+		// config/settings.cfm is the canonical marker (every Wheels app has it);
+		// config/app.cfm and public/Application.cfc are accepted too.
+		if (
+			!fileExists(variables.projectRoot & "/config/settings.cfm")
+			&& !fileExists(variables.projectRoot & "/config/app.cfm")
+			&& !fileExists(variables.projectRoot & "/public/Application.cfc")
+		) {
+			out("This does not look like a Wheels app root: #variables.projectRoot#", "red");
+			out("Run 'wheels framework install' from an app that has config/settings.cfm (e.g. one made with 'wheels new').");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = "Not a Wheels app root (#variables.projectRoot#) — run from an app with config/settings.cfm (or config/app.cfm / public/Application.cfc)."
+			);
+		}
+
+		if ($safeDirExists(vendorDir)) {
+			if (upgrader.looksLikeWheelsFramework(vendorDir)) {
+				var present = upgrader.readFrameworkVersion(vendorDir);
+				out("vendor/wheels/ already exists#len(present) ? ' (Wheels ' & present & ')' : ''#.", "red");
+				out("Use 'wheels upgrade apply' to replace an existing framework.");
+				throw(
+					type = "Wheels.FrameworkInstallFailed",
+					message = "vendor/wheels/ already present — use `wheels upgrade apply` to replace an existing framework."
+				);
+			}
+			out("vendor/wheels/ exists but does not look like a Wheels framework.", "red");
+			out("Remove it (or use 'wheels upgrade apply'), then re-run 'wheels framework install'.");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = "vendor/wheels/ exists but is not a Wheels framework — remove it or use `wheels upgrade apply`."
+			);
+		}
+
+		var sourceDir = $resolveBundledFrameworkSource();
+		if (!len(sourceDir)) {
+			out("Could not locate the CLI's bundled framework — the CLI install may be incomplete.", "red");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = "Could not locate the CLI's bundled framework (tried WHEELS_FRAMEWORK_PATH, then the module's own install tree)."
+			);
+		}
+
+		var bundledVersion = upgrader.readFrameworkVersion(sourceDir);
+		if (len(arguments.targetVersion) && arguments.targetVersion != bundledVersion) {
+			out("Requested --to=#arguments.targetVersion# but the CLI bundles #len(bundledVersion) ? bundledVersion : 'unknown'#.", "red");
+			out("Only the bundled version can be installed (no downloads). Pass --to=#len(bundledVersion) ? bundledVersion : '<the bundled version>'# or omit --to. (A snapshot CLI bundles a version like 4.2.0-snapshot.NNNN, so --to=4.2.0 won't match.)");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = "--to=#arguments.targetVersion# does not match the CLI's bundled framework version (#bundledVersion#); only the bundled version is installable."
+			);
+		}
+
+		// Read the box.json pin BEFORE creating anything, so a pin-read failure
+		// leaves no half-made vendor/ behind (rev1-r3). The pin is updated after
+		// the install so a later `box install` doesn't copy an old framework over
+		// vendor/wheels/; a missing box.json is the normal case for an app moving
+		// onto the CLI.
+		var boxPin = $upgradeApplyBoxPin(upgrader);
+
+		// A fresh install may run in an app that has no vendor/ directory yet
+		// (e.g. one that never ran `box install`); create the parent so the swap
+		// has somewhere to land — validateSwap requires the parent to exist.
+		var vendorParent = getDirectoryFromPath(vendorDir);
+		if (!directoryExists(vendorParent)) {
+			directoryCreate(vendorParent, true, true);
+		}
+
+		// The service's pre-mutation refusal checks (source looks like a
+		// framework; target parent exists; no path overlap). An absent vendorDir
+		// is allowed — that is the fresh-install case.
+		var validationError = upgrader.validateSwap(sourceDir, vendorDir);
+		if (len(validationError)) {
+			out(validationError, "red");
+			throw(type = "Wheels.FrameworkInstallFailed", message = validationError);
+		}
+
+		out("Source:  #sourceDir#");
+		out("Target:  #vendorDir#");
+		out("Installing Wheels #bundledVersion# into vendor/wheels/ ...");
+
+		var result = {};
+		try {
+			// doBackup = false: a fresh install has nothing to back up.
+			result = upgrader.applyUpgrade(sourceDir, vendorDir, false, "");
+		} catch (Wheels.FrameworkUpgrader e) {
+			// A fresh install has no backup to restore from, so a partial copy
+			// should be removed and the command re-run (not the upgrade/re-vendor
+			// recovery the service message describes for an in-place swap).
+			out(e.message, "red");
+			out("Remove the partial vendor/wheels/ and re-run 'wheels framework install'.");
+			throw(
+				type = "Wheels.FrameworkInstallFailed",
+				message = e.message & " — remove the partial vendor/wheels/ and re-run `wheels framework install`."
+			);
+		}
+		if (!result.success) {
+			out(result.error, "red");
+			throw(type = "Wheels.FrameworkInstallFailed", message = result.error);
+		}
+
+		var summary = "Framework installed: #result.newVersion#" & nl;
+		summary &= $upgradeApplyUpdateBoxPin(upgrader, boxPin, result.newVersion);
+		summary &= nl & "Next: run 'wheels start', then 'wheels migrate latest'." & nl;
+		out(summary, "green");
+		return "";
+	}
+
+	/**
+	 * Help block for `wheels framework` / `wheels framework help` / `--help`.
+	 */
+	private string function $printFrameworkHelp() {
+		var nl = chr(10);
+		var help = "Usage:" & nl
+			& "  wheels framework install [--to=<version>]" & nl
+			& nl
+			& "Install the Wheels framework (vendor/wheels/) into an existing app that has" & nl
+			& "none — for example an app moving off CommandBox. To replace an existing" & nl
+			& "framework, use 'wheels upgrade apply' instead." & nl
+			& nl
+			& "Subcommands:" & nl
+			& "  install           Install the CLI's bundled framework into vendor/wheels/." & nl
+			& "                    Refuses if vendor/wheels/ already exists (use upgrade apply)." & nl
+			& nl
+			& "Options:" & nl
+			& "  --to=<version>    Must match the CLI's bundled framework version (no downloads)." & nl
+			& nl
+			& "Examples:" & nl
+			& "  wheels framework install             - install the bundled framework" & nl
+			& "  wheels framework install --to=4.2.0  - install, asserting the bundled version" & nl;
+		// out() is the sole CLI display; returning the text too would print the
+		// whole block twice (the double-print U4/#4265 fixed in upgrade apply).
+		// Specs read capturedOutput() instead of the return value.
+		out(help, "yellow");
+		return "";
+	}
+
+	/**
 	 * Help block for `wheels upgrade help` / `--help`. Extracted so the
 	 * help short-circuit and the unknown-subcommand error path stay in sync.
 	 */
@@ -5986,8 +6214,8 @@ component extends="modules.BaseModule" {
 			& "                    non-zero when breaking changes are found." & nl
 			& "  apply             Apply the upgrade — replace vendor/wheels/ with" & nl
 			& "                    the CLI's bundled framework. Backs up the existing" & nl
-			& "                    vendor/wheels/ as vendor/wheels.bak-<timestamp>/" & nl
-			& "                    unless --nobackup." & nl
+			& "                    vendor/wheels/ as .wheels/backups/wheels.bak-<timestamp>/" & nl
+			& "                    (outside vendor/) unless --nobackup." & nl
 			& "  (none)            Print usage. Bare `wheels upgrade` never modifies" & nl
 			& "                    files — the swap requires the explicit `apply` verb." & nl
 			& nl
@@ -5997,7 +6225,7 @@ component extends="modules.BaseModule" {
 			& "                    CLI's bundled framework version." & nl
 			& "  --offline         Check only: never call GitHub. Without --to the" & nl
 			& "                    check fails and asks for one. Also WHEELS_OFFLINE=1." & nl
-			& "  --nobackup        Apply only: skip the vendor/wheels.bak-<timestamp>/" & nl
+			& "  --nobackup        Apply only: skip the .wheels/backups/wheels.bak-<timestamp>/" & nl
 			& "                    backup. Useful when vendor/wheels/ is tracked in git." & nl
 			& "  --allow-downgrade Apply only: proceed when the CLI's bundled framework" & nl
 			& "                    is OLDER than vendor/wheels/. Refused by default." & nl
@@ -6036,7 +6264,7 @@ component extends="modules.BaseModule" {
 			& "      Scan the app for breaking changes (read-only)." & nl
 			& "  wheels upgrade apply [--to=<version>] [--nobackup]" & nl
 			& "      Replace vendor/wheels/ with the CLI's bundled framework" & nl
-			& "      (backs up to vendor/wheels.bak-<timestamp>/ first)." & nl
+			& "      (backs up to .wheels/backups/wheels.bak-<timestamp>/ first)." & nl
 			& nl
 			& "Run `wheels upgrade help` for full usage." & nl;
 		// Returned for the caller to throw: the thrown error prints it once and
@@ -6222,7 +6450,7 @@ component extends="modules.BaseModule" {
 	private string function generateMigration(required array args) {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate migration <Name>", "yellow");
-			out("  Example: wheels generate migration AddEmailToUsers");
+			out("  Example: wheels generate migration BackfillUserSlugs");
 			$refuse("wheels generate migration: missing required arguments. Usage: wheels generate migration <Name>");
 		}
 
@@ -6244,6 +6472,52 @@ component extends="modules.BaseModule" {
 		$generateWrite(filePath, buildEmptyMigration(migrationName));
 
 		printCreated("app/migrator/migrations/#fileName#");
+		var hint = $migrationNameHint(migrationName);
+		if (len(hint)) {
+			out("");
+			out(hint, "yellow");
+		}
+		return "";
+	}
+
+	/**
+	 * A next step for a migration whose name reads like a column change
+	 * (`AddEmailToUsers`, `add_email_to_users`, `RemoveEmailFromUsers`).
+	 * `generate migration` writes a blank up()/down() whatever the name says,
+	 * so point an add at `wheels generate property`, which writes the
+	 * addColumn() for you, and show the removeColumn() call for a remove.
+	 * Returns "" for any other name. Public for specs; the `$` prefix keeps it
+	 * off the MCP tool list.
+	 */
+	public string function $migrationNameHint(required string migrationName) {
+		var name = arguments.migrationName;
+		var nl = chr(10);
+		var parts = reFind("^(?:Add([A-Z][A-Za-z0-9]*?)To([A-Z][A-Za-z0-9]*)|add_([a-z0-9_]+?)_to_([a-z0-9_]+))$", name, 1, true);
+		if (parts.pos[1] > 0) {
+			var column = parts.pos[2] > 0 ? mid(name, parts.pos[2], parts.len[2]) : mid(name, parts.pos[4], parts.len[4]);
+			var table = parts.pos[3] > 0 ? mid(name, parts.pos[3], parts.len[3]) : mid(name, parts.pos[5], parts.len[5]);
+			// Keep the words' case: lCase() first turned BlogPosts into "Blogpost".
+			// A snake_case table (blog_posts) is PascalCased first; singularize()
+			// then changes only the last word.
+			var pascalTable = "";
+			for (var word in listToArray(table, "_")) {
+				pascalTable &= uCase(left(word, 1)) & mid(word, 2, len(word));
+			}
+			var modelName = getService("helpers").singularize(pascalTable);
+			var columnName = lCase(left(column, 1)) & mid(column, 2, len(column));
+			return "This migration is blank: `generate migration` doesn't read columns from its name." & nl
+				& "To add #columnName# to #lCase(table)# with the migration written for you, use instead:" & nl
+				& "  wheels generate property #modelName# #columnName#:string   (or :integer, :boolean, ...)";
+		}
+		parts = reFind("^(?:Remove([A-Z][A-Za-z0-9]*?)From([A-Z][A-Za-z0-9]*)|remove_([a-z0-9_]+?)_from_([a-z0-9_]+))$", name, 1, true);
+		if (parts.pos[1] > 0) {
+			var column = parts.pos[2] > 0 ? mid(name, parts.pos[2], parts.len[2]) : mid(name, parts.pos[4], parts.len[4]);
+			var table = parts.pos[3] > 0 ? mid(name, parts.pos[3], parts.len[3]) : mid(name, parts.pos[5], parts.len[5]);
+			var columnName = lCase(left(column, 1)) & mid(column, 2, len(column));
+			return "This migration is blank: `generate migration` doesn't read columns from its name." & nl
+				& "Fill in up() with:" & nl
+				& '  removeColumn(table="#lCase(table)#", columnName="#columnName#");';
+		}
 		return "";
 	}
 
@@ -6409,10 +6683,11 @@ component extends="modules.BaseModule" {
 
 		var names = new services.GeneratorPaths();
 		var modelName = capitalize(names.identifier(args[1], "model"));
-		var propArg = args[2];
-		var parts = listToArray(propArg, ":");
-		var propName = names.identifier($underscoreHyphens(arrayLen(parts) ? parts[1] : "", "property"), "property");
-		var propType = names.identifier(arrayLen(parts) > 1 ? parts[2] : "string", "property type");
+		// Share the model generator's token parser so `:optional` and `=value`
+		// are understood here too (it validates the name and type as identifiers).
+		var prop = $parsePropertyArg(args[2]);
+		var propName = prop.name;
+		var propType = prop.type;
 
 		var tableName = getService("helpers").pluralize(lCase(modelName));
 		var timestamp = getService("helpers").generateMigrationTimestamp();
@@ -6429,7 +6704,17 @@ component extends="modules.BaseModule" {
 		content &= tab & 'function up() {' & nl;
 		content &= tab & tab & 'transaction {' & nl;
 		content &= tab & tab & tab & 't = changeTable(name="#tableName#");' & nl;
-		content &= tab & tab & tab & 't.#colType#(columnNames="#propName#");' & nl;
+		// Columns added to an EXISTING table stay nullable (no allowNull=false) so
+		// the ALTER succeeds on a populated table; a `=value` default is emitted
+		// when given (and is safe — it backfills existing rows).
+		var colParams = 'columnNames="#propName#"';
+		if (structKeyExists(prop, "default") && len(prop.default)) {
+			// Literal string in generated CFML: double "##" (interpolation delimiter)
+			// so a "#" in the default stays literal, and double the embedded quotes.
+			var safeDefault = replace(replace(prop.default, "##", "####", "all"), '"', '""', "all");
+			colParams &= ', default="' & safeDefault & '"';
+		}
+		content &= tab & tab & tab & 't.#colType#(#colParams#);' & nl;
 		content &= tab & tab & tab & 't.change();' & nl;
 		content &= tab & tab & '}' & nl;
 		content &= tab & '}' & nl & nl;
@@ -6445,8 +6730,16 @@ component extends="modules.BaseModule" {
 		$generateWrite(migrationDir & "/" & fileName, content);
 		printCreated("app/migrator/migrations/#fileName#");
 		out("");
-		out("Remember to add validation in app/models/#modelName#.cfc config():", "yellow");
-		out('  validatesPresenceOf("#propName#");');
+		// Suggest a presence validation only for a required column with no default —
+		// the same rule the model generator uses. The column is added nullable (so
+		// existing rows are safe); presence then enforces it for new records. An
+		// `:optional` or defaulted column gets no suggestion.
+		var suggestPresence = (structKeyExists(prop, "required") ? prop.required : false)
+			&& !(structKeyExists(prop, "default") && len(prop.default));
+		if (suggestPresence) {
+			out("Remember to add validation in app/models/#modelName#.cfc config():", "yellow");
+			out('  validatesPresenceOf("#propName#");');
+		}
 
 		return "";
 	}
@@ -6791,8 +7084,10 @@ component extends="modules.BaseModule" {
 				out("  3. Restart, then POST credentials to /api/session to receive a JWT.");
 				out("  4. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a bcrypt derivation.");
 			} else {
-				out("  2. Restart, then POST credentials to /api/session to receive a bearer token.");
-				out("  3. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a bcrypt derivation.");
+				out("  2. Create a first account (there is no sign-up endpoint): a seedOnce() in app/db/seeds.cfm, then wheels seed.");
+				out("  3. Restart, then POST credentials to /api/session to receive a bearer token.");
+				out("  4. Protect actions with a filter that authenticates the Authorization header (see .ai/auth.md).");
+				out("  5. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a bcrypt derivation.");
 			}
 			out("  Generated code is yours to edit — re-run with --force and review `git diff` to upgrade.");
 		} else {
@@ -8033,8 +8328,14 @@ component extends="modules.BaseModule" {
 		var currentMajor = val(listFirst(currentVersion, "."));
 		var targetMajor = val(listFirst(target, "."));
 		var sameMajor = (currentMajor == targetMajor);
+		var crosses42 = $upgradeCrosses42(currentVersion, target);
 
-		if (sameMajor && !jsonMode) {
+		if (crosses42 && sameMajor && !jsonMode) {
+			out("#currentVersion# -> #target#: no breaking framework changes, but 4.2 changes app-owned files and some behaviour.", "green");
+			out("Checking the 4.1 -> 4.2 items, then code left over from 3.x...", "green");
+			out("Also read the guide's database-specific changes (MySQL, Oracle, SQLite), which a source scan can't detect.", "green");
+			out("");
+		} else if (sameMajor && !jsonMode) {
 			out("Same major version — no new breaking changes in this upgrade.", "green");
 			out(currentMajor >= 4
 				? "Scanning for code left over from 3.x and for opt-in recommendations..."
@@ -8043,6 +8344,10 @@ component extends="modules.BaseModule" {
 		}
 
 		var checks = $upgradeBuildChecks(currentMajor, targetMajor, target);
+		if (crosses42) {
+			checks = $upgradeAppendChecks4x2(checks, target);
+		}
+		checks = $upgradeAppendTemplateFixChecks(checks, target);
 
 		// Run checks. Matched checks land in `issues` (severity=breaking) or
 		// `advisories` (severity=advisory); unmatched land in `passed`.
@@ -8053,7 +8358,7 @@ component extends="modules.BaseModule" {
 
 		// The version-appropriate guide + the soft-landing adapter, surfaced
 		// whenever breaking findings are reported (and always in JSON output).
-		var guideUrl = new services.GuidesLink().link(
+		var guideUrl = crosses42 && sameMajor ? $upgradeGuide4x2Url() : new services.GuidesLink().link(
 			"upgrading/" & (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/",
 			target
 		);
@@ -8289,19 +8594,40 @@ component extends="modules.BaseModule" {
 		var jump34 = arguments.currentMajor <= 3 && arguments.targetMajor >= 4;
 		var on4 = arguments.currentMajor >= 4 && arguments.targetMajor >= 4;
 		if (jump34 || on4) {
+			// An empty or missing plugins/ doesn't mean the app has no plugins:
+			// 3.x apps declare them in box.json (installed into plugins/ by the
+			// next box install), and 3.0's deletePluginDirectories=true default
+			// can leave the folder empty at runtime. So this also reports
+			// box.json plugin dependencies and code that reads
+			// application.wheels.plugins.
 			arrayAppend(checks, {
-				description: "Legacy plugin directory (deprecated as of 4.0, removed in 5.0)",
+				description: "Legacy plugins (deprecated as of 4.0, removed in 5.0)",
 				jumpOnly: true,
 				pattern: "",
-				checkType: "directory",
+				checkType: "plugins",
 				path: "plugins",
-				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>)"
+				references: {
+					pattern: "application\.wheels\.plugins\b",
+					checkType: "grep",
+					scanDir: "app",
+					extensions: "cfc,cfm",
+					scanTargets: [
+						{path: "Application.cfc"},
+						{path: "public/Application.cfc"},
+						{path: "config", extensions: "cfm,cfc", recurse: true}
+					],
+					skipPackages: true
+				},
+				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>), or to the 4.x built-in that replaces them, and remove their box.json dependencies (box install puts them back in plugins/)"
 			});
 			// application.wirebox → application.wheelsdi (guide item 10). The
-			// hardest real-world case is a root Application.cfc bootstrap that
+			// hardest real-world case is an Application.cfc bootstrap that
 			// calls `new wirebox.system.ioc.Injector(...)` — the WireBox
-			// package no longer ships in vendor/wheels/ — so scan the root
-			// Application.cfc and config/ in addition to app/.
+			// package no longer ships in vendor/wheels/ — so scan the root and
+			// public/ Application.cfc (where 3.x apps keep theirs) and config/
+			// in addition to app/. Packages under app/ (e.g. app/lib/logbox) are
+			// third-party code that uses WireBox itself, not the app, so they
+			// are skipped.
 			arrayAppend(checks, {
 				description: "Direct WireBox references (application.wirebox / wirebox.system.ioc)",
 				pattern: "application\.wirebox|wirebox\.system\.ioc",
@@ -8310,9 +8636,11 @@ component extends="modules.BaseModule" {
 				extensions: "cfc,cfm",
 				scanTargets: [
 					{path: "Application.cfc"},
+					{path: "public/Application.cfc"},
 					{path: "config", extensions: "cfm,cfc", recurse: true}
 				],
-				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector()`. The legacy adapter does NOT shim this item."
+				skipPackages: true,
+				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector(""wheels.Bindings"")` (the constructor requires the bindings path). The legacy adapter does NOT shim this item."
 			});
 			// renderPage()/renderPageToString() removed in 4.0 — shimmed by
 			// the optional wheels-legacy-adapter package, but unshimmed apps
@@ -8592,6 +8920,271 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * True when an upgrade from `currentVersion` to `target` crosses 4.2.0:
+	 * the app is below it and the target is at or above it. False when either
+	 * version can't be compared (a development checkout's placeholder).
+	 */
+	public boolean function $upgradeCrosses42(required string currentVersion, required string target) {
+		var versionPattern = "^[vV]?\d+(\.\d+)*([-+][^\r\n]*)?$";
+		if (!reFind(versionPattern, trim(arguments.currentVersion)) || !reFind(versionPattern, trim(arguments.target))) {
+			return false;
+		}
+		var semver = new services.SemVer();
+		return semver.compare(arguments.currentVersion, "4.2.0") < 0 && semver.compare(arguments.target, "4.2.0") >= 0;
+	}
+
+	/**
+	 * The fixes that live in the app-owned public/Application.cfc. A framework
+	 * swap never updates that file, so each fix the target release has is
+	 * checked on its own: the file lacks the code the template carries for
+	 * it. The generic template-drift check only says the file differs. Each
+	 * entry: since (the first release whose template has it), a pattern the
+	 * template matches, and the guide section that documents the edit. The
+	 * teardown routing is an error because on Adobe ColdFusion a shutdown
+	 * that reads the bare application scope can leave the whole site
+	 * erroring until a restart; the rest are advisory.
+	 */
+	private array function $upgradeAppendTemplateFixChecks(required array checks, required string target) {
+		var guide41 = new services.GuidesLink().pinned("v4-1-0", "upgrading/4x-0-to-4x-1/");
+		var guide42 = $upgradeGuide4x2Url();
+		var adopt = "Adopt it from the app template (public/Application.cfc in a fresh wheels new app), keeping your own changes.";
+		var fixes = [
+			{since: "4.0.4", severity: "advisory", pattern: "this\.sessionCookie",
+				description: "public/Application.cfc doesn't set this.sessionCookie",
+				fix: "The session cookie's flags (including Secure over HTTPS) come from this block. #adopt# Guide: ""Session cookie Secure flag"", #guide41#"},
+			{since: "4.0.4", severity: "advisory", pattern: "StructKeyExists\(\s*application\s*,\s*""wheelsdi""\s*\)",
+				description: "public/Application.cfc onError doesn't guard the DI container",
+				fix: "Without the guard an error page can rebuild the container and wipe registered services. #adopt# Guide: ""DI container guard in onError"", #guide41#"},
+			{since: "4.0.6", severity: "breaking", pattern: "applicationScope\.wo\.\$include", requireFileMatches: "function\s+onApplicationEnd\s*\(",
+				description: "public/Application.cfc onApplicationEnd() doesn't go through arguments.applicationScope",
+				fix: "On Adobe ColdFusion, an onApplicationEnd() that reads the bare application scope can fail during shutdown and leave the whole site erroring until a service restart. Route it through arguments.applicationScope.wo with the StructKeyExists guards. #adopt# Guide: ""Adobe teardown guards in onError / onSessionEnd"", #guide41#"},
+			{since: "4.1.0", severity: "breaking", pattern: "applicationScope\.wo\.\$simpleLock", requireFileMatches: "function\s+onSessionEnd\s*\(",
+				description: "public/Application.cfc onSessionEnd() doesn't go through arguments.applicationScope",
+				fix: "On Adobe ColdFusion, session cleanup can call onSessionEnd() after the application scope is gone, and a bare application.wo then throws. Route it through arguments.applicationScope.wo, guarded with StructKeyExists. #adopt# Guide: ""Adobe teardown guards in onError / onSessionEnd"", #guide41#"},
+			{since: "4.0.6", severity: "advisory", pattern: "testcontext\.cfm",
+				description: "public/Application.cfc doesn't include the isolated test context",
+				fix: "Without it the test suites run against your live application scope. #adopt# Guide: ""Isolated test-application include"", #guide41#"},
+			{since: "4.1.0", severity: "advisory", pattern: "resources/java",
+				description: "public/Application.cfc doesn't put the bundled jBCrypt jar on the Java load path",
+				fix: "Without it bcryptHash()/bcryptVerify() use the slow pure-CFML fallback, and code that loads a BCrypt class can fail. #adopt# Guide: ""jBCrypt load path"", #guide41#"},
+			{since: "4.1.0", severity: "advisory", pattern: "\$authorizeReload",
+				description: "public/Application.cfc reload handling predates the template's helper functions",
+				fix: "The template's onRequestStart moved its reload handling into helper functions. #adopt# Guide: ""Reload-password handoff"", #guide41#"},
+			{since: "4.1.1", severity: "advisory", pattern: "Compare\(\s*lCase\(\s*local\.value\s*\)\s*,\s*""true""\s*\)",
+				description: "public/Application.cfc .env parser predates the 4.1.1 boolean fix",
+				fix: "The older parser turns a numeric 1 (such as 1.0) into the boolean true. #adopt# Guide: "".env boolean parser"", #guide41#"},
+			{since: "4.2.0", severity: "advisory", pattern: "startupPhase",
+				description: "public/Application.cfc onError doesn't tell a running-app error from a startup failure",
+				fix: "The older fallback shows ""Wheels failed to initialize"" for any error and may not log it. #adopt# Guide: ""onError running-app message"", #guide42#"},
+			{since: "4.2.0", severity: "advisory", pattern: "GetHttpRequestData\(\s*false\s*\)\.headers",
+				description: "public/Application.cfc lacks the reload-password header fallback",
+				fix: "Without it wheels reload against a RustCFML server fails every other run. #adopt# Guide: ""Reload-password header fallback"", #guide42#"},
+			{since: "4.2.0", severity: "advisory", pattern: "\$normaliseRedirectPath",
+				description: "public/Application.cfc reload redirect doesn't keep the subfolder",
+				fix: "An app served under a subfolder is redirected to the site root after a reload. #adopt# Guide: ""Reload redirect keeps the subfolder"", #guide42#"}
+		];
+		var versionPattern = "^[vV]?\d+(\.\d+)*([-+][^\r\n]*)?$";
+		var targetKnown = reFind(versionPattern, trim(arguments.target)) > 0;
+		var semver = new services.SemVer();
+		for (var fixSpec in fixes) {
+			if (targetKnown && semver.compare(arguments.target, fixSpec.since) < 0) {
+				continue;
+			}
+			var check = {
+				description: fixSpec.description,
+				severity: fixSpec.severity,
+				checkType: "grep",
+				absent: true,
+				pattern: fixSpec.pattern,
+				scanTargets: [{path: "public/Application.cfc"}],
+				fix: fixSpec.fix
+			};
+			if (structKeyExists(fixSpec, "requireFileMatches")) {
+				check.requireFileMatches = fixSpec.requireFileMatches;
+			}
+			arrayAppend(arguments.checks, check);
+		}
+		return arguments.checks;
+	}
+
+	/**
+	 * The 4.1 → 4.2 upgrade guide. It exists only in the v4-2-0 guide tree, so
+	 * the link is pinned there: GuidesLink.link() would clamp a 4.2 target to
+	 * the latest released tree until the 4.2 guides are marked released, and
+	 * the page isn't in older trees at all.
+	 */
+	private string function $upgradeGuide4x2Url() {
+		return new services.GuidesLink().pinned("v4-2-0", "upgrading/4x-1-to-4x-2/");
+	}
+
+	/**
+	 * The 4.1 → 4.2 checks: app-owned files the 4.2 template changed, and the
+	 * behaviour changes the upgrade guide lists. Severity "breaking" marks an
+	 * item that fails at runtime on 4.2 (an error, a refused request, a failed
+	 * validation); the rest are advisory because the app keeps running but
+	 * behaves differently. Each fix names the guide section to read.
+	 */
+	private array function $upgradeAppendChecks4x2(required array checks, required string target) {
+		var guide = $upgradeGuide4x2Url();
+		// Selecting the environment from anything but WHEELS_ENV: adopting the
+		// 4.2 template drops that selection, and a server without WHEELS_ENV
+		// then starts in development.
+		arrayAppend(arguments.checks, {
+			description: "config/environment.cfm selects the environment without WHEELS_ENV",
+			severity: "breaking",
+			checkType: "envSelection",
+			expect: "logic",
+			fix: "Keep your environment selection when you adopt the 4.2 config/environment.cfm: set WHEELS_ENV on every server before replacing the file, or carry your selection logic into the new file. Replacing it outright makes a server without WHEELS_ENV start in development. Guide: ""config/environment.cfm reads WHEELS_ENV"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "config/environment.cfm hardcodes the environment (4.2 reads WHEELS_ENV)",
+			severity: "advisory",
+			checkType: "envSelection",
+			expect: "literal",
+			fix: "A WHEELS_ENV=production set by the host has no effect while the file hardcodes the environment. Replace it with the 4.2 template's config/environment.cfm, or hardcode production on production servers. Guide: ""config/environment.cfm reads WHEELS_ENV"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "Event templates put blank lines before every response",
+			severity: "advisory",
+			checkType: "eventSilent",
+			files: ["onabort.cfm", "onapplicationend.cfm", "onapplicationstart.cfm", "onrequestend.cfm", "onrequeststart.cfm", "onsessionend.cfm", "onsessionstart.cfm"],
+			// chr(60) keeps a literal tag out of the source (Lucee's tag scanner).
+			fix: "Wrap each listed app/events/ file in " & chr(60) & "cfsilent>..." & chr(60) & "/cfsilent> with no trailing newline, or delete the empty ones. Leave onerror*.cfm, onmaintenance.cfm and onmissingtemplate.cfm alone. Guide: ""Event templates without leading whitespace"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: ".gitignore ignores vendor/ (4.2 apps commit it)",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "^\s*/?vendor/?\s*$",
+			scanTargets: [{path: ".gitignore"}],
+			fix: "Remove the vendor line and commit vendor/, so a clone, CI run or image build has the framework and your packages. Guide: ""Commit vendor/"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "findAll(returnAs=""structs"") now returns an array",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "returnAs\s*=\s*[""']structs?[""']",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			scanTargets: [{path: "tests", extensions: "cfc,cfm", recurse: true}],
+			fix: "Struct functions (StructCount, StructKeyList...) on the result now throw, and for-in loops hand you rows instead of keys. Guide: ""findAll(returnAs=""structs"") returns an array"", #guide#"
+		});
+		if (!$upgradeConfigMatches("trustProxyHeaders\s*=\s*true")) {
+			arrayAppend(arguments.checks, {
+				description: "The app reads X-Forwarded-Proto, but trustProxyHeaders is not set",
+				severity: "advisory",
+				checkType: "grep",
+				pattern: "x[-_]forwarded[-_]proto",
+				scanDir: "app",
+				extensions: "cfc,cfm",
+				scanTargets: [{path: "config", extensions: "cfm,cfc", recurse: true}],
+				fix: "Behind a TLS-terminating proxy, 4.2 builds absolute URLs as http:// unless config/settings.cfm has set(trustProxyHeaders=true). Guide: ""X-Forwarded-Proto needs trustProxyHeaders"", #guide#"
+			});
+		}
+		arrayAppend(arguments.checks, {
+			description: "Validation condition/unless uses is, and, or with this., or this. on the right",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "\b(condition|unless)\s*=\s*[""'][^""']*(\bthis\.[^""']*\s(is|and|or)\s|(==|!=|<>|\s(eq|neq|gt|lt|gte|lte)\s)\s*this\.)",
+			scanDir: "app/models",
+			extensions: "cfc",
+			fix: "4.2 throws Wheels.InvalidValidationCondition for these shapes: replace is with eq (or ==), and with &&, or with ||, and put any this. reference on the left. Guide: ""Validation condition / unless: bare names are resolved"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "Validation condition/unless expressions are evaluated differently",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "\b(condition|unless)\s*=",
+			scanDir: "app/models",
+			extensions: "cfc",
+			fix: "A bare name now means this.<name>: a rule 4.1 skipped may now run, and one that always ran may now be skipped. Run your model specs. Guide: ""Validation condition / unless: bare names are resolved"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "Association joinType is not inner, outer, left or left outer",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "joinType\s*=\s*[""'](?!\s*(inner|outer|left|left outer)\s*[""'])",
+			scanDir: "app/models",
+			extensions: "cfc",
+			fix: "Any other value throws Wheels.InvalidJoinType at application start. Guide: ""Association joinType values are checked"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "A route targets an action named renderNotFound (now a reserved framework helper)",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "renderNotFound",
+			scanTargets: [{path: "config/routes.cfm"}],
+			fix: "A request for that action gets Wheels.ActionNotAllowed. Rename the action and its route. Guide: ""renderNotFound is a framework helper"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "A MySQL datasource sets tinyInt1isBit=false",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "tinyInt1isBit\s*=\s*false",
+			raw: true,
+			scanTargets: [{path: "config", extensions: "cfm,cfc", recurse: true}, {path: "lucee.json"}, {path: "server.json"}, {path: ".env"}],
+			fix: "Existing TINYINT(1) booleans then read as plain integers and fail validation as ""is not a number"". Drop the option, or convert the columns with changeColumn(columnType=""boolean""). Guide: ""MySQL boolean columns are BIT(1)"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "withAdvisoryLock() can now throw Wheels.AdvisoryLockReleaseFailed",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "withAdvisoryLock\s*\(",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			fix: "On MySQL and PostgreSQL a lock that can't be released now throws after the callback finishes. A job that relies on the lock should catch it and alert. Guide: ""withAdvisoryLock() can throw Wheels.AdvisoryLockReleaseFailed"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "LocalDisk storage keys are checked per segment",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "LocalDisk",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			scanTargets: [{path: "config", extensions: "cfm,cfc", recurse: true}],
+			fix: "Keys with a dots-only segment or a drive-letter prefix are now rejected; leading, trailing and doubled slashes are normalised. Check keys built from user input or file names. Guide: ""LocalDisk storage keys are checked per segment"", #guide#"
+		});
+		// enqueue(), enqueueIn() and enqueueAt() throw Wheels.Job.EnqueueFailed in
+		// 4.2 when the write fails, and a job deferred to a commit returns
+		// persisted: false legitimately, so a persisted check no longer means
+		// "failed". Point at status instead.
+		arrayAppend(arguments.checks, {
+			description: "Code reads persisted from a job result (4.2 throws Wheels.Job.EnqueueFailed on a failed write)",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "\.persisted\b|\[\s*[""']persisted[""']\s*\]",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			fix: "enqueue(), enqueueIn() and enqueueAt() throw Wheels.Job.EnqueueFailed when the job can't be written, so persisted: false no longer means a failure: a job enqueued inside a transaction on another datasource returns status ""deferred"" with persisted: false and is written at the commit. Check status (""pending"" or ""deferred"") instead of persisted, and where an enqueue is best-effort, catch Wheels.Job.EnqueueFailed. Guide: ""enqueue() throws Wheels.Job.EnqueueFailed"", #guide#"
+		});
+		// A tests/runner.cfm of the app's own (often a copy of an older core
+		// runner) gets the <datasource>_test rule but not the built-in runner's
+		// behaviour, such as running tests/populate.cfm against the test database.
+		arrayAppend(arguments.checks, {
+			description: "tests/runner.cfm doesn't use the built-in app runner",
+			severity: "advisory",
+			checkType: "grep",
+			absent: true,
+			pattern: "wheels/tests/app-runner\.cfm",
+			scanTargets: [{path: "tests/runner.cfm"}],
+			fix: "Replace it with the runner wheels new creates, a single include of wheels/tests/app-runner.cfm, so the app gets the built-in runner's behaviour, including running tests/populate.cfm against the test database. Guide: ""App tests use the test database and test application"", #guide#"
+		});
+		// An empty string in a where condition binds as '' instead of NULL, so
+		// these conditions now match rows (and updateAll/deleteAll now change or
+		// delete them). A grep: expect false positives, hence "review these".
+		arrayAppend(arguments.checks, {
+			description: "Review these: an empty string in a where condition now matches ''",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "\b(where|updateAll|deleteAll)\b[^\r\n]*(<>|!=|=)\s*''|\bwhere\s*\(\s*[""'][^""']+[""']\s*,\s*(""""|'')\s*\)|\bfind(One|All)By\w+\s*\(\s*(""""|'')\s*\)",
+			scanDir: "app",
+			extensions: "cfc,cfm",
+			fix: "4.2 binds an empty string as '' instead of NULL: col = '' now matches rows that store '', col <> '' matches every other non-NULL row, and updateAll()/deleteAll() with such a condition now change or delete those rows. Check each line, and reject empty input before a lookup. Guide: ""An empty string in where matches empty strings"", #guide#"
+		});
+		return arguments.checks;
+	}
+
+	/**
 	 * True when `pattern` matches anywhere in config/ (.cfm/.cfc, recursive),
 	 * with CFML comments stripped first so a commented-out setting doesn't count.
 	 */
@@ -8647,7 +9240,166 @@ component extends="modules.BaseModule" {
 			}
 		}
 
+		// `skipPackages`: leave out third-party package code: files under a
+		// directory box.json installs a package into, or under any directory
+		// below the project root that has its own box.json (a package moved or
+		// committed somewhere its installPaths entry doesn't say).
+		if (structKeyExists(arguments.check, "skipPackages") && arguments.check.skipPackages) {
+			var packageDirs = $upgradeInstallPathDirs();
+			var root = replace(variables.projectRoot, "\", "/", "all");
+			var hasBoxJson = {};
+			var kept = [];
+			for (var f in filesToScan) {
+				var normalized = replace(f, "\", "/", "all");
+				var inPackage = false;
+				for (var packageDir in packageDirs) {
+					if (findNoCase(packageDir, normalized) == 1) {
+						inPackage = true;
+						break;
+					}
+				}
+				// Walk up from the file's directory, stopping below the root.
+				var dir = getDirectoryFromPath(normalized);
+				while (!inPackage && len(dir) > len(root) + 1 && findNoCase(root & "/", dir) == 1) {
+					if (!structKeyExists(hasBoxJson, dir)) {
+						hasBoxJson[dir] = fileExists(dir & "box.json");
+					}
+					inPackage = hasBoxJson[dir];
+					dir = getDirectoryFromPath(reReplace(dir, "/+$", ""));
+				}
+				if (!inPackage) arrayAppend(kept, f);
+			}
+			filesToScan = kept;
+		}
+
 		return filesToScan;
+	}
+
+	/**
+	 * The app's box.json, parsed; an empty struct when it is missing or isn't a
+	 * JSON object.
+	 */
+	private struct function $upgradeReadBoxJson() {
+		var path = variables.projectRoot & "/box.json";
+		if (!fileExists(path)) return {};
+		try {
+			var parsed = deserializeJSON(fileRead(path));
+			return isStruct(parsed) ? parsed : {};
+		} catch (any e) {
+			return {};
+		}
+	}
+
+	/** A box.json installPaths value as a project-relative path: forward slashes, no leading `./` or trailing `/`. */
+	private string function $upgradeNormalizeInstallPath(required string installPath) {
+		return reReplace(replace(trim(arguments.installPath), "\", "/", "all"), "^(\./)+|/+$", "", "all");
+	}
+
+	/**
+	 * The plugin packages box.json declares, as "box.json: <name> (<installPath>)".
+	 * A dependency counts when its installPath is under plugins/ or, with no
+	 * installPath, when its name starts with "cfwheels-" (CommandBox installs
+	 * that package type into plugins/).
+	 */
+	private array function $upgradePluginDependencies() {
+		var box = $upgradeReadBoxJson();
+		var installPaths = structKeyExists(box, "installPaths") && isStruct(box.installPaths) ? box.installPaths : {};
+		var found = [];
+		for (var section in ["dependencies", "devDependencies"]) {
+			if (!structKeyExists(box, section) || !isStruct(box[section])) continue;
+			var names = structKeyArray(box[section]);
+			arraySort(names, "textnocase");
+			for (var name in names) {
+				var target = structKeyExists(installPaths, name) && isSimpleValue(installPaths[name])
+					? $upgradeNormalizeInstallPath(installPaths[name]) : "";
+				var isPlugin = len(target) ? reFindNoCase("^plugins(/|$)", target) > 0 : reFindNoCase("^cfwheels-", name) > 0;
+				if (isPlugin) {
+					arrayAppend(found, "box.json: " & name & (len(target) ? " (" & target & "/)" : ""));
+				}
+			}
+		}
+		return found;
+	}
+
+	/**
+	 * The directories box.json installs packages into (`installPaths`), as
+	 * absolute paths with forward slashes and a trailing slash.
+	 */
+	private array function $upgradeInstallPathDirs() {
+		var box = $upgradeReadBoxJson();
+		var dirs = [];
+		if (!structKeyExists(box, "installPaths") || !isStruct(box.installPaths)) return dirs;
+		var root = replace(variables.projectRoot, "\", "/", "all");
+		for (var name in box.installPaths) {
+			if (!isSimpleValue(box.installPaths[name])) continue;
+			var rel = $upgradeNormalizeInstallPath(box.installPaths[name]);
+			if (!len(rel) || rel == ".") continue;
+			arrayAppend(dirs, root & "/" & rel & "/");
+		}
+		return dirs;
+	}
+
+	/**
+	 * Whether a grep check leaves a file out of its scan: `skipIfFileMatches`
+	 * skips a file that matches anywhere (the environment.cfm checks skip one
+	 * that already reads WHEELS_ENV), and `requireFileMatches` skips one that
+	 * doesn't (the teardown checks need the function to be declared). A
+	 * skipped file doesn't count as scanned, so an `absent` check over it
+	 * passes.
+	 */
+	private boolean function $upgradeFileSkipped(required struct check, required string content) {
+		if (structKeyExists(arguments.check, "skipIfFileMatches") && reFindNoCase(arguments.check.skipIfFileMatches, arguments.content) > 0) {
+			return true;
+		}
+		return structKeyExists(arguments.check, "requireFileMatches") && reFindNoCase(arguments.check.requireFileMatches, arguments.content) == 0;
+	}
+
+	/**
+	 * Run a "plugins" check: it matches a non-empty plugin directory, the
+	 * plugin packages box.json declares, and the matches of its `references`
+	 * grep. Returns {matched, matchEntry}, matchEntry empty when nothing matched.
+	 */
+	private struct function $upgradePluginResult(required struct check) {
+		var found = [];
+		var pluginDir = variables.projectRoot & "/" & arguments.check.path;
+		if (directoryExists(pluginDir) && arrayLen(directoryList(pluginDir, false, "name"))) {
+			arrayAppend(found, arguments.check.path & "/");
+		}
+		for (var dependency in $upgradePluginDependencies()) {
+			arrayAppend(found, dependency);
+		}
+		// A copy, so the check definition isn't changed.
+		var references = duplicate(arguments.check.references);
+		references.description = arguments.check.description;
+		references.fix = arguments.check.fix;
+		var referenceResult = $upgradeExecuteCheck(references);
+		if (referenceResult.matched) {
+			for (var reference in referenceResult.matchEntry.matches) {
+				arrayAppend(found, reference);
+			}
+		}
+		if (!arrayLen(found)) {
+			return {matched: false, matchEntry: {}};
+		}
+		return {matched: true, matchEntry: {description: arguments.check.description, fix: arguments.check.fix, matches: found}};
+	}
+
+	/**
+	 * The location line for an `absent` check that found nothing: the paths it
+	 * scanned (its scanDir and each scanTarget), so the report names the file
+	 * that lacks the code, e.g. "public/Application.cfc (no occurrences found)".
+	 */
+	private string function $upgradeAbsentHint(required struct check) {
+		var paths = [];
+		if (structKeyExists(arguments.check, "scanDir") && len(arguments.check.scanDir)) {
+			arrayAppend(paths, arguments.check.scanDir & "/");
+		}
+		if (structKeyExists(arguments.check, "scanTargets") && isArray(arguments.check.scanTargets)) {
+			for (var target in arguments.check.scanTargets) {
+				arrayAppend(paths, target.path);
+			}
+		}
+		return arrayLen(paths) ? arrayToList(paths, ", ") & " (no occurrences found)" : "(no occurrences found)";
 	}
 
 	/**
@@ -8672,6 +9424,7 @@ component extends="modules.BaseModule" {
 			var filesToScan = $upgradeCollectScanFiles(arguments.check);
 
 			var matches = [];
+			var scanned = 0;
 			for (var filePath in filesToScan) {
 				// Strip CFML comments before grepping (Anti-Pattern #14):
 				// a commented-out `// t.references(...)` or
@@ -8679,7 +9432,13 @@ component extends="modules.BaseModule" {
 				// block comments collapse and may shift reported line
 				// numbers — same tradeoff other `stripCfmlComments` callers
 				// accept.
-				var content = stripCfmlComments(fileRead(filePath));
+				// `raw: true` scans the file as written: a JDBC URL's `//` would
+				// otherwise read as a line comment and hide the rest of the line.
+				var content = structKeyExists(arguments.check, "raw") && arguments.check.raw ? fileRead(filePath) : stripCfmlComments(fileRead(filePath));
+				if ($upgradeFileSkipped(arguments.check, content)) {
+					continue;
+				}
+				scanned++;
 				var lines = listToArray(content, chr(10), true);
 				for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
 					if (reFindNoCase(arguments.check.pattern, lines[lineNum])) {
@@ -8696,18 +9455,30 @@ component extends="modules.BaseModule" {
 			// treat as pass to avoid noisy false positives.
 			var isAbsent = structKeyExists(arguments.check, "absent") && arguments.check.absent;
 			if (isAbsent) {
-				if (arrayLen(filesToScan) && !arrayLen(matches)) {
+				if (scanned && !arrayLen(matches)) {
 					matched = true;
-					var hint = structKeyExists(arguments.check, "scanDir") && len(arguments.check.scanDir)
-						? arguments.check.scanDir & "/ (no occurrences found)"
-						: "(no occurrences found)";
-					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: [hint]};
+					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: [$upgradeAbsentHint(arguments.check)]};
 				}
 			} else {
 				if (arrayLen(matches)) {
 					matched = true;
 					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: matches};
 				}
+			}
+		} else if (arguments.check.checkType == "plugins") {
+			var pluginResult = $upgradePluginResult(arguments.check);
+			matched = pluginResult.matched;
+			matchEntry = pluginResult.matchEntry;
+		} else if (arguments.check.checkType == "envSelection") {
+			if ($upgradeEnvSelection() == arguments.check.expect) {
+				matched = true;
+				matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: ["config/environment.cfm"]};
+			}
+		} else if (arguments.check.checkType == "eventSilent") {
+			var loudFiles = $upgradeLoudEventTemplates(arguments.check.files);
+			if (arrayLen(loudFiles)) {
+				matched = true;
+				matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: loudFiles};
 			}
 		} else if (arguments.check.checkType == "templateDiff") {
 			// Compare app-owned template files against the CLI's bundled app
@@ -8739,6 +9510,59 @@ component extends="modules.BaseModule" {
 		}
 
 		return {severity: severity, matched: matched, matchEntry: matchEntry};
+	}
+
+	/**
+	 * How config/environment.cfm chooses the environment, comments stripped:
+	 * "none" when the file is missing, reads WHEELS_ENV, or never calls
+	 * set(environment=); "literal" for exactly one set(environment="...") with
+	 * a plain quoted value and no branching in the file; "logic" for anything
+	 * else (more than one set(), if/switch/ternary, # interpolation, an
+	 * unquoted value). Replacing a "logic" file with the 4.2 template drops
+	 * that selection.
+	 */
+	public string function $upgradeEnvSelection() {
+		var path = variables.projectRoot & "/config/environment.cfm";
+		if (!fileExists(path)) {
+			return "none";
+		}
+		var content = stripCfmlComments(fileRead(path));
+		var setCall = "set\s*\(\s*environment\s*=";
+		var sets = arrayLen(reMatchNoCase(setCall, content));
+		if (!sets || reFindNoCase("WHEELS_ENV", content)) {
+			return "none";
+		}
+		// chr(60) keeps literal CFML tags out of the source (Lucee's tag scanner).
+		var branching = "\bif\s*\(|\bswitch\s*\(|" & chr(60) & "cf(if|elseif|switch)\b|\?";
+		var plainLiteral = setCall & "\s*([""'])[^""'##]*\1\s*\)";
+		if (sets == 1 && reFindNoCase(plainLiteral, content) && !reFindNoCase(branching, content)) {
+			return "literal";
+		}
+		return "logic";
+	}
+
+	/**
+	 * The app/events/ templates among `files` that can write output before a
+	 * response: the file doesn't start with a cfsilent tag, or has anything
+	 * after its closing cfsilent tag (a trailing newline included). Returns
+	 * their app/events/ paths.
+	 */
+	private array function $upgradeLoudEventTemplates(required array files) {
+		var loud = [];
+		var open = chr(60) & "cfsilent";
+		var close = chr(60) & "/cfsilent>";
+		for (var name in arguments.files) {
+			var path = variables.projectRoot & "/app/events/" & name;
+			if (!fileExists(path)) {
+				continue;
+			}
+			var content = fileRead(path);
+			var wrapped = left(content, len(open)) == open && len(content) >= len(close) && right(content, len(close)) == close;
+			if (!wrapped) {
+				arrayAppend(loud, "app/events/" & name);
+			}
+		}
+		return loud;
 	}
 
 	/**
@@ -8909,6 +9733,11 @@ component extends="modules.BaseModule" {
 			);
 		}
 
+		// A box.json that pins wheels-core must be updatable before anything
+		// changes: left at the old version, a later `box install` copies the
+		// old framework back over vendor/wheels/.
+		var boxPin = $upgradeApplyBoxPin(upgrader);
+
 		out("Source:  #sourceDir#");
 		out("Target:  #vendorDir#");
 		out("");
@@ -8930,7 +9759,7 @@ component extends="modules.BaseModule" {
 		var backupPath = "";
 		if (arguments.doBackup) {
 			backupPath = upgrader.reserveBackupPath(vendorDir);
-			plan &= "Backing up vendor/wheels -> vendor/#listLast(backupPath, "/")#" & nl
+			plan &= "Backing up vendor/wheels -> .wheels/backups/#listLast(backupPath, "/")#/ (outside vendor/, ignored by git)" & nl
 				& "If this is interrupted, restore with:" & nl
 				& "  rm -rf ""#vendorDir#"" && mv ""#backupPath#"" ""#vendorDir#""" & nl;
 		} else {
@@ -8968,6 +9797,8 @@ component extends="modules.BaseModule" {
 			summary &= "Backup:  #result.backupDir#" & nl;
 			summary &= "Recover with:  rm -rf ""#vendorDir#"" && mv ""#result.backupDir#"" ""#vendorDir#""" & nl;
 		}
+		summary &= $upgradeApplyUpdateBoxPin(upgrader, boxPin, result.newVersion);
+		summary &= $upgradeApplyLeftoverBackups();
 
 		// Surface root-level manifest files the user may want to review
 		// after the upgrade — version refs, dependencies, etc.
@@ -8980,9 +9811,10 @@ component extends="modules.BaseModule" {
 		}
 
 		out(summary, "green");
-		// Return value carries the pre-swap plan too, so callers (and the
-		// dispatch specs) see the full command output in order.
-		return plan & nl & summary;
+		// out() already printed the plan and the summary, and under the stdio MCP
+		// server out() is captured into the tool result too, so returning them as
+		// well printed the whole report twice in a terminal.
+		return "";
 	}
 
 	/**
@@ -9051,6 +9883,97 @@ component extends="modules.BaseModule" {
 		}
 
 		return "";
+	}
+
+	/**
+	 * Read box.json's wheels-core pin before `wheels upgrade apply` changes
+	 * anything. A box.json that can't be read is refused here: its old pin
+	 * would stay, and a later `box install` copies that framework back over
+	 * vendor/wheels/. Returns the pin (plus its path) for the post-swap update.
+	 */
+	private struct function $upgradeApplyBoxPin(required any upgrader) {
+		var boxPath = variables.projectRoot & "/box.json";
+		var pin = arguments.upgrader.readBoxJsonCorePin(boxPath);
+		if (len(pin.error)) {
+			out(pin.error, "red");
+			out("Fix box.json (or remove its wheels-core dependency), then re-run wheels upgrade apply. Nothing was changed.");
+			throw(type = "Wheels.UpgradeApplyFailed", message = pin.error & " Nothing was changed.");
+		}
+		pin.path = boxPath;
+		return pin;
+	}
+
+	/**
+	 * Old framework backups that an earlier `wheels upgrade apply` (before
+	 * 4.2) or a manual swap left inside vendor/. The framework loads every
+	 * vendor/ folder as a package, so each one logs a skipped-package error on
+	 * every start. Returns a note naming them, or "" when there are none.
+	 */
+	private string function $upgradeApplyLeftoverBackups() {
+		var vendorRoot = variables.projectRoot & "/vendor";
+		var leftovers = [];
+		for (var name in directoryList(vendorRoot, false, "name")) {
+			if (name != "wheels" && reFindNoCase("^wheels.*\.bak", name) && directoryExists(vendorRoot & "/" & name)) {
+				arrayAppend(leftovers, "vendor/" & name & "/");
+			}
+		}
+		if (!arrayLen(leftovers)) {
+			return "";
+		}
+		return "Old framework backups are still inside vendor/: " & arrayToList(leftovers, ", ")
+			& ". The framework loads every vendor/ folder as a package and logs an error for these on every start: move them to .wheels/backups/ or delete them." & chr(10);
+	}
+
+	/**
+	 * After the swap, point box.json's wheels-core pins at the framework now in
+	 * vendor/wheels/, so a later `box install` keeps it instead of copying
+	 * the old version back over it. Returns the summary lines, or "" when
+	 * box.json doesn't declare wheels-core. A version that isn't a release
+	 * number (a development checkout's placeholder) is never written.
+	 * Public so specs can drive it with a real version.
+	 */
+	public string function $upgradeApplyUpdateBoxPin(required any upgrader, required struct pin, required string newVersion) {
+		var nl = chr(10);
+		if (!arguments.pin.declared) {
+			return "";
+		}
+		if (!reFind("^\d+\.\d+", arguments.newVersion)) {
+			return "box.json: wheels-core left at #arguments.pin.value# (the new framework reports version ""#arguments.newVersion#"", not a release number). Set it to the installed version yourself, or box install copies #arguments.pin.value# back over vendor/wheels/." & nl;
+		}
+		var lines = "";
+		for (var entry in arguments.pin.pins) {
+			lines &= $upgradeApplyRepinOne(arguments.upgrader, arguments.pin.path, entry, arguments.newVersion) & nl;
+		}
+		return lines;
+	}
+
+	/**
+	 * Update one box.json wheels-core pin (one section) and return its summary
+	 * line. A spec apply doesn't rewrite (4.x, >=4.0.0, a channel, a forgebox
+	 * spec) gets a warning with the exact line to set; a change is reported
+	 * only when a value was actually written.
+	 */
+	private string function $upgradeApplyRepinOne(required any upgrader, required string path, required struct entry, required string newVersion) {
+		var label = arguments.entry.section == "dependencies" ? "box.json" : "box.json (#arguments.entry.section#)";
+		var newValue = arguments.upgrader.boxJsonCorePinFor(arguments.entry.value, arguments.newVersion);
+		if (!len(newValue)) {
+			return "#label#: wheels-core is ""#arguments.entry.value#"", which apply doesn't rewrite. If box install should keep this framework, change it to ""wheels-core"": ""#arguments.newVersion#"".";
+		}
+		if (newValue == arguments.entry.value) {
+			return "#label#: wheels-core already #newValue#";
+		}
+		var written = 0;
+		try {
+			written = arguments.upgrader.writeBoxJsonCorePin(arguments.path, newValue, arguments.entry.section);
+		} catch (any e) {
+			var failure = "vendor/wheels/ is now #arguments.newVersion#, but box.json could not be updated (#e.message#). Set its wheels-core dependency to ""#newValue#"" yourself, or box install copies #arguments.entry.value# back over vendor/wheels/.";
+			out(failure, "red");
+			throw(type = "Wheels.UpgradeApplyFailed", message = failure);
+		}
+		if (!written) {
+			return "#label#: wheels-core could not be located to rewrite. Set it to ""#newValue#"" yourself, or box install copies #arguments.entry.value# back over vendor/wheels/.";
+		}
+		return "#label#: wheels-core #arguments.entry.value# -> #newValue# (so box install keeps this framework)";
 	}
 
 	/**
@@ -9789,6 +10712,9 @@ component extends="modules.BaseModule" {
 			coreTests = arguments.coreTests
 		);
 		out(summary.text, summary.color);
+		for (var skipReason in $collectSkipReasons(arguments.result)) {
+			out("  Skipped (#skipReason.count#): #skipReason.message#", "yellow");
+		}
 		if (arguments.totalFail > 0 || arguments.totalError > 0) {
 			out("");
 
@@ -9831,10 +10757,13 @@ component extends="modules.BaseModule" {
 		boolean defaultScope = false,
 		boolean coreTests = false
 	) {
+		// Skipped specs did not run: they are counted, and a run with skips is never green.
+		var totalSkipped = isStruct(arguments.result) ? val(arguments.result.totalSkipped ?: 0) : 0;
+		var skippedStr = totalSkipped > 0 ? ", #totalSkipped# skipped" : "";
 		if (arguments.totalFail > 0 || arguments.totalError > 0) {
 			var failedToLoadStr = arguments.specsFailedToLoad > 0 ? ", #arguments.specsFailedToLoad# failed to load" : "";
 			return {
-				text = "#arguments.totalPass# passed, #arguments.totalFail# failed, #arguments.totalError# error(s)#failedToLoadStr##arguments.duration#",
+				text = "#arguments.totalPass# passed, #arguments.totalFail# failed, #arguments.totalError# error(s)#skippedStr##failedToLoadStr##arguments.duration#",
 				color = "red"
 			};
 		}
@@ -9856,7 +10785,52 @@ component extends="modules.BaseModule" {
 				color = "red"
 			};
 		}
+		if (totalSkipped > 0) {
+			return {text = "#arguments.totalPass# passed#skippedStr##arguments.duration#", color = "yellow"};
+		}
 		return {text = "#arguments.totalPass# passed#arguments.duration#", color = "green"};
+	}
+
+	/**
+	 * Why specs were skipped, from a TestBox result: one entry per distinct reason
+	 * (the skip message), with how many specs it covers, in the order first seen.
+	 * Pure, so specs can pin it.
+	 */
+	public array function $collectSkipReasons(required any result) {
+		var ctx = {reasons: [], index: {}};
+		if (!isStruct(arguments.result)) {
+			return ctx.reasons;
+		}
+		for (var bundle in (arguments.result.bundleStats ?: [])) {
+			for (var suite in (bundle.suiteStats ?: [])) {
+				$skipWalkSuite(suite, ctx);
+			}
+		}
+		return ctx.reasons;
+	}
+
+	/**
+	 * Recursively collect skipped specs' reasons from one suite into ctx.
+	 */
+	private void function $skipWalkSuite(required any suite, required struct ctx) {
+		for (var spec in (arguments.suite.specStats ?: [])) {
+			if ((spec.status ?: "") != "Skipped") {
+				continue;
+			}
+			var reason = trim(spec.failMessage ?: "");
+			if (!len(reason)) {
+				reason = "(no reason given)";
+			}
+			if (structKeyExists(arguments.ctx.index, reason)) {
+				arguments.ctx.reasons[arguments.ctx.index[reason]].count++;
+			} else {
+				arrayAppend(arguments.ctx.reasons, {message: reason, count: 1});
+				arguments.ctx.index[reason] = arrayLen(arguments.ctx.reasons);
+			}
+		}
+		for (var inner in (arguments.suite.suiteStats ?: [])) {
+			$skipWalkSuite(inner, arguments.ctx);
+		}
 	}
 
 	/**
@@ -10038,7 +11012,7 @@ component extends="modules.BaseModule" {
 
 		// Merge defaults for any missing options
 		var opts = {
-			port: structKeyExists(options, "port") ? options.port : 8080,
+			port: structKeyExists(options, "port") && options.port > 0 ? options.port : $defaultNewPort(targetDir),
 			datasource: structKeyExists(options, "datasource") ? options.datasource : lCase(appName),
 			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : generateRandomPassword(),
 			luceeAdminPassword: generateRandomPassword(),
@@ -10083,17 +11057,7 @@ component extends="modules.BaseModule" {
 			);
 		}
 
-		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
-		var context = {
-			"appName": appName,
-			"datasourceName": opts.datasource,
-			"reloadPassword": opts.reloadPassword,
-			"luceeAdminPassword": opts.luceeAdminPassword,
-			"port": opts.port,
-			"shutdownPort": opts.port + 1,
-			"openBrowser": opts.openBrowser ? "true" : "false",
-			"datasourcesBlock": opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(opts.datasource)
-		};
+		var context = $newTemplateContext(appName, opts, targetDir);
 
 		// Copy template directory tree to target, processing placeholders.
 		// `rootTargetDir` is passed so recursive calls can compute paths
@@ -10133,7 +11097,7 @@ component extends="modules.BaseModule" {
 		out("Application created!", "green");
 		out("");
 		out("Configuration:", "bold");
-		out("  Port:            #opts.port#");
+		out("  Port:            #opts.port# (shutdown #context.shutdownPort#)");
 		out("  Datasource:      #opts.datasource#");
 		out("  Reload password:      #opts.reloadPassword#");
 		out("  Lucee admin password: (see .env — WHEELS_LUCEE_ADMIN_PASSWORD)");
@@ -10555,15 +11519,136 @@ component extends="modules.BaseModule" {
 	 * port next to its requested HTTP port without colliding with another
 	 * project's server. Bounded so a pathological environment cannot spin
 	 * forever; falls back to `from` and lets LuCLI report the conflict itself.
+	 *
+	 * `avoid` is a struct keyed by port number: ports to skip even when nothing
+	 * listens on them right now, such as another project's lucee.json pins.
 	 */
-	private numeric function $nextFreePort(required numeric from) {
+	private numeric function $nextFreePort(required numeric from, struct avoid = {}) {
 		var probe = getService("portProbe");
 		for (var candidate = arguments.from; candidate < arguments.from + 100; candidate++) {
-			if (!probe.portInUse(candidate)) {
+			if (!structKeyExists(arguments.avoid, candidate) && !probe.portInUse(candidate)) {
 				return candidate;
 			}
 		}
 		return arguments.from;
+	}
+
+	/**
+	 * Ports pinned in other projects' lucee.json files, keyed by port, each
+	 * naming the project that pins it. A pin is a port that project will start
+	 * on, so it collides even while that project is stopped, which a listener
+	 * probe can't see. Projects come from the LuCLI server registry (every
+	 * project started on this machine) and from the folders next to
+	 * `targetDir` (siblings created but never started). `targetDir` itself is
+	 * skipped.
+	 */
+	private struct function $otherProjectPins(required string targetDir) {
+		var pins = {};
+		for (var root in $otherProjectRoots(arguments.targetDir)) {
+			var ported = $readPinnedPorts(root);
+			for (var key in ["port", "shutdownPort"]) {
+				if (ported[key] > 0 && !structKeyExists(pins, ported[key])) {
+					pins[ported[key]] = root;
+				}
+			}
+		}
+		return pins;
+	}
+
+	/**
+	 * Project roots for $otherProjectPins(): each registered server's
+	 * `.project-path`, then each sibling folder of `targetDir` that has a
+	 * lucee.json. Unique, without `targetDir`.
+	 */
+	private array function $otherProjectRoots(required string targetDir) {
+		var self = $canonicalDir(arguments.targetDir);
+		var seen = {};
+		var roots = [];
+		var candidates = [];
+		var serversDir = $resolveLucliHome() & "/servers";
+		if (directoryExists(serversDir)) {
+			for (var reg in directoryList(serversDir, false, "path")) {
+				if (fileExists(reg & "/.project-path")) {
+					arrayAppend(candidates, trim(fileRead(reg & "/.project-path")));
+				}
+			}
+		}
+		var parent = getDirectoryFromPath(reReplace(arguments.targetDir, "[\\/]+$", ""));
+		if (directoryExists(parent)) {
+			for (var sibling in directoryList(parent, false, "path")) {
+				arrayAppend(candidates, sibling);
+			}
+		}
+		for (var candidate in candidates) {
+			var dir = $canonicalDir(candidate);
+			if (len(dir) && dir != self && !structKeyExists(seen, dir) && fileExists(dir & "/lucee.json")) {
+				seen[dir] = true;
+				arrayAppend(roots, dir);
+			}
+		}
+		return roots;
+	}
+
+	/**
+	 * Canonical form of a directory path (symlinks resolved, no trailing
+	 * separator), or the path unchanged when it can't be resolved.
+	 */
+	private string function $canonicalDir(required string path) {
+		try {
+			return createObject("java", "java.io.File").init(arguments.path).getCanonicalPath();
+		} catch (any e) {
+			return arguments.path;
+		}
+	}
+
+	/**
+	 * HTTP port for a `wheels new` app created without --port: 8080, or the
+	 * first port above it that nothing listens on and no other project pins
+	 * in its lucee.json. Every app used to get 8080, so the second app on a
+	 * machine always collided with the first.
+	 */
+	private numeric function $defaultNewPort(required string targetDir) {
+		var pins = $otherProjectPins(arguments.targetDir);
+		var port = $nextFreePort(8080, pins);
+		if (port != 8080) {
+			out("Port 8080 is #structKeyExists(pins, 8080) ? 'pinned by ' & pins[8080] : 'in use'#; this app gets port #port#.", "yellow");
+		}
+		return port;
+	}
+
+	/**
+	 * Placeholder values for the `wheels new` project template.
+	 *
+	 * The shutdown port is the first free port above the HTTP port rather than
+	 * a blind port + 1: sibling apps are usually created with adjacent --port
+	 * values, so port + 1 is often another running app's port. `wheels start`
+	 * still moves a pinned shutdown port that is taken later
+	 * ($resolveStartPorts), but the pin `wheels new` writes should be free when
+	 * it is written. Ports that other projects pin in their lucee.json are
+	 * skipped too ($otherProjectPins), since those projects start on them
+	 * even when nothing listens there yet.
+	 */
+	private struct function $newTemplateContext(required string appName, required struct opts, string targetDir = "") {
+		var pins = len(arguments.targetDir) ? $otherProjectPins(arguments.targetDir) : {};
+		if (structKeyExists(pins, arguments.opts.port)) {
+			out("Port #arguments.opts.port# is also pinned by #pins[arguments.opts.port]# (its lucee.json); the two apps can't run at the same time. Pass a different --port to avoid that.", "yellow");
+		}
+		var shutdownPort = $nextFreePort(arguments.opts.port + 1, pins);
+		if (shutdownPort != arguments.opts.port + 1) {
+			var why = structKeyExists(pins, arguments.opts.port + 1) ? "pinned by " & pins[arguments.opts.port + 1] : "in use";
+			out("Shutdown port #arguments.opts.port + 1# is #why#; using #shutdownPort#.", "yellow");
+		}
+		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
+		return {
+			"appName": arguments.appName,
+			"datasourceName": arguments.opts.datasource,
+			"reloadPassword": arguments.opts.reloadPassword,
+			"luceeAdminPassword": arguments.opts.luceeAdminPassword,
+			"port": arguments.opts.port,
+			"shutdownPort": shutdownPort,
+			"openBrowser": arguments.opts.openBrowser ? "true" : "false",
+			"datasourcesBlock": arguments.opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(arguments.opts.datasource)
+		};
 	}
 
 	/**
@@ -10609,6 +11694,34 @@ component extends="modules.BaseModule" {
 		if (arguments.enginePort > 0) {
 			out("Using port " & arguments.enginePort & " (shutdown " & shutdownPort & ").", "cyan");
 		}
+	}
+
+	/**
+	 * Stop `wheels start` when the HTTP port pinned in lucee.json is taken.
+	 *
+	 * Starting anyway either failed inside LuCLI, whose message names its
+	 * standalone binary ("Use: lucli server stop <name>", not on a Wheels
+	 * install's PATH), or, on a LuCLI with the IPv4-blind check, booted on top
+	 * of the other listener. This names the Wheels server that holds the port
+	 * when the registry knows it, says how to stop it, and suggests a free
+	 * port. Throws Wheels.PortInUse.
+	 */
+	private void function $refuseTakenHttpPort(required numeric port) {
+		var holder = getService("serverRegistry").registrationOnPort(arguments.port);
+		var freePort = $nextFreePort(arguments.port + 1, $otherProjectPins(variables.projectRoot));
+		var heldBy = len(holder.name) ? "the Wheels server '#holder.name#'" : "another process";
+		out("");
+		out("Port #arguments.port# (configured in lucee.json) is in use by #heldBy#.", "red");
+		if (len(holder.projectPath)) {
+			out("Stop it:   cd #holder.projectPath# && wheels stop", "yellow");
+		} else if (!len(holder.name)) {
+			out("Stop that process, or use another port.", "yellow");
+		}
+		out("Or start this app on a free port:   wheels start --port=#freePort#", "yellow");
+		throw(
+			type = "Wheels.PortInUse",
+			message = "wheels start: port #arguments.port# is in use by #heldBy#. Stop it, or run: wheels start --port=#freePort#"
+		);
 	}
 
 	/**
@@ -11210,23 +12323,65 @@ component extends="modules.BaseModule" {
 	 *
 	 * Brace modifiers attach to the type token only, so they never steal
 	 * the value list from `name:enum:a,b`.
+	 *
+	 * Required-ness: a column is REQUIRED by default (`required=true` →
+	 * migration `allowNull=false` + a `validatesPresenceOf`). Two markers opt
+	 * out, so the generated migration and model always agree:
+	 *   - `name:type:optional` → nullable (`required=false`, no presence).
+	 *   - `name:type=value`    → a column DEFAULT (`prop.default`); a defaulted
+	 *                            column is never added to `validatesPresenceOf`
+	 *                            (an absent value is filled by the default).
+	 * The two combine: `name:type=value:optional` is nullable with a default.
+	 * `:optional` uses the word (not `?`) because zsh — the macOS default
+	 * shell — treats a bare `?` as a glob.
 	 */
 	private struct function $parsePropertyArg(required string arg) {
-		// Split on the FIRST two colons only — any additional colons
-		// (e.g. inside the comma-separated value list) belong in the
-		// values segment.
-		var parts = listToArray(arguments.arg, ":");
 		var names = new services.GeneratorPaths();
+		var token = arguments.arg;
+
+		// A trailing ":optional" marks the column nullable. Matched as a literal
+		// SUFFIX (not a positional colon segment) so a ":" inside a "=value"
+		// default — a URL or a timestamp — is never mistaken for the marker.
+		var optional = false;
+		if (len(token) GT 9 && compareNoCase(right(token, 9), ":optional") == 0) {
+			optional = true;
+			token = left(token, len(token) - 9);
+		}
+
+		// A "=value" suffix sets a column DEFAULT. Split on the FIRST "=" so the
+		// value keeps every ":" it contains (e.g. https://host, 12:00:00).
+		// Everything after the first "=" is the default; an empty value
+		// ("name:string=") is treated as no default.
+		var columnDefault = "";
+		var hasDefault = false;
+		var eqPos = find("=", token);
+		if (eqPos > 0) {
+			columnDefault = trim(mid(token, eqPos + 1, len(token) - eqPos));
+			token = left(token, eqPos - 1);
+			hasDefault = len(columnDefault) > 0;
+		}
+
+		// What remains is name[:type[:enumvalues]] (the type may carry {N}/{P,S}).
+		var parts = listToArray(token, ":");
 		// Property names and types are written into generated CFML (models,
 		// migrations, forms), so only plain identifiers are accepted.
 		var propName = names.identifier($underscoreHyphens(arrayLen(parts) ? parts[1] : "", "property"), "property");
 		var typeToken = arrayLen(parts) > 1 ? parts[2] : "string";
+		if (!len(typeToken)) {
+			typeToken = "string";
+		}
+
 		var modifiers = $parseTypeModifiers(typeToken);
 		names.identifier(modifiers.type, "property type");
 		var prop = {
 			name: propName,
-			type: modifiers.type
+			type: modifiers.type,
+			// Required by default; ":optional" makes it nullable.
+			required: !optional
 		};
+		if (hasDefault) {
+			prop.default = columnDefault;
+		}
 		if (structKeyExists(modifiers, "limit")) {
 			prop.limit = modifiers.limit;
 		}
@@ -12772,27 +13927,55 @@ component extends="modules.BaseModule" {
 		out("");
 		out("Installing #browserName# browser binaries...");
 
-		var classpath = "";
-		for (var entry in manifest.classpath) {
-			if (len(classpath)) classpath &= ":";
-			classpath &= installDir & "/lib/" & entry.filename;
-		}
+		var classpath = $browserClasspath(installDir, manifest);
 
-		try {
-			cfexecute(
-				name="java",
-				arguments="-cp #classpath# com.microsoft.playwright.CLI install #browserName#",
-				timeout=300,
-				variable="local.stdout",
-				errorVariable="local.stderr"
-			);
-			out("Browser install OK", "green");
-		} catch (any e) {
+		var install = $browserRunProcess(["java", "-cp", classpath, "com.microsoft.playwright.CLI", "install", browserName], 300);
+		if (install.timedOut || install.exitCode != 0) {
 			out("Browser install FAILED", "red");
-			out(local.stderr ?: e.message, "red");
-			return "";
+			out(install.timedOut ? "Playwright's install didn't finish within 300 seconds and was stopped." : trim(install.output), "red");
+			throw(type = "Wheels.BrowserSetupFailed", message = "wheels browser setup: installing the #browserName# binaries failed. See the output above.");
 		}
+		out("Browser install OK", "green");
 
+		return $browserFinishSetup(classpath, browserName);
+	}
+
+	/**
+	 * The Java classpath for the Playwright jars in `installDir`, joined with
+	 * the platform's separator (`:` on macOS and Linux, `;` on Windows).
+	 * Public so specs can check it.
+	 */
+	public string function $browserClasspath(required string installDir, required struct manifest) {
+		var jars = [];
+		for (var entry in arguments.manifest.classpath) {
+			arrayAppend(jars, arguments.installDir & "/lib/" & entry.filename);
+		}
+		return arrayToList(jars, createObject("java", "java.io.File").pathSeparator);
+	}
+
+	/**
+	 * Launch the browser once and finish `wheels browser setup`: print "ready"
+	 * only when the launch worked; otherwise print Playwright's output and the
+	 * remedy, then throw so the command exits non-zero. Downloading the
+	 * binaries doesn't prove they run: on a bare Linux host the browser can be
+	 * missing OS libraries. Public so specs can drive it with a stubbed probe.
+	 */
+	public string function $browserFinishSetup(required string classpath, required string browserName) {
+		out("Launching #arguments.browserName# to check it runs...");
+		var probe = $browserLaunchProbe(arguments.classpath, arguments.browserName);
+		if (!probe.ok) {
+			out("Browser launch FAILED", "red");
+			if (probe.timedOut) {
+				out("The browser didn't finish starting within #probe.timeoutSeconds# seconds and was stopped.", "red");
+			}
+			if (len(trim(probe.output))) {
+				out(trim(probe.output), "red");
+			}
+			out("");
+			out($browserLaunchRemedy(probe.output, arguments.classpath, arguments.browserName), "yellow");
+			throw(type = "Wheels.BrowserSetupFailed", message = "wheels browser setup: #arguments.browserName# is installed but didn't start. See the output above.");
+		}
+		out("Browser launch OK", "green");
 		out("");
 		out("Browser testing ready.", "green");
 		out("Run: wheels test --filter=browser  (or: wheels browser test)", "green");
@@ -13046,6 +14229,93 @@ component extends="modules.BaseModule" {
 		if (!arguments.verbose && len(arguments.message) > 400) {
 			out("    (truncated; pass --verbose for full output)", "yellow");
 		}
+	}
+
+	/**
+	 * Launch the browser once through Playwright's CLI (a headless screenshot of
+	 * about:blank). It counts as running only when the process finished in
+	 * time, exited 0 and wrote the screenshot; a timed-out run never counts,
+	 * even if a screenshot appeared first. The screenshot is always removed.
+	 * Returns {ok, timedOut, timeoutSeconds, output}.
+	 */
+	public struct function $browserLaunchProbe(required string classpath, required string browserName, numeric timeoutSeconds = 120) {
+		var shot = getTempDirectory() & "wheels-browser-probe-" & createUUID() & ".png";
+		var rv = {ok: false, timedOut: false, timeoutSeconds: arguments.timeoutSeconds, output: ""};
+		try {
+			var run = $browserRunProcess(
+				["java", "-cp", arguments.classpath, "com.microsoft.playwright.CLI", "screenshot", "--browser", arguments.browserName, "about:blank", shot],
+				arguments.timeoutSeconds
+			);
+			rv.output = run.output;
+			rv.timedOut = run.timedOut;
+			rv.ok = !run.timedOut && run.exitCode == 0 && fileExists(shot) && getFileInfo(shot).size > 0;
+		} finally {
+			if (fileExists(shot)) {
+				fileDelete(shot);
+			}
+		}
+		return rv;
+	}
+
+	/**
+	 * Run a command (an argv array, so paths with spaces stay one argument) and
+	 * wait at most `timeoutSeconds`. On timeout the process and everything it
+	 * started are killed. Output (stdout and stderr together) goes through a
+	 * temp file, so a chatty process can't block on a full pipe. Returns
+	 * {exitCode, timedOut, output}. Public so specs can check the timeout.
+	 */
+	public struct function $browserRunProcess(required array argv, required numeric timeoutSeconds) {
+		var logFile = getTempDirectory() & "wheels-browser-run-" & createUUID() & ".log";
+		var rv = {exitCode: -1, timedOut: false, output: ""};
+		try {
+			var builder = createObject("java", "java.lang.ProcessBuilder").init(arguments.argv);
+			builder.redirectErrorStream(true);
+			builder.redirectOutput(createObject("java", "java.io.File").init(logFile));
+			var process = builder.start();
+			var seconds = createObject("java", "java.util.concurrent.TimeUnit").SECONDS;
+			if (process.waitFor(javaCast("long", arguments.timeoutSeconds), seconds)) {
+				rv.exitCode = process.exitValue();
+			} else {
+				rv.timedOut = true;
+				$browserKillProcessTree(process);
+			}
+			rv.output = fileExists(logFile) ? fileRead(logFile) : "";
+		} finally {
+			if (fileExists(logFile)) {
+				fileDelete(logFile);
+			}
+		}
+		return rv;
+	}
+
+	/**
+	 * Kill a process and every process it started, then wait briefly for it to
+	 * go. The parent goes first, so it can't react to a child's death (a shell
+	 * would run its next command); the children are listed before that, while
+	 * they are still its descendants.
+	 */
+	private void function $browserKillProcessTree(required any process) {
+		var children = arguments.process.descendants().toArray();
+		arguments.process.destroyForcibly();
+		for (var child in children) {
+			child.destroyForcibly();
+		}
+		arguments.process.waitFor(javaCast("long", 5), createObject("java", "java.util.concurrent.TimeUnit").SECONDS);
+	}
+
+	/**
+	 * What to do after a failed launch probe. When Playwright reports missing
+	 * host libraries (a bare Linux install), print its install-deps command for
+	 * this install's classpath; otherwise point at the output above.
+	 * Public so specs can check the text.
+	 */
+	public string function $browserLaunchRemedy(required string output, required string classpath, required string browserName) {
+		if (findNoCase("missing dependencies", arguments.output) || findNoCase("install-deps", arguments.output)) {
+			return "The browser is installed but the system is missing libraries it needs. On Debian/Ubuntu, install them with:" & chr(10)
+				& "  sudo java -cp ""#arguments.classpath#"" com.microsoft.playwright.CLI install-deps #arguments.browserName#" & chr(10)
+				& "then run wheels browser setup again.";
+		}
+		return "The browser was installed but didn't start; see the output above. Run wheels browser setup --force to reinstall, then try again.";
 	}
 
 	/**

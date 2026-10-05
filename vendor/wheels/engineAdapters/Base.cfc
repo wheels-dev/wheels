@@ -232,19 +232,6 @@ component output="false" {
 		);
 	}
 
-	// --- Hash Normalization ---
-
-	/**
-	 * Normalizes a serialized JSON string for consistent cross-engine hashing.
-	 * Removes structural characters and sorts the result.
-	 *
-	 * @serialized The serialized JSON string
-	 */
-	public string function normalizeForHash(required string serialized) {
-		local.rv = ReplaceList(arguments.serialized, "{,},[,],/", ",,,,");
-		return ListSort(local.rv, "text");
-	}
-
 	// --- Struct Defaults ---
 
 	/**

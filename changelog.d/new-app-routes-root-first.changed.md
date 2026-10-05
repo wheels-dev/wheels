@@ -1,0 +1,1 @@
+- `config/routes.cfm` in a new app (`wheels new`) declares the root route before `.wildcard()`, with the wildcard last, as the routing docs recommend. Existing apps are unaffected; the root route matches either way.

@@ -1,0 +1,1 @@
+- A `where` condition that compares a function call with a value (e.g. `ABS(id) = 5`, `UPPER(title) = 'X'`, `UPPER(title) IS NULL`) now runs, with the value bound as a parameter, instead of failing with "Array index [1] out of range"

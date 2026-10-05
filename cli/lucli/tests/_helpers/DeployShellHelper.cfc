@@ -10,8 +10,20 @@ component {
 		runShell("bash tools/deploy-sshd-up.sh");
 	}
 
+	/**
+	 * The sshd fixture is one shared Docker Compose project on fixed ports
+	 * (22022/22023), so a teardown here would pull the containers out from under
+	 * another checkout's CLI suite running at the same time ("Connection reset",
+	 * "Exhausted available authentication methods"; #4232). `up -d` is
+	 * idempotent, so the fixture stays up by default; set
+	 * WHEELS_DEPLOY_SSHD_TEARDOWN=1 to stop it after each spec, or run
+	 * tools/deploy-sshd-down.sh when done. CI runners are discarded anyway.
+	 */
 	public void function sshdDown() {
-		runShell("bash tools/deploy-sshd-down.sh");
+		var teardown = createObject("java", "java.lang.System").getenv("WHEELS_DEPLOY_SSHD_TEARDOWN");
+		if (!isNull(teardown) && teardown == "1") {
+			runShell("bash tools/deploy-sshd-down.sh");
+		}
 	}
 
 	public void function e2eUp() {
@@ -31,11 +43,24 @@ component {
 			.init(["sh", "-c", arguments.cmd]);
 		pb.directory(createObject("java", "java.io.File").init(projectRoot));
 		pb.redirectErrorStream(true);
+		// Output to a file (no pipe to fill) and a bounded wait: a stuck docker or
+		// sshd fixture fails this bundle with its output instead of hanging the
+		// whole CLI suite request (#4232).
+		var outFile = getTempFile(getTempDirectory(), "wheels-deploy-shell");
+		pb.redirectOutput(createObject("java", "java.io.File").init(outFile));
 		var proc = pb.start();
-		// Drain stdout so child doesn't block on a full pipe. Also gives us
-		// something to surface if the script fails.
-		var output = $drainStream(proc.getInputStream());
-		var exit = proc.waitFor();
+		var finished = proc.waitFor(javaCast("long", 180), createObject("java", "java.util.concurrent.TimeUnit").SECONDS);
+		if (!finished) proc.destroyForcibly();
+		var output = fileExists(outFile) ? fileRead(outFile, "utf-8") : "";
+		if (fileExists(outFile)) fileDelete(outFile);
+		if (!finished) {
+			throw(
+				type = "DeployShellHelper.ShellTimedOut",
+				message = "Shell command did not finish within 180 s: #arguments.cmd#",
+				detail = output
+			);
+		}
+		var exit = proc.exitValue();
 		if (exit != 0) {
 			throw(
 				type = "DeployShellHelper.ShellFailed",
@@ -43,18 +68,6 @@ component {
 				detail = output
 			);
 		}
-	}
-
-	private string function $drainStream(required any stream) {
-		var baos = createObject("java", "java.io.ByteArrayOutputStream").init();
-		var buffer = createObject("java", "java.lang.reflect.Array")
-			.newInstance(createObject("java", "java.lang.Byte").TYPE, javaCast("int", 8192));
-		while (true) {
-			var n = arguments.stream.read(buffer);
-			if (n <= 0) break;
-			baos.write(buffer, javaCast("int", 0), javaCast("int", n));
-		}
-		return baos.toString("UTF-8");
 	}
 
 }

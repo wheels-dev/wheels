@@ -298,11 +298,6 @@ component {
 			);
 		}
 
-		// Set the coreTestDatasourceName to the application dataSourceName if it doesn't exits
-		if (!StructKeyExists(application.$wheels, "coreTestDataSourceName")) {
-			application.$wheels.coreTestDataSourceName = application.$wheels.dataSourceName;
-		}
-
 		// Test framework: "testbox" (default) or "rocketunit"
 		if (!StructKeyExists(application.$wheels, "testFramework")) {
 			application.$wheels.testFramework = "testbox";
@@ -385,6 +380,10 @@ component {
 		// Parse set(baseUrl=...) now: a malformed value stops the application
 		// from starting instead of failing the first absolute URL (#3842).
 		application.wo.$cacheBaseUrl(application.$wheels);
+
+		// Default coreTestDataSourceName to the dataSourceName the settings files set
+		// (not the folder-derived one above), unless they set it themselves.
+		application.wo.$defaultCoreTestDataSourceName(application.$wheels);
 
 		// Re-derive framework paths now that settings.cfm has loaded. Detection
 		// priority for the URL subpath (issue #2968):

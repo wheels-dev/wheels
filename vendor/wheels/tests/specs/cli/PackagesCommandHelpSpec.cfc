@@ -21,10 +21,12 @@ component extends="wheels.WheelsTest" {
 		describe("wheels packages — top-level help summary alignment", () => {
 
 			it("Module.cfc source file is reachable", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				expect(fileExists(ctx.modulePath)).toBeTrue("Missing file: " & ctx.modulePath);
 			});
 
 			it("showHelp() summary line leads with `Add`, not `Install`", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				var source = fileRead(ctx.modulePath);
 
 				// The legacy phrasing led with "Install", the verb older CLIs
@@ -36,6 +38,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("showHelp() summary line for `packages` points at the canonical `add` verb", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				var source = fileRead(ctx.modulePath);
 
 				// Find the line that starts the `packages` summary entry in
@@ -60,6 +63,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("packages() hint metadata leads with `Add`, not `Install`", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				var source = fileRead(ctx.modulePath);
 
 				// `wheels packages --help` prints the packages() `hint:` line.
@@ -74,6 +78,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("unknown-subcommand error points users at `wheels packages add`", () => {
+				$requireRepoPath("cli/lucli/Module.cfc");
 				var source = fileRead(ctx.modulePath);
 
 				expect(source contains "Unknown packages subcommand").toBeTrue(

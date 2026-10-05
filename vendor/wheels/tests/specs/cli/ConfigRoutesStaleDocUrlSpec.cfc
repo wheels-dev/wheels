@@ -44,6 +44,7 @@ component extends="wheels.WheelsTest" {
 				// current value, not the final iteration's value.
 				(function(relPath) {
 					it("points to the canonical guides.wheels.dev path in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 
@@ -80,6 +81,7 @@ component extends="wheels.WheelsTest" {
 			];
 
 			it("no retired guide URLs under cli/lucli/templates/ or the known runtime-message files", () => {
+				$requireRepoPath("cli/lucli/templates");
 				var scanned = [];
 				var templateRoot = repoRoot & "/cli/lucli/templates";
 				var templateFiles = directoryList(templateRoot, true, "path");
