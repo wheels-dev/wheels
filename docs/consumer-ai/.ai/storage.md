@@ -33,7 +33,7 @@ url = service("storage").disk("s3").signedUrl(key="reports/q3.pdf", expiresIn=90
 
 ## Deleting files, and files that belong to records
 
-`service("storage").disk().delete(key)` returns `true` when it removed an object and `false` when nothing was there; `exists(key)` likewise. Neither returns `false` for a failure: an invalid key throws `.InvalidKey`, and an S3 error or unreachable endpoint throws `.RequestFailed`. `put()` returns the key.
+`service("storage").disk().delete(key)` returns `true` when it removed an object and `false` when nothing was there; `exists(key)` likewise. Neither returns `false` for a failure: an invalid key throws `Wheels.Storage.InvalidKey`, and an S3 error or unreachable endpoint throws `Wheels.Storage.RequestFailed`. `put()` returns the key.
 
 There is no attachment API on models. Store the key in a column, write the file with `put()`, and delete it yourself. Delete in `afterCommit`, not in `beforeDelete` / `afterDelete`: if the transaction rolls back, the row survives and must still find its file.
 
