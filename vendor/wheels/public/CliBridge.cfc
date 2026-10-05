@@ -73,7 +73,8 @@ component output="false" displayName="CLI Bridge" {
 			"jobsStatus" = "jobsStatus",
 			"jobsRetry" = "jobsRetry",
 			"jobsPurge" = "jobsPurge",
-			"jobsMonitor" = "jobsMonitor"
+			"jobsMonitor" = "jobsMonitor",
+			"jobsEnqueue" = "jobsEnqueue"
 		};
 		return this;
 	}
@@ -892,7 +893,228 @@ component output="false" displayName="CLI Bridge" {
 		return local.rv;
 	}
 
+	/**
+	 * `wheels jobs enqueue`: enqueue a job now, or after `delaySeconds`. A mutating
+	 * command (POST, loopback, reload password). The class name comes from the
+	 * request, so it is checked from its name and its source file before anything is
+	 * loaded: a dotted identifier, on the worker's own allowlist (app.jobs plus any
+	 * jobClassPrefixes; a bare name resolves under app.jobs), a .cfc that exists,
+	 * and one whose `extends` chain reaches wheels.Job. Only then is it
+	 * instantiated, and the instance is checked again. Anything else is refused.
+	 * Not GetComponentMetadata(): on Lucee that loads the component and runs its
+	 * pseudo-constructor.
+	 */
+	public struct function jobsEnqueue(required struct context, required struct params) {
+		local.rv = {success = false};
+		local.name = StructKeyExists(arguments.params, "job") ? Trim(arguments.params.job) : "";
+		if (!ReFind("^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$", local.name)) {
+			local.rv.message = "Not a job class name: '#local.name#'. Use a component name such as SendWelcomeEmailJob or billing.InvoiceJob (under app/jobs/).";
+			return local.rv;
+		}
+
+		local.input = $jobsEnqueueInput(arguments.params);
+		if (Len(local.input.error)) {
+			local.rv.message = local.input.error;
+			return local.rv;
+		}
+
+		local.base = CreateObject("component", "wheels.Job").init();
+		local.jobClass = local.base.$isAllowedJobClass(local.name) ? local.name : "app.jobs." & local.name;
+		if (!local.base.$isAllowedJobClass(local.jobClass)) {
+			local.rv.message = "#local.jobClass# isn't on the jobs allowlist (app.jobs and jobClassPrefixes).";
+			return local.rv;
+		}
+		if (!FileExists($componentFilePath(local.jobClass))) {
+			local.rv.message = "#local.jobClass# isn't a job class: there is no #Replace(local.jobClass, ".", "/", "all")#.cfc." & $jobsEnqueueAvailable();
+			return local.rv;
+		}
+		if (!$sourceExtendsWheelsJob(local.jobClass)) {
+			local.rv.message = "#local.jobClass# doesn't extend wheels.Job, so it isn't a job.";
+			return local.rv;
+		}
+
+		local.job = local.base.$instantiateJobClass(local.jobClass);
+		if (!IsInstanceOf(local.job, "wheels.Job")) {
+			local.rv.message = "#local.jobClass# doesn't extend wheels.Job, so it isn't a job.";
+			return local.rv;
+		}
+		local.args = {data = local.input.data};
+		if (Len(local.input.queue)) {
+			local.args.queue = local.input.queue;
+		}
+		if (local.input.hasPriority) {
+			local.args.priority = local.input.priority;
+		}
+		if (local.input.delaySeconds > 0) {
+			local.args.seconds = local.input.delaySeconds;
+			local.result = local.job.enqueueIn(argumentCollection = local.args);
+		} else {
+			local.result = local.job.enqueue(argumentCollection = local.args);
+		}
+
+		local.rv.success = true;
+		local.rv.job = {
+			"id" = local.result.id,
+			"jobClass" = local.result.jobClass,
+			"status" = local.result.status,
+			"queue" = Len(local.input.queue) ? local.input.queue : local.job.queue,
+			"priority" = local.input.hasPriority ? local.input.priority : local.job.priority,
+			"delaySeconds" = local.input.delaySeconds
+		};
+		local.rv.message = "Enqueued #local.result.jobClass# (#local.result.id#)";
+		return local.rv;
+	}
+
 	// ── Internal ────────────────────────────────────────────────────────
+
+	/**
+	 * jobsEnqueue's data, queue, priority and delaySeconds, validated. `error` is
+	 * "" when they are all usable.
+	 */
+	public struct function $jobsEnqueueInput(required struct params) {
+		local.rv = {error = "", data = {}, queue = "", priority = 0, hasPriority = false, delaySeconds = 0};
+		local.raw = StructKeyExists(arguments.params, "data") ? Trim(arguments.params.data) : "";
+		if (Len(local.raw)) {
+			local.parsed = IsJSON(local.raw) ? DeserializeJSON(local.raw) : "";
+			if (!IsStruct(local.parsed)) {
+				local.rv.error = "The job data must be a JSON object, like {""userId"":42}.";
+				return local.rv;
+			}
+			local.rv.data = local.parsed;
+		}
+		local.rv.queue = StructKeyExists(arguments.params, "queue") ? Trim(arguments.params.queue) : "";
+		if (StructKeyExists(arguments.params, "priority") && Len(Trim(arguments.params.priority))) {
+			if (!ReFind("^-?[0-9]+$", Trim(arguments.params.priority))) {
+				local.rv.error = "The priority must be a whole number.";
+				return local.rv;
+			}
+			local.rv.priority = Val(arguments.params.priority);
+			local.rv.hasPriority = true;
+		}
+		if (StructKeyExists(arguments.params, "delaySeconds") && Len(Trim(arguments.params.delaySeconds))) {
+			if (!ReFind("^[0-9]+$", Trim(arguments.params.delaySeconds))) {
+				local.rv.error = "delaySeconds must be zero or a positive whole number of seconds.";
+				return local.rv;
+			}
+			local.rv.delaySeconds = Val(arguments.params.delaySeconds);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * The .cfc file a dotted component path names, through the application's mappings.
+	 */
+	public string function $componentFilePath(required string componentPath) {
+		return ExpandPath("/" & Replace(arguments.componentPath, ".", "/", "all") & ".cfc");
+	}
+
+	/**
+	 * True when a component's `extends` chain, read from its source files, reaches
+	 * wheels.Job. Nothing is loaded or run. A parent named without a dot is a
+	 * sibling in the same package, as CFML resolves it.
+	 */
+	public boolean function $sourceExtendsWheelsJob(required string componentPath) {
+		local.current = arguments.componentPath;
+		for (local.depth = 1; local.depth <= 10; local.depth++) {
+			local.file = $componentFilePath(local.current);
+			if (!FileExists(local.file)) {
+				return false;
+			}
+			local.parent = $sourceExtends(FileRead(local.file));
+			if (!Len(local.parent)) {
+				return false;
+			}
+			if (CompareNoCase(local.parent, "wheels.Job") == 0) {
+				return true;
+			}
+			if (!Find(".", local.parent) && Find(".", local.current)) {
+				local.parent = ListDeleteAt(local.current, ListLen(local.current, "."), ".") & "." & local.parent;
+			}
+			local.current = local.parent;
+		}
+		return false;
+	}
+
+	/**
+	 * The `extends` value in a component's declaration (script `component extends="X"`
+	 * or the tag form's extends attribute), with comments removed first so a commented-out
+	 * declaration doesn't count. "" when it extends nothing.
+	 */
+	public string function $sourceExtends(required string source) {
+		local.code = $stripBlockComments(arguments.source);
+		local.lines = [];
+		for (local.line in ListToArray(local.code, Chr(10), true)) {
+			if (!ReFind("^\s*//", local.line)) {
+				ArrayAppend(local.lines, local.line);
+			}
+		}
+		local.code = ArrayToList(local.lines, Chr(10));
+		local.found = ReFindNoCase("(^|[^A-Za-z0-9_])(cf)?component([^A-Za-z0-9_]|$)", local.code, 1, true);
+		if (local.found.pos[1] == 0) {
+			return "";
+		}
+		local.headerStart = local.found.pos[1];
+		local.headerEnd = Len(local.code);
+		for (local.closer in ["{", ">"]) {
+			local.at = Find(local.closer, local.code, local.headerStart);
+			if (local.at > 0 && local.at < local.headerEnd) {
+				local.headerEnd = local.at;
+			}
+		}
+		local.header = Mid(local.code, local.headerStart, local.headerEnd - local.headerStart + 1);
+		local.match = ReFindNoCase("extends[[:space:]]*=[[:space:]]*[""']?([A-Za-z0-9_.]+)", local.header, 1, true);
+		if (local.match.pos[1] == 0 || ArrayLen(local.match.pos) < 2) {
+			return "";
+		}
+		return Mid(local.header, local.match.pos[2], local.match.len[2]);
+	}
+
+	/**
+	 * Source with script block comments and tag comments removed, by plain Find()
+	 * rather than a global non-greedy regex (which can hang Lucee 7 on large input).
+	 * The markers are built with Chr() so this file contains none of them literally.
+	 */
+	public string function $stripBlockComments(required string source) {
+		local.rv = arguments.source;
+		local.pairs = [
+			[Chr(47) & Chr(42), Chr(42) & Chr(47)],
+			[Chr(60) & Chr(33) & "---", "---" & Chr(62)]
+		];
+		for (local.pair in local.pairs) {
+			local.start = Find(local.pair[1], local.rv);
+			while (local.start > 0) {
+				local.stop = Find(local.pair[2], local.rv, local.start + Len(local.pair[1]));
+				if (local.stop == 0) {
+					// Left(str, 0) crashes Lucee 7.
+					local.rv = local.start > 1 ? Left(local.rv, local.start - 1) : "";
+					break;
+				}
+				local.rv = (local.start > 1 ? Left(local.rv, local.start - 1) : "") & Mid(local.rv, local.stop + Len(local.pair[2]), Len(local.rv));
+				local.start = Find(local.pair[1], local.rv);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * " Job classes in app/jobs: A, B." for a refusal, or "" when there are none.
+	 */
+	public string function $jobsEnqueueAvailable() {
+		local.dir = ExpandPath("/app/jobs");
+		if (!DirectoryExists(local.dir)) {
+			return "";
+		}
+		local.names = [];
+		for (local.file in DirectoryList(local.dir, true, "path", "*.cfc")) {
+			local.relative = Mid(Replace(local.file, "\", "/", "all"), Len(Replace(local.dir, "\", "/", "all")) + 2, 1000);
+			ArrayAppend(local.names, Replace(ReReplace(local.relative, "\.cfc$", ""), "/", ".", "all"));
+			if (ArrayLen(local.names) >= 10) {
+				break;
+			}
+		}
+		return ArrayLen(local.names) ? " Job classes in app/jobs: " & ArrayToList(local.names, ", ") & "." : "";
+	}
+
 
 	/**
 	 * Seed orchestration, shared by `dbSeed` and `dbSetup`. Returns a struct
