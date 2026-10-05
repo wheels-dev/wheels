@@ -25,7 +25,8 @@ component extends="wheels.WheelsTest" {
 		t.create();
 		t = variables.migration.createTable(name = "c_o_r_e_upolynotes");
 		t.string(columnNames = "body");
-		t.integer(columnNames = "notable_id", allowNull = true);
+		// as wide as the parents' primary keys (64-bit on CockroachDB)
+		t.bigInteger(columnNames = "notable_id", allowNull = true);
 		t.string(columnNames = "notable_type", allowNull = true);
 		t.create();
 		for (var m in ["UPolyNote", "UPolyPost", "UPolyPage"]) {
@@ -80,12 +81,13 @@ component extends="wheels.WheelsTest" {
 				var post = variables.g.model("UPolyPost").create(title = "p");
 				var page = variables.g.model("UPolyPage").create(title = "g");
 				post.createUPolyNote(body = "on the post");
-				// a note for a page that happens to share the post's id must not show up on the post
+				// The only note is the post's, so the page has none, even when the two ids are equal.
+				expect(page.hasUPolyNote()).toBeFalse();
+				// A note for a page with the post's id must not show up on the post.
 				variables.g.model("UPolyNote").create(body = "on a page", notable_id = post.id, notable_type = "UPolyPage");
 				expect(post.uPolyNotes().recordCount).toBe(1);
 				expect(post.uPolyNoteCount()).toBe(1);
 				expect(post.hasUPolyNotes()).toBeTrue();
-				expect(page.hasUPolyNote()).toBeFalse();
 			});
 
 			it("filters an include join by the type column", () => {
