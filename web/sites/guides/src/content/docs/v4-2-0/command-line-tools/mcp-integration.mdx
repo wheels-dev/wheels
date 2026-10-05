@@ -63,7 +63,7 @@ That runs a single MCP method and exits — useful for smoke-testing without ope
 
 ## Tools exposed
 
-Every public function in the Wheels Module is auto-discovered as an MCP tool. Names in `tools/list` are the bare function names — 16 tools (4.1.2 and earlier also list `create`, and 4.1.0 and earlier `deploy`; see below):
+Every public function in the Wheels Module is auto-discovered as an MCP tool. Names in `tools/list` are the bare function names — 17 tools (4.1.x has no `lookup`, 4.1.2 and earlier also list `create`, and 4.1.0 and earlier `deploy`; see below):
 
 | Tool | Purpose |
 |---|---|
@@ -81,6 +81,7 @@ Every public function in the Wheels Module is auto-discovered as an MCP tool. Na
 | `doctor` | Diagnose install, project, and runtime issues. |
 | `stats` | Count models, controllers, routes, tests, migrations. |
 | `notes` | Surface `TODO`, `FIXME`, `HACK`, `OPTIMIZE` annotations from the codebase. |
+| `lookup` | Look up the Wheels API reference and the guides offline: a function name returns its full entry (parameters, example, link), a phrase returns the best-matching guide sections and functions. |
 | `upgrade` | Scan the project for breaking changes (`check`, read-only) or swap `vendor/wheels/` to a newer release (`apply`, writes with a backup). |
 | `packages` | Search, show, add, update, and remove Wheels packages; manage the registry cache. |
 

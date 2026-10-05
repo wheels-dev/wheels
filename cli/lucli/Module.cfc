@@ -306,6 +306,7 @@ component extends="modules.BaseModule" {
 			"destroy" = destroyArgSpec().toInputSchema(),
 			"doctor"  = verboseFlagSpec().toInputSchema(),
 			"generate" = generateArgSpec().toInputSchema(),
+			"lookup"  = lookupArgSpec().toInputSchema(),
 			"migrate" = migrateArgSpec().toInputSchema(),
 			"notes"   = notesArgSpec().toInputSchema(),
 			"packages" = packagesArgSpec().toInputSchema(),
@@ -822,6 +823,7 @@ component extends="modules.BaseModule" {
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
 		help &= "  setup               Configure this app for external tools (setup agents: AI assistants)" & nl;
+		help &= "  lookup              Look up the Wheels API and guides offline (a function name or a phrase)" & nl;
 		help &= "  version             Show Wheels CLI version" & nl;
 		help &= "  help                Show this help" & nl & nl;
 		help &= "For command-specific help: wheels <command> --help" & nl & nl;
@@ -1998,6 +2000,136 @@ component extends="modules.BaseModule" {
 		return "/";
 	}
 
+
+	// ─────────────────────────────────────────────────
+	//  lookup — Offline API and guides lookup
+	// ─────────────────────────────────────────────────
+
+	private any function lookupArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "query", required = true, description = "A function name (findAll, model.findAll), a phrase (nested resources), or an id from an earlier result (api:model.findAll)")
+			.option(name = "kind", default = "all", choices = "all,api,guides", description = "Search the API reference, the guides, or both")
+			.option(name = "limit", default = 5, type = "numeric", description = "Most results to return (1-20)")
+			.option(name = "format", default = "text", choices = "text,json", description = "Output format");
+	}
+
+	/**
+	 * hint: Look up the Wheels API and guides offline: a function name, a phrase, or an id from an earlier result
+	 */
+	public string function lookup() {
+		var usage = "Usage: wheels lookup <query> [--kind=all|api|guides] [--limit=5] [--format=text|json]";
+		var opts = {};
+		try {
+			opts = lookupArgSpec().parse(structuredArgs(arguments));
+		} catch (Wheels.CLI.MissingArgument e) {
+			$refuse("Missing a query: a function name (findAll), a phrase (nested resources), or an id from an earlier result. " & usage);
+		}
+
+		var index = new services.DocsIndex($docsIndexPath());
+		if (!index.exists()) {
+			// Self-contained: an MCP client sees only the message (it drops what was printed).
+			throw(
+				type = "Wheels.DocsIndexMissing",
+				message = "This Wheels CLI has no docs index (#$docsIndexPath()#). Release and snapshot builds include it; "
+					& "from a source checkout, build it with: node tools/build/scripts/build-docs-index.mjs"
+			);
+		}
+
+		var result = index.lookup(opts.query, opts.kind, opts.limit);
+		result["index"] = index.meta();
+		var note = $docsIndexVersionNote(result.index.frameworkVersion);
+
+		if (opts.format == "json") {
+			if (len(note)) {
+				result["note"] = note;
+			}
+			out(serializeJSON(result));
+			return "";
+		}
+
+		if (result.mode != "search") {
+			if (!arrayLen(result.entries)) {
+				out("No entry with id ""#result.query#"".");
+			}
+			for (var entry in result.entries) {
+				$printDocsEntry(entry);
+			}
+		} else if (!arrayLen(result.results)) {
+			out("No matches for ""#result.query#"". Try fewer or different words, or search https://guides.wheels.dev/");
+		} else {
+			for (var i = 1; i <= arrayLen(result.results); i++) {
+				var hit = result.results[i];
+				out("#i#. [#hit.kind#] #hit.title#", "bold");
+				if (len(hit.snippet)) {
+					out("   " & hit.snippet);
+				}
+				out("   " & hit.url);
+				out("   id: " & hit.id);
+			}
+			out("");
+			out("For a whole entry: wheels lookup <id>");
+		}
+		if (len(note)) {
+			out(note, "yellow");
+		}
+		return "";
+	}
+
+	/**
+	 * The docs index the CLI module ships (built at release and snapshot time).
+	 * Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public string function $docsIndexPath() {
+		return getDirectoryFromPath(getCurrentTemplatePath()) & "data/docs-index.json";
+	}
+
+	/**
+	 * A note when the index describes another framework version than this CLI
+	 * (a stale index in a source checkout). Pre-release suffixes are ignored:
+	 * a 4.2.0-snapshot.N CLI reads a 4.2.0 snapshot index.
+	 */
+	private string function $docsIndexVersionNote(required string indexVersion) {
+		var cliBase = reMatch("^\d+\.\d+\.\d+", $displayVersion());
+		var indexBase = reMatch("^\d+\.\d+\.\d+", arguments.indexVersion);
+		if (!arrayLen(cliBase) || !arrayLen(indexBase) || cliBase[1] == indexBase[1]) {
+			return "";
+		}
+		return "This docs index is for Wheels #arguments.indexVersion#; this CLI is #$displayVersion()#.";
+	}
+
+	private void function $printDocsEntry(required struct entry) {
+		var e = arguments.entry;
+		if (e.kind == "api") {
+			var names = [];
+			for (var p in e.params) {
+				arrayAppend(names, p.name);
+			}
+			out("#e.name#(#arrayToList(names, ", ")#) returns #e.returns#", "bold");
+			out("Available in: #arrayToList(e.scopes, ", ")#   Section: #e.section#");
+			out("");
+			out(e.hint);
+			if (arrayLen(e.params)) {
+				out("");
+				out("Parameters:", "bold");
+				for (var p in e.params) {
+					var detail = p.type & (p.required ? ", required" : "") & (len(p["default"]) ? ", default " & p["default"] : "");
+					out("  #p.name# (#detail#)" & (len(p.hint) ? ": " & p.hint : ""));
+				}
+			}
+			if (len(e.example)) {
+				out("");
+				out("Example:", "bold");
+				out(e.example);
+			}
+		} else {
+			out(compare(e.page, e.heading) == 0 ? e.page : e.page & " › " & e.heading, "bold");
+			out("");
+			out(e.text);
+		}
+		out("");
+		out(e.url);
+		out("");
+	}
 
 	// ─────────────────────────────────────────────────
 	//  docs — Local offline documentation bundle
