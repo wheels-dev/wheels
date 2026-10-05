@@ -187,10 +187,19 @@
 	/**
 	 * Escapes the `LIKE` wildcards in a string so it can be used as a literal search term in a
 	 * `LIKE` comparison that declares `ESCAPE '\'`. The escape character `\` is escaped first, then
-	 * `%`, `_` and `[` (the last is a wildcard on SQL Server). Supply the result as a bound parameter
-	 * and add your own surrounding wildcards:
+	 * `%`, `_` and `[` (the last is a wildcard on SQL Server). Add your own surrounding wildcards and
+	 * place the result in a quoted literal whose `LIKE` declares `ESCAPE '\'`:
 	 *
-	 * `model("post").findAll(where="title LIKE :q ESCAPE '\'", params={q="%" & escapeForLike(term) & "%"})`
+	 * `model("post").findAll(where="title LIKE '%#escapeForLike(params.q)#%' ESCAPE '\'")`
+	 *
+	 * Wheels binds the quoted literal as a query parameter (`parameterize` is on by default), and the
+	 * explicit `ESCAPE '\'` makes the escaped wildcards literal on every supported database — MySQL,
+	 * PostgreSQL, SQL Server, SQLite, Oracle, H2 and CockroachDB. The clause is required: a plain
+	 * `LIKE` has no escape character on most engines, and the three-argument query builder
+	 * (`where("title", "LIKE", ...)`) does not emit one, so `\` would be matched literally there.
+	 *
+	 * This escapes `LIKE` metacharacters only, not SQL quotes; quote the value the same way you would
+	 * any other `where`-string literal.
 	 *
 	 * [section: Global Helpers]
 	 * [category: String Functions]

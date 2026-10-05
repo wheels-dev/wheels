@@ -62,6 +62,8 @@ Create: `model("User").new(params.user).save()`, or `model("User").create(params
 Include associations: `findAll(include="role,orders")`. Pagination: `findAll(page=params.page, perPage=25)`.
 Opt a `select=false` calculated property into one call (additive): `findAll(includeCalculated="fullName")`. Unknown names throw `Wheels.CalculatedPropertyNotFound` in dev/testing.
 
+Literal LIKE search: `findAll(where="title LIKE '%#escapeForLike(params.q)#%' ESCAPE '\'")`. `escapeForLike()` escapes `%` `_` `[` and `\` so a user's term isn't read as wildcards; the quoted literal is bound, and the explicit `ESCAPE '\'` is required (a plain `LIKE` and the 3-arg builder `where("title","LIKE",...)` emit no escape char, so `\` would match literally). Escapes LIKE metacharacters only, not SQL quotes.
+
 ## Scopes / Enums / Builder / Batch
 
 ```cfm
