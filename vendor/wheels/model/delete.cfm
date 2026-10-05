@@ -226,7 +226,10 @@
 				local.rv = true;
 				// v4.2.0: queue afterCommit/afterRollback (fires at the outermost
 				// transaction resolve, or immediately in none/false mode).
-				$enqueueTransactionCallbacks(operation = "delete");
+				// callbacks = false skips the commit callbacks too, like every other callback.
+				if (arguments.callbacks) {
+					$enqueueTransactionCallbacks(operation = "delete");
+				}
 			}
 		}
 		return local.rv;

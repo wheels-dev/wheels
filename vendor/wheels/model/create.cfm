@@ -178,7 +178,10 @@
 						local.rv = true;
 						// v4.2.0: queue afterCommit/afterRollback (fires at the outermost
 						// transaction resolve, or immediately in none/false mode).
-						$enqueueTransactionCallbacks(operation = "create");
+						// callbacks = false skips the commit callbacks too, like every other callback.
+						if (arguments.callbacks) {
+							$enqueueTransactionCallbacks(operation = "create");
+						}
 					} else if (local.rollback) {
 						$resetToNew();
 					}
@@ -206,7 +209,10 @@
 						}
 						local.rv = true;
 						// v4.2.0: queue afterCommit/afterRollback (see create branch).
-						$enqueueTransactionCallbacks(operation = "update");
+						// callbacks = false skips the commit callbacks too, like every other callback.
+						if (arguments.callbacks) {
+							$enqueueTransactionCallbacks(operation = "update");
+						}
 					}
 				} else {
 					$validateAssociations(callbacks = arguments.callbacks);
