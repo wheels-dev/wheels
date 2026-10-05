@@ -664,6 +664,22 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. The parameters a parameterized statement binds: one per value of an
+	 * IN list and one per other param; a NULL is written inline and not counted.
+	 */
+	public numeric function $boundParameterCount(required array sql) {
+		local.count = 0;
+		for (local.part in arguments.sql) {
+			if (!IsStruct(local.part) || (StructKeyExists(local.part, "null") && local.part.null)) {
+				continue;
+			}
+			local.isList = StructKeyExists(local.part, "list") && local.part.list && StructKeyExists(local.part, "value");
+			local.count += local.isList ? ListLen(local.part.value, ",") : 1;
+		}
+		return local.count;
+	}
+
+	/**
 	 * Throws Wheels.TooManyParameters before a parameterized statement runs when it
 	 * would bind more parameters than the database accepts. Every value of an IN
 	 * list binds as its own parameter; a NULL is written inline and not counted.
@@ -673,21 +689,22 @@ component output=false extends="wheels.Global"{
 		if (!arguments.parameterize || local.limit <= 0) {
 			return;
 		}
-		local.count = 0;
-		for (local.part in arguments.sql) {
-			if (!IsStruct(local.part) || (StructKeyExists(local.part, "null") && local.part.null)) {
-				continue;
-			}
-			local.isList = StructKeyExists(local.part, "list") && local.part.list && StructKeyExists(local.part, "value");
-			local.count += local.isList ? ListLen(local.part.value, ",") : 1;
-		}
+		local.count = $boundParameterCount(arguments.sql);
 		if (local.count > local.limit) {
 			Throw(
 				type = "Wheels.TooManyParameters",
 				message = "This query would bind #local.count# parameters, but the database accepts at most #local.limit# per statement.",
-				extendedInfo = "Each value of an IN list (whereIn(), whereNotIn() or a hand-written IN (...)) binds as its own parameter. Query the values in batches of fewer than #local.limit#, or select them with a join or a subquery instead of a long list."
+				extendedInfo = $tooManyParametersAdvice(limit = local.limit)
 			);
 		}
+	}
+
+	/**
+	 * Internal function. What Wheels.TooManyParameters tells the developer to do. An adapter
+	 * that runs some long lists another way says which ones.
+	 */
+	public string function $tooManyParametersAdvice(required numeric limit) {
+		return "Each value of an IN list (whereIn(), whereNotIn() or a hand-written IN (...)) binds as its own parameter. Query the values in batches of fewer than #arguments.limit#, or select them with a join or a subquery instead of a long list.";
 	}
 
 	/**

@@ -17,7 +17,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Internal function. Casts high-precision decimal params exactly before running the query.
+	 * Internal function. Splits IN lists that would exceed the parameter limit into one parameter
+	 * each (#4103), then casts high-precision decimal params exactly (#4172), before running the query.
 	 */
 	public struct function $performQuery(
 		required array sql,
@@ -29,8 +30,242 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		string $debugName = "query",
 		boolean $captureResult = true
 	) {
+		$splitLargeInLists(args = arguments);
 		$castWideDecimalParams(args = arguments);
 		return super.$performQuery(argumentCollection = arguments);
+	}
+
+	/**
+	 * Internal function. When a statement would bind more parameters than SQL Server accepts,
+	 * rewrites IN lists, largest first until it fits, to one parameter each (#4103):
+	 * `(SELECT CAST(value AS <type>) FROM STRING_SPLIT(?, NCHAR(31)))`. A statement that fits keeps
+	 * its SQL. STRING_SPLIT needs compatibility level 130; below it, and for lists of other types
+	 * (dates and times among them), the statement is left for $assertBoundParameterCount() to refuse.
+	 */
+	public void function $splitLargeInLists(required struct args) {
+		local.limit = $inListSplitLimit();
+		if (!arguments.args.parameterize || $boundParameterCount(arguments.args.sql) <= local.limit) {
+			return;
+		}
+		if (!$supportsStringSplit(arguments.args.dataSource)) {
+			return;
+		}
+		local.convert = $inListsToSplit(sql = arguments.args.sql, limit = local.limit);
+		local.rv = [];
+		local.iEnd = ArrayLen(arguments.args.sql);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			// Adobe CF passes arrays by value, so the parts are returned and appended here.
+			if (StructKeyExists(local.convert, local.i)) {
+				local.parts = $stringSplitParts(arguments.args.sql[local.i]);
+			} else {
+				local.parts = [arguments.args.sql[local.i]];
+			}
+			for (local.item in local.parts) {
+				ArrayAppend(local.rv, local.item);
+			}
+		}
+		arguments.args.sql = local.rv;
+	}
+
+	/**
+	 * Internal function. The positions of the IN lists to split, largest first, until the statement
+	 * binds no more than `limit` parameters (as a struct keyed by position).
+	 */
+	public struct function $inListsToSplit(required array sql, required numeric limit) {
+		local.sizes = {};
+		local.iEnd = ArrayLen(arguments.sql);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.split = $stringSplitList(arguments.sql[local.i]);
+			if (!StructIsEmpty(local.split) && ArrayLen(local.split.values) > 1) {
+				local.sizes[local.i] = ArrayLen(local.split.values);
+			}
+		}
+		local.count = $boundParameterCount(arguments.sql);
+		local.rv = {};
+		while (local.count > arguments.limit && !StructIsEmpty(local.sizes)) {
+			local.largest = "";
+			for (local.key in local.sizes) {
+				if (!Len(local.largest) || local.sizes[local.key] > local.sizes[local.largest]) {
+					local.largest = local.key;
+				}
+			}
+			local.rv[local.largest] = true;
+			local.count -= local.sizes[local.largest] - 1;
+			StructDelete(local.sizes, local.largest);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. The SQL parts for an IN list bound as one STRING_SPLIT parameter.
+	 */
+	public array function $stringSplitParts(required struct part) {
+		local.split = $stringSplitList(arguments.part);
+		return [
+			"(SELECT " & local.split.expression & " FROM STRING_SPLIT(",
+			{type = "cf_sql_nvarchar", value = ArrayToList(local.split.values, Chr(31))},
+			", NCHAR(31)))"
+		];
+	}
+
+	/**
+	 * Internal function. For an IN list STRING_SPLIT can carry, its values and the expression that
+	 * turns each split value back into the list's type: integers and decimals are validated here
+	 * and CAST (never TRY_CAST, which turns '' into 0), strings are compared as they are. An empty
+	 * struct for any other list, including dates and times, or one with a value that doesn't
+	 * validate.
+	 */
+	public struct function $stringSplitList(required any part) {
+		if (
+			!IsStruct(arguments.part)
+			|| !StructKeyExists(arguments.part, "list")
+			|| !arguments.part.list
+			|| !StructKeyExists(arguments.part, "value")
+			|| !StructKeyExists(arguments.part, "type")
+		) {
+			return {};
+		}
+		local.values = ListToArray($queryParams(arguments.part).value, Chr(7));
+		local.integerType = $stringSplitIntegerType(arguments.part.type);
+		if (Len(local.integerType)) {
+			return $stringSplitNumbers(values = local.values, pattern = "^-?[0-9]+$", sqlType = local.integerType);
+		}
+		if (ListFindNoCase("cf_sql_decimal,cf_sql_numeric", arguments.part.type)) {
+			return $stringSplitDecimals(local.values);
+		}
+		if (ListFindNoCase("cf_sql_varchar,cf_sql_char", arguments.part.type)) {
+			return $stringSplitStrings(local.values);
+		}
+		return {};
+	}
+
+	/**
+	 * Internal function. The SQL Server type an integer IN list is cast to, or "" for other types.
+	 */
+	public string function $stringSplitIntegerType(required string sqlType) {
+		local.types = {cf_sql_tinyint = "TINYINT", cf_sql_smallint = "SMALLINT", cf_sql_integer = "INT", cf_sql_bigint = "BIGINT"};
+		return StructKeyExists(local.types, arguments.sqlType) ? local.types[arguments.sqlType] : "";
+	}
+
+	/**
+	 * Internal function. Trimmed values cast to `sqlType`, when every value matches `pattern`.
+	 */
+	public struct function $stringSplitNumbers(required array values, required string pattern, required string sqlType) {
+		local.rv = [];
+		for (local.value in arguments.values) {
+			local.value = Trim(local.value);
+			if (!ReFind(arguments.pattern, local.value)) {
+				return {};
+			}
+			ArrayAppend(local.rv, local.value);
+		}
+		return {expression = "CAST(value AS #arguments.sqlType#)", values = local.rv};
+	}
+
+	/**
+	 * Internal function. Plain decimal values cast exactly to DECIMAL(38, s), `s` being the most
+	 * fraction digits of any value; empty when a value isn't a plain decimal or doesn't fit 38 digits.
+	 */
+	public struct function $stringSplitDecimals(required array values) {
+		local.scale = 0;
+		local.integerDigits = 0;
+		for (local.value in arguments.values) {
+			local.value = Trim(local.value);
+			if (!ReFind("^-?[0-9]+(\.[0-9]+)?$", local.value)) {
+				return {};
+			}
+			local.scale = Max(local.scale, $fractionDigitCount(local.value));
+			local.integerDigits = Max(local.integerDigits, $integerDigitCount(local.value));
+		}
+		if (local.integerDigits + local.scale > 38) {
+			return {};
+		}
+		return $stringSplitNumbers(
+			values = arguments.values,
+			pattern = "^-?[0-9]+(\.[0-9]+)?$",
+			sqlType = "DECIMAL(38, #local.scale#)"
+		);
+	}
+
+	/**
+	 * Internal function. String values, compared as they are. A value holding the NCHAR(31)
+	 * delimiter can't be split, so it is refused with a clear error.
+	 */
+	public struct function $stringSplitStrings(required array values) {
+		for (local.value in arguments.values) {
+			if (Find(Chr(31), local.value)) {
+				Throw(
+					type = "Wheels.QueryParamValue",
+					message = "An IN list value contains the control character Chr(31), which Wheels uses to bind long IN lists on SQL Server.",
+					extendedInfo = "Remove the character from the value, or query the values in batches of fewer than #$maxBoundParameters()#."
+				);
+			}
+		}
+		return {expression = "value", values = arguments.values};
+	}
+
+	/**
+	 * Internal function. The parameter count above which IN lists are split: the database limit,
+	 * or a lower value set by $setInListSplitLimit() (used by the specs to exercise the split path).
+	 */
+	public numeric function $inListSplitLimit() {
+		if (StructKeyExists(variables, "inListSplitLimit") && variables.inListSplitLimit > 0) {
+			return variables.inListSplitLimit;
+		}
+		return $maxBoundParameters();
+	}
+
+	/**
+	 * Internal function. Sets the split limit; 0 restores the database limit.
+	 */
+	public void function $setInListSplitLimit(required numeric limit) {
+		variables.inListSplitLimit = arguments.limit;
+	}
+
+	/**
+	 * Internal function. Wheels.TooManyParameters advice for SQL Server: which long lists run as one
+	 * STRING_SPLIT parameter, and that every other list (or a database below level 130) doesn't.
+	 */
+	public string function $tooManyParametersAdvice(required numeric limit) {
+		return super.$tooManyParametersAdvice(limit = arguments.limit)
+			& " On SQL Server 2016 and later (database compatibility level 130 or higher), Wheels runs a long list of integers, plain decimals (up to 38 digits), strings or uniqueidentifiers as one parameter. Any other list (dates, times, float, real, bit, text or binary values, or numbers written another way, such as +5, .5 or 1E5), or a database below level 130, still needs batching.";
+	}
+
+	/**
+	 * Internal function. True when the datasource's database has compatibility level 130 or higher,
+	 * which STRING_SPLIT needs. Read once per datasource and kept in the application's Wheels
+	 * settings, so an application reload reads it again.
+	 */
+	public boolean function $supportsStringSplit(required string dataSource) {
+		local.appKey = $appKey();
+		local.dataSource = $effectiveDataSource(arguments.dataSource);
+		if (!StructKeyExists(application[local.appKey], "sqlServerCompatibilityLevels")) {
+			application[local.appKey].sqlServerCompatibilityLevels = {};
+		}
+		local.levels = application[local.appKey].sqlServerCompatibilityLevels;
+		if (!StructKeyExists(local.levels, local.dataSource)) {
+			local.levels[local.dataSource] = $readCompatibilityLevel(local.dataSource);
+		}
+		return local.levels[local.dataSource] >= 130;
+	}
+
+	/**
+	 * Internal function. The database's compatibility level, or 0 when it can't be read.
+	 */
+	public numeric function $readCompatibilityLevel(required string dataSource) {
+		local.options = {datasource = arguments.dataSource};
+		if (Len(variables.username)) {
+			local.options.username = variables.username;
+		}
+		if (Len(variables.password)) {
+			local.options.password = variables.password;
+		}
+		try {
+			local.query = QueryExecute("SELECT compatibility_level AS lvl FROM sys.databases WHERE name = DB_NAME()", [], local.options);
+			return local.query.recordCount ? Val(local.query.lvl) : 0;
+		} catch (any e) {
+			return 0;
+		}
 	}
 
 	/**
