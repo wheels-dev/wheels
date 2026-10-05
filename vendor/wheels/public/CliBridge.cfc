@@ -51,6 +51,8 @@ component output="false" displayName="CLI Bridge" {
 			"doctor" = "doctor",
 			"forgetVersion" = "forgetVersion",
 			"pretendVersion" = "pretendVersion",
+			"migrationLockStatus" = "migrationLockStatus",
+			"migrationUnlock" = "migrationUnlock",
 			// Database commands
 			"dbStatus" = "dbStatus",
 			"dbVersion" = "dbVersion",
@@ -328,6 +330,26 @@ component output="false" displayName="CLI Bridge" {
 		local.rv.success = local.forgetResult.success;
 		local.rv.removed = local.forgetResult.removed;
 		local.rv.message = local.forgetResult.message;
+		return local.rv;
+	}
+
+	public struct function migrationLockStatus(required struct context, required struct params) {
+		// Who holds the cross-process migration lock, if anyone (#4209). Read-only.
+		local.rv = {};
+		local.rv.success = true;
+		local.rv.lock = arguments.context.migrator.migrationLockStatus();
+		return local.rv;
+	}
+
+	public struct function migrationUnlock(required struct context, required struct params) {
+		// Remove the migration lock's lease row (#4209). Only an expired lease unless force=true.
+		local.force = StructKeyExists(arguments.params, "force") && IsBoolean(arguments.params.force) && arguments.params.force;
+		local.releaseResult = arguments.context.migrator.releaseMigrationLock(force = local.force);
+		local.rv = {};
+		local.rv.success = true;
+		local.rv.released = local.releaseResult.released;
+		local.rv.heldBy = local.releaseResult.heldBy;
+		local.rv.lock = local.releaseResult.lock;
 		return local.rv;
 	}
 

@@ -326,9 +326,10 @@ component extends="modules.BaseModule" {
 	 */
 	private any function migrateArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "action", default = "latest", choices = "latest,up,down,info,doctor,forget,pretend,rename-system-tables,diff", description = "Migration action: latest, up, down, info, doctor, forget, pretend, rename-system-tables, diff")
+			.positional(name = "action", default = "latest", choices = "latest,up,down,info,doctor,forget,pretend,unlock,rename-system-tables,diff", description = "Migration action: latest, up, down, info, doctor, forget, pretend, unlock, rename-system-tables, diff")
 			.positional(name = "version", default = "", description = "Version for forget/pretend")
 			.flag(name = "yes", default = false, description = "Confirm forget/pretend")
+			.flag(name = "force", default = false, description = "unlock: remove the migration lock even when an instance holds it")
 			.flag(name = "dry-run", default = false, description = "Preview rename-system-tables without writing")
 			.positional(name = "model", default = "", description = "Model to diff (diff action; omit for all models)")
 			.option(name = "rename", default = "", description = "Rename hint OLD:NEW (repeatable; Model.OLD:NEW for diffAll)")
@@ -798,7 +799,7 @@ component extends="modules.BaseModule" {
 		help &= "  generate            Generate model, controller, scaffold, migration, etc." & nl;
 		help &= "  destroy (or d)      Remove generated files" & nl & nl;
 		help &= "Database:" & nl;
-		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables, diff)" & nl;
+		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, unlock, rename-system-tables, diff)" & nl;
 		help &= "  seed                Run database seeds" & nl;
 		help &= "  db                  Database management (reset, status, version)" & nl & nl;
 		help &= "Background Jobs:" & nl;
@@ -1391,7 +1392,7 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables)
+	 * hint: Run database migrations (latest, up, down, info, doctor, forget, pretend, unlock, rename-system-tables)
 	 */
 	public string function migrate() {
 		var args = $migrateArgv(structuredArgs(arguments));
@@ -1424,6 +1425,8 @@ component extends="modules.BaseModule" {
 				return runForgetOrPretend("forgetVersion", args);
 			case "pretend":
 				return runForgetOrPretend("pretendVersion", args);
+			case "unlock":
+				return runMigrationUnlock(args);
 			case "rename-system-tables":
 				// F15 Phase 2: opt-in one-shot rename of legacy c_o_r_e_*
 				// system tables to wheels_*. Idempotent (no-op when nothing
@@ -1442,7 +1445,7 @@ component extends="modules.BaseModule" {
 				return runMigrationDiff(args);
 			default:
 				out("Unknown migration action: #action#", "red");
-				out("Usage: wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables|diff]");
+				out("Usage: wheels migrate [latest|up|down|info|doctor|forget|pretend|unlock|rename-system-tables|diff]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown migration action: #action#");
 		}
 	}
@@ -7569,6 +7572,99 @@ component extends="modules.BaseModule" {
 
 		out(msg, "green");
 		return "";
+	}
+
+	/**
+	 * `wheels migrate unlock [--force]` (#4209). Without --force it only reports
+	 * the migration lock: exit 0 when nothing live holds it, a refusal naming
+	 * --force when an instance does, so nobody clears a running migration by
+	 * habit. --force removes the lease row and says what it removed. --yes is
+	 * not an alias: an MCP client confirming out of habit (it confirms
+	 * forget/pretend) must not remove a live lock without naming force.
+	 */
+	private string function runMigrationUnlock(required array args) {
+		var force = false;
+		for (var i = 2; i <= arrayLen(arguments.args); i++) {
+			if (arguments.args[i] == "--force") {
+				force = true;
+			}
+		}
+		if (force) {
+			return runMigrationUnlockForce();
+		}
+
+		var serverPort = $resolveMigrationServerPort(false);
+		var statusUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=migrationLockStatus&format=json";
+		var lock = $migrationLockResponse(makeHttpRequest(statusUrl), "unlock").lock;
+		if (!lock.held) {
+			out("No migration lock is held.", "green");
+			return "";
+		}
+		if (lock.expired) {
+			out("The migration lock is held by #$migrationLockDescription(lock)#, but its lease expired #abs(lock.expiresInSeconds)# seconds ago.", "yellow");
+			out("The next migration takes it over, so there is nothing to clear.");
+			return "";
+		}
+		out("The migration lock is held by #$migrationLockDescription(lock)#; its lease expires in #lock.expiresInSeconds# seconds.", "yellow");
+		$refuse(
+			"The migration lock is held by another instance; nothing was removed.",
+			"Wheels.MigrationLocked",
+			["If that instance is gone, remove the lock with:", "  wheels migrate unlock --force"]
+		);
+		return "";
+	}
+
+	private string function runMigrationUnlockForce() {
+		var serverPort = $requireOwnRunningServer([
+			"Removing the migration lock requires a running server bound to this project.",
+			"Start this project's own server with: wheels start (it registers the server as this project's)"
+		]);
+		var unlockUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=migrationUnlock&force=true&format=json";
+		var httpResult = "";
+		try {
+			// migrationUnlock deletes a row — POST + reload password.
+			httpResult = makeBridgePost(unlockUrl);
+		} catch (any httpErr) {
+			throw(type = "MigrationError", message = "unlock failed (connection error): #httpErr.message#", detail = httpErr.detail ?: "");
+		}
+		var parsed = $migrationLockResponse(httpResult, "unlock");
+		if (parsed.released ?: false) {
+			out("Removed the migration lock held by #$migrationLockDescription(parsed.lock)#.", "green");
+			return "";
+		}
+		if (!parsed.lock.held) {
+			out("No migration lock was held, so there was nothing to remove.", "green");
+			return "";
+		}
+		var heldBy = parsed.heldBy ?: "";
+		if (len(heldBy) && heldBy != parsed.lock.owner) {
+			throw(
+				type = "MigrationError",
+				message = "The migration lock changed hands while it was being removed: owner #heldBy# holds it now, and it was left in place. Run wheels migrate unlock to see who holds it."
+			);
+		}
+		throw(type = "MigrationError", message = "The migration lock held by #$migrationLockDescription(parsed.lock)# was not removed.");
+	}
+
+	/**
+	 * Parse a migrationLockStatus / migrationUnlock bridge response, throwing
+	 * MigrationError when the server reports a failure. Public for specs.
+	 */
+	public struct function $migrationLockResponse(required string body, required string verb) {
+		var parsed = isJSON(arguments.body) ? deserializeJSON(arguments.body) : {success: false, message: "Invalid response"};
+		if (!(parsed.success ?: false) || !isStruct(parsed.lock ?: "")) {
+			var msg = parsed.message ?: "";
+			out(len(msg) ? msg : "#arguments.verb# failed.", "red");
+			throw(type = "MigrationError", message = len(msg) ? msg : "#arguments.verb# failed: no lock status in the response.");
+		}
+		return parsed;
+	}
+
+	/**
+	 * "host `web-1` (owner abc) for 120 seconds", from a migrationLockStatus().
+	 */
+	public string function $migrationLockDescription(required struct lock) {
+		return "host `#arguments.lock.host#` (owner #arguments.lock.owner#) for #arguments.lock.heldForSeconds# seconds";
 	}
 
 	private string function runRenameSystemTables(boolean dryRun = false) {
