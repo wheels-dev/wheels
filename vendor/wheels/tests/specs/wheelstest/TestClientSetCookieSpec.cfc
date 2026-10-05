@@ -74,11 +74,12 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("keeps the session from one request to the next", () => {
+				// The session cookie's name differs by engine (CFID, JSESSIONID, ...), so
+				// check the session itself: a value written in one request is read in the next.
 				var tc = $testClient();
-				tc.get("/_cookieroundtrip/set");
-				var jar = tc.$cookieJar();
-				var sessionCookie = StructKeyExists(jar, "CFID") || StructKeyExists(jar, "JSESSIONID") || StructKeyExists(jar, "jsessionid");
-				expect(sessionCookie).toBeTrue("expected a session cookie in " & StructKeyList(jar));
+				var written = tc.get("/_cookieroundtrip/session/set").assertOk().content();
+				expect(Len(Trim(written))).toBeGT(0);
+				tc.get("/_cookieroundtrip/session/read").assertOk().assertSee("session=[" & Trim(written) & "]");
 			});
 
 		});

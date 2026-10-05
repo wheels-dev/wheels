@@ -1,0 +1,1 @@
+- On RustCFML, a request that sets the cookie-store CSRF cookie and reads the token back in the same request (for example a page rendering `csrfMetaTags()`) no longer fails with an HTTP 500. RustCFML reads a cookie assigned as `{value, httpOnly, ...}` back as that struct rather than its value; the token reader now uses the value

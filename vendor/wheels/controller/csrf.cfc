@@ -248,8 +248,16 @@ component {
 			return "";
 		}
 
-		// Cookie is there. Read it in.
-		local.cookie = cookie[local.cookieName];
+		// Cookie is there. Read it in. When this request set the cookie
+		// (cookie[name] = {value, httpOnly, ...}), Lucee, Adobe and BoxLang read it
+		// back as its value, but RustCFML returns the struct that was assigned.
+		local.cookieValue = cookie[local.cookieName];
+		if (IsStruct(local.cookieValue) && StructKeyExists(local.cookieValue, "value")) {
+			local.cookieValue = local.cookieValue.value;
+		}
+		if (!IsSimpleValue(local.cookieValue)) {
+			return "";
+		}
 
 		try {
 			local.encryptionKey = $ensureCsrfCookieEncryptionKey();
@@ -258,7 +266,7 @@ component {
 			return "";
 		}
 
-		local.cookieAttrs = $decryptCsrfCookieValue(local.cookie, local.encryptionKey);
+		local.cookieAttrs = $decryptCsrfCookieValue(local.cookieValue, local.encryptionKey);
 
 		// When cookie is corrupted (or encrypted with an unknown key/algorithm), fail.
 		if (!Len(local.cookieAttrs)) {
