@@ -161,6 +161,18 @@ component extends="wheels.WheelsTest" {
 				expect(variables.g.model("temporal").count(where = "t >= '23:00:00'")).toBe(truthCount("t", ">=", "TIME(7)", "23:00:00"));
 			});
 
+			// Past the parameter limit the list is split (#4318), and the split compares as TIME(7) too.
+			it("runs a TIME list past the parameter limit, matching the same rows", () => {
+				if (!variables.isSqlServer) {
+					skip("SQL Server's TIME columns.");
+				}
+				var times = ["10:00:00.123", "10:00:00.999"];
+				for (var i = 1; i <= 2200; i++) {
+					ArrayAppend(times, NumberFormat(Int(i / 3600), "00") & ":" & NumberFormat(Int((i mod 3600) / 60), "00") & ":" & NumberFormat(i mod 60, "00"));
+				}
+				expect(variables.g.model("temporal").whereIn("t", times).count()).toBe(2);
+			});
+
 		});
 
 	}

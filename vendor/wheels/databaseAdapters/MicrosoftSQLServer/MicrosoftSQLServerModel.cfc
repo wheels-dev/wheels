@@ -243,8 +243,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * Internal function. For an IN list STRING_SPLIT can carry, its values and the expression that
 	 * turns each split value back into the list's type: integers and decimals are validated here
 	 * and CAST (never TRY_CAST, which turns '' into 0), strings are compared as they are. Dates and
-	 * timestamps are cast to the type the driver binds them as, given in `dateCasts` (#4318). An
-	 * empty struct for any other list, including times, or one with a value that doesn't validate.
+	 * timestamps are cast to the type the driver binds them as, given in `dateCasts` (#4318), except
+	 * on a DATETIME / SMALLDATETIME column, which compares in its own type as the normal path does,
+	 * and times are cast to TIME(7) ($temporalComparisonType(), #4326, #4327). An empty struct for
+	 * any other list, or one with a value that doesn't validate.
 	 */
 	public struct function $stringSplitList(required any part, struct dateCasts = {}) {
 		if (
@@ -267,14 +269,35 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		if (ListFindNoCase("cf_sql_varchar,cf_sql_char", arguments.part.type)) {
 			return $stringSplitStrings(local.values);
 		}
+		// The split compares in the same type the normal path does (#4326, #4327).
+		local.columnCast = StructKeyExists(arguments.part, "dataType") ? $temporalComparisonType(arguments.part.dataType) : "";
+		if (CompareNoCase(arguments.part.type, "cf_sql_time") == 0 && local.columnCast == "TIME(7)") {
+			return $stringSplitTimes(local.values);
+		}
 		if (StructKeyExists(arguments.dateCasts, arguments.part.type)) {
 			return $stringSplitDates(
 				values = local.values,
-				sqlType = arguments.dateCasts[arguments.part.type],
+				sqlType = (Len(local.columnCast) && CompareNoCase(arguments.part.type, "cf_sql_timestamp") == 0) ? local.columnCast : arguments.dateCasts[arguments.part.type],
 				dateOnly = CompareNoCase(arguments.part.type, "cf_sql_date") == 0
 			);
 		}
 		return {};
+	}
+
+	/**
+	 * Internal function. Time values as TIME text ($timeText()), cast to TIME(7) like a time
+	 * condition on the normal path; empty when a value isn't `HH:mm[:ss[.fffffff]]` once converted.
+	 */
+	public struct function $stringSplitTimes(required array values) {
+		local.rv = [];
+		for (local.value in arguments.values) {
+			local.text = $timeText(local.value);
+			if (!ReFind("^[0-9]{1,2}:[0-9]{2}(:[0-9]{2}(\.[0-9]{1,7})?)?$", local.text)) {
+				return {};
+			}
+			ArrayAppend(local.rv, local.text);
+		}
+		return {expression = "CAST(value AS TIME(7))", values = local.rv};
 	}
 
 	/**
@@ -451,7 +474,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public string function $tooManyParametersAdvice(required numeric limit) {
 		return super.$tooManyParametersAdvice(limit = arguments.limit)
-			& " On SQL Server 2016 and later (database compatibility level 130 or higher), Wheels runs a long list of integers, plain decimals (up to 38 digits), strings or uniqueidentifiers as one parameter, and also a list of dates or timestamps written as yyyy-mm-dd with an optional HH:nn, :ss and .lll. Any other list (times, dates written another way, float, real, bit, text or binary values, or numbers written another way, such as +5, .5 or 1E5), or a database below level 130, still needs batching.";
+			& " On SQL Server 2016 and later (database compatibility level 130 or higher), Wheels runs a long list of integers, plain decimals (up to 38 digits), strings or uniqueidentifiers as one parameter, and also a list of dates or timestamps written as yyyy-mm-dd with an optional HH:nn, :ss and .lll, or of times written as HH:mm with an optional :ss and fraction. Any other list (dates written another way, float, real, bit, text or binary values, or numbers written another way, such as +5, .5 or 1E5), or a database below level 130, still needs batching.";
 	}
 
 	/**
