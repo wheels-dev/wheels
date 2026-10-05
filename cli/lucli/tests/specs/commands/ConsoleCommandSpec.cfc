@@ -93,6 +93,47 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("console /routes — lists routes without evaluate() (4410)", () => {
+
+			// The console's eval endpoint runs expressions through evaluate(), which has no closure or
+			// arrow grammar, so /routes cannot map over the route array server-side. It fetches the route
+			// table from the same CLI endpoint `wheels routes` uses and formats it in the CLI instead.
+
+			it("fetches the route table instead of evaluating a map expression", () => {
+				var routesIdx = find("case ""/routes"":", variables.moduleSource);
+				expect(routesIdx).toBeGT(0);
+				var seg = mid(variables.moduleSource, routesIdx, 500);
+				expect(seg).toInclude("$consoleRoutes(");
+				// No eval-side mapping over the routes array (neither closure form parses under evaluate()).
+				expect(reFind("routes\.map\(", seg)).toBe(0, "/routes must not map over routes via the eval endpoint");
+			});
+
+			it("formats each route as 'pattern -> controller##action'", () => {
+				var m = new cli.lucli.Module(cwd = expandPath("/"));
+				prepareMock(m);
+				makePublic(m, "$consoleRoutes");
+				m.$("out");
+				m.$("makeHttpRequest").$results('{"success":true,"routes":[{"pattern":"/","controller":"main","action":"index"},{"pattern":"/posts","controller":"posts","action":"show"}]}');
+				expect(m.$consoleRoutes("http://localhost:8080/wheels/console/eval")).toBeTrue();
+				var lines = [];
+				for (var call in m.$callLog().out) {
+					arrayAppend(lines, call[1]);
+				}
+				expect(lines).toInclude("/ -> main##index");
+				expect(lines).toInclude("/posts -> posts##show");
+			});
+
+			it("returns false when the server refuses the route fetch", () => {
+				var m = new cli.lucli.Module(cwd = expandPath("/"));
+				prepareMock(m);
+				makePublic(m, "$consoleRoutes");
+				m.$("out");
+				m.$("makeHttpRequest").$results('{"success":false,"message":"nope"}');
+				expect(m.$consoleRoutes("http://localhost:8080/wheels/console/eval")).toBeFalse();
+			});
+
+		});
+
 	}
 
 }

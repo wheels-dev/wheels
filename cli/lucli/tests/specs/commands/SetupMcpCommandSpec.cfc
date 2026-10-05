@@ -136,12 +136,20 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				}).toThrow(type = "Wheels.McpSetup.InvalidShape");
 			});
 
-			it("writes nothing outside a Wheels project", () => {
+			it("throws and writes nothing outside a Wheels project", () => {
 				var bare = expandPath("/tmp") & "/wheelsMapBare" & randRange(100000, 999999);
 				directoryCreate(bare, true);
 				try {
 					probe.$setProjectRoot(bare);
-					probe.$setupMcpProbe([]);
+					// #4409: outside a Wheels project this now exits non-zero (Wheels.NotAWheelsProject)
+					// instead of printing a note and exiting 0, so a scripted run can detect the failure.
+					var state = {type = ""};
+					try {
+						probe.$setupMcpProbe([]);
+					} catch (any e) {
+						state.type = e.type;
+					}
+					expect(state.type).toBe("Wheels.NotAWheelsProject");
 					expect(fileExists(bare & "/.mcp.json")).toBeFalse();
 				} finally {
 					probe.$setProjectRoot(variables.root);
