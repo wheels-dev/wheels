@@ -6270,21 +6270,14 @@ component extends="modules.BaseModule" {
 		var subcommand = lCase(args[1]);
 
 		switch (subcommand) {
-			// `setup` is the canonical verb. `install` is accepted but warned —
-			// LuCLI intercepts `install` as its built-in extension installer
-			// before it reaches a module's dispatch, so users typing
-			// `wheels browser install` actually invoke the LuCLI built-in and
-			// see "Reading lucee.json... No git or extension dependencies to
-			// install" instead of the Playwright fetch. The case branch here
-			// only fires if the user reaches us via some other path (e.g. an
-			// argument vector that bypasses LuCLI's parsing). See issue #2332.
+			// `setup` is the documented verb; `install` is an alias of it, as
+			// `wheels packages install` is of `add`. LuCLI intercepts `install`
+			// only as the FIRST argument (`wheels install`), so
+			// `wheels browser install` does reach this module (#4213; the
+			// original interception was #2332).
 			case "setup":
-				return browserInstall(args);
 			case "install":
-				out("'wheels browser install' is intercepted by LuCLI's built-in", "yellow");
-				out("extension installer and won't reach this module. Use:", "yellow");
-				out("  wheels browser setup", "bold");
-				return "";
+				return browserInstall(args);
 			case "test":
 				return browserTest(args);
 			default:
