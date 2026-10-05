@@ -228,6 +228,56 @@ component {
 	}
 
 	/**
+	 * Internal: Writes a job row to the job store, creating the table on first use.
+	 * Throws Wheels.Job.EnqueueFailed when the row can't be written.
+	 */
+	public void function $persistJobRow(required struct row) {
+		try {
+			$insertJobRow(argumentCollection = arguments.row);
+		} catch (any e) {
+			// Auto-create table on first use and retry
+			if ($ensureJobTable()) {
+				try {
+					$insertJobRow(argumentCollection = arguments.row);
+				} catch (any e2) {
+					$throwEnqueueFailed(jobClass = arguments.row.jobClass, error = e2);
+				}
+			} else {
+				$throwEnqueueFailed(jobClass = arguments.row.jobClass, error = e);
+			}
+		}
+	}
+
+	/**
+	 * Internal: When the innermost open Wheels-managed transaction writes to a datasource
+	 * other than the job store's (a tenant's, for a model that isn't shared), its
+	 * callback-queue key; otherwise "". Only then is an enqueue deferred to the commit: a
+	 * transaction on the job store's own datasource is joined. A raw transaction {} is not
+	 * tracked by Wheels, so it is not covered.
+	 */
+	public string function $crossDatasourceTransaction() {
+		if (
+			!StructKeyExists(request, "wheels")
+			|| !StructKeyExists(request.wheels, "$txnOwnerStack")
+			|| !StructKeyExists(request.wheels, "$txnCallbacks")
+		) {
+			return "";
+		}
+		local.stack = request.wheels.$txnOwnerStack;
+		for (local.i = ArrayLen(local.stack); local.i >= 1; local.i--) {
+			local.key = local.stack[local.i];
+			if (!StructKeyExists(request.wheels.$txnCallbacks, local.key)) {
+				continue;
+			}
+			local.store = request.wheels.$txnCallbacks[local.key];
+			if (IsStruct(local.store) && StructKeyExists(local.store, "real") && local.store.real && StructKeyExists(local.store, "dataSource")) {
+				return CompareNoCase(local.store.dataSource, variables.$datasource) == 0 ? "" : local.key;
+			}
+		}
+		return "";
+	}
+
+	/**
 	 * Internal: Persist a job to the queue table.
 	 */
 	private struct function $enqueueJob(
@@ -262,36 +312,34 @@ component {
 		local.serializedData = SerializeJSON(arguments.data);
 		local.now = $now();
 
-		try {
-			$insertJobRow(
-				id = local.id,
-				jobClass = arguments.jobClass,
-				queue = arguments.queue,
-				serializedData = local.serializedData,
-				priority = arguments.priority,
-				runAt = arguments.runAt,
-				enqueuedAt = local.now
+		local.row = {
+			id = local.id,
+			jobClass = arguments.jobClass,
+			queue = arguments.queue,
+			serializedData = local.serializedData,
+			priority = arguments.priority,
+			runAt = arguments.runAt,
+			enqueuedAt = local.now
+		};
+
+		// Inside a Wheels-managed transaction on another datasource (a tenant's), the job
+		// is written when that transaction commits and dropped if it rolls back, so the job
+		// store is never written inside a transaction on a different datasource.
+		local.deferTo = $crossDatasourceTransaction();
+		if (Len(local.deferTo)) {
+			ArrayAppend(
+				request.wheels.$txnCallbacks[local.deferTo].queue,
+				{object = new wheels.JobDeferredEnqueue(job = this, row = local.row), operation = "enqueue"}
 			);
-		} catch (any e) {
-			// Auto-create table on first use and retry
-			if ($ensureJobTable()) {
-				try {
-					$insertJobRow(
-						id = local.id,
-						jobClass = arguments.jobClass,
-						queue = arguments.queue,
-						serializedData = local.serializedData,
-						priority = arguments.priority,
-						runAt = arguments.runAt,
-						enqueuedAt = local.now
-					);
-				} catch (any e2) {
-					$throwEnqueueFailed(jobClass = arguments.jobClass, error = e2);
-				}
-			} else {
-				$throwEnqueueFailed(jobClass = arguments.jobClass, error = e);
-			}
+			writeLog(
+				text = "Job '#arguments.jobClass#' [#local.id#] for queue '#arguments.queue#' will be enqueued when the open transaction commits",
+				type = "information",
+				file = "wheels_jobs"
+			);
+			return {id = local.id, jobClass = arguments.jobClass, status = "deferred", persisted = false, deferred = true};
 		}
+
+		$persistJobRow(local.row);
 
 		writeLog(
 			text = "Job '#arguments.jobClass#' [#local.id#] enqueued to queue '#arguments.queue#' with priority #arguments.priority#",
