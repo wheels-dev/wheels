@@ -1,0 +1,1 @@
+- `insertAll()` and `upsertAll()` no longer fail on SQL Server for batches whose rows × columns exceed the parameter limit. They used to send 1000 rows per statement whatever the column count, so a 5-column write of more than about 400 rows threw `Wheels.TooManyParameters` before writing anything; batches are now sized to fit (at least one row per statement)

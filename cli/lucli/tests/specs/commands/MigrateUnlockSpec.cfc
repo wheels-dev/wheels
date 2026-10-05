@@ -71,15 +71,23 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(m.$callLog().makeHttpRequest[1][1]).toInclude("command=migrationLockStatus");
 			});
 
-			it("refuses non-zero for a live lock, naming the holder and --force, and leaves it", () => {
+			// In the thrown message itself: LuCLI's MCP handler returns only the
+			// exception message and drops everything printed before it.
+			it("refuses non-zero for a live lock, naming the holder and --force in the message, and leaves it", () => {
 				var m = unlockModule(liveLock());
-				expect(thrownType(() => m.migrate(arg1 = "unlock"))).toBe("Wheels.MigrationLocked");
-				var said = printed(m);
-				expect(said).toInclude("web-1");
-				expect(said).toInclude("abc123");
-				expect(said).toInclude("120 seconds");
-				expect(said).toInclude("3480 seconds");
-				expect(said).toInclude("wheels migrate unlock --force");
+				var state = {type: "", message: ""};
+				try {
+					m.migrate(arg1 = "unlock");
+				} catch (any e) {
+					state.type = e.type;
+					state.message = e.message;
+				}
+				expect(state.type).toBe("Wheels.MigrationLocked");
+				expect(state.message).toInclude("web-1");
+				expect(state.message).toInclude("abc123");
+				expect(state.message).toInclude("120 seconds");
+				expect(state.message).toInclude("3480 seconds");
+				expect(state.message).toInclude("wheels migrate unlock --force");
 				expect(m.$count("makeBridgePost")).toBe(0);
 			});
 

@@ -43,6 +43,7 @@ export default defineConfig({
 				'@wheels-dev/ui/styles/starlight-theme.css',
 			],
 			components: {
+				Head: '@wheels-dev/ui/components/starlight/Head.astro',
 				Header: '@wheels-dev/ui/components/starlight/Header.astro',
 				Footer: '@wheels-dev/ui/components/starlight/Footer.astro',
 				SocialIcons: '@wheels-dev/ui/components/starlight/SocialIcons.astro',

@@ -201,6 +201,46 @@ describe("Post scopes", () => {
 
 `published()` and `draft()` above are auto-generated from `enum(property="status", values="draft,published,archived")`. Named scopes declared with `scope(name="active", where="...")` work identically.
 
+## Counting queries
+
+From Wheels 4.2, a spec can assert how many SQL statements a call sends, which makes N+1 queries, missing caches and unexpected writes testable:
+
+| Function | Fails unless |
+|---|---|
+| `assertQueries(count, callback)` | `callback` sends exactly `count` statements |
+| `assertNoQueries(callback)` | `callback` sends none |
+| `assertQueriesMatch(pattern, callback, count)` | at least one statement (or exactly `count`) matches the regular expression `pattern`, case-insensitive |
+| `assertNoQueriesMatch(pattern, callback)` | no statement matches `pattern` |
+| `recordQueries(callback)` | never fails: returns the statements as an array of `{sql, dataSource}` |
+
+```cfm {test:compile}
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Post listing", () => {
+            it("loads authors in the same query", () => {
+                var posts = assertQueries(1, () => model("Post").findAll(include="author"));
+                expect(posts.recordCount).toBeGT(0);
+            });
+
+            it("doesn't touch the comments table", () => {
+                assertNoQueriesMatch("comments", () => model("Post").findAll());
+            });
+        });
+    }
+}
+```
+
+- The assertions return what `callback` returned, so a call can stay inline.
+- Every function takes an optional `dataSource` that counts only statements sent to that datasource, which is useful in a multi-tenant app.
+- A failure lists the statements that ran, with each bound value replaced by `?`, so a failure can't put bound data into a CI log. A value written into the SQL text itself (`parameterize=false`) appears as written.
+- Assertions can be nested: each counts its own callback's statements.
+- **What counts:** every statement the model layer sends, including finders, `count()`, `save()`, `create()`, `update()`, `delete()`, `updateAll()` and `deleteAll()`.
+- **What doesn't count:**
+  - a finder answered from the per-request query cache, because it sends no SQL (pass `reload=true` to force the query);
+  - raw `queryExecute()` / `cfquery`, including the framework features built on it: advisory locks, the migration lock, the job store and SQL Server's settings probes;
+  - transaction control;
+  - requests made through the test client, which run in a request of their own.
+
 ## Test isolation
 
 WheelsTest does not wrap each `it` in a transaction. The database state carries across specs within a run. Two mechanisms keep things predictable:

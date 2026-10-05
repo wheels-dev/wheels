@@ -16,7 +16,11 @@
 #   error     the candidate could not be evaluated (release lookup, download,
 #             boot, unparseable response): exit 1 so the run goes red.
 #
-# Exits 0 when already at the latest release, on accepted, and on rejected.
+#   skipped   the latest release is listed in tools/rustcfml/KNOWN_BAD (a release
+#             known to break the suite, e.g. hang it): emit a ::notice:: with the
+#             listed reason and link, leave the pin unchanged, run nothing.
+#
+# Exits 0 when already at the latest release, on accepted, on rejected and on skipped.
 # Exits 1 only when the candidate could not be evaluated.
 #
 # The required PR check (rustcfml-ci.yml) is unaffected: it calls run-suite.sh
@@ -42,6 +46,14 @@ fi
 
 if [ "$LATEST" = "$PINNED" ]; then
   echo "RustCFML already at latest ($PINNED). Nothing to do."
+  exit 0
+fi
+
+# A release listed in KNOWN_BAD is never evaluated: running the suite against it
+# would only reproduce the listed breakage (a hang turns the run red every day).
+KNOWN_BAD="$(grep -v '^[[:space:]]*#' "$DIR/KNOWN_BAD" 2>/dev/null | awk -v tag="$LATEST" '$1 == tag { $1 = ""; sub(/^ /, ""); print; exit }' || true)"
+if [ -n "$KNOWN_BAD" ]; then
+  echo "::notice::RustCFML $LATEST is listed in tools/rustcfml/KNOWN_BAD and is not evaluated; pin stays $PINNED. ${KNOWN_BAD}"
   exit 0
 fi
 

@@ -7,8 +7,10 @@
 	"exports": {
 		"./components/Header.astro": "./src/components/Header.astro",
 		"./components/Footer.astro": "./src/components/Footer.astro",
+		"./components/FontPreload.astro": "./src/components/FontPreload.astro",
 		"./components/Logo.astro": "./src/components/Logo.astro",
 		"./components/RssPill.astro": "./src/components/RssPill.astro",
+		"./components/starlight/Head.astro": "./src/components/starlight/Head.astro",
 		"./components/starlight/Header.astro": "./src/components/starlight/Header.astro",
 		"./components/starlight/Footer.astro": "./src/components/starlight/Footer.astro",
 		"./components/starlight/SocialIcons.astro": "./src/components/starlight/SocialIcons.astro",
@@ -16,7 +18,9 @@
 		"./components/starlight/EditLink.astro": "./src/components/starlight/EditLink.astro",
 		"./components/starlight/VersionSwitcher.astro": "./src/components/starlight/VersionSwitcher.astro",
 		"./data/versions": "./src/data/versions.ts",
+		"./data/llms": "./src/data/llms.ts",
 		"./styles/tokens.css": "./src/styles/tokens.css",
+		"./styles/fonts.css": "./src/styles/fonts.css",
 		"./styles/base.css": "./src/styles/base.css",
 		"./styles/starlight-theme.css": "./src/styles/starlight-theme.css",
 		"./assets/*": "./src/assets/*",
@@ -24,6 +28,6 @@
 		"./markdown/remark-base-prefix.mjs": "./src/markdown/remark-base-prefix.mjs"
 	},
 	"peerDependencies": {
-		"astro": "^5.0.0"
+		"astro": "^6.0.0"
 	}
 }

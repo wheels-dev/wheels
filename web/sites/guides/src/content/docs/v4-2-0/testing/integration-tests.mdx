@@ -78,6 +78,16 @@ Four things to notice:
 - **Database lookup mid-flow.** After the create redirect, the spec pulls the new row out of the DB to get its primary key, then uses that key in the next URL. The response body isn't enough — the id lives in the `Location` header or the database.
 - **Final assertion on DB state.** `commentCount()` is the proof; a 200 on `POST /comments` only says the action didn't crash, not that the association saved.
 
+## Testing per-client behaviour
+
+Some behaviour depends on the client's address — rate limiting, IP allow/deny rules. `fromAddress()` sets the address the request appears to come from, so you can drive those rules from a spec:
+
+```cfm
+$testClient().fromAddress("203.0.113.9").get("/api/search");   // RateLimiter / IP rules see 203.0.113.9
+```
+
+The address reaches **middleware** through the request context (the same field `RateLimiter` and IP rules read); it does not change the `cgi` scope, so a controller reading `cgi.remote_addr` directly won't see it. It is honoured only inside the isolated test application (development or testing) and ignored everywhere else.
+
 ## Cookie jar semantics
 
 One `$testClient()` instance holds session state across every request in the spec. Multiple clients in one spec represent multiple users — useful when the behaviour under test is "user B can't touch user A's data".
