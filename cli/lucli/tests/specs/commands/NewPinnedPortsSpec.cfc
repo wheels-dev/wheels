@@ -72,13 +72,17 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("moves only for a live listener when port + 1 is briefly busy (the race)", () => {
-				pinProject(parent & "/newapp", port + 40, port + 1);
-				var m = moduleWithHome();
 				// Held only while the context is built, released before any assertion:
-				// the window that made the old re-probe-afterwards check flaky.
-				var holder = createObject("java", "java.net.ServerSocket").init(port + 1);
+				// the window that made the old re-probe-afterwards check flaky. Bound to
+				// an ephemeral port (binding a chosen one throws if it is taken), and the
+				// app's port is the one below it.
+				var holder = createObject("java", "java.net.ServerSocket").init(0);
 				var context = {};
+				var m = "";
 				try {
+					variables.port = holder.getLocalPort() - 1;
+					pinProject(parent & "/newapp", port + 40, port + 1);
+					m = moduleWithHome();
 					context = contextFor(m, parent & "/newapp");
 				} finally {
 					holder.close();
