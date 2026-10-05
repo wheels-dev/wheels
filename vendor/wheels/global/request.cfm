@@ -725,94 +725,101 @@
 	) {
 		$args(name = "processRequest", args = arguments);
 
-		// Set the global transaction mode to rollback when specified.
-		// Also save the current state so we can set it back after the tests have run.
-		if (arguments.rollback) {
-			local.transactionMode = $get("transactionMode");
-			$set(transactionMode = "rollback");
+		// Capture the state processRequest() changes so the finally below can restore it on EVERY exit —
+		// including when the action throws and the caller catches it. Restoring only on the success path
+		// leaked the request method / transaction mode / deliver=false into later specs (reported by a
+		// downstream app: request.cgi.request_method stayed "post", so a later redirectTo() answered 303
+		// instead of 302). The request method is restored to its PREVIOUS value, not a hard-coded "get",
+		// so nested callers stay correct.
+		local.restore = {
+			requestMethod = (StructKeyExists(request, "cgi") && StructKeyExists(request.cgi, "request_method")) ? request.cgi.request_method : "get",
+			rollback = arguments.rollback,
+			transactionMode = arguments.rollback ? $get("transactionMode") : "",
+			deliverEmail = $get(functionName = "sendEmail", name = "deliver"),
+			deliverFile = $get(functionName = "sendFile", name = "deliver")
+		};
+
+		try {
+			// Set the global transaction mode to rollback when specified.
+			if (arguments.rollback) {
+				$set(transactionMode = "rollback");
+			}
+
+			// Before proceeding we set the request method to our internal CGI scope if passed in.
+			// This way it's possible to mock a POST request so that an isPost() call in the action works as expected for example.
+			if (arguments.method != "get") {
+				request.cgi.request_method = arguments.method;
+			}
+
+			// Look up controller & action via route name and method
+			if (StructKeyExists(arguments.params, "route")) {
+				local.route = $findRoute(argumentCollection = arguments.params, method = arguments.method);
+				arguments.params.controller = local.route.controller;
+				arguments.params.action = local.route.action;
+			}
+
+			// Never deliver email or send files during test.
+			$set(functionName = "sendEmail", deliver = false);
+			$set(functionName = "sendFile", deliver = false);
+
+			local.controller = controller(name = arguments.params.controller, params = arguments.params);
+
+			// Historic test helper defaults to ignore. Opt in to exception/abort
+			// without flipping the production protectsFromForgery() default.
+			// The override is applied to this controller instance only: protectsFromForgery() would
+			// write it into the application-wide cached controller class (#3843).
+			local.controller.$setCsrfOverride(type = arguments.csrf);
+
+			local.controller.processAction(includeFilters = arguments.includeFilters);
+			local.response = local.controller.response();
+
+			// Get redirect info.
+			// If a delayed redirect was made we use the status code for that and set the body to a blank string.
+			// If not we use the current status code and response and set the redirect info to a blank string.
+			local.redirectDetails = local.controller.getRedirect();
+			if (StructCount(local.redirectDetails)) {
+				local.body = "";
+				local.redirect = local.redirectDetails.url;
+				local.status = local.redirectDetails.statusCode;
+			} else {
+				local.status = $statusCode();
+				local.body = local.response;
+				local.redirect = "";
+			}
+
+			if (arguments.returnAs == "struct") {
+				local.rv = {
+					body = local.body,
+					emails = local.controller.getEmails(),
+					files = local.controller.getFiles(),
+					flash = local.controller.flash(),
+					redirect = local.redirect,
+					status = local.status,
+					type = $contentType()
+				};
+			} else {
+				local.rv = local.body;
+			}
+
+			// Clear the Flash so we can run several processAction calls without the Flash sticking around.
+			local.controller.$flashClear();
+
+			return local.rv;
+		} finally {
+			// Restore everything processRequest() changed, on every exit (success, throw or abort).
+			// This try has NO catch, so BoxLang runs this finally on an abort too (cross-engine
+			// invariant 22); there is no for-loop here (Lucee 7 miscompiles loops in a finally,
+			// invariant 12) — only plain assignments and calls.
+			if (local.restore.rollback) {
+				$set(transactionMode = local.restore.transactionMode);
+			}
+			request.cgi.request_method = local.restore.requestMethod;
+			$set(functionName = "sendEmail", deliver = local.restore.deliverEmail);
+			$set(functionName = "sendFile", deliver = local.restore.deliverFile);
+			// Reset the status code and Content-Type so a later processAction / assertion starts clean
+			// (the test suite sets 500 later if it fails).
+			$header(statusCode = 200);
+			$header(name = "Content-Type", value = "text/html", charset = "UTF-8");
 		}
-
-		// Before proceeding we set the request method to our internal CGI scope if passed in.
-		// This way it's possible to mock a POST request so that an isPost() call in the action works as expected for example.
-		if (arguments.method != "get") {
-			request.cgi.request_method = arguments.method;
-		}
-
-		// Look up controller & action via route name and method
-		if (StructKeyExists(arguments.params, "route")) {
-			local.route = $findRoute(argumentCollection = arguments.params, method = arguments.method);
-			arguments.params.controller = local.route.controller;
-			arguments.params.action = local.route.action;
-		}
-
-		// Never deliver email or send files during test.
-		local.deliverEmail = $get(functionName = "sendEmail", name = "deliver");
-		$set(functionName = "sendEmail", deliver = false);
-		local.deliverFile = $get(functionName = "sendFile", name = "deliver");
-		$set(functionName = "sendFile", deliver = false);
-
-		local.controller = controller(name = arguments.params.controller, params = arguments.params);
-
-		// Historic test helper defaults to ignore. Opt in to exception/abort
-		// without flipping the production protectsFromForgery() default.
-		// The override is applied to this controller instance only: protectsFromForgery() would
-		// write it into the application-wide cached controller class (#3843).
-		local.controller.$setCsrfOverride(type = arguments.csrf);
-
-		local.controller.processAction(includeFilters = arguments.includeFilters);
-		local.response = local.controller.response();
-
-		// Get redirect info.
-		// If a delayed redirect was made we use the status code for that and set the body to a blank string.
-		// If not we use the current status code and response and set the redirect info to a blank string.
-		local.redirectDetails = local.controller.getRedirect();
-		if (StructCount(local.redirectDetails)) {
-			local.body = "";
-			local.redirect = local.redirectDetails.url;
-			local.status = local.redirectDetails.statusCode;
-		} else {
-			local.status = $statusCode();
-			local.body = local.response;
-			local.redirect = "";
-		}
-
-		if (arguments.returnAs == "struct") {
-			local.rv = {
-				body = local.body,
-				emails = local.controller.getEmails(),
-				files = local.controller.getFiles(),
-				flash = local.controller.flash(),
-				redirect = local.redirect,
-				status = local.status,
-				type = $contentType()
-			};
-		} else {
-			local.rv = local.body;
-		}
-
-		// Clear the Flash so we can run several processAction calls without the Flash sticking around.
-		local.controller.$flashClear();
-
-		// Set back the global transaction mode to the previous value if it has been changed.
-		if (arguments.rollback) {
-			$set(transactionMode = local.transactionMode);
-		}
-
-		// Set back the request method to GET (this is fine since the test suite is always run using GET).
-		request.cgi.request_method = "get";
-
-		// Set back email delivery setting to previous value.
-		$set(functionName = "sendEmail", deliver = local.deliverEmail);
-		$set(functionName = "sendFile", deliver = local.deliverFile);
-
-		// Set back the status code to 200 so the test suite does not use the same code that the action that was tested did.
-		// If the test suite fails it will set the status code to 500 later.
-		$header(statusCode = 200);
-
-		// Set the Content-Type header in case it was set to something else (e.g. application/json) during processing.
-		// It's fine to do this because we always want to return the test page as text/html.
-		$header(name = "Content-Type", value = "text/html", charset = "UTF-8");
-
-		return local.rv;
 	}
 </cfscript>
