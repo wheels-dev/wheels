@@ -172,10 +172,11 @@ echo "Reloading app for CLI tests..."
 curl -s -o /dev/null --max-time 30 "${BASE_URL}/?reload=true&password=wheels-dev" || true
 sleep 2
 echo "Running CLI module tests..."
-CLI_HTTP_CODE=$(curl -s -o "$CLI_RESULT_FILE" \
-  --max-time 300 \
-  --write-out "%{http_code}" \
-  "$CLI_TEST_URL" || echo "000")
+# Per-bundle watchdog (#4232): names a stalled bundle, shows a server thread
+# dump and stops the request instead of waiting out the 300 s request timeout.
+# CLI_SERVER_LOG is where the workflow sends the server's stdout.
+CLI_HTTP_CODE=$(bash "$(dirname "$0")/cli-suite-request.sh" "$CLI_TEST_URL" "$CLI_RESULT_FILE" \
+  "${CLI_SERVER_LOG:-/tmp/lucli-server.log}" "$PORT" 300) || true
 
 echo "[CLI Tests] HTTP status: ${CLI_HTTP_CODE}"
 

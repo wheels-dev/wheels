@@ -30,6 +30,19 @@ shopt -s dotglob
 cp -r examples/starter-app/* "${BUILD_DIR}/"
 shopt -u dotglob
 
+# Ship the framework, as `wheels new` does, so the zip runs with
+# `wheels start` and no install step. prepare-core.sh has already built the
+# version-stamped framework at the release commit into build-wheels-core/wheels.
+CORE_DIR="build-wheels-core/wheels"
+if [ ! -f "${CORE_DIR}/box.json" ]; then
+    echo "ERROR: ${CORE_DIR} is missing; run prepare-core.sh first" >&2
+    exit 1
+fi
+echo "Copying the framework into vendor/wheels..."
+rm -rf "${BUILD_DIR}/vendor/wheels"
+mkdir -p "${BUILD_DIR}/vendor"
+cp -R "${CORE_DIR}" "${BUILD_DIR}/vendor/wheels"
+
 # Stamp the release version, as prepare-base.sh and prepare-core.sh do. The
 # source box.json keeps a fixed placeholder version, so without this every
 # release published the starter app to ForgeBox as that version (#3908).

@@ -36,6 +36,7 @@ component extends="wheels.WheelsTest" {
 				// current value, not the final iteration's value.
 				(function(relPath) {
 					it("guards application.wo before dereferencing it in onError() in " & relPath, () => {
+						$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
 						var absolute = repoRoot & "/" & relPath;
 						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
 

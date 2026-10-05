@@ -84,12 +84,27 @@ component {
 		var extraLines = [];
 
 		for (var prop in arguments.properties) {
-			arrayAppend(presenceProps, prop.name);
+			// Validate presence only for REQUIRED columns. Columns are required by
+			// default, so a prop with no `required` key is treated as required (the
+			// migration applies the same default, so model and schema agree). A
+			// `:optional` column (required=false) or a column with a DEFAULT is
+			// omitted — an optional/defaulted column that also carried a presence
+			// rule could never be saved blank.
+			var isRequired = structKeyExists(prop, "required") ? prop.required : true;
+			var hasDefault = structKeyExists(prop, "default") && len(prop.default);
+			var presenceRequired = isRequired && !hasDefault;
+			if (presenceRequired) {
+				arrayAppend(presenceProps, prop.name);
+			}
+			// When a column is not presence-required, its format rule must allow a
+			// blank value too, or it would reject the emptiness that makes the
+			// column optional.
+			var formatAllowBlank = presenceRequired ? "" : ", allowBlank=true";
 			var propType = structKeyExists(prop, "type") ? lCase(prop.type) : "string";
 			if (propType == "email") {
-				arrayAppend(extraLines, "validatesFormatOf(property=""#prop.name#"", type=""email"");");
+				arrayAppend(extraLines, "validatesFormatOf(property=""#prop.name#"", type=""email""#formatAllowBlank#);");
 			} else if (propType == "url") {
-				arrayAppend(extraLines, "validatesFormatOf(property=""#prop.name#"", type=""URL"");");
+				arrayAppend(extraLines, "validatesFormatOf(property=""#prop.name#"", type=""URL""#formatAllowBlank#);");
 			}
 			if (isStringLikeLengthLimit(prop, propType)) {
 				// allowBlank=true so an empty value only surfaces the
@@ -99,7 +114,12 @@ component {
 			}
 		}
 
-		var lines = ["validatesPresenceOf(""#arrayToList(presenceProps)#"");"];
+		var lines = [];
+		// Only emit validatesPresenceOf when at least one column is required —
+		// an all-optional/defaulted model must not get validatesPresenceOf("").
+		if (arrayLen(presenceProps)) {
+			arrayAppend(lines, "validatesPresenceOf(""#arrayToList(presenceProps)#"");");
+		}
 		lines.append(extraLines, true);
 		// Join with newline + 2 tabs so subsequent lines align with the template's
 		// `\t\t{{validations}}` placeholder indent. The first line gets its indent

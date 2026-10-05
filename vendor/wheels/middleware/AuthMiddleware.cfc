@@ -20,6 +20,8 @@
  *   - success (boolean): true
  *   - principal (struct): the authenticated identity
  *   - strategy (string): the strategy name that authenticated
+ * The controller reads it as `request.auth` (with allowAnonymous=true, a failed result is
+ * there too, with success=false).
  *
  * [section: Middleware]
  * [category: Built-in]
@@ -29,8 +31,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	/**
 	 * Creates the AuthMiddleware with configurable options.
 	 *
-	 * @authenticator An Authenticator instance. If not provided, resolves from
-	 *                application.$wheels.authenticator or application.wheels.authenticator at request time.
+	 * @authenticator An Authenticator instance. If not provided, resolves at request time from
+	 *                application.$wheels.authenticator, application.wheels.authenticator, or the
+	 *                DI container's "authenticator" (registered by `wheels generate auth`).
 	 * @strategies Comma-delimited list or array of strategy names to restrict authentication to.
 	 *             If empty, all registered strategies are tried. Useful for per-route strategy selection.
 	 *             When set, the authenticator must expose authenticateWith(request, strategies)
@@ -117,6 +120,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * 1. Instance passed to init()
 	 * 2. application.$wheels.authenticator
 	 * 3. application.wheels.authenticator
+	 * 4. the DI container's "authenticator" (what `wheels generate auth` and enableSession() register)
 	 */
 	private any function $resolveAuthenticator() {
 		// Passed directly at construction
@@ -133,9 +137,13 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			return application.wheels.authenticator;
 		}
 
+		if (IsDefined("application.wheelsdi") && IsObject(application.wheelsdi) && application.wheelsdi.containsInstance("authenticator")) {
+			return application.wheelsdi.getInstance("authenticator");
+		}
+
 		throw(
 			type = "Wheels.Auth.NoAuthenticator",
-			message = "AuthMiddleware could not resolve an Authenticator. Pass one to init() or register one in application.$wheels.authenticator."
+			message = "AuthMiddleware could not resolve an Authenticator. Pass one to init() or register one as ""authenticator"" in the DI container (config/services.cfm)."
 		);
 	}
 
@@ -158,9 +166,10 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			local.errorMessage = "Unauthorized";
 		}
 
+		// Quoted keys keep their case; bare keys serialize as ERROR/STATUS on Lucee.
 		return SerializeJSON({
-			error = local.errorMessage,
-			status = arguments.authResult.statusCode
+			"error" = local.errorMessage,
+			"status" = arguments.authResult.statusCode
 		});
 	}
 

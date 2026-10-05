@@ -233,7 +233,8 @@
 		} else if (!StructKeyExists(local, "rv")) {
 			// make the where clause generic for use in caching
 			local.originalWhere = arguments.where;
-			arguments.where = ReReplace(arguments.where, variables.wheels.class.RESQLWhere, "\1?\8", "all");
+			// computed on the masked string: RESQLWhere's values are masked literals
+			arguments.where = ReReplace($maskWhereLiterals(arguments.where), variables.wheels.class.RESQLWhere, "\1?\8", "all");
 
 			// get info from cache when available, otherwise create the generic select, from, where and order by clause.
 			// $useRequestCache governs request-level caching only — it doesn't change the generated SQL — so strip it from the shell-key args; otherwise the application-scoped SQL cache fragments into two entries (batch vs non-batch) for every model that uses both.

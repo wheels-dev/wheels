@@ -50,6 +50,9 @@ services:
       # development so the isolated _wheelsTest binding stays on; smoke-env
       # overrides this per leg.
       - "WHEELS_ENV=${WHEELS_ENV:-development}"
+      # Runs through this file are framework-repository runs: specs that skip outside
+      # the repository must not skip here (RequireRepoPathSpec fails instead).
+      - "WHEELS_EXPECT_REPO=true"
     volumes:
       - ./:/wheels-test-suite
       - type: bind
@@ -80,6 +83,9 @@ services:
       # development so the isolated _wheelsTest binding stays on; smoke-env
       # overrides this per leg.
       - "WHEELS_ENV=${WHEELS_ENV:-development}"
+      # Runs through this file are framework-repository runs: specs that skip outside
+      # the repository must not skip here (RequireRepoPathSpec fails instead).
+      - "WHEELS_EXPECT_REPO=true"
     volumes:
       - ./:/wheels-test-suite
       - type: bind
@@ -116,6 +122,9 @@ services:
       # development so the isolated _wheelsTest binding stays on; smoke-env
       # overrides this per leg.
       - "WHEELS_ENV=${WHEELS_ENV:-development}"
+      # Runs through this file are framework-repository runs: specs that skip outside
+      # the repository must not skip here (RequireRepoPathSpec fails instead).
+      - "WHEELS_EXPECT_REPO=true"
     volumes:
       - ./:/wheels-test-suite
       - type: bind
@@ -146,6 +155,9 @@ services:
       # development so the isolated _wheelsTest binding stays on; smoke-env
       # overrides this per leg.
       - "WHEELS_ENV=${WHEELS_ENV:-development}"
+      # Runs through this file are framework-repository runs: specs that skip outside
+      # the repository must not skip here (RequireRepoPathSpec fails instead).
+      - "WHEELS_EXPECT_REPO=true"
     tty: true          
     stdin_open: true
     volumes:
@@ -178,6 +190,9 @@ services:
       # development so the isolated _wheelsTest binding stays on; smoke-env
       # overrides this per leg.
       - "WHEELS_ENV=${WHEELS_ENV:-development}"
+      # Runs through this file are framework-repository runs: specs that skip outside
+      # the repository must not skip here (RequireRepoPathSpec fails instead).
+      - "WHEELS_EXPECT_REPO=true"
     tty: true          
     stdin_open: true
     volumes:
@@ -216,6 +231,9 @@ services:
       # development so the isolated _wheelsTest binding stays on; smoke-env
       # overrides this per leg.
       - "WHEELS_ENV=${WHEELS_ENV:-development}"
+      # Runs through this file are framework-repository runs: specs that skip outside
+      # the repository must not skip here (RequireRepoPathSpec fails instead).
+      - "WHEELS_EXPECT_REPO=true"
     tty: true
     stdin_open: true
     volumes:
@@ -263,6 +281,9 @@ services:
       # development so the isolated _wheelsTest binding stays on; smoke-env
       # overrides this per leg.
       - "WHEELS_ENV=${WHEELS_ENV:-development}"
+      # Runs through this file are framework-repository runs: specs that skip outside
+      # the repository must not skip here (RequireRepoPathSpec fails instead).
+      - "WHEELS_EXPECT_REPO=true"
     tty: true
     stdin_open: true
     volumes:
@@ -305,6 +326,9 @@ services:
       # development so the isolated _wheelsTest binding stays on; smoke-env
       # overrides this per leg.
       - "WHEELS_ENV=${WHEELS_ENV:-development}"
+      # Runs through this file are framework-repository runs: specs that skip outside
+      # the repository must not skip here (RequireRepoPathSpec fails instead).
+      - "WHEELS_EXPECT_REPO=true"
     tty: true
     stdin_open: true
     volumes:

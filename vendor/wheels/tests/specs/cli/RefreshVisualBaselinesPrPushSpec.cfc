@@ -58,6 +58,7 @@ component extends="wheels.WheelsTest" {
 			};
 
 			it("hosts no push of its own — the workflow delegates delivery to the tools/ helper", () => {
+				$requireRepoPath(".github/workflows/refresh-visual-baselines.yml");
 				expect(fileExists(workflow)).toBeTrue("Missing file: " & workflow);
 				var wfExec = stripCommentLines(fileRead(workflow));
 
@@ -78,6 +79,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("grants the job pull-requests: write so the PR fallback can operate", () => {
+				$requireRepoPath(".github/workflows/refresh-visual-baselines.yml");
 				var wfExec = stripCommentLines(fileRead(workflow));
 				expect(reFindNoCase("pull-requests:[[:space:]]*write", wfExec) > 0).toBeTrue(
 					"issue ##3283: opening the fallback refresh PR needs `pull-requests: write` "
@@ -87,6 +89,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("treats the direct push as a guarded fast path — a GH013 rejection can never fail the job", () => {
+				$requireRepoPath(".github/workflows/refresh-visual-baselines.yml");
 				expect(fileExists(helper)).toBeTrue(
 					"Missing helper: " & helper & " — the commit/push/PR-fallback flow should "
 					& "live in a reviewable, reusable script the workflow calls."
@@ -118,6 +121,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("falls back to an executable `gh pr create` and never enables auto-merge", () => {
+				$requireRepoPath(".github/workflows/refresh-visual-baselines.yml");
 				var helperExec = stripCommentLines(fileRead(helper));
 				var wfExec = stripCommentLines(fileRead(workflow));
 
@@ -142,6 +146,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("keeps re-runs safe by seeding the throwaway branch name with the run attempt", () => {
+				$requireRepoPath(".github/workflows/refresh-visual-baselines.yml");
 				var helperExec = stripCommentLines(fileRead(helper));
 				expect(reFindNoCase("chore/refresh-baseline-[^\n]*RUN_ID[^\n]*RUN_ATTEMPT", helperExec) > 0).toBeTrue(
 					"issue ##3283: the throwaway branch name must include both RUN_ID and "

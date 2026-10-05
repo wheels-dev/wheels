@@ -117,8 +117,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("strips the literal 'hint:' prefix from function metadata", () => {
 				// Lucee surfaces /** hint: ... */ values with the literal "hint:"
-				// prefix; $commandHelpParts() strips it from the hint line before
-				// rendering. Match the case-insensitive ^\s*hint\s*:\s* anchor.
+				// prefix. $commandHint() (which $commandHelp() calls) strips it from
+				// the hint, and $commandHelpParts() strips it again from the summary
+				// line, so a hint read some other way is covered too.
+				expect(variables.source).toInclude('return trim(reReplaceNoCase(trim(fn.hint ?: ""), "^hint\s*:\s*", ""));');
 				expect(variables.source).toInclude('rv.summary = trim(reReplaceNoCase(lines[1], "^\s*hint\s*:\s*", ""));');
 			});
 
