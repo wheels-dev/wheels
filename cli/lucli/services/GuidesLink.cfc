@@ -3,15 +3,16 @@
  * vendor/wheels/GuidesLink.cfc. Callers pass the project's framework version
  * (or an upgrade target); "" or an unparsable version gets the latest tree.
  *
- * The segment (`v4-1-0`) is clamped to the guide trees that exist: never older
+ * The segment (`v4-2-0`) is clamped to the guide trees that exist: never older
  * than 4.0, never newer than `variables.latest`, because a version whose guides
- * aren't cut yet would 404. GuidesLinkSpec fails when a newer tree exists under
- * web/sites/guides/src/content/docs/ than `latest`: bump it here and in
- * vendor/wheels/GuidesLink.cfc when a version's guides are cut.
+ * aren't cut yet would 404. GuidesLinkSpec fails when any tree under
+ * web/sites/guides/src/content/docs/ is newer than `latest`, including one still
+ * in development: bump it here and in vendor/wheels/GuidesLink.cfc when a
+ * version's guides tree is cut.
  */
 component {
 
-	variables.latest = "4.1";
+	variables.latest = "4.2";
 	variables.oldest = "4.0";
 
 	/**
@@ -32,7 +33,7 @@ component {
 	}
 
 	/**
-	 * The guides version segment (`v4-1-0`) for a framework version.
+	 * The guides version segment (`v4-2-0`) for a framework version.
 	 */
 	public string function segment(string version = "") {
 		local.match = ReFind("^([0-9]+)\.([0-9]+)", arguments.version, 1, true);

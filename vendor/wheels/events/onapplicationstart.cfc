@@ -341,6 +341,12 @@ component {
 		// New installs get the clean `wheels_*` prefix.
 		application.$wheels.migratorTableName = "wheels_migrator_versions";
 		application.$wheels.levelsTableName = "wheels_levels";
+		// Cross-process migration lock (#4134): instances sharing a database run its migrations
+		// one at a time. A waiting instance gives up after migrationLockTimeout seconds; a holder
+		// that died frees the lock once its lease (renewed before each step) runs out.
+		application.$wheels.migratorLockTableName = "wheels_migrator_locks";
+		application.$wheels.migrationLockTimeout = 300;
+		application.$wheels.migrationLockLease = 3600;
 		application.$wheels.createMigratorTable = true;
 		application.$wheels.writeMigratorSQLFiles = false;
 		// Preserve column / table / index name case as written in the migration.

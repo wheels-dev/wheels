@@ -1,0 +1,1 @@
+- Guide links in framework and CLI messages now reach the 4.2 guides. A link for a 4.2 project or a `--to=4.2.0` upgrade check resolved to the 4.1 guides, which have no 4.1 to 4.2 upgrade page, because the newest linkable guides version was still 4.1. The spec that guards that version now counts guide trees still in development, so it can't fall behind again

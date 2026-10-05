@@ -44,28 +44,28 @@ component extends="wheels.WheelsTest" {
 				expect(DirectoryExists(docsRoot & latestSegment)).toBeTrue("missing guides tree " & latestSegment);
 			});
 
-			it("is not behind the newest released guide tree", () => {
+			it("is not behind the newest guide tree, released or in development", () => {
 				$requireRepoPath("web/sites/guides/src/content/docs");
-				// When a version's guides are released, bump variables.latest in
+				// When a version's guides tree is cut, bump variables.latest in
 				// vendor/wheels/GuidesLink.cfc and cli/lucli/services/GuidesLink.cfc.
-				// A tree marked status 'snapshot' in versions.ts (in development) is
-				// allowed to be newer: links don't point at unreleased guides.
-				var ahead = $treesAheadOfLatest(DirectoryList(docsRoot, false, "name"), $snapshotSlugs(), guides);
-				expect(ArrayLen(ahead)).toBe(0, "released guide tree(s) newer than GuidesLink's latest (#guides.latestVersion()#): #ArrayToList(ahead)#");
+				// A tree still marked 'snapshot' counts too: the code on that branch
+				// ships as that minor, and an upgrade check for it must link that
+				// minor's upgrading/ page, which older trees don't have.
+				var ahead = $treesAheadOfLatest(DirectoryList(docsRoot, false, "name"), guides);
+				expect(ArrayLen(ahead)).toBe(0, "guide tree(s) newer than GuidesLink's latest (#guides.latestVersion()#): #ArrayToList(ahead)#");
 			});
 
-			it("lets a newer snapshot tree pass and still fails a newer released tree", () => {
+			it("flags a guide tree one minor ahead of latest", () => {
 				var next = "v" & ListFirst(guides.latestVersion(), ".") & "-" & (ListLast(guides.latestVersion(), ".") + 1) & "-0";
-				expect(ArrayLen($treesAheadOfLatest([next], [next], guides))).toBe(0);
-				expect($treesAheadOfLatest([next], [], guides)).toBe([next]);
+				expect($treesAheadOfLatest([next], guides)).toBe([next]);
+				expect(ArrayLen($treesAheadOfLatest([latestSegment, "v4-0-0", "index.mdx"], guides))).toBe(0);
 			});
 
-			it("reads the snapshot status from versions.ts", () => {
+			it("links an upgrade to the latest minor to that minor's upgrade guide", () => {
 				$requireRepoPath("web/sites/guides/src/content/docs");
-				var source = FileRead(ExpandPath("/wheels/../..") & "/web/packages/ui/src/data/versions.ts");
-				for (var slug in $snapshotSlugs()) {
-					expect(ReFind("slug: '#slug#'[^}]*status: 'snapshot'", source)).toBeGT(0);
-				}
+				var target = guides.latestVersion() & ".0";
+				expect(guides.segment(target)).toBe(latestSegment);
+				expect(DirectoryExists(docsRoot & latestSegment & "/upgrading")).toBeTrue("missing #latestSegment#/upgrading");
 			});
 
 			it("matches the CLI's copy", () => {
@@ -128,13 +128,12 @@ component extends="wheels.WheelsTest" {
 		];
 	}
 
-	// Guide trees (vN-M-0 directory names) newer than GuidesLink's latest that
-	// are not marked 'snapshot'.
-	private array function $treesAheadOfLatest(required array dirs, required array snapshotSlugs, required any guides) {
+	// Guide trees (vN-M-0 directory names) newer than GuidesLink's latest.
+	private array function $treesAheadOfLatest(required array dirs, required any guides) {
 		var ahead = [];
 		for (var dir in arguments.dirs) {
 			var m = ReFind("^v([0-9]+)-([0-9]+)-0$", dir, 1, true);
-			if (m.pos[1] > 0 && !ArrayFindNoCase(arguments.snapshotSlugs, dir)) {
+			if (m.pos[1] > 0) {
 				var tree = Mid(dir, m.pos[2], m.len[2]) & "." & Mid(dir, m.pos[3], m.len[3]);
 				if (arguments.guides.$compareMinor(tree, arguments.guides.latestVersion()) > 0) {
 					ArrayAppend(ahead, dir);
@@ -142,23 +141,6 @@ component extends="wheels.WheelsTest" {
 			}
 		}
 		return ahead;
-	}
-
-	// Slugs that versions.ts lists in GUIDES_VERSIONS with status 'snapshot'.
-	private array function $snapshotSlugs() {
-		var source = FileRead(ExpandPath("/wheels/../..") & "/web/packages/ui/src/data/versions.ts");
-		var start = Find("GUIDES_VERSIONS", source);
-		var block = Mid(source, start, Find("];", source, start) - start);
-		var slugs = [];
-		for (var entry in ReMatch("\{[^}]*\}", block)) {
-			if (Find("status: 'snapshot'", entry)) {
-				var m = ReFind("slug: '([^']+)'", entry, 1, true);
-				if (m.pos[1] > 0) {
-					ArrayAppend(slugs, Mid(entry, m.pos[2], m.len[2]));
-				}
-			}
-		}
-		return slugs;
 	}
 
 	// Every guides path passed to GuidesLink.link() as a literal in the files
