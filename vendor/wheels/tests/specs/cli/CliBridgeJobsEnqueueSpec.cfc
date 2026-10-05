@@ -73,7 +73,19 @@ component extends="wheels.WheelsTest" {
 				var rv = enqueue({job = "wheels.tests._assets.jobs.ProbeJob", queue = variables.queue, delaySeconds = "120"});
 				expect(rv.success).toBeTrue();
 				expect(rv.job.delaySeconds).toBe(120);
-				expect(DateDiff("s", before, row(rv.job.id).runAt)).toBeGTE(110);
+				// Compared in the database against typed timestamps (as JobHardenerSpec
+				// does): JDBC hands runAt back as a different type per engine and
+				// database (an Oracle TIMESTAMP, epoch milliseconds on BoxLang SQLite).
+				var stored = QueryExecute(
+					"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE id = :id AND status = 'pending' AND runAt > :earliest AND runAt < :latest",
+					{
+						id = {value = rv.job.id, cfsqltype = "cf_sql_varchar"},
+						earliest = {value = DateAdd("s", 110, before), cfsqltype = "cf_sql_timestamp"},
+						latest = {value = DateAdd("s", 180, before), cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = variables.ds}
+				);
+				expect(stored.cnt).toBe(1);
 			});
 
 			it("refuses a component on the jobs path that doesn't extend wheels.Job, without instantiating it", () => {
