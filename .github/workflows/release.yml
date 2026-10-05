@@ -60,7 +60,7 @@ jobs:
   #############################################
   build:
     name: Build & Publish Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Stable runs queue instead of overlapping, so two quick pushes to main
     # can't both pass the republish check before either uploads (#4221).
     # Snapshot runs get a unique group and never wait.
@@ -430,7 +430,7 @@ jobs:
 
       # Build .deb / .rpm Linux packages alongside the zip artifacts. nfpm
       # needs no Linux-specific build host (it's a single Go binary), so this
-      # runs on the same ubuntu-latest runner as the rest of the pipeline.
+      # runs on the same ubuntu-24.04 runner as the rest of the pipeline.
       # Generates arch-independent wheels_<v>_all.deb and wheels-<v>.noarch.rpm.
       # See tools/distribution-drafts/linux-packages/ for the nfpm configs.
       - name: Install nfpm
@@ -865,7 +865,7 @@ jobs:
   smoke-test-distribution:
     name: Smoke Test Installed Distribution
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
