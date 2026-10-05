@@ -17,6 +17,16 @@ mapper()
         .post(name="browserTestLogout", pattern="/logout", to="BrowserTestSessions##destroy")
         .get(name="browserTestLoginAs", pattern="/login-as", to="BrowserTestLogin##create")
     .end()
+    // Advisory-lock release-on-abort fixtures (#4219) — a lock taken by
+    // withAdvisoryLock() whose callback ends the request via abort/redirectTo
+    // must still be released (the release runs in a finally). Driven by
+    // wheels.tests.specs.model.advisoryLockAbortReleaseSpec. Must precede .wildcard().
+    .scope(path="/_advisorylock")
+        .get(name="advisoryLockAbortDefault", pattern="/abort-default", to="AdvisoryLockProbe##abortDefault")
+        .get(name="advisoryLockRedirectDefault", pattern="/redirect-default", to="AdvisoryLockProbe##redirectDefault")
+        .get(name="advisoryLockAbortTx", pattern="/abort-tx", to="AdvisoryLockProbe##abortTransaction")
+        .get(name="advisoryLockRedirectTx", pattern="/redirect-tx", to="AdvisoryLockProbe##redirectTransaction")
+    .end()
     .wildcard()
 	.get(name="wheelstestbox", pattern="wheels/core/tests", to="wheels##public##tests")
 	.get(name="sampleLinkToTest", pattern="sample/linktotest", to="sample##linktotest")
