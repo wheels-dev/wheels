@@ -71,6 +71,16 @@ private string function csrfToken(required any testClient) {
 }
 ```
 
+## Setting the client address
+
+`fromAddress(ip)` makes a request appear to come from a given client address, so per-client behaviour (rate limiting, IP allow/deny rules) is testable:
+
+```cfm
+$testClient().fromAddress("203.0.113.9").get("/api/search");   // RateLimiter / IP rules see 203.0.113.9
+```
+
+The address reaches middleware through the request context; it never changes `cgi.remote_addr`, so app code reading that directly is unaffected, and it is ignored outside the isolated test application.
+
 ## Saving and restoring route state in specs
 
 A spec that redefines the route table leaks stale routes into every spec that runs after it (wrong `linkTo`/`urlFor` output, phantom named routes). `wheels.WheelsTest` provides three helpers so a route-manipulating spec cleans up after itself: `$snapshotRoutes()` captures the full route state, `$restoreRoutes(snapshot)` puts it back, and `$clearRoutes()` empties it so you can define a fresh table. Snapshot in `beforeEach`, restore in `afterEach`:
