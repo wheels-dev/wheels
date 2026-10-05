@@ -30,7 +30,7 @@ wheels deploy lock release [--destination=<name>] [--dry-run]
 
 ## Behavior
 
-Removes `/tmp/kamal_deploy_lock_<service>` on a single host. Lock state is per-service, stored at one well-known path — any host sees the same lock.
+Emits `rm -f /tmp/kamal_deploy_lock_<service>` on every host. The lock is per service and lives at the same path on each host.
 
 ## Example
 

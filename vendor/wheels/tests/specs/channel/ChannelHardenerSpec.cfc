@@ -322,8 +322,6 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("subscribeToChannel rejects an empty name before opening SSE", function() {
-				var stubDir = ExpandPath("/testbox/system/stubs");
-				CreateObject("java", "java.io.File").init(stubDir).mkdirs();
 				params = {controller = "dummy", action = "dummy"};
 				_controller = g.controller("dummy", params);
 				prepareMock(_controller);

@@ -19,6 +19,10 @@ excerpt: >-
   CFWheels 2.2 app we upgrade on camera, wheels-dev/cfwheels-example-app, with
   one branch and one commit per step.
 coverImage: null
+announcement:
+  title: 'From Wheels 2.x to 4.1: a new blog series'
+  body: |
+    New post: **[2.x to 4.x: why it's two passes, and the map](https://blog.wheels.dev/posts/from-2x-to-41-the-map/)** — the first post in *From 2.x to 4.1: the field guide*. We take a real CFWheels 2.2 app to Wheels 4.1.2 in two passes (2.x to 3.0, then 3.0 to 4.1), one branch and one commit per step, and this post maps what each pass touches. New posts follow on weekdays through October 13.
 ---
 
 The question we hear most from teams on Wheels 2.x is some version of "can I jump straight to 4.x, and what am I in for?" This series answers it by doing it. We take one real CFWheels 2.2 app all the way to Wheels 4.1.2, fix what breaks in the order it breaks, and publish every commit.

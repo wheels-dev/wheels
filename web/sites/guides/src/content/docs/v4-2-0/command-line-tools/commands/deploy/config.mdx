@@ -24,28 +24,25 @@ wheels deploy config [--destination=<name>] [--config=<path>]
 
 ## Output
 
-Prints the resolved config as YAML: `service`, `image`, `servers` (hosts per role), `registry`, `proxy`, `env`, `accessories`, `ssh` and `builder`. Secret values never appear: `env.secret` and `registry.password` list only the key names `.kamal/secrets` supplies, and a value resolved from `.kamal/secrets` into `env.clear` is redacted.
+Prints the resolved config as YAML: `service`, `image`, `servers` (hosts per role), `registry`, `proxy`, `env`, `accessories`, `ssh`, `builder` and `volumes`, with defaults filled in (for example `registry.server: docker.io` and `builder.arch: [amd64]`). Key order is not fixed, and short lists and maps print in flow style (`[a, b]`, `{k: v}`). Secret values never appear: `env.secret` and `registry.password` list only the key names `.kamal/secrets` supplies, and a value resolved from `.kamal/secrets` into `env.clear` is redacted.
 
 ```yaml title="example output (abridged)"
 service: myapp
 image: myorg/myapp
 servers:
-  web:
-    - 192.0.2.10
+  web: [192.0.2.10]
 registry:
   server: ghcr.io
+  password: [REGISTRY_PASSWORD]
   username: myorg
-  password:
-    - REGISTRY_PASSWORD
 proxy:
-  host: app.example.com
-  ssl: true
   app_port: 8888
+  host: app.example.com
+  healthcheck: {interval: 1, path: /up, timeout: 30}
+  ssl: true
 env:
-  clear:
-    DB_HOST: db.internal
-  secret:
-    - WHEELS_RELOAD_PASSWORD
+  secret: [WHEELS_RELOAD_PASSWORD]
+  clear: {DB_HOST: db.internal}
 ```
 
 Per-role options are not emitted.

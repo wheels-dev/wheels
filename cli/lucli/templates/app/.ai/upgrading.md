@@ -2,7 +2,7 @@
 
 Part of the Wheels application guide; start with `../CLAUDE.md`.
 
-Run `wheels upgrade check` first: it scans the app read-only and lists what breaks on the way to the target version (`--to=<version>`, `--format=json`, `--strict` to fail on advisories too, `--offline`). Breaking findings exit non-zero. `wheels upgrade apply --to=<version>` swaps the framework afterwards.
+Run `wheels upgrade check` first: it scans the app read-only and lists what breaks on the way to the target version (`--to=<version>`, `--format=json`, `--strict` to fail on advisories too, `--offline` together with `--to`). Breaking findings exit non-zero. `wheels upgrade apply --to=<version>` swaps the framework afterwards.
 
 Full guides: https://guides.wheels.dev/v4-2-0/upgrading/ (3.x to 4.x, 4.0 to 4.1, 4.1 to 4.2).
 

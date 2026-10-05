@@ -77,7 +77,7 @@ component {
             container: arguments.opts.container ?: ""
         };
         var n = $forEachHost(arguments.opts, function(cmds, role, version) {
-            return cmds.logs(logOpts);
+            return cmds.logs(logOpts, role);
         }, {versionOptional: true, collect: true});
         return $renderResult(arguments.opts, "Tailed app logs on " & n & " host(s)");
     }
@@ -130,6 +130,7 @@ component {
         var collect = arguments.flags.collect ?: false;
         var appCmds = new modules.wheels.services.deploy.commands.AppCommands(cfg);
         var roleFilter = arguments.opts.role ?: "";
+        $assertKnownRole(cfg, roleFilter);
         var hostCount = 0;
 
         // env.secret delivery (#2957): container-(re)creating verbs opt in
@@ -286,5 +287,22 @@ component {
             }
         });
         return ctx.lines;
+    }
+
+    /**
+     * A `--role` that names no role in deploy.yml matched no host, so the verb did nothing and
+     * exited 0 (#4417). It now fails and names the roles there are.
+     */
+    public void function $assertKnownRole(required any cfg, required string roleFilter) {
+        if (!len(arguments.roleFilter)) return;
+        var names = [];
+        for (var role in arguments.cfg.roles()) {
+            if (role.name() == arguments.roleFilter) return;
+            arrayAppend(names, role.name());
+        }
+        throw(
+            type = "DeployAppCli.UnknownRole",
+            message = "Unknown role '#arguments.roleFilter#'. deploy.yml defines: #arrayToList(names, ", ")#."
+        );
     }
 }

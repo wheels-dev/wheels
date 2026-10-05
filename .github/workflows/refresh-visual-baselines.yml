@@ -64,7 +64,7 @@ on:
 jobs:
   refresh:
     name: Refresh ${{ inputs.sites }} baseline(s) on ${{ github.ref_name }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Serialize per-branch so two simultaneous refreshes can't both build,
     # commit, and race on `git push` (the second would be rejected as
     # non-fast-forward). Matches the pattern web-deploy.yml uses for the
