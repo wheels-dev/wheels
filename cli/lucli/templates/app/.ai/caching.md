@@ -1,4 +1,4 @@
-# Partial Caching
+# Caching
 
 Part of the Wheels application guide; start with `../CLAUDE.md`.
 
@@ -25,3 +25,24 @@ fetch(url, {
 ```
 
 A plain HTML form post cannot set a header, so fill the hidden field from the meta tag on submit (a small `submit` listener in the uncached layout). Caching per user (a per-user key argument) also avoids the problem, but gives up the shared fragment.
+
+## Caching your own data
+
+`appCacheFetch(key, callback, time)` returns the value cached under `key`; on a miss it calls `callback`, caches the result for `time` (in `cacheDatePart` units, minutes by default; `defaultCacheTime` when left out) and returns it:
+
+```cfm
+stats = appCacheFetch("dashboard-stats", function() {
+    return {orders = model("Order").count(), revenue = model("Order").sum("total")};
+}, 10);
+```
+
+The rest: `appCacheRead(key, defaultValue="")`, `appCacheWrite(key, value, time)` (returns `false` when the cache is full), `appCacheExists(key)`, `appCacheDelete(key)` (returns `true` if there was an entry) and `appCacheClear()`. Available in controllers, models, views, jobs and specs.
+
+- Works in **every environment**, including development and testing, unlike `caches()` / `cache=` / `findAll(cache=N)`.
+- A cached `false`, `0` or `""` is a hit: `appCacheFetch()` won't recompute it. Never infer a miss from the value; use `appCacheExists()`.
+- Keys are case-sensitive strings, or a struct/array of values (struct key order ignored), e.g. `["user", userId, "orders"]`.
+- Values are copied in and out. A callback that returns nothing caches nothing (returns `""`); one that throws caches nothing and the error propagates.
+- No stampede guard: concurrent misses may each run the callback; the later write wins.
+- Entries live in their own `data` category: `appCacheClear()` never touches action/page/partial/query caches. They share `maximumItemsToCache`, are per server and in memory, and empty on reload/restart.
+- These names, like every public framework helper, can't be used as controller action names.
+- Invalidate with `appCacheDelete(key)` when the underlying data changes (e.g. from a model `afterSave`).
