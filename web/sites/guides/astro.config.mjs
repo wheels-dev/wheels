@@ -71,6 +71,10 @@ function buildSidebarForVersion(version) {
 }
 
 const config = defineConfig({
+	// Astro 7 changed the compressHTML default to 'jsx', which drops the space
+	// between text and an element on the next line ("Install with<code>").
+	// true keeps Astro 6's HTML-aware compression.
+	compressHTML: true,
 	site: 'https://guides.wheels.dev',
 	// The local docs bundle that ships with the framework is served from
 	// /wheels/guides/ rather than a domain root, and every asset URL Astro
