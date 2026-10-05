@@ -15,6 +15,13 @@ component extends="Model" {
 		return arguments.outcome;
 	}
 
+	// saves a tag first (queuing its commit callbacks), then enqueues a durable job
+	public boolean function saveTagThenEnqueue(required string marker, required boolean outcome) {
+		model("tag").create(name = arguments.marker, transaction = "commit");
+		new wheels.tests._assets.jobs.ProbeJob().enqueue(data = {}, queue = arguments.marker, transactional = false);
+		return arguments.outcome;
+	}
+
 	public boolean function enqueueThenThrow(required string marker) {
 		new wheels.tests._assets.jobs.ProbeJob().enqueue(data = {}, queue = arguments.marker, transactional = false);
 		Throw(type = "JobTxnProbe.Boom", message = "boom");

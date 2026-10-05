@@ -92,6 +92,33 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("A durable job queued after a model write whose callback throws", () => {
+
+				beforeEach(() => {
+					variables.g.model("tag").$registerCallback(type = "afterCommit", methods = "callbackThatThrows");
+					variables.g.model("tag").$registerCallback(type = "afterRollback", methods = "recordRollbackThenThrow");
+				});
+
+				afterEach(() => {
+					variables.g.model("tag").$clearCallbacks(type = "afterCommit");
+					variables.g.model("tag").$clearCallbacks(type = "afterRollback");
+					QueryExecute("DELETE FROM c_o_r_e_tags WHERE name LIKE 'durable_%'", [], {datasource = variables.g.get("dataSourceName")});
+				});
+
+				it("is still written on commit, and the callback's error still propagates", () => {
+					expect(errorOf(() => probe().invokeWithTransaction(method = "saveTagThenEnqueue", transaction = "commit", marker = "durable_cb_commit", outcome = true))).toBe("Wheels.TestAfterCommitBoom");
+					expect(jobCount("durable_cb_commit")).toBe(1);
+				});
+
+				it("is still written on a rollback without an exception", () => {
+					expect(errorOf(() => probe().invokeWithTransaction(method = "saveTagThenEnqueue", transaction = "commit", marker = "durable_cb_false", outcome = false))).toBe("Wheels.TestAfterRollbackBoom");
+					expect(jobCount("durable_cb_false")).toBe(1);
+					expect(errorOf(() => probe().invokeWithTransaction(method = "saveTagThenEnqueue", transaction = "rollback", marker = "durable_cb_rollback", outcome = true))).toBe("Wheels.TestAfterRollbackBoom");
+					expect(jobCount("durable_cb_rollback")).toBe(1);
+				});
+
+			});
+
 			describe("The transactional = true default", () => {
 
 				it("still rolls the job back with the transaction", () => {

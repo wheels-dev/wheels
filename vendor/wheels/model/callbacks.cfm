@@ -785,9 +785,12 @@
 	 * leave a stuck transaction marker or a leaked queue.
 	 */
 	public void function $runQueueCallbacks(required array queue, required string type, boolean propagateErrors = true) {
+		// The first entry not yet run. A struct, not local: read in finally after a throw.
+		var progress = {next = 1};
 		try {
 			local.iEnd = ArrayLen(arguments.queue);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				progress.next = local.i + 1;
 				local.entry = arguments.queue[local.i];
 				// An entry queued only to restore the saved-change state fires nothing (F49).
 				if (StructKeyExists(local.entry, "callbacks") && !local.entry.callbacks) {
@@ -796,10 +799,29 @@
 				$runQueueEntryCallbacks(entry = local.entry, type = arguments.type, propagateErrors = arguments.propagateErrors);
 			}
 		} finally {
+			// A callback that threw stops the queue as before, but a durable entry after it (a job
+			// enqueued with transactional = false) is still written, once. Helper calls: Lucee 7
+			// miscompiles loops inside finally.
+			$runRemainingDurableEntries(queue = arguments.queue, type = arguments.type, from = progress.next);
 			// A rollback puts each object back to what savedChanges() reported before its first
-			// rolled-back save. A helper call: Lucee 7 miscompiles loops inside finally.
+			// rolled-back save.
 			if (arguments.type == "afterRollback") {
 				$restoreSavedChangesBeforeQueue(arguments.queue);
+			}
+		}
+	}
+
+	/**
+	 * Internal. Runs the durable entries of `queue` from position `from` on, without propagating their
+	 * errors: [see:$runQueueCallbacks] calls it once the main loop has stopped, so after a throwing
+	 * callback the durable entries it didn't reach are still attempted, each exactly once.
+	 */
+	public void function $runRemainingDurableEntries(required array queue, required string type, required numeric from) {
+		local.iEnd = ArrayLen(arguments.queue);
+		for (local.i = arguments.from; local.i <= local.iEnd; local.i++) {
+			local.entry = arguments.queue[local.i];
+			if (StructKeyExists(local.entry, "durable") && local.entry.durable) {
+				$runQueueEntryCallbacks(entry = local.entry, type = arguments.type, propagateErrors = false);
 			}
 		}
 	}

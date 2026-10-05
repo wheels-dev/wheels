@@ -181,7 +181,7 @@ The job is then written **after the outermost Wheels-managed transaction ends, w
 Two limitations:
 
 - **A raw `transaction {}` block isn't tracked by Wheels.** A `transactional=false` job enqueued inside one is written inside it and shares its fate. Use a model save or `invokeWithTransaction()`, or enqueue after the block.
-- **A request that ends with `abort` inside the transaction may not write the job.** The transaction is rolled back, but the request ends before the deferred write runs. Enqueue a must-survive job before any code that may abort, or outside the transaction.
+- **A request that ends with `abort` inside the transaction may not write the job.** The transaction is rolled back, but the request ends before the deferred write runs. Enqueueing earlier in the same transaction doesn't help: the job is still deferred to the end. For a job that must survive an `abort`, enqueue it outside the transaction.
 
 ## Process the queue
 
