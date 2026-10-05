@@ -276,7 +276,10 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * Fixed window: discrete time buckets. Simple counter per window ID.
 	 */
 	private struct function $checkFixedWindow(required string clientKey, required numeric now) {
-		local.windowId = Int(arguments.now / variables.windowSeconds);
+		// Fix(), not Int(): Int() truncates to a 32-bit int on Lucee, so a window id derived from an
+		// epoch-seconds `now` past 2038 (e.g. a spec's travelTo() into the future) wraps. Fix() is
+		// identical for these positive values but has no 32-bit ceiling.
+		local.windowId = Fix(arguments.now / variables.windowSeconds);
 		local.storeKey = arguments.clientKey & ":" & local.windowId;
 		local.resetAt = (local.windowId + 1) * variables.windowSeconds;
 
@@ -464,7 +467,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				}
 				variables.lastCleanup = arguments.now;
 
-				local.currentWindowId = Int(arguments.now / variables.windowSeconds);
+				local.currentWindowId = Fix(arguments.now / variables.windowSeconds);
 				local.keysToRemove = [];
 				local.keys = variables.store.keySet().toArray();
 				local.keyCount = ArrayLen(local.keys);
@@ -609,7 +612,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			}
 
 			// First pass: remove fully expired entries (cheap, no sorting needed).
-			local.currentWindowId = Int(arguments.now / variables.windowSeconds);
+			local.currentWindowId = Fix(arguments.now / variables.windowSeconds);
 			local.windowStart = arguments.now - variables.windowSeconds;
 			local.expiredCount = 0;
 			for (local.key in local.keys) {
@@ -1148,17 +1151,6 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	}
 
 	/**
-	 * Seconds elapsed since a stored timestamp value. SQLite has no real DATETIME
-	 * type — depending on the engine + JDBC driver combination, a cf_sql_timestamp
-	 * binding round-trips as a date object, a datetime string, or a raw
-	 * epoch-milliseconds number (observed on Adobe CF with sqlite-jdbc, where
-	 * IsDate() is false and DateDiff() against the raw number silently produces a
-	 * huge bogus elapsed value that reads every token bucket as fully refilled).
-	 * Normalize: dates/datetime strings go through DateDiff, raw numbers are
-	 * treated as epoch milliseconds against GetTickCount() (epoch ms on both
-	 * Lucee and Adobe).
-	 */
-	/**
 	 * The framework clock, read through wheels.Global so a spec's travelTo() can freeze it (the seam is
 	 * what makes rate-limit window logic deterministically testable). Falls back to the built-in when the
 	 * application object isn't available yet — same defensiveness as $secondsSince()'s application.wo use.
@@ -1180,6 +1172,17 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		return GetTickCount();
 	}
 
+	/**
+	 * Seconds elapsed since a stored timestamp value. SQLite has no real DATETIME
+	 * type — depending on the engine + JDBC driver combination, a cf_sql_timestamp
+	 * binding round-trips as a date object, a datetime string, or a raw
+	 * epoch-milliseconds number (observed on Adobe CF with sqlite-jdbc, where
+	 * IsDate() is false and DateDiff() against the raw number silently produces a
+	 * huge bogus elapsed value that reads every token bucket as fully refilled).
+	 * Normalize: dates/datetime strings go through DateDiff, raw numbers are
+	 * treated as epoch milliseconds against GetTickCount() (epoch ms on both
+	 * Lucee and Adobe).
+	 */
 	private numeric function $secondsSince(required any storedTime) {
 		if (IsDate(arguments.storedTime)) {
 			return DateDiff("s", arguments.storedTime, $clockNow());
@@ -1197,7 +1200,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			// No application scope (or an older framework) — fall through to the
 			// numeric epoch-milliseconds branch.
 		}
-		return Int(($clockTick() - arguments.storedTime) / 1000);
+		// Fix(), not Int(): $clockTick() is epoch milliseconds, so past 2038 (or after a spec's
+		// travelTo() into the future) the elapsed seconds can exceed Int()'s 32-bit ceiling and wrap.
+		return Fix(($clockTick() - arguments.storedTime) / 1000);
 	}
 
 	/**
