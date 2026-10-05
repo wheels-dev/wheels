@@ -34,20 +34,26 @@ Start a Wheels development server for the current project. Delegates to `wheels 
 wheels start [flags]
 ```
 
-Flags other than `--port` and `--force` are forwarded verbatim to `wheels server start`. The common ones are listed below — see [`wheels server start`](../../core-commands/server/) for the full list.
+`wheels start` handles `--port`, `--force`, `--engine` and `--dry-run` itself. Every other flag is forwarded verbatim to `wheels server start`; the common ones are listed below. See [`wheels server start`](../../core-commands/server/) for the full list.
 
-#### Flags (forwarded to `wheels server start`)
+#### Flags handled by `wheels start`
 
 | Flag | Description |
 |---|---|
-| `--port=<port>` | Port number for the server (e.g., `8080`). Handled by `wheels start` itself: it writes the port, and a free shutdown port, into `lucee.json`, so later starts reuse it. The short form `-p` is forwarded to `wheels server start` unchanged and is not written to `lucee.json`. |
+| `-p, --port=<port>` | Port number for the server (e.g., `8080`). `wheels start` writes the port, and a free shutdown port, into `lucee.json`, so later starts reuse it. `-p <port>` and `-p=<port>` are the same as `--port`. |
+| `--force` | Replace a stopped server registration that belongs to another project with the same server name. It does not restart a running server. |
+| `--engine=<engine>` | The engine to run (default `lucee`). See [`wheels server start`](../../core-commands/server/). |
+| `--dry-run` | Show the resolved configuration without starting the server. Nothing is written: a `--port` value is passed to the dry run instead of into `lucee.json`. Not supported with `--engine=rustcfml`. |
+
+#### Flags forwarded to `wheels server start`
+
+| Flag | Description |
+|---|---|
 | `-n, --name=<name>` | Custom name for the server instance. |
 | `-v, --version=<version>` | Lucee version to use (e.g., `6.2.2.91`). |
-| `--env, --environment=<env>` | Environment to use (e.g., `dev`, `staging`, `prod`). |
+| `-e, --env, --environment=<env>` | Apply the matching `environments` profile from `lucee.json` (e.g., `dev`, `staging`, `prod`). An explicit `--env`/`--environment` value wins. |
 | `-c, --config=<file>` | Configuration file to use (defaults to `lucee.json`). |
-| `--force` | Handled by `wheels start`: replace a stopped server registration that belongs to another project with the same server name. It does not restart a running server. |
 | `--disable-open-browser` | Don't open a browser after the server starts. |
-| `--dry-run` | Show the resolved configuration without starting the server. |
 | `--sandbox` | Start a transient background server without writing `lucee.json`. |
 
 #### Example
@@ -61,7 +67,7 @@ Prints `Starting Wheels server...` in cyan and hands control off to `wheels serv
 If the port in `lucee.json` is already taken, `wheels start` stops before starting anything. It names the Wheels server that holds the port, when it's one of yours, with the `cd <its folder> && wheels stop` to free it, and suggests a free port to pass as `wheels start --port=<port>`.
 
 <Aside type="note" title="Background process">
-`wheels start` returns control to your shell once the server is up — it does not block the terminal. Stop the server with `wheels stop`. Running `wheels start` while the server is already up prints `Server '<name>' is already running.` and exits 0 without restarting it, even with `--force`; restart with `wheels stop && wheels start`.
+`wheels start` returns control to your shell once the server is up — it does not block the terminal. Stop the server with `wheels stop`. Running `wheels start` while the server is already up prints `Server '<name>' is already running.` and exits 0. It doesn't restart the server or change `lucee.json`, even with `--force`; restart with `wheels stop && wheels start`.
 </Aside>
 
 ### `wheels stop`

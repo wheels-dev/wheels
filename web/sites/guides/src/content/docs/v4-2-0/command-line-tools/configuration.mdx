@@ -148,14 +148,14 @@ The `environments` object in `lucee.json` lets you override specific keys for a 
 }
 ```
 
-Select an environment with `--env` (or `--environment`) on any command that loads `lucee.json`:
+Select an environment with `--env` (or `--environment`) on the server commands (`wheels server start`, `wheels start`):
 
 ```bash title="selecting an environment profile"
 wheels server start --env=prod
 wheels server start --environment=dev
 ```
 
-If the environment name you pass isn't defined in `lucee.json`, the CLI prints `Environment '<name>' not found in lucee.json; using base configuration.` and continues with the base configuration. Environment overrides apply both to server-level keys (`port`, `jvm`, `admin`) and to `dependencySettings` (for example, `installDevDependencies: true` in `dev` and `false` in `prod`).
+If the environment name you pass isn't defined in `lucee.json`, the server commands print `Environment '<name>' not found in lucee.json; using base configuration.` and continue with the base configuration. Environment overrides apply both to server-level keys (`port`, `jvm`, `admin`) and to `dependencySettings` (for example, `installDevDependencies: true` in `dev` and `false` in `prod`).
 
 ### Binary-name profiles (CLI branding)
 

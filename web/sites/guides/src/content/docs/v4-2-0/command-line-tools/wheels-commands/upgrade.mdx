@@ -114,7 +114,7 @@ The checks are hard-coded in the CLI and keyed by the major-version transition:
 **2.x → 3.x**
 
 - Existence of `plugins/` at the project root (legacy plugin directory; skipped on a 2.x → 4.x jump where the 4.x check below covers it).
-- *(advisory)* `extends="wheels.Test"` (either quote style) anywhere under `tests/` (the RocketUnit base class; deprecated, still runs on 4.x).
+- *(advisory)* `extends="wheels.Test"` or `extends="wheels.Testbox"` (either quote style) anywhere under `tests/`. `wheels.Test` is the RocketUnit base class (deprecated, still runs on 4.x); `wheels.Testbox` is an alias of `wheels.WheelsTest` that 5.0 removes.
 
 **3.x → 4.x**
 
