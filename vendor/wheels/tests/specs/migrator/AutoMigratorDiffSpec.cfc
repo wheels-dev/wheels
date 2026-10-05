@@ -95,6 +95,8 @@ component extends="wheels.WheelsTest" {
 				expect(m.$modelNameFromPath("/app/models/_shared/Thing.cfc", "/app/models/")).toBe("");
 				expect(m.$modelNameFromPath("/app/models/.hidden/Thing.cfc", "/app/models/")).toBe("");
 				expect(m.$modelNameFromPath("/elsewhere/Thing.cfc", "/app/models/")).toBe("");
+				expect(m.$modelNameFromPath("/app/models/.cfc", "/app/models/")).toBe("");
+				expect(m.$modelNameFromPath("/app/models/admin/.cfc", "/app/models/")).toBe("");
 			});
 
 			it("lists each model once and skips the base Model.cfc", () => {

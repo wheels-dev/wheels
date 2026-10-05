@@ -342,6 +342,10 @@ component extends="wheels.migrator.Base" {
 			return "";
 		}
 		local.relative = Mid(arguments.filePath, Len(arguments.root) + 1, Len(arguments.filePath));
+		// A file named just ".cfc" has no name to take; and Left(x, 0) crashes Lucee 7.
+		if (Len(ListLast(local.relative, "/")) <= 4) {
+			return "";
+		}
 		local.relative = Left(local.relative, Len(local.relative) - 4);
 		local.parts = ListToArray(local.relative, "/");
 		for (local.part in local.parts) {
