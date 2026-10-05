@@ -195,7 +195,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			local.result = queryExecute(
 				"SELECT pg_try_advisory_lock(hashtext(?)) AS lockresult, pg_backend_pid() AS sessionid",
 				[arguments.name],
-				{datasource: variables.dataSource, username: variables.username, password: variables.password}
+				$advisoryLockConnection()
 			);
 			if (IsQuery(local.result) && IsBoolean(local.result.lockresult) && local.result.lockresult) {
 				return local.result.sessionid;
@@ -218,7 +218,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		queryExecute(
 			"SELECT pg_advisory_unlock(hashtext(?))",
 			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 	}
 
@@ -229,7 +229,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		local.result = queryExecute(
 			"SELECT pg_advisory_unlock(hashtext(?)) AS released",
 			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 		return IsQuery(local.result) && IsBoolean(local.result.released) && local.result.released;
 	}
@@ -254,7 +254,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		local.result = queryExecute(
 			local.sql,
 			local.params,
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 		return IsQuery(local.result) && Val(local.result.holders) > 0;
 	}

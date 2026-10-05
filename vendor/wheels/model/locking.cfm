@@ -80,10 +80,12 @@
 
 	/**
 	 * Internal function. The application-server lock name that serialises withAdvisoryLock() callers
-	 * for one database lock (#4197).
+	 * for one database lock (#4197). It is keyed on the datasource the lock is taken on, the active
+	 * tenant's for a tenant model (#4223): another tenant's datasource is another connection pool,
+	 * which can't borrow the session holding this lock, so its callers needn't wait here.
 	 */
 	public string function $advisoryLockLocalName(required string name) {
-		return "wheels_advisory_" & Hash(variables.wheels.class.dataSource & "|" & arguments.name);
+		return "wheels_advisory_" & Hash(variables.wheels.class.adapter.$effectiveDataSource() & "|" & arguments.name);
 	}
 
 	/**
