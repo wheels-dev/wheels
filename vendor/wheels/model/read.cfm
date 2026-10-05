@@ -615,9 +615,15 @@
 	public void function reload() {
 		// A reloaded object reports no saved changes, as after clearChangeInformation() (F49).
 		StructDelete(variables, "$savedChanges");
-		// The row as it is now, soft-deleted or not; a row that is gone can't be reloaded.
+		// An object without a key has no row to read back: an unsaved object, or a save on a
+		// database that returns no generated key (Oracle). Leave it as it is.
+		if (!Len(key())) {
+			return;
+		}
+		// The row as it is now, soft-deleted or not; a row that is gone can't be reloaded. A finder
+		// can answer false instead of an empty query (BoxLang), which also means no row.
 		local.query = findByKey(key = key(), reload = true, returnAs = "query", includeSoftDeletes = true);
-		if (!local.query.recordCount) {
+		if (!IsQuery(local.query) || !local.query.recordCount) {
 			Throw(
 				type = "Wheels.RecordNotFound",
 				message = "Can't reload this #variables.wheels.class.modelName# object: no row exists for its key (#key()#).",

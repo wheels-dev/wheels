@@ -49,7 +49,7 @@ component extends="wheels.WheelsTest" {
 			it("soft-deletes dependents that can be soft-deleted", () => {
 				var state = {};
 				transaction {
-					var parentId = g.model("post").findOne(where = "authorId IS NOT NULL", order = "id").authorId;
+					var parentId = $parentPostWithChildren();
 					state.children = g.model("post").count(where = "authorId = #parentId# AND id <> #parentId#");
 					var parent = g.model("SoftDeletePostChildPosts").findByKey(parentId);
 					state.deleted = parent.delete();
@@ -66,7 +66,7 @@ component extends="wheels.WheelsTest" {
 			it("leaves dependents alone when a stale copy's soft delete changes nothing, inside a caller's transaction", () => {
 				var state = {};
 				transaction {
-					var parentId = g.model("post").findOne(where = "authorId IS NOT NULL", order = "id").authorId;
+					var parentId = $parentPostWithChildren();
 					state.children = g.model("post").count(where = "authorId = #parentId# AND id <> #parentId#");
 					var stale = g.model("SoftDeletePostChildPosts").findByKey(parentId);
 					// Soft-delete the parent row alone, behind the stale copy's back.
@@ -76,6 +76,7 @@ component extends="wheels.WheelsTest" {
 					transaction action="rollback";
 				}
 				expect(state.deleted).toBeFalse();
+				expect(state.children).toBe(2);
 				expect(state.liveChildren).toBe(state.children);
 			});
 
@@ -256,6 +257,19 @@ component extends="wheels.WheelsTest" {
 				expect(IsDate(state.reloadedDeletedAt)).toBeTrue();
 			});
 
+			it("leaves an object without a key alone on reload()", () => {
+				// An unsaved object, or a save on a database that returns no generated key (Oracle).
+				var post = g.model("post").new(title = "no key yet", body = "b");
+				var state = {type = ""};
+				try {
+					post.reload();
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("");
+				expect(post.title).toBe("no key yet");
+			});
+
 			it("throws from reload() when the row no longer exists", () => {
 				var state = {type = ""};
 				transaction {
@@ -273,6 +287,22 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+	}
+
+
+	/**
+	 * A new post with two "child" posts whose authorId is its id, for SoftDeletePostChildPosts (whose
+	 * childPosts association keys on authorId). Created rather than found, so the pairing doesn't rely
+	 * on post and author ids overlapping, which they don't on CockroachDB. Call inside a transaction
+	 * that rolls back. Returns the parent's id.
+	 */
+	private any function $parentPostWithChildren() {
+		var tag = Replace(CreateUUID(), "-", "", "all");
+		var parent = g.model("post").create(authorId = 1, title = "sd-parent-#tag#", body = "parent", views = 0, transaction = "none");
+		for (var i = 1; i <= 2; i++) {
+			g.model("post").create(authorId = parent.id, title = "sd-child-#i#-#tag#", body = "child", views = 0, transaction = "none");
+		}
+		return parent.id;
 	}
 
 }
