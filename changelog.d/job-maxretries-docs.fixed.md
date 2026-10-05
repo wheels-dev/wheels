@@ -1,0 +1,1 @@
+- The background-jobs guide (4.1 and 4.2) and the AI jobs reference now describe `maxRetries` as it works: it counts the retries after the first run, so the default `3` means up to four runs. The log line for a job that runs out of retries now reports how many times it ran.
