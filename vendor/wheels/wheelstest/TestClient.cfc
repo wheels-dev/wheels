@@ -415,7 +415,9 @@ component {
 	 * @value Cookie value
 	 */
 	public TestClient function withCookie(required string name, required string value) {
-		variables.cookies[arguments.name] = arguments.value;
+		// Kept URL-encoded, the form a server sets it in: the jar goes back out as
+		// one Cookie header with each value as stored (see $cookieHeaderValue()).
+		variables.cookies[arguments.name] = URLEncodedFormat(arguments.value);
 		return this;
 	}
 
@@ -771,6 +773,23 @@ component {
 		var mergedHeaders = StructCopy(variables.defaultHeaders);
 		StructAppend(mergedHeaders, arguments.headers, true);
 
+		// The cookie jar goes out as one Cookie header, each value exactly as the
+		// server set it, as a browser sends it. Not cfhttpparam type="cookie": it
+		// URL-encodes the value again, so a value the server had already encoded
+		// (Adobe sends a+b as a%2Bb) arrived double-encoded and unreadable.
+		if (!StructIsEmpty(variables.cookies)) {
+			var cookieHeaderName = "Cookie";
+			for (var headerKey in mergedHeaders) {
+				if (CompareNoCase(headerKey, "Cookie") == 0) {
+					cookieHeaderName = headerKey;
+				}
+			}
+			var jarValue = $cookieHeaderValue();
+			mergedHeaders[cookieHeaderName] = StructKeyExists(mergedHeaders, cookieHeaderName) && Len(mergedHeaders[cookieHeaderName])
+				? mergedHeaders[cookieHeaderName] & "; " & jarValue
+				: jarValue;
+		}
+
 		var result = {};
 
 		cfhttp(url = fullUrl, method = arguments.method, timeout = arguments.timeout, result = "result", redirect = false) {
@@ -779,10 +798,6 @@ component {
 				cfhttpparam(type = "header", name = hName, value = mergedHeaders[hName]);
 			}
 
-			// Add cookies
-			for (var cName in variables.cookies) {
-				cfhttpparam(type = "cookie", name = cName, value = variables.cookies[cName]);
-			}
 
 			// Add body for POST/PUT/PATCH. Adobe CF rejects a POST/PUT/PATCH
 			// cfhttp with zero cfhttpparam tags ("requires at least one
@@ -858,7 +873,20 @@ component {
 	}
 
 	/**
-	 * A copy of the cookies this client sends. Public for specs ($-prefixed).
+	 * The Cookie header for the jar: name=value pairs, values as stored. Public
+	 * for specs ($-prefixed).
+	 */
+	public string function $cookieHeaderValue() {
+		var pairs = [];
+		for (var name in variables.cookies) {
+			ArrayAppend(pairs, name & "=" & variables.cookies[name]);
+		}
+		return ArrayToList(pairs, "; ");
+	}
+
+	/**
+	 * A copy of the cookies this client sends, values as sent. Public for specs
+	 * ($-prefixed).
 	 */
 	public struct function $cookieJar() {
 		return Duplicate(variables.cookies);

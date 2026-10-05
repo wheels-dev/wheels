@@ -40,11 +40,45 @@ component extends="wheels.WheelsTest" {
 				expect(tc.$cookieJar().S).toBe("newest");
 			});
 
+			it("sends the jar back as one Cookie header, values as the server set them", () => {
+				var tc = new wheels.wheelstest.TestClient(testContext = false);
+				tc.$absorbSetCookies({"Set-Cookie" = {"1" = "TOKEN=a%2Bb%2Fc%3D; Path=/", "2" = "CFID=403"}});
+				var sent = tc.$cookieHeaderValue();
+				expect(sent).toInclude("TOKEN=a%2Bb%2Fc%3D");
+				expect(sent).notToInclude("%25");
+				expect(sent).toInclude("CFID=403");
+			});
+
+			it("URL-encodes a value set with withCookie() once", () => {
+				var tc = new wheels.wheelstest.TestClient(testContext = false);
+				tc.withCookie("note", "a b;c");
+				expect(tc.$cookieHeaderValue()).notToInclude("a b;c");
+				expect(tc.$cookieJar().note).toBe(URLEncodedFormat("a b;c"));
+			});
+
 			it("ignores a response without Set-Cookie and a value without name=value", () => {
 				var tc = new wheels.wheelstest.TestClient(testContext = false);
 				tc.$absorbSetCookies({"Content-Type" = "text/html"});
 				tc.$absorbSetCookies({"Set-Cookie" = "garbage"});
 				expect(StructCount(tc.$cookieJar())).toBe(0);
+			});
+
+		});
+
+		describe("TestClient cookie round trip over HTTP", () => {
+
+			it("returns a cookie the server set exactly as it was set", () => {
+				var tc = $testClient();
+				tc.get("/_cookieroundtrip/set").assertOk();
+				tc.get("/_cookieroundtrip/read").assertOk().assertSee("value=[a+b/c=d e]");
+			});
+
+			it("keeps the session from one request to the next", () => {
+				var tc = $testClient();
+				tc.get("/_cookieroundtrip/set");
+				var jar = tc.$cookieJar();
+				var sessionCookie = StructKeyExists(jar, "CFID") || StructKeyExists(jar, "JSESSIONID") || StructKeyExists(jar, "jsessionid");
+				expect(sessionCookie).toBeTrue("expected a session cookie in " & StructKeyList(jar));
 			});
 
 		});
