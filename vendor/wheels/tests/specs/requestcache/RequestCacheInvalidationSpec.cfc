@@ -73,6 +73,27 @@ component extends="wheels.WheelsTest" {
 				expect(g.model("Author").findByKey(variables.authorId).firstName).toBe(variables.authorFirstName);
 			});
 
+			it("a rollback through the exception (throw) path clears cached reads too", () => {
+				// The probe throws instead of returning false, so the transaction rolls back through the
+				// begin-catch branch of $runInTransaction, which must clear the cache just like the other path.
+				var state = {threw = false};
+				try {
+					g.model("Author").findByKey(variables.authorId).invokeWithTransaction(method = "$throwRollbackProbe4429", transaction = "commit");
+				} catch (any e) {
+					state.threw = true;
+				}
+				expect(state.threw).toBeTrue();
+				expect(g.model("Author").findByKey(variables.authorId).firstName).toBe(variables.authorFirstName);
+			});
+
+			it("a savepoint rollback clears reads cached inside the savepoint (no phantom), outer carries on", () => {
+				// The outer transaction commits; inside it a savepoint unit writes + reads (caching the
+				// uncommitted row) then rolls back. Pre-fix the savepoint's phantom row stayed cached while
+				// the outer transaction continued and committed.
+				g.model("Author").findByKey(variables.authorId).invokeWithTransaction(method = "$savepointOuter4429", transaction = "commit");
+				expect(g.model("Author").findByKey(variables.authorId).firstName).toBe(variables.authorFirstName);
+			});
+
 		});
 
 	}

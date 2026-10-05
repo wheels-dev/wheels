@@ -426,11 +426,16 @@
 			// A rollback that itself fails is logged, never allowed to replace the
 			// method's exception, which is what the caller needs to see.
 			$rollbackToSavepointQuietly(name = local.savepoint, connection = local.connectionArgs, mark = local.mark);
+			// The savepoint unit's reads may have cached rows it just rolled back; clear the request
+			// cache so the outer transaction, which carries on, does not serve them as phantoms (#4429).
+			$clearRequestCache();
 			rethrow;
 		}
 		// Same failure test as the commit branch: a numeric count (0-row bulk op) is not a failure.
 		if (!IsBoolean(local.rv) || (!IsNumeric(local.rv) && !local.rv)) {
 			$rollbackToSavepoint(name = local.savepoint, connection = local.connectionArgs, mark = local.mark);
+			// Same phantom-read risk as the exception path above (#4429).
+			$clearRequestCache();
 		}
 		if (!IsBoolean(local.rv)) {
 			Throw(
