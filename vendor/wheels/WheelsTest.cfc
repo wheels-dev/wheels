@@ -361,8 +361,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
      *                      g.mapper()...end(); g.$setNamedRoutePositions(); });
      *   afterEach(() => $restoreRoutes(variables._routes));
      *
-     * Managed keys (each guarded, so this works on develop now and auto-covers
-     * #4183's dynamicRouteIndex / routeTableGeneration once it merges):
+     * Managed keys (each guarded, so a key absent on an older base degrades
+     * cleanly; includes #4183's dynamicRouteIndex / routeTableGeneration):
      *   application[appKey].{routes, staticRoutes, namedRoutePositions,
      *                        urlForCache, dynamicRouteIndex, routeTableGeneration}
      *   request.wheels.urlForCache  (the whole core suite runs in ONE request,
