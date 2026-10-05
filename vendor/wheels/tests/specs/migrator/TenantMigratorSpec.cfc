@@ -206,6 +206,190 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		// A failed up()/down() is caught by the migrator and RETURNED in the
+		// step's output rather than thrown. migrateAll() used to classify tenants
+		// only by thrown exceptions, so a tenant whose migration failed was listed
+		// under `success` with the error buried in its output text.
+		describe("TenantMigrator migrateAll with a failing migration step", () => {
+
+			var errorMigratePath = "/wheels/tests/_assets/migrator-error-path/migrations/";
+			var errorSqlPath = "/wheels/tests/_assets/migrator-error-path/sql/";
+			var noTxMigratePath = "/wheels/tests/_assets/migrator/notransaction_fail/";
+			var noTxSqlPath = "/wheels/tests/_assets/migrator/sql_tenant_notransaction_fail/";
+
+			beforeEach(() => {
+				$clearPlantedVersions();
+			});
+
+			afterEach(() => {
+				$clearPlantedVersions();
+				if (StructKeyExists(request, "wheels")) {
+					StructDelete(request.wheels, "tenant");
+				}
+			});
+
+			it("lists the tenant under failed, with the error and the full output", () => {
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				var results = tenantMigrator.migrateAll(
+					action = "latest",
+					tenants = [{id = "t1", dataSource = application.wheels.dataSourceName}],
+					migratePath = errorMigratePath,
+					sqlPath = errorSqlPath
+				);
+				expect(results.total).toBe(1);
+				expect(ArrayLen(results.success)).toBe(0, "a tenant whose migration failed must not be reported as a success");
+				expect(ArrayLen(results.failed)).toBe(1);
+				expect(results.failed[1].tenant).toBe("t1");
+				expect(results.failed[1].dataSource).toBe(application.wheels.dataSourceName);
+				expect(results.failed[1].error).toInclude("synthetic failure");
+				expect(results.failed[1].version).toBe("004");
+				expect(results.failed[1].output).toInclude("Error migrating to 004");
+			});
+
+			it("lists a tenant whose no-transaction step failed under failed, keeping the not-rolled-back note", () => {
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				var results = tenantMigrator.migrateAll(
+					action = "latest",
+					tenants = [{id = "t1", dataSource = application.wheels.dataSourceName}],
+					migratePath = noTxMigratePath,
+					sqlPath = noTxSqlPath
+				);
+				expect(ArrayLen(results.success)).toBe(0);
+				expect(ArrayLen(results.failed)).toBe(1);
+				expect(results.failed[1].error).toInclude("deliberate failure after the step started");
+				expect(results.failed[1].output).toInclude("were not rolled back");
+			});
+
+			it("stops after the first failed tenant when stopOnError=true", () => {
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				var results = tenantMigrator.migrateAll(
+					action = "latest",
+					tenants = [
+						{id = "first", dataSource = application.wheels.dataSourceName},
+						{id = "second", dataSource = application.wheels.dataSourceName}
+					],
+					migratePath = errorMigratePath,
+					sqlPath = errorSqlPath
+				);
+				expect(results.total).toBe(2);
+				expect(ArrayLen(results.failed)).toBe(1);
+				expect(ArrayLen(results.success)).toBe(0);
+				expect(results.failed[1].tenant).toBe("first");
+			});
+
+			it("records every failed tenant and continues when stopOnError=false", () => {
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				var results = tenantMigrator.migrateAll(
+					action = "latest",
+					tenants = [
+						{id = "first", dataSource = application.wheels.dataSourceName},
+						{id = "second", dataSource = application.wheels.dataSourceName}
+					],
+					stopOnError = false,
+					migratePath = errorMigratePath,
+					sqlPath = errorSqlPath
+				);
+				expect(ArrayLen(results.failed)).toBe(2);
+				expect(ArrayLen(results.success)).toBe(0);
+				expect(results.failed[2].tenant).toBe("second");
+			});
+
+			it("reports action=up and action=down failures the same way", () => {
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				var results = tenantMigrator.migrateAll(
+					action = "up",
+					tenants = [{id = "t1", dataSource = application.wheels.dataSourceName}],
+					migratePath = errorMigratePath,
+					sqlPath = errorSqlPath
+				);
+				expect(ArrayLen(results.success)).toBe(0);
+				expect(ArrayLen(results.failed)).toBe(1);
+				expect(results.failed[1].version).toBe("004");
+			});
+		});
+
+		describe("Migrator.$lastStepFailure()", () => {
+
+			beforeEach(() => {
+				$clearPlantedVersions();
+			});
+
+			afterEach(() => {
+				$clearPlantedVersions();
+			});
+
+			it("describes the failed step after migrateTo() returns a failure, and resets on the next run", () => {
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				var failing = CreateObject("component", "wheels.Migrator").init(
+					migratePath = "/wheels/tests/_assets/migrator-error-path/migrations/",
+					sqlPath = "/wheels/tests/_assets/migrator-error-path/sql/"
+				);
+				var output = failing.migrateToLatest();
+				// The returned text is unchanged: callers that read it keep working.
+				expect(output).toInclude("Error migrating to 004");
+				var failure = failing.$lastStepFailure();
+				expect(failure.failed).toBeTrue();
+				expect(failure.version).toBe("004");
+				expect(failure.direction).toBe("up");
+				expect(failure.error).toInclude("synthetic failure");
+
+				// A clean run on the same instance clears it.
+				failing.migrateTo("0");
+				expect(failing.$lastStepFailure().failed).toBeFalse();
+			});
+
+			it("reports no failure after a successful run", () => {
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				var ok = CreateObject("component", "wheels.Migrator").init(
+					migratePath = fixtureMigratePath,
+					sqlPath = fixtureSqlPath
+				);
+				ok.migrateTo("001");
+				expect(ok.$lastStepFailure().failed).toBeFalse();
+				ok.migrateTo("0");
+			});
+		});
+
+	}
+
+	/** Clears every version the failing fixtures could record, so a run starts from nothing. */
+	private void function $clearPlantedVersions() {
+		deleteMigratorVersions(2);
+		for (var v in ["001", "002", "003", "004", "005", "90000000000012"]) {
+			try {
+				queryExecute(
+					"DELETE FROM #application.wheels.migratorTableName# WHERE version = :v",
+					{v = {value = v, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+			} catch (any e) {
+				// Table not bootstrapped yet on a first run: nothing to clear.
+			}
+		}
+		for (var t in ["c_o_r_e_bunyips", "c_o_r_e_dropbears", "c_o_r_e_hoopsnakes"]) {
+			try { migration.dropTable(t); } catch (any e) {}
+		}
 	}
 
 }

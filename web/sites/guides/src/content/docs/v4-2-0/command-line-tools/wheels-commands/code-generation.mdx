@@ -58,6 +58,8 @@ Previewing is the safe way to see exactly what a generator will create — files
 
 Property-aware generators — `model`, `scaffold`, `api-resource`, and `property` — accept a trailing list of `name:type` property pairs after the resource name. They also recognise `--belongsTo=`, `--hasMany=`, and `--hasOne=` flags for associations. Type names are normalised to Wheels migration column types — unknown types fall back to `string`.
 
+Columns are **required by default**: an unmarked `name:type` column is created `allowNull=false` and added to the model's `validatesPresenceOf`, so the generated migration and model agree. Mark a column nullable with `name:type:optional` or give it a default with `name:type=value`; both exclude the column from `validatesPresenceOf` (a defaulted column never needs a presence check because the default fills an absent value). A `belongsTo` foreign-key column is required by default.
+
 The other generators (`controller`, `view`, `migration`, `route`, `test`, `helper`, `snippets`, `admin`) take their own positional arguments — see the per-subcommand Synopsis sections below for what each accepts.
 
 | You write | Column type | Notes |
@@ -76,7 +78,9 @@ The other generators (`controller`, `view`, `migration`, `route`, `test`, `helpe
 | `publishedOn:date` | `date` | |
 | `startsAt:time` | `time` | |
 | `payload:binary` | `binary` | |
-| `--belongsTo=author` | — | Adds `belongsTo("author")` and an `author_id` or `authorId` FK column, according to `useUnderscoreReferenceColumns`. |
+| `bio:text:optional` | `text` | `:optional` makes the column nullable (`allowNull=true`) and omits it from `validatesPresenceOf`. Use the word `optional`, not `?` — zsh (the macOS default shell) treats a bare `?` as a glob. |
+| `status:string=draft` | `string` | `=value` sets a column `DEFAULT` and omits the column from `validatesPresenceOf` (the default fills an absence). Combine the two as `status:string=draft:optional`. |
+| `--belongsTo=author` | — | Adds `belongsTo("author")` and an `author_id` or `authorId` FK column, according to `useUnderscoreReferenceColumns`. The FK column is required by default. |
 | `--hasMany=comments` | — | Adds `hasMany(name="comments")`. Pass multiple names comma-separated. |
 | `--hasOne=profile` | — | Adds `hasOne(name="profile")`. |
 
@@ -315,9 +319,9 @@ wheels generate property <ModelName> <property:type>
 
 #### Description
 
-Writes a `Add<Property>To<Tables>` migration under `app/migrator/migrations/`. The migration calls `changeTable()` with the mapped column type in `up()` and `removeColumn()` in `down()`. Property type mapping follows the same table as the [attribute syntax](#attribute-syntax).
+Writes a `Add<Property>To<Tables>` migration under `app/migrator/migrations/`. The migration calls `changeTable()` with the mapped column type in `up()` and `removeColumn()` in `down()`. Property type mapping follows the same table as the [attribute syntax](#attribute-syntax), including `name:type:optional` and `name:type=value`. A column added to an existing table is created nullable so the migration succeeds on a populated table (a `=value` default is applied when given); backfill, then enforce the value with a validation.
 
-The generator prints a reminder to add a matching `validatesPresenceOf()` call in the model's `config()` — it does not modify the model CFC for you.
+For a required column (no `:optional`, no `=value`) the generator prints a reminder to add a matching `validatesPresenceOf()` call in the model's `config()` — it does not modify the model CFC for you.
 
 #### Example
 

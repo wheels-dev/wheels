@@ -23,7 +23,7 @@ component extends="[extends]" hint="[description]" {
 		var state = {};
 		transaction {
 			try {
-				changeColumn(table = 'tableName', columnType = '', columnName = 'columnName', default = '', allowNull = true);
+				changeColumn(table = 'tableName', columnType = '', columnName = 'columnName', allowNull = true);
 			} catch (any e) {
 				state.exception = e;
 			}

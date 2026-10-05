@@ -25,17 +25,20 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
-		describe("docblock placement in the CLI sources", () => {
+		describe("docblock placement in the CLI and framework sources", () => {
 
 			it("has no docblock directly followed by another docblock", () => {
-				var root = expandPath("/cli/lucli");
 				var offenders = [];
-				for (var path in directoryList(root, true, "path", "*.cfc")) {
-					var source = fileRead(path);
-					var at = reFind("\*/[ \t]*\r?\n[ \t]*/\*\*", source);
-					if (at > 0) {
-						var lineNumber = listLen(left(source, at), chr(10), true);
-						arrayAppend(offenders, replace(path, root, "cli/lucli") & ":" & lineNumber);
+				for (var tree in ["cli/lucli", "vendor/wheels"]) {
+					var root = expandPath("/" & tree);
+					for (var path in directoryList(root, true, "path", "*.cfc|*.cfm")) {
+						var source = fileRead(path);
+						var at = reFind("\*/[ \t]*\r?\n[ \t]*/\*\*", source);
+						while (at > 0) {
+							var lineNumber = listLen(left(source, at), chr(10), true);
+							arrayAppend(offenders, replace(path, root, tree) & ":" & lineNumber);
+							at = reFind("\*/[ \t]*\r?\n[ \t]*/\*\*", source, at + 2);
+						}
 					}
 				}
 				expect(arrayToList(offenders, ", ")).toBe(

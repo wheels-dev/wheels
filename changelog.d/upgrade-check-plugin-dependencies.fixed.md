@@ -1,0 +1,1 @@
+- `wheels upgrade check`: the legacy plugins check no longer passes a 3.x app just because `plugins/` is empty or missing. It also reports plugin packages declared in `box.json` (installed under `plugins/`, or `cfwheels-*` packages) and code that reads `application.wheels.plugins`.

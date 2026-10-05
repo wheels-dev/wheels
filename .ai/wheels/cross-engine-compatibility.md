@@ -100,6 +100,36 @@ var fn = obj["dynamicMethod"];
 var result = fn();
 ```
 
+### Quoted Named Argument in a Direct Call (Adobe CF 2023)
+
+A named argument whose *name* is a quoted string literal — `obj.method("name" = value)` — is a **compile error on Adobe CF 2023 only** (`MissingNameException: Invalid construct: Either argument or name is missing` / "each parameter must have a name"). Lucee 6/7, BoxLang, **and Adobe CF 2025** all accept it. This is the inverse footprint of the related invariants: the parenthesized-`new` receiver (invariant 16a) fails on both Adobe engines, the zero-arg `application`-scope call (16b/16b-ext) is Adobe 2025 only, and this one is the lone **Adobe 2023-only** shape — so an Adobe 2025 smoke, or Lucee-only local verification, does **not** cover it.
+
+**Context-independent (unlike the closure-sensitive 16b-ext).** Probe-verified on adobe2023/62023, the quoted named-arg call fails identically in every call context tested — a single-expression arrow (`(x) => obj.method("n" = x)`), a block-bodied arrow, a regular `function()` closure, and a plain statement in a non-closure method body all throw the same `MissingNameException`. There is no "safe" context; only changing the call shape (below) helps.
+
+You only reach for a quoted argument name when the name is otherwise illegal as a bare token — a `$`-prefixed or hyphenated argument. Measured boundaries that compile on adobe2023 (do **not** "fix" these):
+- an *unquoted* named argument, `obj.method(name = value)`, compiles on every engine;
+- a quoted key in a *struct literal*, `{"$x" = 1}`, compiles everywhere — it is a struct key, not a function-argument name;
+- passing the same `$`-prefixed value via `argumentCollection` compiles everywhere.
+
+Adobe misattributes the error to the enclosing `describe(...)` / `function` line, and because the core suite compiles via `directory="wheels.tests.specs"`, a single occurrence zeroes the **entire adobe2023 leg** (`tests="0"` on every database) while Lucee/BoxLang/Adobe 2025 stay green.
+
+```cfm
+// WRONG — MissingNameException on adobe2023 (compiles on Lucee/BoxLang/adobe2025)
+var out = c.URLFor(controller = "posts", action = "index", "$argsResolved" = true);
+
+// RIGHT — the $-prefixed name lives on a struct key, not an argument name
+var args = {controller = "posts", action = "index"};
+args["$argsResolved"] = true;
+var out = c.URLFor(argumentCollection = args);
+```
+
+**Reference**: `vendor/wheels/tests/specs/view/linkToUrlForDifferentialSpec.cfc` ([#4192](https://github.com/wheels-dev/wheels/pull/4192)). It was pre-existing and only the adobe2023 matrix legs caught it. Bisect against a running container (~13s vs ~19min), using the Adobe 2023 port `62023`:
+
+```bash
+curl -s "http://localhost:62023/wheels/core/tests?db=sqlite&format=json&cli=true" | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('totalPass','COMPILE FAIL'), d.get('RootCause',{}).get('snippet',''))"
+```
+
 ### Method Reference Extraction Loses Receiver (BoxLang)
 
 BoxLang implements method dispatch with JavaScript-style semantics: pulling a method off an object into a local variable produces a bare function reference with no bound receiver. Calling that local then runs the function in an empty context, and any in-component call inside (helpers prefixed with `$`, `this.x()`, etc.) fails to resolve. The lookup-and-call **must** stay in a single expression for BoxLang to bind the receiver.
