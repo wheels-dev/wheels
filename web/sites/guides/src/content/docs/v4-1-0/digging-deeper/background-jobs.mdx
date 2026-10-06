@@ -138,8 +138,9 @@ Check queue health without tailing logs — `queueStats()` returns per-status co
 ```cfm {test:compile} title="queue health"
 component extends="Controller" {
     function status() {
-        stats = (new wheels.Job()).queueStats();                    // all queues
-        mailerStats = (new wheels.Job()).queueStats(queue="mailers"); // one queue
+        worker = new wheels.Job();
+        stats = worker.queueStats();                    // all queues
+        mailerStats = worker.queueStats(queue="mailers"); // one queue
         // {pending: n, processing: n, completed: n, failed: n, total: n}
         renderWith(data=stats);
     }
@@ -217,7 +218,8 @@ For headless metrics, scrape `wheels jobs status --format=json` from a cron job 
 ```cfm {test:compile} title="app/controllers/admin/Jobs.cfc (fragment)"
 component extends="Controller" {
     function metrics() {
-        renderWith(data=(new wheels.Job()).queueStats());
+        worker = new wheels.Job();
+        renderWith(data=worker.queueStats());
     }
 }
 ```
