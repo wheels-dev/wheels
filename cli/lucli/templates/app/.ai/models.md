@@ -155,8 +155,8 @@ result = model("Product").upsertAll(records=rows, uniqueBy="sku");              
 
 ## `order=`
 
-- Property names are quoted for you, so a property named after a reserved word (`order="rank DESC"`) is safe. `ASC` / `DESC` may be any case.
-- `order="comments.createdAt"` (table.column) orders by a column of an included association.
+- Property names are quoted for you, so a property named after a reserved word (`order="rank DESC"`) is safe (except on H2; see #4440). `ASC` / `DESC` may be any case.
+- `order="comments.createdAt"` (table.column) orders by a column of the model's table or an included association's, quoted the same way, so reserved words work there too (except on H2; see #4440). A qualifier that is neither (an alias, say) is passed through as written.
 - Raw expressions (anything with parentheses) throw `Wheels.InvalidOrderClause`: define a calculated property and order by its name instead.
   ```cfm
   property(name="lastActivity", sql="COALESCE(updatedAt, createdAt)");
