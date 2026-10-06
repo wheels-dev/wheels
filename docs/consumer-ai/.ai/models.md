@@ -107,7 +107,7 @@ A model whose table has a `deletedAt` column soft-deletes. `t.timestamps()` adds
 - `delete()`, `deleteAll()`, `deleteOne()` and `deleteByKey()` run `UPDATE ... SET deletedAt = <timestamp>` instead of `DELETE`. The timestamp follows `timeStampMode` (UTC by default). `beforeDelete` / `afterDelete` still run.
 - Finders skip soft-deleted rows: `findAll`, `findOne`, `findByKey`, `findEach`, `findInBatches`, paginated `findAll(page=)`, `count` / `sum` / `average` / `minimum` / `maximum`, `exists`, association readers (`post.comments()`), `updateAll` / `updateOne` / `updateByKey`, and the query builder. Soft-deleted rows on an `include=` join are filtered too.
 - Pass `includeSoftDeletes=true` to see them: `model("Post").findAll(where="authorId = 7", includeSoftDeletes=true)`.
-- Remove a row for good with `softDelete=false`. For rows that are already soft-deleted, pass both: `model("Post").deleteAll(where="...", softDelete=false, includeSoftDeletes=true)`.
+- Remove a row for good with `softDelete=false`; that also removes rows that are already soft-deleted: `model("Post").deleteAll(where="...", softDelete=false)`.
 - Restore: `model("Post").updateByKey(key=params.key, deletedAt="", includeSoftDeletes=true)`.
 - `validatesUniquenessOf` ignores soft-deleted rows, but a database unique index does not: a new row can pass validation and still hit the index.
 
