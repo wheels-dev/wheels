@@ -7,7 +7,7 @@ sidebar:
   order: 2
 ---
 
-Prune dangling images labelled with the service on every host.
+Remove the service's unused images on every host.
 
 ## Synopsis
 
@@ -24,7 +24,11 @@ wheels deploy prune images [--destination=<name>] [--dry-run]
 
 ## Behavior
 
-Per host, emits `docker image prune -f --filter label=service=<service>`. Without `-a`, `docker image prune` removes only dangling (untagged) images, and only those carrying a `service=<service>` label. The `Dockerfile` that `wheels deploy init` generates sets no such label and the build adds none, so on a default setup this removes nothing; tagged images of old versions stay on the host.
+Per host, emits `docker image prune --all --force --filter label=service=<service>`. It removes every image of the service that no container uses, tagged images of old versions included. Images used by any container, running or stopped, are kept.
+
+Rollback isn't affected while a version's container still exists: [`wheels deploy rollback <version>`](../../rollback/) restarts that version's existing container (`docker start`) and doesn't pull, and an image in use by a stopped container is kept. Once [`prune containers`](../containers/) has removed a version's container, the next `prune images` removes its image too. Going back to that version then means deploying it again with `wheels deploy --version=<version> --skip-push`, which pulls that version's image from the registry instead of building the current checkout.
+
+The label comes from [`wheels deploy build push`](../../build/push/), which sets `service=<service>` on every image it builds. Images built before that label was added carry none, so this command doesn't remove them; remove those once with `docker image rm`.
 
 ## Example
 

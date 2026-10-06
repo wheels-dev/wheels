@@ -7,7 +7,7 @@ sidebar:
   order: 7
 ---
 
-`docker logs` fanned out across every host, prefixed by host. Follows and per-container targeting supported.
+`docker logs` fanned out across every host, prefixed by host. Reads each role's newest container by default; `--container` picks one by name.
 
 ## Synopsis
 
@@ -21,22 +21,30 @@ wheels deploy app logs [--tail=<N>] [--follow] [--container=<name>] [--role=<nam
 |------|-------------|
 | `--tail=<N>` | Trailing lines per host. Default 100. |
 | `--follow` | `docker logs --follow`. Leaves the connection open; Ctrl-C to stop. |
-| `--container=<name>` | Container to read logs from. Pass it in practice: without it the emitted `docker logs` command has no container argument, and Docker rejects it. |
-| `--role=<name>` | Limit to one role. |
+| `--container=<name>` | Read this container's logs instead of each role's newest running container. |
+| `--role=<name>` | Limit to one role. A name that `deploy.yml` doesn't define stops the command with an error listing the roles it does define. |
 | `--destination=<name>` | Overlay destination config. |
 
 `--release` is not required.
 
 ## Behavior
 
-Emits `docker logs --tail <N> [--follow] [<container>]` per host in the targeted role(s). Output is line-buffered and prefixed with `[<host>]`.
+Without `--container`, each host in the targeted role(s) reads the role's newest running container:
+
+```txt
+docker ps --latest --quiet --filter 'label=service=<service>' [--filter 'label=role=<role>' --filter 'label=destination=<destination>'] | xargs -r docker logs --tail <N> [--follow]
+```
+
+The role and destination filters are added for each role the command runs for, which is every targeted role. Without `--destination`, the destination filter is empty (`label=destination=`) and matches containers deployed without one.
+
+With `--container=<name>`, it runs `docker logs --tail <N> [--follow] <name>`, with the name shell-quoted. Output is line-buffered and prefixed with `[<host>]`.
 
 Under `--follow`, the command fans out in parallel and stays running until interrupted.
 
 ## Examples
 
 ```bash title="illustrative"
-wheels deploy app logs --container=myapp-web-abc1234
-wheels deploy app logs --container=myapp-web-abc1234 --tail=500
-wheels deploy app logs --container=myapp-web-abc1234 --follow --role=web
+wheels deploy app logs
+wheels deploy app logs --tail=500 --role=web
+wheels deploy app logs --container=myapp-web-abc1234 --follow
 ```
