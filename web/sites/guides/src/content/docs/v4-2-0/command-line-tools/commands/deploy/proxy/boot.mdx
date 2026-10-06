@@ -27,13 +27,12 @@ wheels deploy proxy boot [--destination=<name>] [--dry-run]
 For every host across every role (the proxy is a per-host singleton):
 
 ```txt title="
-docker run -d --restart unless-stopped \
+docker run --detach --restart unless-stopped \
   --name kamal-proxy \
   --network kamal \
   --publish 80:80 --publish 443:443 \
-  -v /home/<user>/.config/kamal-proxy:/config \
-  basecamp/kamal-proxy:v0.8.6 \
-  run
+  --volume /home/<user>/.config/kamal-proxy:/home/kamal-proxy/.config/kamal-proxy \
+  basecamp/kamal-proxy:v0.8.6
 ```
 
 Fails fast if port 80 or 443 is occupied on any host.

@@ -97,8 +97,10 @@ component extends="wheels.WheelsTest" {
 			describe("ORDER BY and GROUP BY dot-notation", () => {
 
 				it("accepts a $ table in ORDER BY", () => {
-					var result = g.model("DollarWidget").$orderByClause(order = "#dollarTable#.name DESC", include = "");
-					expect(result).toInclude("#dollarTable#.name DESC");
+					var widget = g.model("DollarWidget");
+					var result = widget.$orderByClause(order = "#dollarTable#.name DESC", include = "");
+					// Quoted like the bare column since 4374.
+					expect(result).toBe(widget.$orderByClause(order = "name DESC", include = ""));
 				});
 
 				it("still rejects injection behind a $ table in ORDER BY", () => {

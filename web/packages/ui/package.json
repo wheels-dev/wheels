@@ -28,6 +28,6 @@
 		"./markdown/remark-base-prefix.mjs": "./src/markdown/remark-base-prefix.mjs"
 	},
 	"peerDependencies": {
-		"astro": "^6.0.0"
+		"astro": "^7.0.0"
 	}
 }

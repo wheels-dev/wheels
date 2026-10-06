@@ -42,17 +42,21 @@ component {
 		numeric heartbeatInterval = 15
 	) {
 		$assertChannelName(arguments.channel);
-		// Auto-detect Last-Event-ID from request header
-		if (!Len(arguments.lastEventId)) {
-			try {
-				local.headers = GetHTTPRequestData().headers;
-				if (StructKeyExists(local.headers, "Last-Event-ID")) {
-					arguments.lastEventId = local.headers["Last-Event-ID"];
-				}
-			} catch (any e) {
-				// Ignore header detection errors
-			}
+		// Resume point: an explicit lastEventId wins, then the native EventSource's Last-Event-ID
+		// header, then the bundled WheelsSSE client's lastEventId url parameter (the header wins over
+		// it). Before, only the header was read, so a WheelsSSE reconnect — which sends lastEventId as
+		// a url parameter — replayed nothing unless the action forwarded params.lastEventId itself.
+		local.requestHeaders = {};
+		try {
+			local.requestHeaders = GetHTTPRequestData().headers;
+		} catch (any e) {
+			// Request headers unavailable in this context — fall back to the explicit arg / url param.
 		}
+		arguments.lastEventId = $resolveLastEventId(
+			explicit = arguments.lastEventId,
+			requestHeaders = local.requestHeaders,
+			requestParams = (StructKeyExists(variables, "params") && IsStruct(variables.params)) ? variables.params : {}
+		);
 
 		// Resolve adapter type
 		local.adapterType = arguments.adapter;
@@ -64,11 +68,8 @@ component {
 			}
 		}
 
-		// Parse event filter list
-		local.eventFilter = [];
-		if (Len(arguments.events)) {
-			local.eventFilter = ListToArray(arguments.events);
-		}
+		// Parse the event filter list, trimming names so events="a, b" matches "b".
+		local.eventFilter = $parseEventFilter(arguments.events);
 
 		if (local.adapterType == "database") {
 			$subscribeDatabase(
@@ -88,6 +89,47 @@ component {
 				heartbeatInterval = arguments.heartbeatInterval
 			);
 		}
+	}
+
+	/**
+	 * Parse a comma-delimited event-filter list into a trimmed array, dropping blanks, so an
+	 * `events="a, b"` filter matches a `b` event (ArrayFind is exact, so an untrimmed " b" never did).
+	 * Public with a `$` prefix so it is integrated onto controllers and unit-testable.
+	 */
+	public array function $parseEventFilter(string events = "") {
+		local.rv = [];
+		for (local.evt in ListToArray(arguments.events)) {
+			local.trimmed = Trim(local.evt);
+			if (Len(local.trimmed)) {
+				ArrayAppend(local.rv, local.trimmed);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Resolve the SSE resume point. An explicitly passed id wins; otherwise the native EventSource's
+	 * `Last-Event-ID` header wins over the bundled WheelsSSE client's `lastEventId` url parameter. All
+	 * values are trimmed; absent sources resolve to "". Public with a `$` prefix so it is integrated
+	 * onto controllers and unit-testable without a live request.
+	 */
+	public string function $resolveLastEventId(string explicit = "", struct requestHeaders = {}, struct requestParams = {}) {
+		if (Len(Trim(arguments.explicit))) {
+			return Trim(arguments.explicit);
+		}
+		if (
+			StructKeyExists(arguments.requestHeaders, "Last-Event-ID")
+			&& Len(Trim(ToString(arguments.requestHeaders["Last-Event-ID"])))
+		) {
+			return Trim(ToString(arguments.requestHeaders["Last-Event-ID"]));
+		}
+		if (
+			StructKeyExists(arguments.requestParams, "lastEventId")
+			&& Len(Trim(ToString(arguments.requestParams.lastEventId)))
+		) {
+			return Trim(ToString(arguments.requestParams.lastEventId));
+		}
+		return "";
 	}
 
 	/**

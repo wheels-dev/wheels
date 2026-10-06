@@ -563,6 +563,9 @@
 	 * @property [see:findFirst].
 	 */
 	public any function findLastOne(string property) {
+		if ($strictArgumentsMode() != "off") {
+			$checkArguments(args = arguments, name = "findLastOne", accepted = $strictArgumentsAccepted("findLastOne"));
+		}
 		arguments.$sort = "DESC";
 		return findFirst(argumentCollection = arguments);
 	}
@@ -615,7 +618,21 @@
 	public void function reload() {
 		// A reloaded object reports no saved changes, as after clearChangeInformation() (F49).
 		StructDelete(variables, "$savedChanges");
-		local.query = findByKey(key = key(), reload = true, returnAs = "query");
+		// An object without a key has no row to read back: an unsaved object, or a save on a
+		// database that returns no generated key (Oracle). Leave it as it is.
+		if (!Len(key())) {
+			return;
+		}
+		// The row as it is now, soft-deleted or not; a row that is gone can't be reloaded. A finder
+		// can answer false instead of an empty query (BoxLang), which also means no row.
+		local.query = findByKey(key = key(), reload = true, returnAs = "query", includeSoftDeletes = true);
+		if (!IsQuery(local.query) || !local.query.recordCount) {
+			Throw(
+				type = "Wheels.RecordNotFound",
+				message = "Can't reload this #variables.wheels.class.modelName# object: no row exists for its key (#key()#).",
+				extendedInfo = "The row was deleted after the object was loaded."
+			);
+		}
 		local.properties = propertyNames();
 		local.columnInfo = variables.wheels.class.properties;
 		local.iEnd = ListLen(local.properties);

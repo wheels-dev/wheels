@@ -1,0 +1,4 @@
+- An object whose row is soft-deleted behaves consistently (#4372):
+  - After a soft `delete()`, the object's `deletedAt` holds the timestamp written. It goes back to its earlier value if the delete is vetoed or rolled back, so a retry works.
+  - A second soft `delete()`, or one from a stale copy of a row soft-deleted elsewhere, returns `false` and changes nothing. It no longer rewrites `deletedAt`, and it no longer soft-deletes the dependents of a row it didn't delete.
+  - `reload()` reloads a soft-deleted row instead of blanking every property.
