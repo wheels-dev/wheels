@@ -192,13 +192,13 @@ The return struct depends on the adapter:
 
 ### subscribeToChannel()
 
-Call from a controller action to open a long-lived SSE connection streaming a channel's events until the client disconnects or the timeout elapses. When the connection ends, the browser's `EventSource` reconnects automatically and the next request resumes — `subscribeToChannel()` reads the `Last-Event-ID` request header on its own when `lastEventId` isn't passed.
+Call from a controller action to open a long-lived SSE connection streaming a channel's events until the client disconnects or the timeout elapses. When the connection ends, the browser's `EventSource` reconnects automatically and the next request resumes — `subscribeToChannel()` reads the resume point on its own when `lastEventId` isn't passed: the `Last-Event-ID` header a native `EventSource` sends, or the `lastEventId` url parameter the bundled `WheelsSSE` client sends (the header wins if both are present). You no longer have to forward `params.lastEventId` from the action yourself.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `channel` | string | required | Channel to subscribe to |
-| `events` | string | `""` | Comma-delimited event types to deliver; empty delivers all |
-| `lastEventId` | string | `""` | Resume after this event ID; auto-detected from the `Last-Event-ID` header when empty |
+| `events` | string | `""` | Comma-delimited event types to deliver (surrounding whitespace is ignored, so `"a, b"` works); empty delivers all |
+| `lastEventId` | string | `""` | Resume after this event ID; auto-detected from the `Last-Event-ID` header or the `lastEventId` url parameter when empty |
 | `adapter` | string | `""` | Per-call adapter override |
 | `pollInterval` | numeric | `2` | Seconds between table polls (database adapter only) |
 | `timeout` | numeric | `300` | Maximum connection duration in seconds |

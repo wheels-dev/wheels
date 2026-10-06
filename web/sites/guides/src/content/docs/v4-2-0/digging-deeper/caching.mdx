@@ -193,6 +193,19 @@ Query caching is ideal when:
 - Per-request result variation is acceptable (a 5-minute-old revenue number is fine on a dashboard).
 - The view output depends on other per-request data (current user, feature flags) so whole-action caching won't work.
 
+## The per-request query cache
+
+Separate from `findAll(cache=N)` above, Wheels keeps a second, much shorter-lived query cache that is **on by default**: `cacheQueriesDuringRequest`. Within a **single request**, the first time a finder runs a given SQL statement its result is remembered, and an identical finder later in the same request returns that result instead of hitting the database again. It is what keeps a view that calls the same finder in a loop — or across several partials — from running the query many times. The cache lives in `request` scope, so it never outlives the request and is never shared between requests, visitors, or nodes.
+
+You rarely interact with it directly, because Wheels keeps it correct for you:
+
+- **Any ORM write clears the whole per-request cache.** `create()`, `update()`, `delete()`, `save()`, and the bulk forms (`updateAll` / `deleteAll` / `updateByKey` / `deleteByKey` / `insertAll` / `upsertAll`) drop every cached finder result for the rest of the request — not just the written model's. This matters for `include=`: a query that joins another model is cached under the base model, so a write to the included model has to clear it too, or the base finder would keep returning the joined model's pre-write columns.
+- **A transaction rollback clears it too.** A finder that ran inside a transaction can cache rows the transaction then rolled back; clearing on rollback keeps those phantom rows from being served later in the request.
+- **`reload=true` bypasses it for one call:** `model("Post").findByKey(key=id, reload=true)` always goes to the database.
+- **After a raw write you clear it yourself.** A `queryExecute("UPDATE …")` is invisible to the ORM, so cached finders can go stale. Call `forgetCachedQueries(all=true)` after a raw write when the tables you changed are joined by other models' `include=` queries; the single-model form `forgetCachedQueries("Post")` is enough for a raw single-table write that no other cached query joins. The same applies to a **raw `transaction {}` block that rolls back** — the automatic clear only fires for ORM transactions (`model.transaction()` / a write's `transaction=` argument), so after rolling back a raw block call `forgetCachedQueries(all=true)` to drop any rows it cached.
+
+Turn the whole thing off with `set(cacheQueriesDuringRequest=false)` in `config/settings.cfm` if you want every finder to hit the database.
+
 ## Cache your own data
 
 When the slow part is a value you compute yourself (a total, a call to another service, a struct built from several queries), cache it with `appCacheFetch()`. It returns the cached value, or calls your function, caches what it returns and returns that:

@@ -289,8 +289,9 @@ component extends="wheels.migrator.Base" {
 
 	/**
 	 * Internal function. The models the all-models diff covers: every model file in the
-	 * configured model paths (except _-prefixed files and the base Model.cfc), plus any
-	 * other model already loaded. Reading the files matters because the model cache only
+	 * configured model paths and their subfolders (a subfolder model is named in dot
+	 * notation, admin.User, as model() takes it), except _-prefixed files and folders and
+	 * the base Model.cfc, plus any other model already loaded. Reading the files matters because the model cache only
 	 * holds models that a request has used, so diffing the cache alone gave answers that
 	 * depended on request history (4406).
 	 */
@@ -306,9 +307,13 @@ component extends="wheels.migrator.Base" {
 			if (!DirectoryExists(local.dir)) {
 				continue;
 			}
-			for (local.file in DirectoryList(local.dir, false, "name", "*.cfc")) {
-				local.name = Left(local.file, Len(local.file) - 4);
-				if (Left(local.name, 1) == "_" || local.name == "Model" || StructKeyExists(local.seen, LCase(local.name))) {
+			local.root = Replace(local.dir, "\", "/", "all");
+			if (Right(local.root, 1) != "/") {
+				local.root &= "/";
+			}
+			for (local.file in DirectoryList(local.dir, true, "path", "*.cfc")) {
+				local.name = $modelNameFromPath(Replace(local.file, "\", "/", "all"), local.root);
+				if (!Len(local.name) || StructKeyExists(local.seen, LCase(local.name))) {
 					continue;
 				}
 				local.seen[LCase(local.name)] = true;
@@ -324,6 +329,32 @@ component extends="wheels.migrator.Base" {
 			}
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. The model name for a .cfc under a model path root (both with "/"
+	 * separators, root ending in "/"): its relative path with "." between the parts, as
+	 * model() resolves it. "" for the base Model.cfc, and for a file or folder whose name
+	 * starts with "_" or ".".
+	 */
+	public string function $modelNameFromPath(required string filePath, required string root) {
+		if (Left(arguments.filePath, Len(arguments.root)) != arguments.root) {
+			return "";
+		}
+		local.relative = Mid(arguments.filePath, Len(arguments.root) + 1, Len(arguments.filePath));
+		// A file named just ".cfc" has no name to take; and Left(x, 0) crashes Lucee 7.
+		if (Len(ListLast(local.relative, "/")) <= 4) {
+			return "";
+		}
+		local.relative = Left(local.relative, Len(local.relative) - 4);
+		local.parts = ListToArray(local.relative, "/");
+		for (local.part in local.parts) {
+			if (ListFind("_,.", Left(local.part, 1))) {
+				return "";
+			}
+		}
+		local.name = ArrayToList(local.parts, ".");
+		return local.name == "Model" ? "" : local.name;
 	}
 
 	/**
