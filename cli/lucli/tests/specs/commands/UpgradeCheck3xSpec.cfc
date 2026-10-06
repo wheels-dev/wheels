@@ -110,6 +110,24 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(text).toInclude("wheels.Testbox");
 			});
 
+			it("dates the renderPage() rename to 2.0 and names its real replacement", () => {
+				var files = {
+					"vendor/wheels/wheels.json": serializeJSON({name: "wheels-core", version: "4.1.2"}),
+					"app/controllers/Legacy.cfc": "component { function x() { renderPageToString(); } }"
+				};
+				var line = "";
+				for (var entry in $check($app(files)).breaking) {
+					var description = isStruct(entry) ? entry.description : entry;
+					if (findNoCase("renderPage", description)) {
+						line = description & " " & (isStruct(entry) && structKeyExists(entry, "fix") ? entry.fix : "");
+					}
+				}
+				expect(line).toInclude("2.0");
+				expect(line).notToInclude("4.0");
+				expect(line).toInclude("renderView(returnAs=""string"")");
+				expect(line).notToInclude("renderViewToString");
+			});
+
 			it("reports nothing breaking for a stock 4.x app (plugins/ placeholder, deprecated helpers)", () => {
 				var files = {
 					"vendor/wheels/wheels.json": serializeJSON({name: "wheels-core", version: "4.1.2"}),

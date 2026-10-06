@@ -47,7 +47,7 @@ Print every module installed under the active profile's modules directory, along
 wheels modules list
 ```
 
-Takes no flags. Output is a table with `NAME`, `INSTALLED`, `STATUS`, `VERSION`, and `DESCRIPTION` columns, plus the resolved modules directory at the top so you can see exactly where LuCLI is looking.
+Takes no flags. Output is a table with `NAME`, `INSTALLED`, `STATUS`, `VERSION`, and `DESCRIPTION` columns, plus the resolved modules directory at the top so you can see exactly where LuCLI is looking. Installed modules show `[OK]` and `INSTALLED`; modules that are only in the repository index show `AVAILABLE`.
 
 #### Example
 
@@ -60,9 +60,15 @@ Sample output:
 ```
 Wheels Modules
 Module directory: /Users/you/.wheels/modules
-
-NAME       INSTALLED   STATUS   VERSION   DESCRIPTION
-wheels     yes         ok       4.0.0     Wheels framework CLI module
+==========================================================================
+NAME         INSTALLED  STATUS     VERSION   DESCRIPTION
+──────────────────────────────────────────────────────────────────────────
+bitbucket               AVAILABLE  N/A       Interact with Bitbucket API from LuCLI (alpha)
+lint                    AVAILABLE  N/A       Linter for Lucee CFML files (alpha)
+markspresso             AVAILABLE  N/A       Brew static sites from Markdwon in shot!
+wheels       [OK]       INSTALLED  4.2.0     Wheels CLI - Code generation, migrations, testing, and server management for Wheels
+──────────────────────────────────────────────────────────────────────────
+Total: 4 modules
 ```
 
 ### `install`
@@ -172,9 +178,9 @@ wheels modules run <MODULE_NAME> [ARGS...] [flags]
 
 | Flag | Description |
 |---|---|
-| `-h, --help` | Show the module's own help output (invokes its `showHelp` entry point). |
+| `-h, --help` | In standalone LuCLI, shows the module's own help output (invokes its `showHelp` entry point). In the `wheels` binary, `--help` and `-h` print the Wheels help instead. |
 
-Any unmatched trailing arguments are forwarded verbatim to the module.
+The first argument after the module name selects the module function to call (`wheels modules run my-module hello` calls `hello()`); any remaining arguments are forwarded verbatim to the module.
 
 ### `help`
 
@@ -203,7 +209,7 @@ Manage per-project dependencies declared in `lucee.json`. Aliased as `wheels dep
 wheels deps <subcommand> [flags]
 ```
 
-Calling `wheels deps` with no subcommand prints help and exits. The subcommands are `install`, `add`, and `prune`.
+Calling `wheels deps` with no subcommand prints help and exits. The subcommands are `install`, `add`, `prune`, and `help` (`wheels deps help install` prints the flags for `install`).
 
 `wheels deps` reads and writes `lucee.json` — specifically the `dependencies` and `devDependencies` blocks — and maintains a `lucee-lock.json` lock file alongside it when `dependencySettings.useLockFile` is enabled.
 
@@ -239,15 +245,20 @@ wheels deps install --env=prod --production
 
 ### `add`
 
-Interactive wizard that appends a new dependency to `lucee.json`. Walks you through picking the scope (`dependencies` vs `devDependencies`), the kind of dependency (CFML/git, Lucee extension, Java/Maven, or raw JAR/file), and every required field for that kind.
+Appends a new dependency to `lucee.json`, either from a named shortcut (non-interactive) or through an interactive wizard. The wizard walks you through picking the scope (`dependencies` vs `devDependencies`), the kind of dependency (CFML/git, Lucee extension, Java/Maven, or raw JAR/file), and every required field for that kind.
 
 #### Synopsis
 
 ```bash title="synopsis"
-wheels deps add
+wheels deps add [SHORTCUT] [--dev]
 ```
 
-Takes no flags. The wizard handles everything interactively. For CFML/git deps it suggests modules from the bundled registry; for Lucee extensions it offers an interactive list from the Lucee extension registry including version selection.
+| Argument / flag | Description |
+|---|---|
+| `SHORTCUT` | Dependency shortcut to add without the wizard (for example `testbox` or `fw1`). |
+| `--dev` | Add the dependency to `devDependencies` instead of `dependencies`. |
+
+`wheels deps add testbox --dev` writes a `testbox` entry to `devDependencies` and prints `Added 'testbox' from shortcut 'testbox' to devDependencies in lucee.json`. Without a shortcut, the wizard handles everything interactively. For CFML/git deps it suggests modules from the bundled registry; for Lucee extensions it offers an interactive list from the Lucee extension registry including version selection.
 
 ### `prune`
 
@@ -259,7 +270,7 @@ Remove cached git dependency clones under LuCLI's git cache directory (e.g. `~/.
 wheels deps prune
 ```
 
-Takes no flags. Prints the cache path, then deletes it.
+Takes no flags. Prints the cache path, then deletes it. If no cache exists it prints `No git dependency cache found at <path>` and exits `0`.
 
 <Aside type="caution" title="Prune wipes the whole git cache">
 `prune` deletes every cloned git dependency in LuCLI's cache directory, not just unused ones. It does not touch your project's installed dependencies — only the shared clone cache that `deps install` pulls from. Run it when you want to force clean re-clones.
@@ -289,7 +300,7 @@ wheels modules install my-module --url=https://github.com/acme/my-module.git --r
 wheels modules list
 ```
 
-The first command clones the repo into `~/.wheels/modules/my-module/` and registers it; the second verifies it's there. After this, `wheels my-module <whatever>` will route to the module's commands.
+The first command clones the repo into `~/.wheels/modules/my-module/` and registers it; the second verifies it's there. In the `wheels` binary, call the module with `wheels modules run my-module <function>`; a bare `wheels my-module` is routed to the Wheels module and fails with `Unknown command: my-module`. (Standalone `lucli my-module <whatever>` routes to the module directly.)
 
 ### Add a dep to the current project
 

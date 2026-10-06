@@ -160,8 +160,22 @@ export class TutorialSession {
 
   async applyCliExample(ex) {
     await this.ensureInitialised();
+    // A reader following the tutorial has the dev server running by the time a step reloads,
+    // lists live routes, migrates or runs tests, and those commands refuse without this
+    // project's own server (#4426). Start the fixture's server first, as for HTTP asserts.
+    if (needsServer(ex.attrs.cmd)) {
+      await this.ensureServer();
+    }
     return await runCliInFixture(ex);
   }
+}
+
+// `wheels` commands that talk to the project's running dev server.
+const SERVER_COMMANDS = new Set(['reload', 'routes', 'test', 'migrate', 'seed', 'console']);
+
+export function needsServer(cmd) {
+  const [program, verb] = String(cmd ?? '').trim().split(/\s+/);
+  return program === 'wheels' && SERVER_COMMANDS.has(verb);
 }
 
 async function runCliInFixture(ex) {

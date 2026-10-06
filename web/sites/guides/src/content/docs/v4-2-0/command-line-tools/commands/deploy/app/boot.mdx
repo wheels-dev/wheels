@@ -24,11 +24,11 @@ wheels deploy app boot --release=<v> [--role=<name>] [--destination=<name>] [--d
 | `--destination=<name>` | Overlay `deploy.<name>.yml`. |
 | `--dry-run` | Print the `docker run` commands without executing. |
 
-A literal `--version=` flag does not work — the CLI's picocli root intercepts it before deploy dispatch ([#2674](https://github.com/wheels-dev/wheels/issues/2674)). Prefer non-numeric release labels: a purely numeric value like `--release=1` currently hangs ([#3111](https://github.com/wheels-dev/wheels/issues/3111)).
+`--version=<v>` is accepted as an alias of `--release=<v>`. Purely numeric release values such as `--release=1` work.
 
 ## Behavior
 
-For each host in each role, emits:
+For each host in each role, emits the command below. When `env.secret` lists keys, `boot` first creates the role's env file on the host and uploads the secret values to it (`--env-file` is only added in that case).
 
 ```txt title="
 docker run --detach --restart unless-stopped \
@@ -36,6 +36,7 @@ docker run --detach --restart unless-stopped \
   --network kamal \
   --label service=<service> --label role=<role> --label destination=<dest> --label version=<v> \
   -e KEY=VALUE ... \
+  --env-file .kamal/apps/<service>/env/roles/<role>.env \
   <image>:<version>
 ```
 

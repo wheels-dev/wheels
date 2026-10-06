@@ -1,6 +1,6 @@
 ---
 title: "wheels deploy build push"
-description: docker build + docker push on the control machine.
+description: docker buildx build --push on the control machine.
 type: reference
 sidebar:
   label: "push"
@@ -21,16 +21,27 @@ wheels deploy build push [--version=<v>] [--destination=<name>] [--dry-run]
 |------|-------------|
 | `--version=<v>` | Tag for the pushed image. Defaults to git short sha. |
 | `--destination=<name>` | Overlay destination config. |
-| `--dry-run` | Print the `docker build` + `docker push` commands without executing. |
+| `--dry-run` | Print the `docker buildx build --push` command without executing. |
 
 ## Behavior
 
-Uses the `builder:` block in `deploy.yml`:
+Emits one command:
 
-1. `docker build` with `context`, `dockerfile`, `args`, and `arch` from config.
-2. `docker push <image>:<version>`.
+```txt
+docker buildx build --push --platform linux/<arch>[,linux/<arch>...] [--builder kamal-<service>] --label service=<service> [--build-arg KEY=value ...] --tag <image>:<version> --file <dockerfile> <context>
+```
 
-If `builder.remote:` is set, the build happens on the remote builder over SSH instead of locally. Multi-arch builds require `docker buildx` (run [`build create`](/v4-2-0/command-line-tools/commands/deploy/build/create/) once).
+- **`--file` and the context** come from `builder.dockerfile` (default `Dockerfile`) and `builder.context` (default `.`). The image is prefixed with `registry.server` unless the server is `docker.io`.
+- **`--platform`** lists one `linux/<arch>` per entry in `builder.arch`, which takes a list or a comma-separated string and defaults to `amd64`. An entry that already contains `/` (for example `linux/arm/v7`) is used as is. An entry that isn't a plain platform name (letters, digits, `.`, `_`, `/` and `-` only) stops the command with `Wheels.Deploy.InvalidInput`.
+- **`--builder kamal-<service>`** is added when `builder.remote` is set. That builder is the one [`wheels deploy build create`](../create/) creates on the remote host.
+- **`--build-arg`** is added once per `builder.args` entry, sorted by key.
+- **`--label service=<service>`** is always set. [`wheels deploy prune images`](../../prune/images/) relies on it to find the service's images; images built before this label was added carry none.
+
+With `--dry-run`, for a `builder` of `arch: amd64,arm64`, `remote: ssh://deploy@192.0.2.50` and `args: {ALPHA: first, ZETA: last}`:
+
+```txt
+[local] docker buildx build --push --platform linux/amd64,linux/arm64 --builder kamal-ddapp --label 'service=ddapp' --build-arg 'ALPHA=first' --build-arg 'ZETA=last' --tag 'ddapp/web:v3' --file 'Dockerfile' '.'
+```
 
 ## Example
 

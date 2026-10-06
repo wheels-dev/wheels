@@ -105,7 +105,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
                 var appCmds = new cli.lucli.services.deploy.commands.AppCommands(cfg);
-                var logsCmd = appCmds.logs({tail: 100, follow: false, container: ""});
+                // Without --container the CLI tails each role's newest container, so the command
+                // carries the role filter.
+                var logsCmd = appCmds.logs({tail: 100, follow: false, container: ""}, cfg.roles()[1]);
                 fake.expect("1.2.3.4", logsCmd, {
                     exitCode: 0,
                     stdout: "line one" & chr(10) & "line two",

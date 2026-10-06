@@ -38,7 +38,7 @@ All positional arguments are joined with a single space and handed to the Lucee 
 
 #### Flags
 
-`wheels cfml` takes no command-specific flags. It accepts the global flags inherited from the root `wheels` command (for example, `--verbose`, `--debug`, `--timing`).
+`wheels cfml` takes no command-specific flags. A failing expression prints `Error in cfml command: ...` and exits `1`.
 
 #### Example
 
@@ -81,11 +81,11 @@ wheels run <script> [<arg> ...]
 - `.lucli` — executed as a LuCLI batch script (LuCLI's own scripting DSL, not CFML).
 - `.cfc` — **not supported**. Use a module entry point instead (e.g. `wheels modules run <module>`).
 
-Any trailing arguments after the script path are passed through to the script. The root `wheels` command also accepts a bare script path as a shortcut: `wheels hello.cfm` behaves identically to `wheels run hello.cfm`.
+Any trailing arguments after the script path are passed through to the script. Standalone LuCLI also accepts a bare script path (`lucli hello.cfm`), but the `wheels` binary does not: `wheels hello.cfm` fails with `Unknown command: hello.cfm`. Always use `wheels run hello.cfm`.
 
 #### Flags
 
-`wheels run` takes no command-specific flags beyond the script path and its arguments. Global flags from the root `wheels` command (`--verbose`, `--debug`, `--timing`) still apply.
+`wheels run` takes no command-specific flags beyond the script path and its arguments.
 
 #### Example
 
@@ -98,7 +98,7 @@ wheels run deploy.lucli
 The first invocation executes `hello.cfm` as a CFML template. The second runs `script.cfs` with two trailing arguments (available to the script). The third dispatches to the LuCLI batch runner for a `.lucli` file.
 
 <Aside type="caution" title="Unsupported extensions">
-Any file whose name does not end in `.cfm`, `.cfs`, or `.lucli` is rejected with an error. `run` will not guess the language from content.
+Any file whose name does not end in `.cfm`, `.cfs`, or `.lucli` is rejected with `Unsupported script file extension` and exit code `1`. `run` will not guess the language from content.
 </Aside>
 
 ### `wheels repl`
@@ -113,16 +113,11 @@ wheels repl [flags]
 
 #### Description
 
-`repl` drops you into a line-edited CFML prompt (`cfml>` by default — the prefix reflects the active LuCLI profile). Each line you enter is handed to the Lucee script engine; non-null results print to the terminal. History persists to `repl_history` in the CLI home (`~/.wheels/` for the `wheels` binary; `~/.lucli/` for standalone LuCLI) — 500 lines so you can arrow-back through previous expressions across sessions.
+`repl` drops you into a line-edited CFML prompt (`wheels>` in the `wheels` binary — the prefix reflects the active LuCLI profile). Each line you enter is handed to the Lucee script engine; non-null results print to the terminal. History persists to `repl_history` in the CLI home (`~/.wheels/` for the `wheels` binary; `~/.lucli/` for standalone LuCLI) — 500 lines so you can arrow-back through previous expressions across sessions.
 
 #### Flags
 
-| Flag | Description |
-|---|---|
-| `-h, --help` | Show command help and exit. |
-| `-V, --version` | Print LuCLI version and exit. |
-
-`repl` inherits the global flags from the root `wheels` command as well (for example, `--verbose`, `--debug`).
+`wheels repl` takes no command-specific flags. Type `help` inside the REPL for the list of special commands.
 
 #### Special commands (inside the REPL)
 
@@ -137,14 +132,14 @@ wheels repl [flags]
 
 ```text title="example REPL session — illustrative"
 $ wheels repl
-🚀 CFML REPL - LuCLI 0.3.5
-ℹ  Type CFML expressions to evaluate. Type 'exit' or Ctrl+D to quit.
+🚀 CFML REPL - Wheels 0.6.2.2
+ℹ️ Type CFML expressions to evaluate. Type 'exit' or Ctrl+D to quit.
 
-cfml> 1 + 2
-3
-cfml> dateFormat(now(), 'yyyy-mm-dd')
+wheels> 1 + 2
+3.0
+wheels> dateFormat(now(), 'yyyy-mm-dd')
 2026-04-20
-cfml> exit
+wheels> exit
 
 👋 Goodbye!
 ```

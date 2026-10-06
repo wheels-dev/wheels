@@ -2,7 +2,8 @@
 import { readdir, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { wheelsBinaryAttestation } from './lib/exec.mjs';
+import { runExec, wheelsBinaryAttestation } from './lib/exec.mjs';
+import { enterIsolatedHome } from './lib/isolated-home.mjs';
 import { extractExamples } from './lib/extract.mjs';
 import { printReport } from './lib/report.mjs';
 import { loadAllowlist, applyAllowlist, bodyHash } from './lib/allowlist.mjs';
@@ -37,6 +38,18 @@ async function collectMdx(target) {
 }
 
 async function main() {
+  // Run the CLI in a throwaway home so the blocks can't change the developer's
+  // own (#4422). Before the first spawn: every `wheels` inherits this env.
+  const { home, source } = enterIsolatedHome();
+  console.log(`verify-docs: CLI home: ${home} (modules copied from ${source})`);
+  // The first JVM run in a fresh home sets up LuCLI's Lucee context there; let one
+  // command do that before blocks run in parallel, which otherwise race on it.
+  const warm = await runExec('wheels', ['system', 'paths']);
+  if (warm.code !== 0) {
+    console.error(`verify-docs: could not start the CLI in ${home} (exit ${warm.code}):\n${warm.stderr || warm.stdout}`);
+    process.exit(2);
+  }
+
   // State up front WHICH wheels binary this run attests to (#3042).
   console.log(`verify-docs: ${await wheelsBinaryAttestation()}`);
 

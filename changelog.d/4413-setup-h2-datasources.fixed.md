@@ -1,0 +1,1 @@
+- `wheels new --setup-h2` no longer leaves SQLite datasource entries in `lucee.json`; the embedded-database choice in `config/app.cfm` and `lucee.json` now agree (#4413)

@@ -25,7 +25,7 @@ wheels deploy prune containers [--keep=<n>] [--destination=<name>] [--dry-run]
 
 ## Behavior
 
-Per host, walks the service-labelled container list, sorts by creation time, and `docker rm`s anything older than the retention window. Older versions become unrollbackable after this — check [`wheels deploy app containers`](/v4-2-0/command-line-tools/commands/deploy/app/containers/) first if you might need them.
+Per host, emits `docker ps -a --filter label=service=<service> --filter status=exited --format '{{.ID}}' | tail -n +<keep+1> | xargs -r docker rm`. Only exited containers are considered, so running containers are never removed; Docker lists newest first, so the `<keep>` newest exited containers survive. Older versions become unrollbackable after this — check [`wheels deploy app containers`](/v4-2-0/command-line-tools/commands/deploy/app/containers/) first if you might need them.
 
 ## Example
 

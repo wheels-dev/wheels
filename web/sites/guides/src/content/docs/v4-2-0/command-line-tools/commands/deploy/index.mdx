@@ -1,6 +1,6 @@
 ---
 title: "wheels deploy"
-description: The wheels deploy verb surface — 25 top-level verbs plus nine subcommand groups, mirrored from Kamal 2.4.0.
+description: The wheels deploy verb surface — 16 top-level verbs plus nine subcommand groups, mirrored from Kamal 2.4.0.
 type: reference
 sidebar:
   order: 11
@@ -59,7 +59,7 @@ For the end-to-end walk, start at [Your First Deploy](/v4-2-0/deployment/first-d
   <LinkCard
     title="wheels deploy server"
     href="/v4-2-0/command-line-tools/commands/deploy/server/"
-    description="Host-level operations. Nested verbs are picocli-shadowed — use the flat aliases: wheels deploy bootstrap and wheels deploy exec."
+    description="Host-level operations: exec and bootstrap, also available as the flat aliases wheels deploy exec and wheels deploy bootstrap."
   />
   <LinkCard
     title="wheels deploy prune"
@@ -74,7 +74,7 @@ For the end-to-end walk, start at [Your First Deploy](/v4-2-0/deployment/first-d
   <LinkCard
     title="wheels deploy secrets"
     href="/v4-2-0/command-line-tools/commands/deploy/secrets/"
-    description="Secret-store integration. Nested verbs are picocli-shadowed — use the flat aliases: wheels deploy fetch-secrets, extract-secrets, print-secrets."
+    description="Secret-store integration: fetch, extract, print, also available as the flat aliases wheels deploy fetch-secrets, extract-secrets, print-secrets."
   />
 </CardGrid>
 
@@ -87,4 +87,4 @@ Every `wheels deploy` verb accepts these:
 | `--config=<path>` | Path to `deploy.yml`. Default `config/deploy.yml`. `--configPath=<path>` is an accepted alias. |
 | `--destination=<name>` | Overlay `deploy.<name>.yml` and `.kamal/secrets.<name>`. |
 | `--dry-run` | Print the commands that would run, prefixed by host. No network. |
-| `--release=<v>` | Version label (default: `git rev-parse --short HEAD`). |
+| `--release=<v>` | Version label (default: `git rev-parse --short HEAD`). `--version=<v>` is an accepted alias. |

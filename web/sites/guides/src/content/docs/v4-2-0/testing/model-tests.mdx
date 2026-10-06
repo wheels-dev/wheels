@@ -266,11 +266,29 @@ The default transaction mode in the test runner is `none` — writes persist acr
 - **Mixed positional and named args.** `hasMany("comments", dependent="delete")` looks natural but breaks — Wheels functions can't mix the two styles. Use all-named (`hasMany(name="comments", dependent="delete")`) or all-positional (`hasMany("comments")`). This is the single most common source of model spec failures.
 - **Treating `findAll()` as an array.** `model("Post").findAll()` returns a CFML query, not an array. `<cfloop query="posts">` works; `<cfloop array="#posts#">` raises a type error. Check `.recordCount` for size.
 - **Forgetting `.reload()` after a callback writes server-generated columns.** A `beforeCreate` that sets `slug` from a database `DEFAULT` expression, or an `afterSave` that updates a counter, may not be reflected on the in-memory instance. Call `post.reload()` before asserting.
-- **A cached finder can return stale rows.** Finders cache their results for the rest of the request (`cacheQueriesDuringRequest`, on by default), and a spec runs in one request. A save through a model clears *that model's* cached queries, so re-reading the same model after its own save is fine — but the cache stays stale when data changes another way: raw SQL, a write through a *different* model than the one you re-query (e.g. a `Comment` create vs a cached `model("Post").findAll(include="comments")`), or a change made in a separate test-client request. Pass `reload=true` to the finder, or clear the whole cache with `StructDelete(request.wheels, "$queryCache")`, to read fresh data.
+- **A cached finder can return stale rows.** Finders cache their results for the rest of the request (`cacheQueriesDuringRequest`, on by default), and a spec runs in one request. A save through a model clears *that model's* cached queries, so re-reading the same model after its own save is fine — but the cache stays stale when data changes another way: raw SQL, a write through a *different* model than the one you re-query (e.g. a `Comment` create vs a cached `model("Post").findAll(include="comments")`), or a change made in a separate test-client request. Pass `reload=true` to the finder, or clear the cache with `model("Post").forgetCachedQueries()` (one model) or `forgetCachedQueries(all=true)` (every model), to read fresh data.
 - **Reaching for matchers that don't exist.** `toEqual`, `toBeTruthy`, and `toBeFalsy` are not shipped — neither is in the matcher set. Use `toBe` for value equality (it wraps `isEqual`, which recurses into structs and arrays), `toBeTrue` or `toBeFalse` for booleans, and `toBeArray` / `toBeStruct` / `toBeQuery` for type checks.
 - **`toBeInstanceOf("component")` is not cross-engine.** `getMetadata(obj).type` returns `"component"` on Lucee and Adobe CF but the fully-qualified class name on BoxLang, so this assertion passes on two engines and silently fails on the third. When asserting that a finder returned a Wheels model instance, use `expect(found).toBeWheelsModel()` instead.
 
 ## Related guides
+
+## Traveling the clock
+
+Time-dependent behaviour — a cache that expires, a rate-limit window that rolls over, a `createdAt` that must fall on a certain day — is hard to test against the real clock. `travelTo(moment, callback)` freezes the framework clock for the duration of the callback:
+
+```cfm
+travelTo("2026-10-04 12:00:00", function() {
+    // code under test sees 12:00:00 — model timestamps, cache expiry
+    // and rate-limit windows all read this instant
+});
+
+// roll the clock forward to prove a window reset, deterministically and without sleeping
+travelTo("2026-10-04 12:02:00", function() {
+    expect(limiter.handle(request = req, next = nextFn)).toBe("ok");
+});
+```
+
+Framework features that read the clock through the seam (`$now()` / `$tick()`) honour it: cache expiry and culling, the `RateLimiter` rate-limit windows, and model `createdAt` / `updatedAt` timestamps. The override is request-scoped and restored after the callback returns — even if it throws — so it never leaks into another spec. It applies to in-process code; a separate `$testClient()` request runs its own request and keeps the real clock.
 
 <CardGrid>
   <LinkCard title="Models and the ORM" href="/v4-2-0/basics/models-and-the-orm/" description="Defining models, declaring config(), finders and creators." />

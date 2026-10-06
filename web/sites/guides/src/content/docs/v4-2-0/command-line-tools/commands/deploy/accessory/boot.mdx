@@ -25,7 +25,7 @@ wheels deploy accessory boot <name|all> [--destination=<name>] [--dry-run]
 
 ## Behavior
 
-For each targeted accessory, emits `docker run` with the image, env, volumes, and `files:` uploads declared in `deploy.yml`. Container named `<service>-<accessory>`.
+For each targeted accessory, emits `docker run` with the image, `port`, `volumes`/`directories`, `env` and `cmd` declared in `deploy.yml`, on the `kamal` network. Container named `<service>-<accessory>`. A `files:` key is accepted without a warning, but nothing is uploaded.
 
 ## Example
 
