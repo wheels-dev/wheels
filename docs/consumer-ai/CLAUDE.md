@@ -40,7 +40,7 @@ Open the file for a topic before working on it:
 - Routing and route model binding: `.ai/routing.md`
 - JSON APIs: `.ai/api.md`
 - Pagination, development error page: `.ai/views.md`
-- Partial caching: `.ai/caching.md`
+- Partial caching and caching your own data (`appCacheFetch()`): `.ai/caching.md`
 - Middleware, rate limiting: `.ai/middleware.md`
 - DI container: `.ai/di.md`
 - Auth: `.ai/auth.md`

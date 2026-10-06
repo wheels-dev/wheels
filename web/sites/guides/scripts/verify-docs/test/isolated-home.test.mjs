@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, lstatSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createIsolatedHome, enterIsolatedHome, isolatedEnv, sourceHome } from '../lib/isolated-home.mjs';
@@ -14,7 +16,8 @@ function fakeSource() {
   const source = mkdtempSync(join(tmpdir(), 'verify-docs-source-'));
   mkdirSync(join(source, 'modules', 'wheels'), { recursive: true });
   writeFileSync(join(source, 'modules', 'wheels', 'Module.cfc'), 'component {}');
-  mkdirSync(join(source, 'express'));
+  mkdirSync(join(source, 'express', '7.0.0.1', 'lib', 'ext'), { recursive: true });
+  writeFileSync(join(source, 'express', '7.0.0.1', 'lib', 'ext', 'lucee.jar'), 'jar');
   mkdirSync(join(source, 'cache', 'packages'), { recursive: true });
   writeFileSync(join(source, 'cache', 'packages', 'manifest.json'), '{}');
   return source;
@@ -35,11 +38,27 @@ test('the isolated home is a new directory with a copy of the modules', () => {
   }
 });
 
-test('the Lucee express runtime is linked, and the real cache is left out', () => {
+test('the Lucee express runtime is a copy, so writes and downloads stay in the isolated home', () => {
   const source = fakeSource();
   const home = createIsolatedHome({ source });
   try {
-    assert.ok(lstatSync(join(home, 'express')).isSymbolicLink());
+    assert.equal(lstatSync(join(home, 'express')).isSymbolicLink(), false);
+    assert.equal(readFileSync(join(home, 'express', '7.0.0.1', 'lib', 'ext', 'lucee.jar'), 'utf8'), 'jar');
+    // A new runtime download, and a driver staged into an existing runtime, land in the copy only.
+    mkdirSync(join(home, 'express', '7.9.9.9'));
+    writeFileSync(join(home, 'express', '7.0.0.1', 'lib', 'ext', 'sqlite.jar'), 'driver');
+    assert.equal(existsSync(join(source, 'express', '7.9.9.9')), false);
+    assert.equal(existsSync(join(source, 'express', '7.0.0.1', 'lib', 'ext', 'sqlite.jar')), false);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(source, { recursive: true, force: true });
+  }
+});
+
+test('the real cache is left out', () => {
+  const source = fakeSource();
+  const home = createIsolatedHome({ source });
+  try {
     assert.equal(existsSync(join(home, 'cache')), false);
     rmSync(home, { recursive: true, force: true });
     assert.ok(existsSync(join(source, 'cache', 'packages', 'manifest.json')));
@@ -83,3 +102,31 @@ test('harness test processes run in the isolated home', () => {
   assert.equal(process.env.LUCLI_HOME, process.env.WHEELS_VERIFY_DOCS_HOME);
   assert.match(process.env.LUCLI_JAVA_ARGS, /-Dlucli\.home=/);
 });
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  test(`the isolated home is removed when the run is stopped with ${signal}`, { timeout: 30_000 }, async () => {
+    const source = fakeSource();
+    const lib = fileURLToPath(new URL('../lib/isolated-home.mjs', import.meta.url));
+    const env = { ...process.env, LUCLI_HOME: source };
+    delete env.WHEELS_VERIFY_DOCS_HOME;
+    delete env.WHEELS_VERIFY_DOCS_SOURCE_HOME;
+    const child = spawn(process.execPath, [
+      '--input-type=module', '-e',
+      `const { enterIsolatedHome } = await import(${JSON.stringify(lib)}); console.log(enterIsolatedHome().home); setInterval(() => {}, 1000);`,
+    ], { env, stdio: ['ignore', 'pipe', 'inherit'] });
+    try {
+      const home = await new Promise((resolve, reject) => {
+        child.stdout.once('data', (d) => resolve(String(d).trim()));
+        child.once('exit', () => reject(new Error('child exited before reporting its home')));
+      });
+      assert.ok(existsSync(home), 'the child created its home');
+      const exited = new Promise((resolve) => child.once('exit', resolve));
+      child.kill(signal);
+      await exited;
+      assert.equal(existsSync(home), false, `${signal} left ${home} behind`);
+    } finally {
+      try { child.kill('SIGKILL'); } catch {}
+      rmSync(source, { recursive: true, force: true });
+    }
+  });
+}

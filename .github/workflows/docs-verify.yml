@@ -140,10 +140,8 @@ jobs:
         # lets `wheels new` succeed, which makes fixture cwds real. See
         # #2178 for the full root-cause write-up.
         #
-        # Still soft-fail: surfaces the remaining tutorial-driver fixture
-        # issues (e.g., blog-tutorial's lucee.json emission). Drop
-        # continue-on-error once those are fixed.
-        continue-on-error: true
+        # Blocking: the last known failure, the mini-tutorial reloading before
+        # any server was started, is fixed (#4426).
         env:
           WHEELS_FRAMEWORK_PATH: ${{ github.workspace }}/vendor/wheels
         run: |
