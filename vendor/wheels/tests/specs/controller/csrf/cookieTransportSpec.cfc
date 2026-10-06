@@ -72,10 +72,13 @@ component extends="wheels.WheelsTest" {
 					// The server sets the old cookie, so each engine encodes it as it did then.
 					var tc = $testClient();
 					tc.get("/_csrfclient/setoldcookie?v=" & EncodeForURL(_old)).assertOk();
-					tc.post("/_csrfclient/save", {authenticityToken = _token}).assertOk().assertSee("saved:POST");
+					// The token goes in the X-CSRF-Token header, which the server validates the
+					// same way as the field: RustCFML's cfhttp leaves "+" unencoded in a form
+					// field, so a token containing "+" reached the server with a space instead.
+					tc.post("/_csrfclient/save", {}, {"X-CSRF-Token" = _token}).assertOk().assertSee("saved:POST");
 					var wrong = $testClient();
 					wrong.get("/_csrfclient/setoldcookie?v=" & EncodeForURL(_old)).assertOk();
-					wrong.post("/_csrfclient/save", {authenticityToken = "not-" & _token}).assertStatus(403);
+					wrong.post("/_csrfclient/save", {}, {"X-CSRF-Token" = "not-" & _token}).assertStatus(403);
 				} finally {
 					application.wheels.csrfStore = saved;
 				}
