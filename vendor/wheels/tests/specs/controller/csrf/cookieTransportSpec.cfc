@@ -43,6 +43,65 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("CSRF cookies issued before base64url", () => {
+
+			beforeEach(() => {
+				_controller = application.wo.controller("CsrfProtectedWithException", {});
+				_key = _controller.$ensureCsrfCookieEncryptionKey();
+				_alg = application.wheels.csrfCookieEncryptionAlgorithm;
+				// A standard-base64 cookie as written before: one whose ciphertext has both
+				// "+" and "/", the characters base64url replaces.
+				_token = "";
+				_old = "";
+				for (var i = 1; i <= 500; i++) {
+					var candidateToken = GenerateSecretKey(ListFirst(_alg, "/"));
+					var candidate = Encrypt(SerializeJSON({sessionId = CreateUUID(), authenticityToken = candidateToken}), _key, _alg, "Base64");
+					if (Find("+", candidate) && Find("/", candidate)) {
+						_token = candidateToken;
+						_old = candidate;
+						break;
+					}
+				}
+			});
+
+			it("still validates a form post against an old standard-base64 cookie", () => {
+				expect(Len(_old)).toBeGT(0, "no ciphertext with both + and / in 500 tries");
+				var saved = application.wheels.csrfStore;
+				application.wheels.csrfStore = "cookie";
+				try {
+					// The server sets the old cookie, so each engine encodes it as it did then.
+					var tc = $testClient();
+					tc.get("/_csrfclient/setoldcookie?v=" & EncodeForURL(_old)).assertOk();
+					tc.post("/_csrfclient/save", {authenticityToken = _token}).assertOk().assertSee("saved:POST");
+					var wrong = $testClient();
+					wrong.get("/_csrfclient/setoldcookie?v=" & EncodeForURL(_old)).assertOk();
+					wrong.post("/_csrfclient/save", {authenticityToken = "not-" & _token}).assertStatus(403);
+				} finally {
+					application.wheels.csrfStore = saved;
+				}
+			});
+
+			it("decrypts an old cookie whose + an engine turned into a space", () => {
+				var payload = DeserializeJSON(_controller.$decryptCsrfCookieValue(Replace(_old, "+", " ", "all"), _key));
+				expect(payload.authenticityToken).toBe(_token);
+			});
+
+			it("leaves a non-Base64 cookie encoding alone", () => {
+				var savedEncoding = application.wheels.csrfCookieEncryptionEncoding;
+				application.wheels.csrfCookieEncryptionEncoding = "Hex";
+				try {
+					var hex = Encrypt(SerializeJSON({sessionId = CreateUUID(), authenticityToken = _token}), _key, _alg, "Hex");
+					expect(_controller.$csrfCookieTransportValue(hex)).toBe(hex);
+					expect(_controller.$csrfCookieCipherText(hex)).toBe(hex);
+					var payload = DeserializeJSON(_controller.$decryptCsrfCookieValue(hex, _key));
+					expect(payload.authenticityToken).toBe(_token);
+				} finally {
+					application.wheels.csrfCookieEncryptionEncoding = savedEncoding;
+				}
+			});
+
+		});
+
 	}
 
 }
