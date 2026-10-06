@@ -27,24 +27,11 @@ function runEntry(args, env = {}) {
   });
 }
 
-test('verify-docs reports pass/fail counts', { timeout: 300_000 }, async (t) => {
-  // Several `wheels` JVMs starting at once in a fresh isolated home race in Lucee's OSGi bundle cache
-  // ("Bundle symbolic name and version are not unique") and fail or stall (#4450). The sample has two
-  // per-block examples, so run them one at a time. If it still fails, bound each command at 60 s so a
-  // stall surfaces quickly, show the child's output (which names the command), and skip on CI while
-  // #4450 is open. Locally a failure still fails.
-  const { code, stdout, stderr } = await runEntry([fixture], {
-    VERIFY_DOCS_CONCURRENCY: '1',
-    WHEELS_EXEC_TIMEOUT_MS: '60000',
-  });
-  if (code !== 0) {
-    t.diagnostic(`verify-docs exited ${code}`);
-    for (const line of `--- stdout ---\n${stdout}\n--- stderr ---\n${stderr}`.split('\n')) t.diagnostic(line);
-    if (process.env.CI) {
-      t.skip('a wheels command stalls on CI (#4450); the output above names it');
-      return;
-    }
-  }
+test('verify-docs reports pass/fail counts', { timeout: 300_000 }, async () => {
+  // Runs the per-block examples four at a time, as a real run does: `wheels` JVM starts are staggered
+  // in runExec() because simultaneous starts in one CLI home race (#4450). Each command is bounded at
+  // 60 s so a stall surfaces quickly, and a failure shows the child's output.
+  const { code, stdout, stderr } = await runEntry([fixture], { WHEELS_EXEC_TIMEOUT_MS: '60000' });
   // Phase 1 drivers: cli + tutorial + compile. Fixture has compile + cli +
   // tutorial; all three pass (compile falls back to bracket-check when
   // LuCLI PR #1 isn't installed, which still accepts the balanced sample).
