@@ -5,7 +5,7 @@ Part of the Wheels application guide; start with `../CLAUDE.md`.
 ```cfm
 mapper()
     .resources("users")
-    .resources("products", except="delete")
+    .resources(name="products", except="delete")
     .resources(name="posts", callback=function(map) {
         map.resources("comments");
     })
