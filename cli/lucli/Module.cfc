@@ -7592,16 +7592,16 @@ component extends="modules.BaseModule" {
 			"seed-data": {
 				name: "Seed Data",
 				description: "Database seeding template with seedOnce() examples",
-				hint: "wheels seed reads app/db/: move seeds.cfm to app/db/seeds.cfm and seeds-development.cfm to app/db/seeds/development.cfm, then run: wheels seed.",
+				hint: "Seeds go in app/db/seeds.cfm and app/db/seeds/development.cfm, where wheels seed reads them; existing files are kept unless you pass --force. Run them with: wheels seed.",
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
 					var content = fileRead(snippetDir & "seeds.txt");
-					var p = writeSnippetFile(projectRoot, "app/snippets/seeds.cfm", content, force);
+					var p = writeSnippetFile(projectRoot, "app/db/seeds.cfm", content, force);
 					if (len(p)) arrayAppend(created, p);
 
 					var devContent = fileRead(snippetDir & "seeds-development.txt");
-					p = writeSnippetFile(projectRoot, "app/snippets/seeds-development.cfm", devContent, force);
+					p = writeSnippetFile(projectRoot, "app/db/seeds/development.cfm", devContent, force);
 					if (len(p)) arrayAppend(created, p);
 
 					return created;
