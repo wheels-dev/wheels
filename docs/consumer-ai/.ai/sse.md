@@ -34,8 +34,8 @@ function stream() {
 #channelSSETag(channel="user.#session.userId#", route="notificationStream")#
 ```
 
-- `subscribeToChannel(channel, events, lastEventId, adapter, pollInterval=2, timeout=300, heartbeatInterval=15)`. `events` limits delivery to those event names. There are no wildcard channels; one connection subscribes to one channel.
-- Resume: a reconnecting browser sends its last event ID and the subscriber continues after it.
+- `subscribeToChannel(channel, events, lastEventId, adapter, pollInterval=2, timeout=300, heartbeatInterval=15)`. `events` limits delivery to those event names (surrounding whitespace is ignored, so `events="a, b"` works). There are no wildcard channels; one connection subscribes to one channel.
+- Resume: a reconnecting client sends its last event id and the subscriber continues after it. Both sources are honoured out of the box — the `Last-Event-ID` header a native `EventSource` sends, and the `lastEventId` url parameter the bundled client sends (the header wins if both are present); you no longer have to forward `params.lastEventId` from the action yourself.
 - Adapters: `set(channelAdapter="memory")` (default) or `"database"`, or `adapter=` per call. Memory lives in one application instance (no cross-server delivery, lost on restart) and keeps the last 100 events per channel for resume. Database stores events in `wheels_events` (created on first use, no migration), works across servers, delivers within `pollInterval` seconds, and deletes events older than 60 minutes as you publish. A new database subscriber without a `lastEventId` first receives the last 5 minutes of events.
 - Errors: an empty channel name throws `Wheels.Channel.InvalidName`; a failed database publish throws `Wheels.Channel.PublishFailed`; `channelSSETag()` without `route` or `controller` throws `Wheels.Channel.MissingEndpoint`.
 
