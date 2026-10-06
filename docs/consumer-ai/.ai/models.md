@@ -129,7 +129,7 @@ hasMany(name="comments", dependent="delete");
 
 On `hasOne`, `delete` and `deleteAll` both load the child and call `delete()`; `remove` and `removeAll` both go through `update()`.
 
-`delete(callbacks=false)` on the parent skips the dependents' callbacks too. An unsupported `dependent` value throws `Wheels.InvalidArgument` when the association is declared, so a typo surfaces at app start, not on the first delete.
+`delete(callbacks=false)` on the parent skips the dependents' callbacks too. An unsupported `dependent` value throws `Wheels.InvalidArgument` when the association is declared (the first time the model loads), not on the first delete.
 
 Order inside the parent's `delete()` transaction: the parent's `beforeDelete`, then the dependents, then the parent row, then `afterDelete`. If `beforeDelete` returns `false` nothing is deleted; if the parent delete fails, the children's changes roll back with it. `deleteAll()` on the parent without `instantiate=true` runs no callbacks and no `dependent=`.
 
