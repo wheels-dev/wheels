@@ -16,17 +16,17 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("writes base64 ciphertext with - and _ and no padding", () => {
-				expect(_controller.$csrfCookieTransportValue("ab+cd/ef==")).toBe("ab-cd_ef");
+				expect(_controller.$csrfCookieTransportValue("ab+cd/e=")).toBe("ab-cd_e");
 				expect(_controller.$csrfCookieTransportValue("abcdefgh")).toBe("abcdefgh");
 			});
 
 			it("reads base64url, standard base64 and a value whose + became a space", () => {
-				expect(_controller.$csrfCookieCipherText("ab-cd_ef")).toBe("ab+cd/ef==");
-				expect(_controller.$csrfCookieCipherText("ab+cd/ef==")).toBe("ab+cd/ef==");
-				expect(_controller.$csrfCookieCipherText("ab cd/ef==")).toBe("ab+cd/ef==");
+				expect(_controller.$csrfCookieCipherText("ab-cd_e")).toBe("ab+cd/e=");
+				expect(_controller.$csrfCookieCipherText("ab+cd/e=")).toBe("ab+cd/e=");
+				expect(_controller.$csrfCookieCipherText("ab cd/e=")).toBe("ab+cd/e=");
 			});
 
-			it("issues a cookie that needs no encoding over HTTP", () => {
+			it("issues a cookie whose value has no + or / for an engine to mangle", () => {
 				var saved = application.wheels.csrfStore;
 				application.wheels.csrfStore = "cookie";
 				try {
@@ -37,7 +37,8 @@ component extends="wheels.WheelsTest" {
 				} finally {
 					application.wheels.csrfStore = saved;
 				}
-				expect(ReFind("^[A-Za-z0-9_-]+$", value)).toBe(1, "cookie value: " & value);
+				// Decoded first: Adobe percent-encodes "-" and "_" too, and decodes them back.
+				expect(ReFind("^[A-Za-z0-9_-]+$", URLDecode(value))).toBe(1, "cookie value: " & value);
 			});
 
 		});
