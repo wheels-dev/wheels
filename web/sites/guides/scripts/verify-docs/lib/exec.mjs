@@ -64,23 +64,71 @@ export async function wheelsBinaryAttestation() {
 }
 
 /**
+ * How long a single command may run before runExec() gives up on it: WHEELS_EXEC_TIMEOUT_MS when it
+ * is a positive number, else 240 s. Below the harness tests' own 300 s limit, so a stuck command fails
+ * with its name instead of as an anonymous test timeout.
+ */
+export function defaultExecTimeout(env = process.env) {
+  const ms = Number(env.WHEELS_EXEC_TIMEOUT_MS);
+  return Number.isFinite(ms) && ms > 0 ? ms : 240_000;
+}
+
+// After the command exits, how long to keep reading output a leftover process may still be writing.
+const EXIT_GRACE_MS = 2_000;
+
+// Commands still running, and commands that exited while something they started still held their
+// output (a server a block started, say). Each leads its own process group, so a Ctrl-C at the
+// terminal no longer reaches it; when the harness exits (normally, or via the signal handlers in
+// isolated-home.mjs, which also delete the isolated home those processes run in), stop them all.
+const running = new Set();
+const leftovers = new Set();
+process.on('exit', () => {
+  for (const proc of [...running, ...leftovers]) killGroup(proc, 'SIGKILL');
+});
+
+// Kill the child's whole process group (it leads one: spawned detached), so a JVM or anything else it
+// started goes too; fall back to the child alone where groups aren't available.
+function killGroup(proc, signal) {
+  try {
+    if (process.platform !== 'win32') {
+      process.kill(-proc.pid, signal);
+      return;
+    }
+  } catch {
+    // no group (already gone, or not a group leader): try the child itself
+  }
+  try { proc.kill(signal); } catch {}
+}
+
+/**
  * Launches `program` with the given argv array. Never invokes a shell.
- * Returns `{ code, stdout, stderr }`. `code` is the process exit code, or -1
- * on spawn error (stderr will contain the Node error message in that case).
+ * Returns `{ code, stdout, stderr }`, plus `timedOut: true` when the command was stopped for running
+ * too long. `code` is the process exit code, or -1 on spawn error or timeout (stderr then carries the
+ * reason).
  *
  * Why no shell: the harness runs command strings pulled from MDX metadata.
  * Using `sh -c` would be a shell-injection surface. All callers must
  * pre-tokenize into program + args.
+ *
+ * Bounded, so one stuck `wheels` can't stall the run (a hung `wheels` call used to wait out a test's
+ * 300 s limit and then hang the job):
+ * - `opts.timeout` (default defaultExecTimeout()) stops the command and the whole process group it
+ *   leads, and reports "timed out after Ns running <program> <args>".
+ * - It returns when the command exits, after a short grace for the last output, even if a leftover
+ *   process still holds its output pipes. That leftover keeps running while the harness does (a block
+ *   may legitimately leave a server running, `wheels start`), and is stopped when the harness exits.
  */
 export function runExec(program, args = [], opts = {}) {
-  const { cwd, env, timeout } = opts;
+  const { cwd, env } = opts;
+  const timeout = opts.timeout ?? defaultExecTimeout();
   const spawnOpts = {
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,
+    // Its own process group, so a timeout can kill everything the command started.
+    detached: process.platform !== 'win32',
   };
   if (cwd !== undefined) spawnOpts.cwd = cwd;
   if (env !== undefined) spawnOpts.env = env;
-  if (timeout !== undefined) spawnOpts.timeout = timeout;
 
   // Substitute the absolute `wheels` path resolved at module load.
   // Belt-and-braces: also protects against shells where PATH doesn't
@@ -91,15 +139,43 @@ export function runExec(program, args = [], opts = {}) {
   // `wheels new` exited 0 despite a framework-not-found error. See
   // fixtures.mjs `createFixture` for the guard.
   const resolvedProgram = program === 'wheels' ? RESOLVED_WHEELS : program;
+  const label = [program, ...args].join(' ');
 
   return new Promise((resolve) => {
     const proc = spawn(resolvedProgram, args, spawnOpts);
+    running.add(proc);
     let stdout = '';
     let stderr = '';
+    let settled = false;
+    let graceTimer;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      running.delete(proc);
+      clearTimeout(timeoutTimer);
+      clearTimeout(graceTimer);
+      proc.stdout.destroy();
+      proc.stderr.destroy();
+      resolve(result);
+    };
+    const timeoutTimer = setTimeout(() => {
+      killGroup(proc, 'SIGKILL');
+      const reason = `timed out after ${timeout / 1000}s running ${label}`;
+      finish({ code: -1, stdout, stderr: stderr ? `${stderr}\n${reason}` : reason, timedOut: true });
+    }, timeout);
     proc.stdout.on('data', (d) => (stdout += d.toString()));
     proc.stderr.on('data', (d) => (stderr += d.toString()));
-    proc.on('error', (err) => resolve({ code: -1, stdout, stderr: stderr + err.message }));
-    proc.on('close', (code) => resolve({ code, stdout, stderr }));
+    proc.on('error', (err) => finish({ code: -1, stdout, stderr: stderr + err.message }));
+    proc.on('exit', (code, signal) => {
+      const exitCode = code ?? (signal ? -1 : 0);
+      graceTimer = setTimeout(() => {
+        // The pipes are still open, so something the command started is still running: let the
+        // harness carry on, but keep the group to stop when the harness exits.
+        leftovers.add(proc);
+        finish({ code: exitCode, stdout, stderr });
+      }, EXIT_GRACE_MS);
+    });
+    proc.on('close', (code, signal) => finish({ code: code ?? (signal ? -1 : 0), stdout, stderr }));
   });
 }
 

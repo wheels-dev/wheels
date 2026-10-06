@@ -483,13 +483,13 @@
 	public string function $timestamp(string timeStampMode = application.wheels.timeStampMode) {
 		switch (arguments.timeStampMode) {
 			case "utc":
-				local.rv = DateConvert("local2Utc", Now());
+				local.rv = DateConvert("local2Utc", $now());
 				break;
 			case "local":
-				local.rv = Now();
+				local.rv = $now();
 				break;
 			case "epoch":
-				local.rv = Now().getTime();
+				local.rv = $now().getTime();
 				break;
 			default:
 				Throw(type = "Wheels.InvalidTimeStampMode", message = "Timestamp mode #arguments.timeStampMode# is invalid");

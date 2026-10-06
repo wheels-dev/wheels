@@ -272,6 +272,24 @@ The default transaction mode in the test runner is `none` — writes persist acr
 
 ## Related guides
 
+## Traveling the clock
+
+Time-dependent behaviour — a cache that expires, a rate-limit window that rolls over, a `createdAt` that must fall on a certain day — is hard to test against the real clock. `travelTo(moment, callback)` freezes the framework clock for the duration of the callback:
+
+```cfm
+travelTo("2026-10-04 12:00:00", function() {
+    // code under test sees 12:00:00 — model timestamps, cache expiry
+    // and rate-limit windows all read this instant
+});
+
+// roll the clock forward to prove a window reset, deterministically and without sleeping
+travelTo("2026-10-04 12:02:00", function() {
+    expect(limiter.handle(request = req, next = nextFn)).toBe("ok");
+});
+```
+
+Framework features that read the clock through the seam (`$now()` / `$tick()`) honour it: cache expiry and culling, the `RateLimiter` rate-limit windows, and model `createdAt` / `updatedAt` timestamps. The override is request-scoped and restored after the callback returns — even if it throws — so it never leaks into another spec. It applies to in-process code; a separate `$testClient()` request runs its own request and keeps the real clock.
+
 <CardGrid>
   <LinkCard title="Models and the ORM" href="/v4-2-0/basics/models-and-the-orm/" description="Defining models, declaring config(), finders and creators." />
   <LinkCard title="Validation and Error Display" href="/v4-2-0/basics/validation-and-errors/" description="The validation helpers you're testing — presence, length, uniqueness, format." />
