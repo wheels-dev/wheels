@@ -239,6 +239,21 @@ component {
 
 	/**
 	 * Internal function.
+	 * The CSRF cookie's value as read from the cookie scope. When this request set the
+	 * cookie (cookie[name] = {value, httpOnly, ...}), Lucee, Adobe and BoxLang read it
+	 * back as its value, but RustCFML returns the struct that was assigned, so take its
+	 * value. Anything else that isn't a string reads as no cookie ("").
+	 */
+	public string function $csrfCookieScopeValue(required any raw) {
+		local.rv = arguments.raw;
+		if (IsStruct(local.rv) && StructKeyExists(local.rv, "value")) {
+			local.rv = local.rv.value;
+		}
+		return IsSimpleValue(local.rv) ? local.rv : "";
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public string function $readAuthenticityTokenFromCookie() {
 		local.cookieName = application.wheels.csrfCookieName;
@@ -249,7 +264,10 @@ component {
 		}
 
 		// Cookie is there. Read it in.
-		local.cookie = cookie[local.cookieName];
+		local.cookieValue = $csrfCookieScopeValue(cookie[local.cookieName]);
+		if (!Len(local.cookieValue)) {
+			return "";
+		}
 
 		try {
 			local.encryptionKey = $ensureCsrfCookieEncryptionKey();
@@ -258,7 +276,7 @@ component {
 			return "";
 		}
 
-		local.cookieAttrs = $decryptCsrfCookieValue(local.cookie, local.encryptionKey);
+		local.cookieAttrs = $decryptCsrfCookieValue(local.cookieValue, local.encryptionKey);
 
 		// When cookie is corrupted (or encrypted with an unknown key/algorithm), fail.
 		if (!Len(local.cookieAttrs)) {

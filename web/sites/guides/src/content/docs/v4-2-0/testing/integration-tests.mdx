@@ -112,6 +112,26 @@ component extends="wheels.WheelsTest" {
 
 For an A-vs-B interaction test, build two clients and log each in separately — the pattern scales to any number of actors. A fresh `$testClient()` always starts with an empty cookie jar, so there's no bleed between users in the same spec.
 
+## Forms and CSRF protection
+
+Controllers that call `protectsFromForgery()` refuse a POST, PUT, PATCH or DELETE without the session's authenticity token (HTTP 403). The test client handles that the way a browser does. When a page it fetches has the token, in the `csrf-token` meta tag from `csrfMetaTags()` or the `authenticityToken` hidden field from a form, the client keeps it. It then sends it on the next unsafe requests: as the `X-CSRF-Token` header always, and as the `authenticityToken` field on a form body.
+
+```cfm
+var tc = $testClient();
+tc.get("/posts/new");                                  // the form: token captured
+tc.post("/posts", {"post[title]": "Hi"}).assertRedirect();
+tc.delete("/posts/1").assertRedirect();               // the header carries it
+```
+
+| Method | What it does |
+|---|---|
+| `csrfToken()` | The token the client holds, or `""`. |
+| `fetchCsrfToken(path = "/")` | GETs a page just for its token. Throws `Wheels.TestClient.CsrfTokenNotFound` when the page has none. |
+| `withCsrfToken(token)` | Uses this token, for example one read from a JSON response. |
+| `withoutCsrfToken()` | Forgets the token and stops picking one up, to test that a protected action refuses a request without one: `tc.withoutCsrfToken().post("/posts", {}).assertStatus(403)`. |
+
+The token belongs to the session. When the session cookie changes, as it does at login because Wheels rotates the session there, the client drops the token, and the next page with one refreshes it. Fetch a page after logging in before the next form post. A token is never shared between clients. If the test passes its own `X-CSRF-Token` header or `authenticityToken` field, that is what's sent; the client adds nothing.
+
 ## Asserting on DB state
 
 After a workflow, the persistence side is the authoritative check. A redirect only says the controller thought the save succeeded; a record in the database says it actually did.
