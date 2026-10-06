@@ -420,6 +420,7 @@
 				local.method = local.shortcut.method;
 				local.componentReference = local.shortcut.componentReference;
 			} else if (ListFindNoCase(variables.wheels.class.associations[local.key].methods, arguments.missingMethodName)) {
+				$resolvePolymorphicColumns(local.key);
 				local.assoc = variables.wheels.class.associations[local.key];
 
 				// Polymorphic belongsTo: resolve model dynamically from the type column.

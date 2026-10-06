@@ -2319,6 +2319,7 @@
 			// below); the lock is only taken before the marker exists so the hot path stays
 			// lock-free, and the values are derived solely from class data so filling them
 			// once per application lifetime is equivalent to the previous per-call rewrite
+			local.class.$resolvePolymorphicColumns(local.name);
 			$expandedAssociationsMetadata(
 				associationName = local.name,
 				association = local.classAssociations[local.name],

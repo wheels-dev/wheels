@@ -303,7 +303,7 @@ Wheels resolves the parent at runtime by reading `commentableType` on each row. 
 
 ### Column names
 
-By default the two columns are `<name>id` and `<name>type`, with no underscore: `commentableid` and `commentabletype` for `commentable`. Polymorphic associations don't follow `useUnderscoreReferenceColumns`. If your columns are named differently, for example `commentable_id` / `commentable_type` as `t.references(columnNames="commentable", polymorphic=true)` writes them when that setting is on, pass both names on every side:
+Wheels finds the two columns on the child's table: `<name>id` and `<name>type` (`commentableid` and `commentabletype` for `commentable`) when they exist, otherwise `<name>_id` and `<name>_type`, which is how `t.references(columnNames="commentable", polymorphic=true)` writes them when `useUnderscoreReferenceColumns` is on. If a table has both shapes, the names without the underscore win. For any other names, pass both on every side:
 
 ```cfm {test:compile}
 component extends="Model" {
