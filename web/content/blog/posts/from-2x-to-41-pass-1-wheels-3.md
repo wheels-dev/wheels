@@ -20,6 +20,10 @@ excerpt: >-
   range can install a 4.0 development build, joinType="left" silently drops a
   nested join, and a 2.3 validatesConfirmationOf change breaks login.
 coverImage: null
+announcement:
+  title: 'From 2.x to 4.x, part 2: the layout move to Wheels 3.0'
+  body: |
+    New post: **[Pass 1: 2.x to 3.0, the layout move](https://blog.wheels.dev/posts/from-2x-to-41-pass-1-wheels-3/)** — the nine commits that take a real CFWheels 2.2 app to Wheels 3.0.0+33: code into app/, assets into public/, the new public/Application.cfc, and vendor/wheels pinned for the next pass.
 ---
 
 Pass 1 takes the example app from CFWheels 2.2 to Wheels 3.0.0+33. It's mostly moving files, and the frozen [Upgrading to Wheels 3.0.0](https://guides.wheels.dev/v3-0-0/introduction/upgrading/) guide covers most of it. This post walks the 9 commits on [`upgrade/pass-1-wheels-3.0`](https://github.com/wheels-dev/cfwheels-example-app/tree/upgrade/pass-1-wheels-3.0), and the places where following the guide alone wasn't enough.
