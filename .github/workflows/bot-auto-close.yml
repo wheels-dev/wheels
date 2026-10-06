@@ -15,7 +15,7 @@ concurrency:
 jobs:
   auto-close:
     name: Auto-close stale triage
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     if: vars.WHEELS_BOT_ENABLED == 'true'
     steps:

@@ -297,6 +297,43 @@ component extends="wheels.WheelsTest" {
 			});
 		});
 
+		describe("subscribeToChannel input parsing", function() {
+
+			beforeEach(function() {
+				params = {controller = "dummy", action = "dummy"};
+				_controller = g.controller("dummy", params);
+			});
+
+			it("trims whitespace around event-filter names so every name matches", function() {
+				expect(_controller.$parseEventFilter("a, b")).toBe(["a", "b"]);
+				expect(_controller.$parseEventFilter(" a ,, b ")).toBe(["a", "b"]);
+				expect(_controller.$parseEventFilter("")).toBe([]);
+			});
+
+			it("resolves lastEventId with explicit > Last-Event-ID header > lastEventId url param", function() {
+				// An explicitly passed id wins.
+				expect(
+					_controller.$resolveLastEventId(explicit = "x", requestHeaders = {"Last-Event-ID": "h"}, requestParams = {lastEventId: "p"})
+				).toBe("x");
+				// The native EventSource header wins over the url param.
+				expect(
+					_controller.$resolveLastEventId(explicit = "", requestHeaders = {"Last-Event-ID": "h"}, requestParams = {lastEventId: "p"})
+				).toBe("h");
+				// The bundled WheelsSSE client sends only the url param — it must be honoured.
+				expect(
+					_controller.$resolveLastEventId(explicit = "", requestHeaders = {}, requestParams = {lastEventId: "p"})
+				).toBe("p");
+				// Values are trimmed; nothing resolves to "".
+				expect(
+					_controller.$resolveLastEventId(explicit = "", requestHeaders = {}, requestParams = {lastEventId: " p "})
+				).toBe("p");
+				expect(
+					_controller.$resolveLastEventId(explicit = "", requestHeaders = {}, requestParams = {})
+				).toBe("");
+			});
+
+		});
+
 		describe("Controller Mixin Availability", function() {
 
 			beforeEach(function() {

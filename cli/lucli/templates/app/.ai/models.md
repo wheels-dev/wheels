@@ -2,6 +2,8 @@
 
 Part of the Wheels application guide; start with `../CLAUDE.md`.
 
+In development, `strictArguments` (default `"warn"`) logs any argument a declaration or finder doesn't know (`foreign_key`, `orderby`) to `wheels.log`; `set(strictArguments="throw")` makes it an error. A logged argument was ignored: fix the call.
+
 ```cfm
 component extends="Model" {
     function config() {
@@ -26,7 +28,7 @@ component extends="Model" {
         // and invokeWithTransaction() blocks fire once together on the outermost
         // commit; with transactionMode="none" afterCommit fires immediately per op.
         // IMPORTANT: afterCommit/afterRollback are only reliable inside a Wheels-managed
-        // transaction — transaction() / invokeWithTransaction(). A write placed inside a
+        // transaction — invokeWithTransaction() or a save()/delete(). A write placed inside a
         // raw CFML `transaction {}` block is SKIPPED (with a one-time wheels.log warning)
         // on Lucee and BoxLang, and is NOT detectable on Adobe CF or RustCFML — there the
         // behaviour inside a raw transaction{} is left to the engine and is not guaranteed.
@@ -64,6 +66,7 @@ Include associations: `findAll(include="role,orders")`. Pagination: `findAll(pag
 Polymorphic: `belongsTo(name="commentable", polymorphic=true)` on the child, `hasMany(name="comments", as="commentable")` on each parent. The columns default to `commentableid` / `commentabletype` (no underscore, whatever `useUnderscoreReferenceColumns` says); for other names pass `foreignKey="commentable_id", foreignType="commentable_type"` on every side.
 
 What the last save wrote (4.2+): `savedChanges()`, `hasSavedChange("status")`, `savedChangeFrom("status")`, `savedChangedProperties()`, the saved counterparts of `allChanges()` / `hasChanged()` / `changedFrom()` / `changedProperties()`. Use them in `afterCommit`: each call sees the save that queued it, so a record saved twice in one transaction is told apart, and no hand-kept flag is needed (`if (hasSavedChange("published") && this.published) ...`).
+Soft delete (table has `deletedAt`, which `t.timestamps()` adds): `delete()` sets `deletedAt`, and finders skip such rows unless `includeSoftDeletes=true`. `softDelete=false` is a real DELETE, including rows that are already soft-deleted (4.2+). On a soft delete, `dependent=` children with their own `deletedAt` are soft-deleted and all others are left untouched. `reload()` finds a soft-deleted row and throws `Wheels.RecordNotFound` when the row is gone. A second soft `delete()` returns `false`.
 Opt a `select=false` calculated property into one call (additive): `findAll(includeCalculated="fullName")`. Unknown names throw `Wheels.CalculatedPropertyNotFound` in dev/testing.
 
 Literal LIKE search: `findAll(where="title LIKE '%#escapeForLike(params.q)#%' ESCAPE '\'")`. `escapeForLike()` escapes `\` `%` `_` (and `[` on SQL Server — `\[` is illegal on Oracle; on SQL Server `[` is escaped only after a model has initialised the adapter, so call a `model()` finder before using it in a fresh/just-reloaded app) so a user's term isn't read as wildcards; the quoted literal is bound. Always declare `ESCAPE '\'`: MySQL/PG/CockroachDB/H2 default the escape char to `\` but SQLite/Oracle/SQL Server have none, and the 3-arg builder `where("title","LIKE",...)` emits no `ESCAPE`, so without it `\` matches literally. Escapes LIKE metacharacters only, not SQL quotes.
@@ -142,7 +145,8 @@ result = model("Product").upsertAll(records=rows, uniqueBy="sku");              
 - Every record must have the same keys, or `Wheels.InvalidRecordKeys` is thrown. Keys that aren't model properties are dropped.
 - `insertAll` has no "ignore duplicates" option: a unique violation throws. Use `upsertAll` when rows may already exist.
 - The count is the number of records you passed, not the number the database changed, and no generated keys come back. Read the rows back if you need their ids.
-- Rows are written in batches of 1000.
+- One call is one transaction (`transaction` works like `save()`'s and defaults to the `transactionMode` setting, `commit` unless changed): if any batch fails, none of the call's rows are kept. Inside an open Wheels transaction (`invokeWithTransaction()`) the call joins it; inside a raw `transaction {}` block its rows belong to that block. `transaction="none"` commits batch by batch; `"rollback"` writes nothing.
+- Rows go in batches of up to 1000, fewer when the database caps the parameters per statement (SQL Server).
 
 ## `afterCommit` / `afterRollback` details
 
@@ -150,6 +154,7 @@ result = model("Product").upsertAll(records=rows, uniqueBy="sku");              
 - It is queued once per successful `save()` / `delete()`, with no de-duplication: saving one record twice in a transaction (or through two objects) runs it twice, in save order. A `save()` that changed nothing still counts as a successful update and queues it.
 - Outside an explicit transaction, each `save()` is its own transaction, so `afterCommit` runs before `save()` returns.
 - A save that fails validation, or that a `before*` callback stops, queues nothing, so it gets no `afterRollback` either.
+- `save(callbacks=false)` and `delete(callbacks=false)` skip `afterCommit` / `afterRollback` along with every other callback.
 
 ## `order=`
 
@@ -162,4 +167,4 @@ result = model("Product").upsertAll(records=rows, uniqueBy="sku");              
   ```
 - `order="random"` uses the database's random order.
 
-`updateAll` binds every value as a parameter, so `updateAll(position="position - 1")` is never evaluated as SQL. There is no increment/decrement API: for a value relative to its current one, use a parameterized `queryExecute("UPDATE ... SET position = position - 1 WHERE ...", {...})` (inside `transaction()` if it goes with other writes).
+`updateAll` binds every value as a parameter, so `updateAll(position="position - 1")` is never evaluated as SQL. There is no increment/decrement API: for a value relative to its current one, use a parameterized `queryExecute("UPDATE ... SET position = position - 1 WHERE ...", {...})` (inside the same `invokeWithTransaction()` as the writes it goes with).

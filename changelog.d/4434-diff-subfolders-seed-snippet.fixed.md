@@ -1,0 +1,2 @@
+- The all-models `wheels migrate diff` also covers models in subfolders of the model path, named in dot notation (`admin.User`) as `model()` takes them (#4434)
+- `wheels generate snippets seed-data` writes `app/db/seeds.cfm` and `app/db/seeds/development.cfm`, where `wheels seed` reads them, instead of `app/snippets/`; existing seed files are kept unless `--force` is given (#4434)

@@ -13,9 +13,9 @@ Disk cleanup. Three verbs with increasing scope.
 
 | Verb | Removes |
 |------|---------|
-| [`all`](/v4-2-0/command-line-tools/commands/deploy/prune/all/) | Old containers + old images. |
-| [`images`](/v4-2-0/command-line-tools/commands/deploy/prune/images/) | Old images only. |
-| [`containers`](/v4-2-0/command-line-tools/commands/deploy/prune/containers/) | Old containers only. |
+| [`all`](/v4-2-0/command-line-tools/commands/deploy/prune/all/) | Old stopped containers + the service's unused images. |
+| [`images`](/v4-2-0/command-line-tools/commands/deploy/prune/images/) | The service's unused images only. |
+| [`containers`](/v4-2-0/command-line-tools/commands/deploy/prune/containers/) | Old stopped containers only. |
 
 ## Retention policy
 
@@ -25,4 +25,4 @@ The `--keep=<n>` flag on `prune all` and `prune containers` controls how many ol
 
 - After several successful deploys, disk pressure grows on each host.
 - Before a container-registry rotation, to make sure you aren't pinning stale base images.
-- Never as part of a regular deploy flow — `wheels deploy` already prunes at the end.
+- `wheels deploy` does not prune; run these verbs yourself.

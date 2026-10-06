@@ -187,6 +187,9 @@
 				$combineArguments(args = arguments.args, combine = "#local.first#,#local.second#", required = local.required);
 			}
 		}
+		if ($strictArgumentsMode() != "off" && Len($strictArgumentsSource(arguments.name))) {
+			$checkArguments(args = arguments.args, name = arguments.name, accepted = $strictArgumentsAccepted(arguments.name));
+		}
 		if ($get("showErrorInformation")) {
 			if (ListLen(arguments.reserved)) {
 				local.iEnd = ListLen(arguments.reserved);
@@ -221,6 +224,280 @@
 		}
 	}
 
+
+	/**
+	 * Internal function. The `strictArguments` setting: "warn", "throw" or "off" (also for any
+	 * other value, or before the setting exists).
+	 */
+	public string function $strictArgumentsMode() {
+		if (
+			!StructKeyExists(application, "wheels")
+			|| !StructKeyExists(application.wheels, "strictArguments")
+			|| !IsSimpleValue(application.wheels.strictArguments)
+		) {
+			return "off";
+		}
+		local.rv = LCase(application.wheels.strictArguments);
+		return ListFind("warn,throw", local.rv) ? local.rv : "off";
+	}
+
+	/**
+	 * Internal function. The framework functions whose arguments `strictArguments` checks, and
+	 * where each is declared: "model" (the `wheels.Model` surface), a component path, or "" for a
+	 * function that isn't checked. These take a fixed set of arguments. Functions that turn unknown
+	 * arguments into something (property values, route params, HTML attributes, view variables,
+	 * filter arguments) aren't checked.
+	 */
+	public string function $strictArgumentsSource(required string name) {
+		local.modelFunctions = "belongsTo,hasMany,hasOne,nestedProperties,property,table,"
+			& "validate,validateOnCreate,validateOnUpdate,validatesConfirmationOf,validatesExclusionOf,"
+			& "validatesFormatOf,validatesInclusionOf,validatesLengthOf,validatesNumericalityOf,"
+			& "validatesPresenceOf,validatesUniquenessOf,afterNew,afterFind,afterInitialization,"
+			& "beforeValidation,beforeValidationOnCreate,beforeValidationOnUpdate,afterValidation,"
+			& "afterValidationOnCreate,afterValidationOnUpdate,beforeSave,afterSave,beforeCreate,afterCreate,"
+			& "beforeUpdate,afterUpdate,beforeDelete,afterDelete,afterCommit,afterRollback,"
+			& "findAll,findOne,findByKey,findFirst,findLastOne";
+		if (ListFindNoCase(local.modelFunctions, arguments.name)) {
+			return "model";
+		}
+		local.controllerFunctions = {
+			caches = "wheels.controller.caching",
+			protectsFromForgery = "wheels.controller.csrf",
+			provides = "wheels.controller.provides",
+			usesLayout = "wheels.controller.layouts"
+		};
+		if (StructKeyExists(local.controllerFunctions, arguments.name)) {
+			return local.controllerFunctions[arguments.name];
+		}
+		return "";
+	}
+
+	/**
+	 * Internal function. Arguments a checked function takes without declaring them. findAll() reads
+	 * `returnType` and `keyColumn` (native query options), the other finders pass everything on to
+	 * findAll(), and aliases resolved later (`property` for `properties`) count too.
+	 */
+	public string function $strictArgumentsAccepted(required string name) {
+		switch (arguments.name) {
+			case "findAll":
+				return "returnType,keyColumn";
+			case "findOne": case "findByKey": case "findFirst":
+				return ListAppend($declaredArgumentNames("findAll"), "returnType,keyColumn");
+			case "findLastOne":
+				return ListAppend($declaredArgumentNames("findAll"), "returnType,keyColumn,properties");
+		}
+		// the validations also take `property` for `properties`
+		if (Left(arguments.name, 9) == "validates") {
+			return "property";
+		}
+		return "";
+	}
+
+	/**
+	 * Internal function. The declared parameter names of a checked framework function, as a list,
+	 * read from the framework's own definition (so an app override doesn't change it) and cached
+	 * for the application's lifetime. Empty when the metadata can't be read: then nothing is
+	 * checked, rather than guessed.
+	 */
+	public string function $declaredArgumentNames(required string name) {
+		if (!StructKeyExists(application.wheels, "$strictArgumentsDeclared")) {
+			application.wheels.$strictArgumentsDeclared = {};
+		}
+		if (!StructKeyExists(application.wheels.$strictArgumentsDeclared, arguments.name)) {
+			try {
+				application.wheels.$strictArgumentsDeclared[arguments.name] = $readDeclaredArgumentNames(arguments.name);
+			} catch (any e) {
+				application.wheels.$strictArgumentsDeclared[arguments.name] = "";
+			}
+		}
+		return application.wheels.$strictArgumentsDeclared[arguments.name];
+	}
+
+	/**
+	 * Internal function. Reads [see:$declaredArgumentNames] from the component that declares the
+	 * function: a bare `wheels.Model` for model functions, the controller component otherwise.
+	 */
+	public string function $readDeclaredArgumentNames(required string name) {
+		local.source = $strictArgumentsSource(arguments.name);
+		if (local.source == "model") {
+			if (!StructKeyExists(application.wheels, "modelSuperPrototype")) {
+				application.wheels.modelSuperPrototype = CreateObject("component", "wheels.Model");
+			}
+			local.owner = application.wheels.modelSuperPrototype;
+		} else if (Len(local.source)) {
+			local.owner = CreateObject("component", local.source);
+		} else {
+			return "";
+		}
+		if (!StructKeyExists(local.owner, arguments.name) || !IsCustomFunction(local.owner[arguments.name])) {
+			return "";
+		}
+		local.fn = local.owner[arguments.name];
+		local.rv = "";
+		for (local.parameter in GetMetadata(local.fn).parameters) {
+			local.rv = ListAppend(local.rv, local.parameter.name);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. With `strictArguments` set to "warn" or "throw", reports each argument in
+	 * `args` that `name` doesn't declare: positional and `$`-prefixed (internal) keys and the names
+	 * in `accepted` are allowed. "warn" writes one `wheels.log` warning per class, function and
+	 * argument for the application's lifetime; "throw" raises `Wheels.UnknownArgument`.
+	 * `declared` replaces the function's metadata when given.
+	 */
+	public void function $checkArguments(
+		required struct args,
+		required string name,
+		string accepted = "",
+		string declared = "",
+		string label = ""
+	) {
+		local.mode = $strictArgumentsMode();
+		if (local.mode == "off") {
+			return;
+		}
+		local.known = Len(arguments.declared) ? arguments.declared : $declaredArgumentNames(arguments.name);
+		if (!Len(local.known)) {
+			return;
+		}
+		local.known = ListAppend(local.known, arguments.accepted);
+		for (local.key in arguments.args) {
+			// A declared parameter that wasn't passed can still be iterated (Lucee), as a null.
+			if (!StructKeyExists(arguments.args, local.key)) {
+				continue;
+			}
+			if (IsNumeric(local.key) || Left(local.key, 1) == "$" || ListFindNoCase(local.known, local.key)) {
+				continue;
+			}
+			$reportUnknownArgument(
+				name = Len(arguments.label) ? arguments.label : arguments.name,
+				argumentName = local.key,
+				known = local.known,
+				mode = local.mode,
+				family = arguments.name
+			);
+		}
+	}
+
+	/**
+	 * Internal function. Logs or throws one unknown argument for [see:$checkArguments].
+	 */
+	public void function $reportUnknownArgument(
+		required string name,
+		required string argumentName,
+		required string known,
+		required string mode,
+		string family = ""
+	) {
+		local.owner = $strictArgumentsOwner();
+		local.message = "`#arguments.name#()`" & (Len(local.owner) ? " on `#local.owner#`" : "")
+			& " got an argument it doesn't know: `#arguments.argumentName#`. Unknown arguments are ignored.";
+		local.suggestion = $suggestArgumentName(arguments.argumentName, arguments.known);
+		if (Len(local.suggestion)) {
+			local.message &= " Did you mean `#local.suggestion#`?";
+		}
+		if (ListFindNoCase("findAll,findOne,findByKey,findFirst,findLastOne", Len(arguments.family) ? arguments.family : arguments.name)) {
+			local.message &= " If a model method overriding a finder passes its own arguments on (argumentCollection = arguments), remove them first with StructDelete().";
+		}
+		if (arguments.mode == "throw") {
+			Throw(
+				type = "Wheels.UnknownArgument",
+				message = local.message,
+				extendedInfo = "Arguments it knows: #Replace(arguments.known, ",", ", ", "all")#. Set `strictArguments` to ""warn"" or ""off"" to allow it."
+			);
+		}
+		if (!StructKeyExists(application.wheels, "$strictArgumentsSeen")) {
+			application.wheels.$strictArgumentsSeen = {};
+		}
+		// The finders pass their arguments on to each other, so an unknown one is reported once, by
+		// the finder the app called (it checks first).
+		local.family = Len(arguments.family) ? arguments.family : arguments.name;
+		if (ListFindNoCase("findAll,findOne,findByKey,findFirst,findLastOne", local.family)) {
+			local.family = "finder";
+		}
+		local.seenKey = local.owner & "|" & local.family & "|" & arguments.argumentName;
+		if (StructKeyExists(application.wheels.$strictArgumentsSeen, local.seenKey)) {
+			return;
+		}
+		// Argument names can come from a request (argumentCollection = params), so the record of
+		// what was logged is capped: past the cap, one last line says logging stopped.
+		if (StructCount(application.wheels.$strictArgumentsSeen) >= $strictArgumentsSeenCap()) {
+			if (!StructKeyExists(application.wheels, "$strictArgumentsCapped")) {
+				application.wheels.$strictArgumentsCapped = true;
+				writeLog(
+					file = "wheels",
+					type = "warning",
+					text = "Wheels: strictArguments has logged #$strictArgumentsSeenCap()# unknown arguments and stops logging new ones until the application reloads. Check for argumentCollection = params passed to a framework function."
+				);
+			}
+			return;
+		}
+		application.wheels.$strictArgumentsSeen[local.seenKey] = true;
+		writeLog(file = "wheels", type = "warning", text = "Wheels: " & local.message);
+	}
+
+	/**
+	 * Internal function. How many distinct unknown arguments "warn" logs before it stops.
+	 */
+	public numeric function $strictArgumentsSeenCap() {
+		return 500;
+	}
+
+	/**
+	 * Internal function. The model or controller the checked call configures, for the message.
+	 */
+	public string function $strictArgumentsOwner() {
+		if (StructKeyExists(variables, "wheels") && IsStruct(variables.wheels) && StructKeyExists(variables.wheels, "class")) {
+			if (StructKeyExists(variables.wheels.class, "modelName")) {
+				return variables.wheels.class.modelName;
+			}
+		}
+		if (StructKeyExists(variables, "$class") && IsStruct(variables.$class) && StructKeyExists(variables.$class, "name")) {
+			return variables.$class.name;
+		}
+		return ListLast(GetMetadata(this).name, ".");
+	}
+
+	/**
+	 * Internal function. A known argument name that `argumentName` probably meant: the same name
+	 * ignoring case, underscores and dashes, or a common name from other frameworks. Empty when
+	 * there is no likely match.
+	 */
+	public string function $suggestArgumentName(required string argumentName, required string known) {
+		local.aliases = {
+			"null" = "allowNull",
+			"nullable" = "allowNull",
+			"classname" = "modelName",
+			"class" = "modelName",
+			"orderby" = "order",
+			"sort" = "order",
+			"limit" = "maxRows",
+			"includes" = "include",
+			"joins" = "include"
+		};
+		local.normalized = LCase(ReReplace(arguments.argumentName, "[_\-]", "", "all"));
+		for (local.candidate in ListToArray(arguments.known)) {
+			if (LCase(ReReplace(local.candidate, "[_\-]", "", "all")) == local.normalized) {
+				return local.candidate;
+			}
+		}
+		// singular for plural and the other way round (method / methods)
+		for (local.variant in [arguments.argumentName & "s", ReReplaceNoCase(arguments.argumentName, "s$", "")]) {
+			local.position = ListFindNoCase(arguments.known, local.variant);
+			if (local.position) {
+				return ListGetAt(arguments.known, local.position);
+			}
+		}
+		if (StructKeyExists(local.aliases, local.normalized)) {
+			local.position = ListFindNoCase(arguments.known, local.aliases[local.normalized]);
+			if (local.position) {
+				return ListGetAt(arguments.known, local.position);
+			}
+		}
+		return "";
+	}
 
 	// ======================================================================
 	// MISC FUNCTIONS
@@ -1507,5 +1784,37 @@ public string function $testRunFailureMessage(required any runErr) {
 		return "The test run hit the request timeout (" & $getRequestTimeout() & " seconds) and was stopped before it finished. " & local.message;
 	}
 	return local.message;
+}
+
+/**
+ * The current wall-clock datetime, or the frozen test clock when a spec has called `travelTo()`.
+ * Framework code reads this instead of a bare `Now()` so a spec can freeze time (cache expiry,
+ * rate-limit windows) deterministically. In production no `travelTo()` runs, so it returns `Now()`
+ * and behaviour is unchanged. The override lives in request scope (`request.$wheelsClock`), set only
+ * by `wheels.WheelsTest.travelTo()`, so it can never leak past the request.
+ *
+ * [section: Miscellaneous Functions]
+ * [category: General Functions]
+ */
+public any function $now() {
+	if (StructKeyExists(request, "$wheelsClock")) {
+		return request.$wheelsClock.at;
+	}
+	return Now();
+}
+
+/**
+ * The millisecond tick counter (`GetTickCount()`), or the frozen test clock's epoch ms when
+ * `travelTo()` is active. Framework time-window logic (RateLimiter) reads this so a spec can freeze it.
+ * Returns `GetTickCount()` verbatim when no travel is active.
+ *
+ * [section: Miscellaneous Functions]
+ * [category: General Functions]
+ */
+public numeric function $tick() {
+	if (StructKeyExists(request, "$wheelsClock")) {
+		return request.$wheelsClock.tick;
+	}
+	return GetTickCount();
 }
 </cfscript>

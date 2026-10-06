@@ -198,6 +198,21 @@ component extends="Controller" {
 
 For a key-only delete without loading the record, use `model("Post").deleteByKey(params.key)`. For bulk deletes, `deleteAll(where="...")` runs a single statement and returns the row count; like `updateAll`, it skips callbacks by default.
 
+### Soft delete
+
+A table with a `deletedAt` column (`t.timestamps()` adds one) is soft-deleted: `delete()` sets `deletedAt` instead of removing the row, and finders skip such rows unless you pass `includeSoftDeletes=true`. A soft delete is meant to be reversible, so:
+
+- After `post.delete()`, `post.deletedAt` holds the timestamp written. A second `delete()` on the same object returns `false`.
+- `dependent=` children whose model also has a `deletedAt` column are soft-deleted with the parent. Other children are left alone, neither deleted nor unlinked: `dependent=` applies to them only on a real delete.
+- `post.reload()` reloads a soft-deleted row. It throws `Wheels.RecordNotFound` if the row no longer exists at all.
+- Restoring is an update: `model("Post").updateByKey(key = id, deletedAt = "", includeSoftDeletes = true)`. It doesn't restore the children that were soft-deleted with the parent.
+
+Pass `softDelete=false` for a real `DELETE`. It removes rows that are already soft-deleted too, and runs `dependent=` on every child:
+
+```cfm
+model("Post").deleteAll(where = "deletedAt < '#cutoff#'", softDelete = false);  // purge old soft-deleted posts
+```
+
 ## Lifecycle callbacks
 
 Callbacks register a method to run at a specific point in the record's lifecycle. For the write-cycle callbacks the method takes no arguments (the record is `this`), returns nothing, and can mutate any property on `this` before the write happens. Return `false` from a `before*` callback to cancel the operation. (`afterFind` is the exception — see below.)

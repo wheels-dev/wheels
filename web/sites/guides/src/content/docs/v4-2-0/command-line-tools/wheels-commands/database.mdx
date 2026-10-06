@@ -31,7 +31,7 @@ Apply or roll back migration files in `app/migrator/migrations/`.
 wheels migrate [latest|up|down|info|doctor|forget|pretend|unlock|rename-system-tables|diff]
 ```
 
-Running `wheels migrate` with no subcommand defaults to `latest`. Unknown subcommands print `Unknown migration action: <name>` and exit without touching the schema.
+Running `wheels migrate` with no subcommand defaults to `latest`. An unknown subcommand prints `Invalid value '<name>' for action. Valid values: latest, up, down, info, doctor, forget, pretend, unlock, rename-system-tables, diff.` and exits non-zero without touching the schema.
 
 #### Subcommands
 
@@ -79,7 +79,7 @@ wheels migrate unlock --force   # remove it
 
 ##### `rename-system-tables`
 
-Migrates legacy framework bookkeeping tables to their current `wheels_`-prefixed names. Run once when upgrading a project whose system tables predate the current naming.
+Migrates legacy framework bookkeeping tables (`c_o_r_e_*`) to their current `wheels_`-prefixed names. Run once when upgrading a project whose system tables predate the current naming. Add `--dry-run` to preview the renames without writing.
 
 ##### `diff`
 
@@ -87,7 +87,7 @@ Diffs your models against the live schema via `AutoMigrator` and prints the woul
 
 | Flag | Default | Description |
 |---|---|---|
-| `--model=<Name>` | all models | Diff a single model instead of every model. |
+| `--model=<Name>` | all models | Diff a single model instead of every model. The model name can also be passed positionally: `wheels migrate diff Post`. |
 | `--rename=<OLD:NEW>` | — | Repeatable rename hint; use `Model.OLD:NEW` when diffing all models. |
 | `--hints=<json>` | — | Rename hints as JSON: `{"renames":{"old":"new"}}`. |
 | `--threshold=<n>` | — | Heuristic rename-detection threshold between `0` and `1`. |
@@ -106,7 +106,7 @@ The `dbmigrate diff` alias is equivalent to `wheels migrate diff`.
 wheels migrate latest
 ```
 
-Prints `Running migration: latest...` in cyan, dispatches the run to the server, and reports completion with a message like `Migration latest completed.` in green. Migration errors are caught and reported as `Migration failed: <message>` — and the command exits non-zero, so a `wheels migrate latest && ...` CI gate does not proceed as if the schema moved.
+Prints `Running migration: latest...` in cyan, dispatches the run to the server, and prints the migrator's output: one block per migration applied, or `Database is currently at version <version>. No migration required.` when nothing is pending. Migration errors are reported as `Migration failed: <message>` — and the command exits non-zero, so a `wheels migrate latest && ...` CI gate does not proceed as if the schema moved.
 
 <Aside type="note" title="Generating migration files">
 `wheels migrate` only applies migrations — it does not create them. To stamp out a new migration file, use `wheels generate migration` (blank) or `wheels generate property` (add-column). See [Code Generation](../code-generation/).
@@ -119,7 +119,7 @@ Populate the database from `app/db/seeds.cfm` and any environment-specific seed 
 #### Synopsis
 
 ```txt title="
-wheels seed [--environment=<env>] [--mode=<mode>] [--generate]
+wheels seed [--environment=<env>] [--mode=<mode>] [--generate] [--models=<list>] [--count=<n>]
 ```
 
 The seeder runs `app/db/seeds.cfm` first (shared across every environment) and then `app/db/seeds/<environment>.cfm` if one exists. Both are wrapped in a single transaction. Seeds use the `seedOnce()` helper, which checks `uniqueProperties` before inserting — re-running is safe.
@@ -129,8 +129,10 @@ The seeder runs `app/db/seeds.cfm` first (shared across every environment) and t
 | Flag | Default | Description |
 |---|---|---|
 | `--environment=<env>` | auto-detected | Load `app/db/seeds/<env>.cfm` after the shared seeds file. When omitted, the server uses the active Wheels environment. |
-| `--mode=<mode>` | `auto` | Seeder mode. `auto` runs the convention-based seed files. |
-| `--generate` | off | Legacy shortcut for `--mode=generate` — random test data. Kept for compatibility with the old CommandBox surface; convention-based seeds (`seedOnce()`) are preferred. |
+| `--mode=<mode>` | `auto` | Seeder mode: `auto`, `convention`, or `generate`. `convention` runs the seed files. `generate` creates random test data for your models. `auto` runs the seed files when `app/db/seeds.cfm` or an environment seed file exists, and falls back to `generate` when none does. |
+| `--generate` | off | Shortcut for `--mode=generate`. Convention-based seeds (`seedOnce()`) are preferred. |
+| `--models=<list>` | every model under `app/models` | Generate mode only: comma-delimited model names to generate data for. |
+| `--count=<n>` | `10` | Generate mode only: records to create per model. |
 
 #### Example
 
@@ -158,7 +160,7 @@ Utility subcommands for migration status, schema version, and full-reset workflo
 wheels db <command> [flags]
 ```
 
-Running `wheels db` with no subcommand prints a usage banner. Unknown subcommands print `Unknown db command: <name>` and exit.
+Running `wheels db` with no subcommand prints a usage banner and exits non-zero. An unknown subcommand prints `Invalid value '<name>' for subcommand. Valid values: reset, status, version.` and exits non-zero.
 
 #### Subcommands
 

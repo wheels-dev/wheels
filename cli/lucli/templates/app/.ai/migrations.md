@@ -2,6 +2,8 @@
 
 Part of the Wheels application guide; start with `../CLAUDE.md`.
 
+Column options are `allowNull`, `default`, `limit`, `precision`, `scale` (`null` is the deprecated pre-3.0 name for `allowNull`; write `allowNull`); with `strictArguments` on (development default), an unknown option such as `nullable=true` is logged instead of ignored.
+
 ## Shared Dev DB Reconciliation
 
 `wheels_migrator_versions` can drift from on-disk files when several developers share a single dev database (peer applied a migration whose file isn't yet in your branch). Detected and surfaced automatically; reconciliation is explicit:
@@ -58,7 +60,7 @@ wheels seed --environment=production
 wheels seed --generate                 # generated sample data
 ```
 
-To scaffold seed templates, use: `wheels generate snippets seed-data` (writes `app/snippets/seeds*.cfm` — copy or move to `app/db/` to activate them). There is no `wheels generate seed` generator.
+To scaffold seed templates, use: `wheels generate snippets seed-data` (writes `app/db/seeds.cfm` and `app/db/seeds/development.cfm`, where `wheels seed` reads them; existing files are kept unless you pass `--force`). There is no `wheels generate seed` generator.
 
 `seedOnce()`: idempotent — checks `uniqueProperties` via `findOne()`, creates only if not found. Execution: `seeds.cfm` → `seeds/<environment>.cfm`, wrapped in a transaction. Programmatic: `application.wheels.seeder.runSeeds()`. (Note: `wheels db:seed` is NOT a valid command — it errors. Use `wheels seed`.)
 
