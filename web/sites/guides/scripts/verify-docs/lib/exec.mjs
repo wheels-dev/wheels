@@ -118,7 +118,34 @@ function killGroup(proc, signal) {
  *   process still holds its output pipes. That leftover keeps running while the harness does (a block
  *   may legitimately leave a server running, `wheels start`), and is stopped when the harness exits.
  */
-export function runExec(program, args = [], opts = {}) {
+// Starts of `wheels` JVMs, one at a time: each waits until the previous one has had startGap() ms
+// to boot. JVMs starting at the same moment in one CLI home race in Lucee's OSGi bundle cache
+// ("Bundle symbolic name and version are not unique", then a null script engine) and fail or stall
+// (#4450). Measured on 12 runs of four-way verify-docs: no gap failed 6, 250 ms and up failed none;
+// 1 s leaves room for slower CI machines. Once started, commands still run in parallel.
+let wheelsStartGate = Promise.resolve();
+export function startGap(env = process.env) {
+  const ms = Number(env.WHEELS_START_GAP_MS);
+  return Number.isFinite(ms) && ms >= 0 ? ms : 1_000;
+}
+function nextWheelsStart() {
+  const turn = wheelsStartGate;
+  let release;
+  wheelsStartGate = new Promise((r) => (release = r));
+  return turn.then(() => () => setTimeout(release, startGap()));
+}
+
+export async function runExec(program, args = [], opts = {}) {
+  const releaseStart = program === 'wheels' ? await nextWheelsStart() : null;
+  try {
+    return await runExecNow(program, args, opts, releaseStart);
+  } finally {
+    // If the spawn never happened (it threw), still hand over, so the next start isn't stuck.
+    releaseStart?.();
+  }
+}
+
+function runExecNow(program, args, opts, releaseStart) {
   const { cwd, env } = opts;
   const timeout = opts.timeout ?? defaultExecTimeout();
   const spawnOpts = {
@@ -143,6 +170,7 @@ export function runExec(program, args = [], opts = {}) {
 
   return new Promise((resolve) => {
     const proc = spawn(resolvedProgram, args, spawnOpts);
+    releaseStart?.();
     running.add(proc);
     let stdout = '';
     let stderr = '';
