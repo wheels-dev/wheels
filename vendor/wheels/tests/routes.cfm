@@ -52,6 +52,10 @@ mapper()
     .patch(name="csrfClientPatch", pattern="/_csrfclient/save", to="CsrfTestClientProbe##save")
     .delete(name="csrfClientDelete", pattern="/_csrfclient/save", to="CsrfTestClientProbe##save")
     .post(name="csrfClientLogin", pattern="/_csrfclient/login", to="CsrfTestClientProbe##login")
+    // Cookie flash written and read in one request. Driven by
+    // wheels.tests.specs.controller.FlashCookieSameRequestSpec. Must precede .wildcard().
+    .get(name="flashCookieInsertRead", pattern="/_flashcookie/insertread", to="FlashCookieProbe##insertAndRead")
+    .get(name="flashCookieReadCount", pattern="/_flashcookie/readcount", to="FlashCookieProbe##readCount")
     .wildcard()
 	.get(name="wheelstestbox", pattern="wheels/core/tests", to="wheels##public##tests")
 	.get(name="sampleLinkToTest", pattern="sample/linktotest", to="sample##linktotest")

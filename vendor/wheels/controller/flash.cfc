@@ -162,11 +162,12 @@ component {
 				};
 			}
 		} else if ($getFlashStorage() == "cookie" && StructKeyExists(cookie, "flash")) {
-			if (isJSON(cookie.flash)) {
-				local.rv = DeserializeJSON(cookie.flash);
-			} else {
+			local.cookieValue = $flashCookieScopeValue(cookie.flash);
+			if (isJSON(local.cookieValue)) {
+				local.rv = DeserializeJSON(local.cookieValue);
+			} else if (Len(local.cookieValue)) {
 				local.rv = {
-					"action": cookie.flash
+					"action": local.cookieValue
 				};
 			}
 		} else if ($getFlashStorage() == "session") {
@@ -184,6 +185,22 @@ component {
 			}
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 * The flash cookie's value as read from the cookie scope. When this request wrote the
+	 * cookie (cookie["flash"] = {value, httpOnly, ...}), Lucee, Adobe and BoxLang read it
+	 * back as its value, but RustCFML returns the struct that was assigned, so take its
+	 * value. A simple value (string, number or boolean) is returned as is; anything else
+	 * reads as no cookie ("").
+	 */
+	public string function $flashCookieScopeValue(required any raw) {
+		local.rv = arguments.raw;
+		if (IsStruct(local.rv) && StructKeyExists(local.rv, "value")) {
+			local.rv = local.rv.value;
+		}
+		return IsSimpleValue(local.rv) ? local.rv : "";
 	}
 
 	/**
