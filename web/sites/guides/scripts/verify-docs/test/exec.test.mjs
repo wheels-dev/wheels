@@ -34,3 +34,99 @@ test('attestation defaults to as-installed mode when WHEELS_ATTEST_MODE is unset
     if (prev !== undefined) process.env.WHEELS_ATTEST_MODE = prev;
   }
 });
+
+// A `wheels` call that never finishes used to stall the harness until the test's own timeout and then
+// hang the job: runExec() had no default timeout and waited for its output pipes to close, which a
+// leftover process can hold open forever. These use small `node` programs in place of `wheels`.
+const NODE = process.execPath;
+
+// Starts a grandchild that inherits the output pipes and sleeps, prints its pid, then (optionally) exits.
+function parentScript({ exit }) {
+  return [
+    "const { spawn } = require('node:child_process');",
+    "const g = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'inherit' });",
+    "console.log(g.pid);",
+    exit ? "setTimeout(() => process.exit(0), 100);" : "setInterval(() => {}, 1000);",
+  ].join('\n');
+}
+
+function alive(pid) {
+  try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+async function waitDead(pid, ms) {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline && alive(pid)) await new Promise((r) => setTimeout(r, 100));
+  return !alive(pid);
+}
+
+test('a command that never exits fails fast with a timeout that names it', { timeout: 30_000 }, async () => {
+  const { runExec } = await import('../lib/exec.mjs');
+  const started = Date.now();
+  const r = await runExec(NODE, ['-e', 'setInterval(() => {}, 1000)'], { timeout: 800 });
+  assert.ok(Date.now() - started < 10_000, 'runExec did not return promptly');
+  assert.equal(r.code, -1);
+  assert.equal(r.timedOut, true);
+  assert.match(r.stderr, /timed out after 0\.8s running /);
+  assert.match(r.stderr, /setInterval/);
+});
+
+test('returns once the command exits, even when a leftover process holds its output pipes', { timeout: 30_000 }, async () => {
+  const { runExec } = await import('../lib/exec.mjs');
+  let grandchild;
+  try {
+    const started = Date.now();
+    const r = await runExec(NODE, ['-e', parentScript({ exit: true })]);
+    grandchild = Number(r.stdout.trim().split('\n')[0]);
+    assert.ok(Date.now() - started < 10_000, 'runExec waited for the leftover process');
+    assert.equal(r.code, 0);
+  } finally {
+    if (grandchild) try { process.kill(grandchild, 'SIGKILL'); } catch {}
+  }
+});
+
+test('a timeout kills the whole process group, so nothing it started lingers', { timeout: 30_000 }, async () => {
+  const { runExec } = await import('../lib/exec.mjs');
+  let grandchild;
+  try {
+    const r = await runExec(NODE, ['-e', parentScript({ exit: false })], { timeout: 1500 });
+    grandchild = Number(r.stdout.trim().split('\n')[0]);
+    assert.equal(r.timedOut, true);
+    assert.ok(grandchild > 0, `no grandchild pid in stdout: ${r.stdout}`);
+    assert.ok(await waitDead(grandchild, 5000), `grandchild ${grandchild} survived the timeout`);
+  } finally {
+    if (grandchild) try { process.kill(grandchild, 'SIGKILL'); } catch {}
+  }
+});
+
+test('the default timeout comes from WHEELS_EXEC_TIMEOUT_MS', async () => {
+  const { defaultExecTimeout } = await import('../lib/exec.mjs');
+  assert.equal(defaultExecTimeout({ WHEELS_EXEC_TIMEOUT_MS: '5000' }), 5000);
+  assert.equal(defaultExecTimeout({}), 240_000);
+  assert.equal(defaultExecTimeout({ WHEELS_EXEC_TIMEOUT_MS: 'nope' }), 240_000);
+});
+
+test('a leftover from a command that exited is stopped when the harness exits', { timeout: 30_000 }, async () => {
+  // A "harness" process runs a command that exits while its grandchild (think: a `wheels start` server)
+  // keeps running, then exits itself. The grandchild must not outlive it: the isolated home it runs in
+  // is deleted on exit, and a detached group no longer gets the terminal's Ctrl-C.
+  const lib = new URL('../lib/exec.mjs', import.meta.url).href;
+  const harness = [
+    `const { runExec } = await import(${JSON.stringify(lib)});`,
+    `const r = await runExec(process.execPath, ['-e', ${JSON.stringify(parentScript({ exit: true }))}]);`,
+    "console.log(r.stdout.trim().split('\\n')[0]);",
+    'process.exit(0);',
+  ].join('\n');
+  const { spawn } = await import('node:child_process');
+  const proc = spawn(NODE, ['--input-type=module', '-e', harness], { stdio: ['ignore', 'pipe', 'inherit'] });
+  let out = '';
+  proc.stdout.on('data', (d) => (out += d));
+  await new Promise((resolve) => proc.once('exit', resolve));
+  const grandchild = Number(out.trim());
+  try {
+    assert.ok(grandchild > 0, `no grandchild pid: ${out}`);
+    assert.ok(await waitDead(grandchild, 5000), `leftover ${grandchild} outlived the harness`);
+  } finally {
+    if (grandchild) try { process.kill(grandchild, 'SIGKILL'); } catch {}
+  }
+});

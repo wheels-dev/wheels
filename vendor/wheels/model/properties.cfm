@@ -759,9 +759,23 @@
 	 * Internal function.
 	 */
 	public void function $updatePersistedProperties(string property) {
+		// Refresh only the named property's baseline, keeping every other property's intact, so
+		// clearChangeInformation(property = "x") marks x unchanged without resetting change tracking for
+		// everything else — before, the whole $persistedProperties struct was reset and only x refilled,
+		// leaving every other property looking changed and written on the next save (#4381).
+		if (StructKeyExists(arguments, "property")) {
+			if (!StructKeyExists(variables, "$persistedProperties")) {
+				variables.$persistedProperties = {};
+			}
+			if (StructKeyExists(this, arguments.property)) {
+				variables.$persistedProperties[arguments.property] = this[arguments.property];
+			}
+			return;
+		}
+		// No property named (after a save/create): refresh the whole baseline to the persisted values.
 		variables.$persistedProperties = {};
 		for (local.key in variables.wheels.class.properties) {
-			if (StructKeyExists(this, local.key) && (!StructKeyExists(arguments, "property") || arguments.property == local.key)) {
+			if (StructKeyExists(this, local.key)) {
 				variables.$persistedProperties[local.key] = this[local.key];
 			}
 		}

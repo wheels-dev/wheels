@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { constants, cpSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -17,9 +17,13 @@ export function sourceHome(env = process.env) {
 
 /**
  * A new home with a copy of the source's modules/ (the wheels module, which CI
- * overlays from the checkout, and BaseModule.cfc) and a link to its express/
- * Lucee runtime, which is large and only read. Everything else (cache, servers,
- * settings) starts empty.
+ * overlays from the checkout, and BaseModule.cfc) and of its express/ Lucee
+ * runtimes. Everything else (cache, servers, settings) starts empty.
+ *
+ * express/ is copied, not linked: the CLI downloads a missing Lucee version into
+ * it and stages JDBC drivers into a runtime's lib/ext, and through a link both
+ * would land in the real home (#4427). The copy asks for a copy-on-write clone,
+ * which is near-instant on APFS and btrfs; elsewhere it is an ordinary copy.
  */
 export function createIsolatedHome({ source = sourceHome(), parent = tmpdir() } = {}) {
   const home = mkdtempSync(join(parent, 'wheels-verify-docs-home-'));
@@ -27,7 +31,11 @@ export function createIsolatedHome({ source = sourceHome(), parent = tmpdir() } 
     cpSync(join(source, 'modules'), join(home, 'modules'), { recursive: true, verbatimSymlinks: true });
   }
   if (existsSync(join(source, 'express'))) {
-    symlinkSync(join(source, 'express'), join(home, 'express'));
+    cpSync(join(source, 'express'), join(home, 'express'), {
+      recursive: true,
+      verbatimSymlinks: true,
+      mode: constants.COPYFILE_FICLONE,
+    });
   }
   return home;
 }
@@ -60,5 +68,11 @@ export function enterIsolatedHome() {
     WHEELS_VERIFY_DOCS_SOURCE_HOME: source,
   });
   process.on('exit', () => rmSync(home, { recursive: true, force: true }));
+  // An 'exit' handler doesn't run when the process is killed by a signal, so a
+  // Ctrl-C (or a CI cancel) left the home behind (#4427). Exit normally on those
+  // signals instead, with the conventional 128 + signal number status.
+  for (const [signal, status] of [['SIGINT', 130], ['SIGTERM', 143]]) {
+    process.once(signal, () => process.exit(status));
+  }
   return { home, source };
 }

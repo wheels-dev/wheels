@@ -164,6 +164,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(has(runCheck().breaking, "renderNotFound")).toBeTrue();
 			});
 
+			it("is an error when a route targets an action named isSafeRedirectUrl", () => {
+				put("config/routes.cfm", lt & "cfscript>mapper().get(name=""back"", to=""sessions##isSafeRedirectUrl"").end();" & lt & "/cfscript>");
+				var report = runCheck();
+				expect(has(report.breaking, "isSafeRedirectUrl")).toBeTrue();
+			});
+
+			it("doesn't flag a controller's own isSafeRedirectUrl helper that no route targets", () => {
+				put("config/routes.cfm", lt & "cfscript>mapper().get(name=""home"", to=""main##index"").end();" & lt & "/cfscript>");
+				put("app/controllers/Spec4x2Safe.cfc", "component extends=""Controller"" { private boolean function isSafeRedirectUrl(required string u) { return true; } }");
+				expect(has(runCheck().breaking, "isSafeRedirectUrl")).toBeFalse();
+			});
+
 			it("is an error when a MySQL datasource sets tinyInt1isBit=false", () => {
 				put("config/app.cfm", lt & "cfscript>this.datasources[""a""] = {connectionString: ""jdbc:mysql://h/db?tinyInt1isBit=false""};" & lt & "/cfscript>");
 				expect(has(runCheck().breaking, "tinyInt1isBit=false")).toBeTrue();
@@ -186,6 +198,30 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				put("app/controllers/Signups.cfc", "component {#chr(10)#function create() {#chr(10)#var result = job.enqueue();#chr(10)#if (!result.persisted) { abort; }#chr(10)#}#chr(10)#}");
 				var found = matchesFor(runCheck().advisories, "reads persisted from a job result");
 				expect(found).toBe(["app/controllers/Signups.cfc:4"]);
+			});
+
+			it("lists migrations that use null=false and null=true separately", () => {
+				var nl = chr(10);
+				put("app/migrator/migrations/20180519_Users.cfc", "component extends=""wheels.migrator.Migration"" {" & nl
+					& "function up() {" & nl
+					& "t.string(columnNames='email', default='', null=false, limit='255');" & nl
+					& "t.text(columnNames='bio', null=true);" & nl
+					& "t.integer(columnNames='age', allowNull=false);" & nl
+					& "}" & nl & "}");
+				var report = runCheck();
+				expect(matchesFor(report.advisories, "use null=false")).toBe(["app/migrator/migrations/20180519_Users.cfc:3"]);
+				expect(matchesFor(report.advisories, "use null=true")).toBe(["app/migrator/migrations/20180519_Users.cfc:4"]);
+			});
+
+			it("doesn't list allowNull or a commented-out null=", () => {
+				var nl = chr(10);
+				put("app/migrator/migrations/20180519_Users.cfc", "component extends=""wheels.migrator.Migration"" {" & nl
+					& "// t.string(columnNames='email', null=false);" & nl
+					& "function up() { t.string(columnNames='email', allowNull=false); }" & nl
+					& "}");
+				var report = runCheck();
+				expect(has(report.advisories, "use null=false")).toBeFalse();
+				expect(has(report.advisories, "use null=true")).toBeFalse();
 			});
 
 			it("doesn't flag persisted in a comment or inside another name", () => {

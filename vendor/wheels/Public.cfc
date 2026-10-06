@@ -641,21 +641,23 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 * (version <= currentVersion → "applied") misclassified out-of-sequence
 	 * pending migrations as applied — the exact shared-dev-DB drift
 	 * `migrate doctor` exists to surface (2026-06-09 review P3).
+	 *
+	 * @appliedAt When each version was applied, from Migrator.$appliedAtByVersion() (4407).
 	 */
-	public struct function $cliFormatMigrationStatus(required array migrations) {
+	public struct function $cliFormatMigrationStatus(required array migrations, struct appliedAt = {}) {
 		local.rv = {migrations = [], summary = {total = 0, applied = 0, pending = 0}};
 		for (local.migration in arguments.migrations) {
 			local.isApplied = local.migration.status == "migrated";
-			// getAvailableMigrations() does not track per-row apply
-			// timestamps; keep the key for CLI display compatibility
-			// (the CLI prints "-" when empty).
+			// The CLI prints "-" when a version has no applied-at.
 			ArrayAppend(
 				local.rv.migrations,
 				{
 					version = local.migration.version,
 					description = local.migration.name,
 					status = local.isApplied ? "applied" : "pending",
-					appliedAt = ""
+					appliedAt = local.isApplied && StructKeyExists(arguments.appliedAt, local.migration.version)
+						? arguments.appliedAt[local.migration.version]
+						: ""
 				}
 			);
 			if (local.isApplied) {
