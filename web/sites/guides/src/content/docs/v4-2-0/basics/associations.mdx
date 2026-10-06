@@ -301,6 +301,28 @@ component extends="Model" {
 
 Wheels resolves the parent at runtime by reading `commentableType` on each row. `comment.commentable()` returns a Post or a Photo depending on the row's type column.
 
+### Column names
+
+By default the two columns are `<name>id` and `<name>type`, with no underscore: `commentableid` and `commentabletype` for `commentable`. Polymorphic associations don't follow `useUnderscoreReferenceColumns`. If your columns are named differently, for example `commentable_id` / `commentable_type` as `t.references(columnNames="commentable", polymorphic=true)` writes them when that setting is on, pass both names on every side:
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        belongsTo(name="commentable", polymorphic=true, foreignKey="commentable_id", foreignType="commentable_type");
+    }
+}
+```
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        hasMany(name="comments", as="commentable", foreignKey="commentable_id", foreignType="commentable_type");
+    }
+}
+```
+
+`foreignType` is accepted by `belongsTo` (with `polymorphic=true`), `hasMany` and `hasOne` (with `as`).
+
 <Aside type="caution">
   One limitation: `findAll(include="commentable")` on the polymorphic side throws `Wheels.PolymorphicIncludeNotSupported`. A single JOIN can't span multiple target tables. Load the comments first, then load each parent type separately if you need eager loading.
 </Aside>
