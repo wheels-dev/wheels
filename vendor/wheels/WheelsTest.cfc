@@ -201,7 +201,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
     /**
      * Runs `callback` and returns the SQL statements the model layer sent while it ran, as an array of
-     * `{sql, dataSource}`. Each `sql` has a `?` for every bound value; values are never recorded.
+     * `{sql, dataSource}`. Each `sql` has a `?` for every bound value, so bound values aren't recorded; a
+     * value written into the SQL itself (`parameterize=false`) appears as written.
      * Statements a request query cache answered aren't sent, so they aren't recorded; neither are raw
      * `QueryExecute()` / `cfquery` calls, transaction control, or requests made through a TestClient.
      *

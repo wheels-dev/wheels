@@ -382,7 +382,12 @@
 	 * until the entry expires or is deleted. When `callback` returns nothing, nothing is cached and `""`
 	 * is returned; when it throws, nothing is cached and the error propagates. `callback` runs outside
 	 * the cache lock, so two requests that miss at the same moment may both call it (the later write
-	 * wins). The cache lives in this server's memory and empties on an application reload or restart.
+	 * wins). When the cache is full, the computed value is returned but not cached, so the next call
+	 * computes it again. The cache lives in this server's memory and empties on an application reload
+	 * or restart.
+	 *
+	 * Keys are shared by every user, session, tenant and host: nothing about the request is added. For
+	 * per-user, per-role or per-tenant data, put that identity in the key, e.g. `"digest-" & userId`.
 	 *
 	 * [section: Global Helpers]
 	 * [category: Caching Functions]
@@ -413,6 +418,7 @@
 	/**
 	 * Returns the value cached under `key`, or `defaultValue` when there is no unexpired entry. A cached
 	 * `false`, `0` or `""` is returned as it is. Complex values come back as a copy.
+	 * Keys are shared by every user, session, tenant and host (see `appCacheFetch()`).
 	 *
 	 * [section: Global Helpers]
 	 * [category: Caching Functions]
