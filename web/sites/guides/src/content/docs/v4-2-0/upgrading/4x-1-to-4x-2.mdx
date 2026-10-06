@@ -332,6 +332,10 @@ On SQLite, a date passed to the query builder (`where()`, `whereBetween()`, `whe
 
 A request that ends with `abort` inside a Wheels transaction (`invokeWithTransaction()`, a nested call that joins it, or a savepoint unit) now rolls that transaction back on BoxLang, as it already did on Lucee and Adobe ColdFusion. On BoxLang, 4.1 kept the writes made before the `abort`. If a BoxLang app relies on those writes, let the transaction finish (return from the method) before it aborts. Raw `transaction {}` blocks aren't managed by Wheels and are unchanged.
 
+### `afterRollback` runs after the transaction block when the method throws
+
+When a Wheels-managed transaction rolls back because its method threw, `afterRollback` callbacks now run after the transaction block has ended. That's where they already ran for a rollback without an exception (`transaction="rollback"`, or a method that returns `false`). In 4.1 they ran inside the block, after the rollback. An `afterRollback` callback that writes to the database therefore keeps its write on this path too; in 4.1 that write was discarded with the transaction. A callback that throws doesn't replace the method's exception. If an `afterRollback` callback relied on its writes being discarded, move that write into the transaction itself.
+
 ### A job enqueued in a transaction on another datasource waits for the commit
 
 Inside a Wheels-managed transaction (a model save or `invokeWithTransaction()`) on another datasource than the job store's, the job is now written when the transaction commits, and dropped if it rolls back ([#4282](https://github.com/wheels-dev/wheels/pull/4282)). That's a tenant datasource under `TenantResolver`, or a model with its own `dataSource()`. In 4.1, depending on the engine, such a job could survive a rollback, land in the tenant's database where no worker reads it, or not be written at all. `enqueue()` then returns `{status: "deferred", deferred: true, persisted: false}`. That `persisted: false` is not a failure; check `status` instead. A write that fails after the commit throws `Wheels.Job.EnqueueFailed`, and the saved record stays committed. A raw `transaction {}` block isn't tracked, so enqueue after it ends. See [Background jobs: with a tenant datasource](/v4-2-0/digging-deeper/background-jobs/#with-a-tenant-datasource).
@@ -351,6 +355,16 @@ Instances that share a database now take turns running migrations ([#4134](https
 ### An empty `default` on a non-string column means no default
 
 In a migration, `default=""` on a column that isn't string-like (`bigInteger`, `binary`, `uniqueidentifier`, `integer`, `decimal`, `float`, `date` and so on) now means "no default" ([#4248](https://github.com/wheels-dev/wheels/pull/4248)). It renders as `DEFAULT NULL` when the column allows null and as no `DEFAULT` clause on a `NOT NULL` column. In 4.1, `bigInteger` and `uniqueidentifier` emitted a bare `DEFAULT`, `binary` emitted `DEFAULT ''`, and a `NOT NULL` column got `DEFAULT NULL NOT NULL`, which MySQL rejects; those migrations failed. They now run. Migrations that already worked produce the same schema.
+
+### Migration column option `null`
+
+Before Wheels 3.0, a migration column's nullability option was called `null`. 3.0 renamed it `allowNull` and dropped the old name, so Wheels 3.0 through 4.1 ignored `null`. No `NULL` / `NOT NULL` clause was emitted, and the column got the database's default, nullable on most databases. 4.2 reads `null` again as a deprecated alias of `allowNull`: `allowNull` wins when both are passed, and a warning is logged once per migration run.
+
+This matters for `null=false`. A database built or rebuilt by 3.0 through 4.1 from such a migration has the column nullable, and it may hold `NULL` rows. A database rebuilt on 4.2 from the same migration gets a `NOT NULL` column, stricter than the one you run in production. `wheels upgrade check` lists the migrations that use `null=false` and `null=true`. For each `null=false` column:
+
+1. Check the running database for `NULL` rows in that column.
+2. Fix or backfill them, then tighten the column with a new migration (`changeColumn(..., allowNull=false)`), or change the old migration to `allowNull=true` if the column should allow `NULL`.
+3. Rename `null` to `allowNull` in the migrations.
 
 ### Unsupported migration column types fail at migrate time
 
@@ -401,6 +415,22 @@ If your app builds storage keys from user input or file names, check that none o
 ### `insertAll()` and `upsertAll()` run in one transaction
 
 `insertAll()` and `upsertAll()` now honour their `transaction` argument, which defaults to your `transactionMode` setting (`commit` unless you changed it). Records are still written in batches of up to 1000 rows (fewer on SQL Server, to stay within its parameter limit), but all the batches now run in one transaction: a large import is all-or-nothing, and a failing batch rolls back the ones before it. In 4.1 each batch committed on its own. If you relied on that, for example to keep a partial import, pass `transaction="none"`. `transaction="rollback"` writes nothing, like `save(transaction="rollback")`. One transaction holds its locks until the end, so an import of many thousands of rows holds them for the whole call.
+
+### Soft-deleting a parent leaves non-soft-delete dependents alone
+
+On a model with a soft-delete column (`deletedAt`), a soft `delete()` no longer runs `dependent=` actions that a restore couldn't undo ([#4370](https://github.com/wheels-dev/wheels/issues/4370)). Children whose model also has a soft-delete column are soft-deleted, as before. Children without one are left alone: `dependent="delete"` / `"deleteAll"` no longer hard-deletes them, and `dependent="remove"` / `"removeAll"` no longer sets their foreign keys to `NULL`. On a soft delete, `dependent=` therefore applies only to a real delete. If an app counted on a soft delete removing such children, delete them in a `beforeDelete` / `afterDelete` callback, or delete the parent with `softDelete=false`.
+
+### `softDelete=false` also deletes rows that are already soft-deleted
+
+`delete(softDelete=false)`, `deleteAll(softDelete=false)`, `deleteOne(softDelete=false)` and `deleteByKey(softDelete=false)` are now always real deletes, including rows that were soft-deleted earlier and the `dependent=` children of a deleted record ([#4371](https://github.com/wheels-dev/wheels/issues/4371)). In 4.1 they skipped soft-deleted rows unless `includeSoftDeletes=true` was passed too. An explicit `includeSoftDeletes=false` alongside `softDelete=false` no longer keeps soft-deleted rows. With `instantiate=true`, `deleteAll(softDelete=false)` now loads those rows and runs their `beforeDelete`, `afterDelete` and `afterCommit` callbacks too.
+
+### `reload()` and `delete()` on a soft-deleted object
+
+Three changes for an object whose row is soft-deleted ([#4372](https://github.com/wheels-dev/wheels/issues/4372)):
+
+- `reload()` reloads the soft-deleted row. In 4.1 it blanked every property. When the row is gone altogether, `reload()` now throws `Wheels.RecordNotFound` instead of blanking the object; uncaught in an action, that error renders the 404 page.
+- A soft `delete()` on an object that is already soft-deleted, or on a stale copy of a row soft-deleted elsewhere, returns `false` and changes nothing. In 4.1 it wrote a new `deletedAt` and returned `true`.
+- After a soft `delete()`, the object's `deletedAt` holds the timestamp written. If the delete is rolled back, it goes back to what it was.
 
 ## CLI and deployment changes
 

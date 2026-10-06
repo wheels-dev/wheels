@@ -154,6 +154,35 @@ Under `wheels.middleware.TenantResolver`, the tenant's work runs on the tenant d
 
 When a job can't be written, the enqueue methods throw `Wheels.Job.EnqueueFailed`. If an enqueue is best-effort, catch that type.
 
+#### Jobs that must survive a rollback
+
+Some work has to happen *because* a transaction failed: a failure notice to an editor, an audit record of the attempt, a retry-later job queued from inside a batch that's about to be undone. A job that joins the transaction would be rolled back with it, so pass `transactional=false`:
+
+```cfm {test:compile}
+// inside a model save or invokeWithTransaction()
+new app.jobs.ImportFailedNoticeJob().enqueue(
+    data = {importId: importId},
+    transactional = false
+);
+```
+
+Or make it the default for a job class, in its `config()`:
+
+```cfm {test:compile}
+component extends="wheels.Job" {
+    function config() {
+        this.transactional = false;
+    }
+}
+```
+
+The job is then written **after the outermost Wheels-managed transaction ends, whether it commits or rolls back**. That includes a rollback caused by an exception and a savepoint unit that rolls back. `enqueue()` returns `{status: "deferred", deferred: true}` until then. With no transaction open, the job is written immediately, as usual. Leave the default (`transactional=true`) for jobs that should only run when the data commits.
+
+Two limitations:
+
+- **A raw `transaction {}` block isn't tracked by Wheels.** A `transactional=false` job enqueued inside one is written inside it and shares its fate. Use a model save or `invokeWithTransaction()`, or enqueue after the block.
+- **A request that ends with `abort` inside the transaction may not write the job.** The transaction is rolled back, but the request ends before the deferred write runs. Enqueueing earlier in the same transaction doesn't help: the job is still deferred to the end. For a job that must survive an `abort`, enqueue it outside the transaction.
+
 ## Process the queue
 
 The simplest way to drain the queue is the bundled worker — a long-lived CLI process that polls the `wheels_jobs` table, claims one `pending` job per cycle, and runs it. It talks to your running app server, so start that first (`wheels start`):

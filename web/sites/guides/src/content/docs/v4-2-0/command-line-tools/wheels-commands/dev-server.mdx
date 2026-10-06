@@ -34,20 +34,26 @@ Start a Wheels development server for the current project. Delegates to `wheels 
 wheels start [flags]
 ```
 
-Any flags you pass are forwarded verbatim to `wheels server start`. The common ones are listed below — see [`wheels server start`](../../core-commands/server/) for the full list.
+`wheels start` handles `--port`, `--force`, `--engine` and `--dry-run` itself. Every other flag is forwarded verbatim to `wheels server start`; the common ones are listed below. See [`wheels server start`](../../core-commands/server/) for the full list.
 
-#### Flags (forwarded to `wheels server start`)
+#### Flags handled by `wheels start`
 
 | Flag | Description |
 |---|---|
-| `-p, --port=<port>` | Port number for the server (e.g., `8080`). |
+| `-p, --port=<port>` | Port number for the server (e.g., `8080`). `wheels start` writes the port, and a free shutdown port, into `lucee.json`, so later starts reuse it. `-p <port>` and `-p=<port>` are the same as `--port`. |
+| `--force` | Replace a stopped server registration that belongs to another project with the same server name. It does not restart a running server. |
+| `--engine=<engine>` | The engine to run (default `lucee`). See [`wheels server start`](../../core-commands/server/). |
+| `--dry-run` | Show the resolved configuration without starting the server. Nothing is written: a `--port` value is passed to the dry run instead of into `lucee.json`. Not supported with `--engine=rustcfml`. |
+
+#### Flags forwarded to `wheels server start`
+
+| Flag | Description |
+|---|---|
 | `-n, --name=<name>` | Custom name for the server instance. |
 | `-v, --version=<version>` | Lucee version to use (e.g., `6.2.2.91`). |
-| `--env, --environment=<env>` | Environment to use (e.g., `dev`, `staging`, `prod`). |
+| `-e, --env, --environment=<env>` | Apply the matching `environments` profile from `lucee.json` (e.g., `dev`, `staging`, `prod`). An explicit `--env`/`--environment` value wins. |
 | `-c, --config=<file>` | Configuration file to use (defaults to `lucee.json`). |
-| `-f, --force` | Force a restart, replacing any server already running for this project. |
 | `--disable-open-browser` | Don't open a browser after the server starts. |
-| `--dry-run` | Show the resolved configuration without starting the server. |
 | `--sandbox` | Start a transient background server without writing `lucee.json`. |
 
 #### Example
@@ -61,7 +67,7 @@ Prints `Starting Wheels server...` in cyan and hands control off to `wheels serv
 If the port in `lucee.json` is already taken, `wheels start` stops before starting anything. It names the Wheels server that holds the port, when it's one of yours, with the `cd <its folder> && wheels stop` to free it, and suggests a free port to pass as `wheels start --port=<port>`.
 
 <Aside type="note" title="Background process">
-`wheels start` returns control to your shell once the server is up — it does not block the terminal. Stop the server with `wheels stop`, and force a restart over an already-running instance with `wheels start -f` (or `--force`).
+`wheels start` returns control to your shell once the server is up — it does not block the terminal. Stop the server with `wheels stop`. Running `wheels start` while the server is already up prints `Server '<name>' is already running.` and exits 0. It doesn't restart the server or change `lucee.json`, even with `--force`; restart with `wheels stop && wheels start`.
 </Aside>
 
 ### `wheels stop`
@@ -103,10 +109,10 @@ Reinitialize the running Wheels application without restarting the JVM. Useful a
 #### Synopsis
 
 ```txt title="
-wheels reload
+wheels reload [--password=<pw>]
 ```
 
-`wheels reload` detects the running server's port automatically (from `lucee.json`, then `.env`) and hits `http://localhost:<port>/?reload=true&password=<password>` with the reload password it finds in your project config. If no server is running, it prints `No running Wheels server detected. Start one with: wheels start` and exits.
+`wheels reload` finds the port of this project's own running server (the one `wheels start` registered) and hits `http://localhost:<port>/?reload=true&password=<password>` with the reload password it finds in your project config (`.env`, then `config/settings.cfm`). Pass `--password=<pw>` to override the detected password. If this project's server isn't running, it prints `Reload requires this project's own server (started with: wheels start).` and exits with a non-zero status.
 
 <Aside type="note" title="Why the CLI doesn't re-prompt for the reload password">
 The reload password gates the **HTTP** endpoint `?reload=true` — it's an ACL against remote attackers who could otherwise hit that URL and wipe your app's state. The CLI runs locally, has filesystem access to your project, and reads the configured password directly from `.env` or `config/settings.cfm`. Re-prompting you for a password the tool just read from disk wouldn't add security: an attacker with disk read would already have the password.
@@ -122,7 +128,7 @@ If you need to keep `wheels reload` itself behind a credential check (e.g. a sha
 wheels reload
 ```
 
-On success: `Application reloaded successfully.` in green. On failure — most often a password mismatch — it prints `Failed to reload: <message>` and hints at setting `WHEELS_RELOAD_PASSWORD` in `.env` or `config/settings.cfm`.
+On success: `Application reloaded successfully.` in green. On a password mismatch the server serves the page normally instead of redirecting, and the command prints `Reload was not triggered: the server served the page normally (HTTP 200) instead of answering with the reload redirect (302). The application was NOT reloaded — check the reload password.` If the request itself fails it prints `Failed to reload: <message>`. Both exit with a non-zero status; when no password was found, it also hints at setting `WHEELS_RELOAD_PASSWORD` in `.env` or `config/settings.cfm`.
 
 <Aside type="note" title="When you need reload">
 Most CFML source changes are picked up on the next request without a reload. In development, changes to `app/global/functions.cfm` (and any files it `<cfinclude>`s) are also auto-detected on bare `?reload=true` (the `reloadOnGlobalChange` setting). You need `wheels reload` when you change config that's only read at bootstrap — routes, settings, DI bindings, package manifests — or when you want to force every per-request cache to clear.

@@ -265,6 +265,22 @@
 			StructDelete(arguments.missingMethodArguments, "1");
 			StructDelete(arguments.missingMethodArguments, "value");
 			StructDelete(arguments.missingMethodArguments, "values");
+			// A property passed by name was read into the where clause above. findAll() ignores it, so
+			// it's dropped before the strictArguments check (kept if it's also a finder option).
+			if ($strictArgumentsMode() != "off") {
+				local.finderOptions = $strictArgumentsAccepted("findOne");
+				for (local.property in local.finderProperties) {
+					if (!ListFindNoCase(local.finderOptions, local.property)) {
+						StructDelete(arguments.missingMethodArguments, local.property);
+					}
+				}
+				$checkArguments(
+					args = arguments.missingMethodArguments,
+					name = local.finderPrefix == "findOneBy" ? "findOne" : "findAll",
+					accepted = local.finderOptions,
+					label = arguments.missingMethodName
+				);
+			}
 
 			// call finder method
 			if (Left(arguments.missingMethodName, 9) == "findOneBy") {
@@ -315,7 +331,18 @@
 
 		// add where argument for findOne and remove afterwards
 		arguments.where = $keyWhereString(local.property, local.value);
-		local.object = findOne(argumentCollection = arguments);
+		local.findArgs = arguments;
+		if ($strictArgumentsMode() != "off") {
+			// findOne() ignores the property values meant for create(), so don't pass them to it.
+			local.findArgs = {};
+			local.finderOptions = $strictArgumentsAccepted("findOne");
+			for (local.key in arguments) {
+				if (StructKeyExists(arguments, local.key) && (Left(local.key, 1) == "$" || ListFindNoCase(local.finderOptions, local.key))) {
+					local.findArgs[local.key] = arguments[local.key];
+				}
+			}
+		}
+		local.object = findOne(argumentCollection = local.findArgs);
 		StructDelete(arguments, "where");
 
 		if (IsObject(local.object)) {

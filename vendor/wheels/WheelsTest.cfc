@@ -201,7 +201,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
     /**
      * Runs `callback` and returns the SQL statements the model layer sent while it ran, as an array of
-     * `{sql, dataSource}`. Each `sql` has a `?` for every bound value; values are never recorded.
+     * `{sql, dataSource}`. Each `sql` has a `?` for every bound value, so bound values aren't recorded; a
+     * value written into the SQL itself (`parameterize=false`) appears as written.
      * Statements a request query cache answered aren't sent, so they aren't recorded; neither are raw
      * `QueryExecute()` / `cfquery` calls, transaction control, or requests made through a TestClient.
      *
@@ -773,6 +774,33 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 arguments.scope[key] = Duplicate(arguments.captured[key].value);
             } else {
                 StructDelete(arguments.scope, key);
+            }
+        }
+    }
+
+    /**
+     * Freezes the framework clock ($now() / $tick()) to `moment` for the duration of `callback`, then
+     * restores the previous clock. Use it to test time-dependent behaviour — cache expiry, rate-limit
+     * windows — deterministically:
+     *
+     *   travelTo("2026-10-04 12:00:00", function() { ... code under test sees that instant ... });
+     *
+     * The override is request-scoped, so it never leaks into another request, and it is restored in a
+     * catch-free finally, so a throwing or aborting callback still resets the clock. `moment` is a date
+     * string or a date object. Returns whatever the callback returns.
+     */
+    public any function travelTo(required any moment, required any callback) {
+        var instant = IsSimpleValue(arguments.moment) ? ParseDateTime(arguments.moment) : arguments.moment;
+        var hadClock = StructKeyExists(request, "$wheelsClock");
+        var previousClock = hadClock ? request.$wheelsClock : {};
+        request.$wheelsClock = {at = instant, tick = instant.getTime()};
+        try {
+            return arguments.callback();
+        } finally {
+            if (hadClock) {
+                request.$wheelsClock = previousClock;
+            } else {
+                StructDelete(request, "$wheelsClock");
             }
         }
     }

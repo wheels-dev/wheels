@@ -37,10 +37,12 @@ expect(model("Post").findAll(reload = true).recordCount).toBe(3);
 - Clear the whole request cache when several later reads must not see anything cached earlier:
 
 ```cfm
-StructDelete(request.wheels, "$queryCache");
+model("Post").forgetCachedQueries();    // just that model's cached finder results
+forgetCachedQueries("Post");            // same, by name, from anywhere
+forgetCachedQueries(all = true);        // every model's cached results this request
 ```
 
-`$queryCache` is a reserved key under `request.wheels`; deleting it drops every model's cached finder results for the current request.
+`forgetCachedQueries()` drops the per-request finder cache (`cacheQueriesDuringRequest`). Called on a model it scopes to that model; from a controller/view/job pass a model name or `all = true` (a bare call outside a model throws rather than silently wiping everything). Prefer it over reaching into the reserved `request.wheels["$queryCache"]` key.
 
 ## Counting the queries a call sends (4.2+)
 
@@ -65,23 +67,18 @@ set(functionName = "sendEmail", deliver = false);
 
 To turn delivery off for a single spec instead, see `.ai/mailers.md`.
 
-## POSTs through the test client need the CSRF token
+## POSTs through the test client and CSRF
 
-Controllers extending the app's `Controller` call `protectsFromForgery()`, so a `$testClient()` POST, PUT or DELETE without the authenticity token gets a 403. Fetch a page first (the client keeps the session cookie), read the token from the `csrf-token` meta tag (`csrfMetaTags()` in the layout), and send it as `authenticityToken` or the `X-CSRF-Token` header:
+Controllers extending the app's `Controller` call `protectsFromForgery()`, so a POST, PUT, PATCH or DELETE needs the session's authenticity token. `$testClient()` handles it like a browser: fetch a page that has the token (a form, or `csrfMetaTags()` in the layout) and the client sends it on the next unsafe requests, as the `X-CSRF-Token` header and the `authenticityToken` form field:
 
 ```cfm
 var testClient = $testClient();
 testClient.get("/posts/new");
-testClient.post("/posts", {"authenticityToken": csrfToken(testClient), "post[title]": "T", "post[body]": "B"})
+testClient.post("/posts", {"post[title]": "T", "post[body]": "B"})
     .assertRedirect();  // redirectTo() answers a POST with 303
-
-// in the spec component:
-private string function csrfToken(required any testClient) {
-    var html = arguments.testClient.content();
-    var match = ReFindNoCase('<meta[^>]*name="csrf-token"[^>]*>', html, 1, true);
-    return match.len[1] ? ReReplaceNoCase(Mid(html, match.pos[1], match.len[1]), '.*content="([^"]*)".*', "\1") : "";
-}
 ```
+
+After a login, the session (and its token) changes: GET a page again before the next form post. Also `fetchCsrfToken(path)`, `csrfToken()`, `withCsrfToken(token)`, and `withoutCsrfToken()` to test the 403.
 
 ## Setting the client address
 
@@ -109,3 +106,15 @@ afterEach(() => $restoreRoutes(variables._routes));
 ```
 
 `$snapshotRoutes()` captures everything a redefinition touches — the route list, the static-route index, named-route positions, the `urlFor` caches, and the dynamic route index and route-table generation — so `$restoreRoutes()` leaves the table byte-for-byte as it was, with no leakage into later specs.
+
+## Traveling the clock
+
+`travelTo(moment, callback)` freezes the framework clock for the callback so time-dependent behaviour is testable without sleeping:
+
+```cfm
+travelTo("2026-10-04 12:00:00", function() {
+    // code under test sees 12:00:00
+});
+```
+
+Features that read the clock through the seam (`$now()` / `$tick()`) honour it: cache expiry and culling, the RateLimiter rate-limit windows, and model `createdAt`/`updatedAt` timestamps. The override is request-scoped and restored after the callback (even if it throws), so it never leaks into another spec. It does not reach a separate `$testClient()` request (that runs its own request); test in-process code with it.

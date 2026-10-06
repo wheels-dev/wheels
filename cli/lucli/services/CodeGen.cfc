@@ -207,9 +207,12 @@ component {
 		// defaults applied next shape the controller body only, never the view files.
 		var requestedActions = arguments.actions;
 
-		// Default actions based on type
-		if (arrayLen(arguments.actions) == 0) {
-			arguments.actions = arguments.crud ? crudActions : ["index"];
+		// Default the controller body to the CRUD actions only under --crud. With no actions and no
+		// --crud, leave the body empty: the documented contract is "passing no actions creates an empty
+		// controller with no view files", and a default index() stub with no matching view 500s at
+		// runtime (#4414).
+		if (arrayLen(arguments.actions) == 0 && arguments.crud) {
+			arguments.actions = crudActions;
 		}
 
 		var context = {

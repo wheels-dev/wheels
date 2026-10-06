@@ -20,7 +20,7 @@ concurrency:
 jobs:
   research:
     name: Cross-framework research
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Phase 4 (auto-fire): runs from wheels-bot[bot] comments containing
     # `wheels-bot:triage-class:framework-design`. workflow_dispatch is

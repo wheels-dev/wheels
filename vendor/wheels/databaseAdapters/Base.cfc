@@ -127,8 +127,9 @@ component output=false extends="wheels.Global"{
 
 	/**
 	 * Internal function. Adds a statement to every active query recorder (F4): its SQL with a `?` for
-	 * each bound value (an IN list shows one `?` per list), never the values, so a failure message can't
-	 * leak data into a log. A recorder with a `dataSource` filter only takes that datasource's statements.
+	 * each bound value (an IN list shows one `?` per list), so a failure message doesn't put bound data
+	 * in a log. A value written into the SQL itself (`parameterize=false`) appears as written. A recorder
+	 * with a `dataSource` filter only takes that datasource's statements.
 	 */
 	public void function $recordQuery(required array sql, required struct queryAttributes) {
 		local.text = "";

@@ -1,0 +1,126 @@
+---
+title: Strict Arguments
+description: Catch misspelled or unsupported arguments to associations, validations, callbacks, finders and migration columns.
+type: howto
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The `strictArguments` setting reports an argument a framework function doesn't know, instead of ignoring it.
+
+You'll learn:
+
+- what the setting checks, and its three values
+- how to read a warning and fix the call
+- how to opt into errors, and when an override needs a change
+
+## Why it exists
+
+Wheels functions take named arguments, and an unknown name is ignored. A typo such as `orderby` for `order`, or a name from another framework such as `foreign_key` or `nullable`, doesn't fail. The call runs without the option, and the mistake shows up later as unordered results, a missing foreign key or a column that allows NULL when you didn't mean it to.
+
+With `strictArguments` on, those calls are reported where they're made:
+
+```text title="illustrative — do not type"
+Wheels: `hasMany()` on `Post` got an argument it doesn't know: `foreign_key`. Unknown arguments are ignored. Did you mean `foreignKey`?
+```
+
+## The three values
+
+| Value | What happens | Default in |
+|---|---|---|
+| `"warn"` | One line in `wheels.log` per model or controller, function and argument, for the life of the application. | `development` |
+| `"throw"` | The call raises `Wheels.UnknownArgument`, with the same text. | none (opt-in) |
+| `"off"` | Unknown arguments are ignored, as before 4.2. | `testing`, `production`, `maintenance` |
+
+Set it in `config/settings.cfm`, or per environment in `config/<environment>/settings.cfm`:
+
+```cfm title="config/development/settings.cfm" {test:compile}
+<cfscript>
+    set(strictArguments = "throw");
+</cfscript>
+```
+
+Use `"throw"` in development once your app's warnings are fixed, so a new mistake fails at once. Keep `"off"` in production: a warning there means the code was never run in development.
+
+## What it checks
+
+Only functions that take a fixed set of arguments are checked:
+
+- **Associations:** `belongsTo()`, `hasMany()`, `hasOne()`, `nestedProperties()`.
+- **Validations:** `validate()`, `validateOnCreate()`, `validateOnUpdate()` and every `validates*()` function.
+- **Callback registration:** `beforeSave()`, `afterCommit()` and the other callback functions.
+- **Model configuration:** `property()`, `table()`.
+- **Finders:** `findAll()`, `findOne()`, `findByKey()`, `findFirst()`, `findLastOne()` and the dynamic finders (`findOneByEmail()`, `findAllByStatus()`).
+- **Controller configuration:** `caches()`, `protectsFromForgery()`, `provides()`, `usesLayout()`.
+- **Migration columns:** `t.string()`, `t.integer()` and the other column functions of a table definition.
+
+Functions that turn unknown arguments into something aren't checked: `create()`, `new()` and `update()` (property values), `linkTo()` and `URLFor()` (route parameters), the form helpers (HTML attributes), `includePartial()` and `sendEmail()` (view variables), and `filters()` (filter arguments).
+
+Documented aliases are accepted: `property` for `properties`, `method` for `methods`, `associations` for `association`. So are the finders' `returnType` and `keyColumn`, and a property passed by name to a dynamic finder (`findOneByEmail(email = params.email)`).
+
+## Fix the common warnings
+
+| Argument | Use instead |
+|---|---|
+| `foreign_key`, `class_name` | `foreignKey`, `modelName` |
+| `nullable` on a migration column | `allowNull` (`null`, its name before Wheels 3.0, is still read, with a deprecation warning) |
+| `orderby`, `sort` | `order` |
+| `limit` on a finder | `maxRows` |
+| `on` on `beforeSave()` | `beforeCreate()` or `beforeUpdate()` (`afterCommit()` and `afterRollback()` do take `on`) |
+| `method` on `afterCommit()` | `methods` |
+
+```cfm title="app/models/Post.cfc" {test:compile}
+component extends="Model" {
+    function config() {
+        hasMany(name = "comments", foreignKey = "postId");
+        validatesPresenceOf(properties = "title", message = "Every post needs a title");
+        beforeCreate("setSlug");
+    }
+}
+```
+
+## Overriding a finder
+
+A model method that overrides a finder and passes its own arguments on with `argumentCollection = arguments` is reported too, because the extra arguments reach the framework's finder. Remove them before the call:
+
+```cfm title="app/models/Post.cfc" {test:compile}
+component extends="Model" {
+    function findAll(boolean published = false) {
+        if (arguments.published) {
+            arguments.where = "publishedAt IS NOT NULL";
+        }
+        StructDelete(arguments, "published");
+        return superFindAll(argumentCollection = arguments);
+    }
+}
+```
+
+## Don't pass `params` straight through
+
+`findAll(argumentCollection = params)` turns every request parameter into an argument name, so a visitor decides what reaches the finder. With `strictArguments` on, every unknown parameter is reported, and with `"throw"` an extra query-string key fails the request. Pick the keys you mean:
+
+```cfm title="app/controllers/Posts.cfc" {test:compile}
+component extends="Controller" {
+    function index() {
+        posts = model("post").findAll(
+            where = "status = 'published'",
+            order = "publishedAt DESC",
+            page = Val(params.page ?: 1),
+            perPage = 20
+        );
+    }
+}
+```
+
+`"warn"` logs at most 500 distinct unknown arguments per application lifetime. After that it logs one line saying it stopped, so arbitrary request keys can't grow the log or the record of what was logged.
+
+<Aside type="note">
+`strictArguments` checks argument names, not values.
+</Aside>
+
+## Related guides
+
+<CardGrid>
+    <LinkCard title="Environments and Configuration" href="/v4-2-0/core-concepts/environments-and-configuration/" />
+    <LinkCard title="Overriding Core Methods" href="/v4-2-0/digging-deeper/overriding-core-methods/" />
+</CardGrid>

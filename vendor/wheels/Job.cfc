@@ -34,6 +34,9 @@ component {
 	this.timeout = 300;
 	this.baseDelay = 2;
 	this.maxDelay = 3600;
+	// false: write the job after the outermost Wheels transaction resolves, on commit or
+	// rollback alike, so it survives a rollback (failure notices, audit records).
+	this.transactional = true;
 
 	/**
 	 * Constructor
@@ -75,14 +78,21 @@ component {
 	 * @data Job data to pass to perform().
 	 * @queue Override the default queue name.
 	 * @priority Override the default priority (higher = processed first).
+ * @transactional `false` writes the job after the outermost Wheels-managed transaction resolves, on commit or rollback alike, so it survives a rollback. Defaults to the job's `this.transactional` (`true`).
 	 */
-	public struct function enqueue(struct data = {}, string queue = this.queue, numeric priority = this.priority) {
+	public struct function enqueue(
+		struct data = {},
+		string queue = this.queue,
+		numeric priority = this.priority,
+		any transactional = ""
+	) {
 		return $enqueueJob(
 			jobClass = $persistableJobClass(),
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
-			runAt = $now()
+			runAt = $now(),
+			transactional = $resolveTransactional(arguments.transactional)
 		);
 	}
 
@@ -92,19 +102,22 @@ component {
 	 * @data Job data to pass to perform().
 	 * @queue Override the default queue name.
 	 * @priority Override the default priority.
+ * @transactional [see:enqueue].
 	 */
 	public struct function enqueueIn(
 		required numeric seconds,
 		struct data = {},
 		string queue = this.queue,
-		numeric priority = this.priority
+		numeric priority = this.priority,
+		any transactional = ""
 	) {
 		return $enqueueJob(
 			jobClass = $persistableJobClass(),
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
-			runAt = DateAdd("s", arguments.seconds, $now())
+			runAt = DateAdd("s", arguments.seconds, $now()),
+			transactional = $resolveTransactional(arguments.transactional)
 		);
 	}
 
@@ -114,19 +127,22 @@ component {
 	 * @data Job data to pass to perform().
 	 * @queue Override the default queue name.
 	 * @priority Override the default priority.
+ * @transactional [see:enqueue].
 	 */
 	public struct function enqueueAt(
 		required date runAt,
 		struct data = {},
 		string queue = this.queue,
-		numeric priority = this.priority
+		numeric priority = this.priority,
+		any transactional = ""
 	) {
 		return $enqueueJob(
 			jobClass = $persistableJobClass(),
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
-			runAt = arguments.runAt
+			runAt = arguments.runAt,
+			transactional = $resolveTransactional(arguments.transactional)
 		);
 	}
 
@@ -249,6 +265,43 @@ component {
 	}
 
 	/**
+	 * Internal: the `transactional` argument as a boolean; an empty value means the job's
+	 * `this.transactional` default.
+	 */
+	public boolean function $resolveTransactional(any transactional = "") {
+		if (IsBoolean(arguments.transactional)) {
+			return arguments.transactional;
+		}
+		return !StructKeyExists(this, "transactional") || !IsBoolean(this.transactional) || this.transactional;
+	}
+
+	/**
+	 * Internal: the callback-queue key of the outermost open Wheels-managed transaction (the first
+	 * real owner on the owner stack), or "" when none is open. It resolves last, so a job queued on
+	 * it is written after every nested transaction has resolved too.
+	 */
+	public string function $outermostWheelsTransaction() {
+		if (
+			!StructKeyExists(request, "wheels")
+			|| !StructKeyExists(request.wheels, "$txnOwnerStack")
+			|| !StructKeyExists(request.wheels, "$txnCallbacks")
+		) {
+			return "";
+		}
+		for (local.key in request.wheels.$txnOwnerStack) {
+			if (
+				StructKeyExists(request.wheels.$txnCallbacks, local.key)
+				&& IsStruct(request.wheels.$txnCallbacks[local.key])
+				&& StructKeyExists(request.wheels.$txnCallbacks[local.key], "real")
+				&& request.wheels.$txnCallbacks[local.key].real
+			) {
+				return local.key;
+			}
+		}
+		return "";
+	}
+
+	/**
 	 * Internal: When the innermost open Wheels-managed transaction writes to a datasource
 	 * other than the job store's (a tenant's, for a model that isn't shared), its
 	 * callback-queue key; otherwise "". Only then is an enqueue deferred to the commit: a
@@ -285,7 +338,8 @@ component {
 		required struct data,
 		required string queue,
 		required numeric priority,
-		required date runAt
+		required date runAt,
+		boolean transactional = true
 	) {
 		local.id = CreateUUID();
 
@@ -321,6 +375,26 @@ component {
 			runAt = arguments.runAt,
 			enqueuedAt = local.now
 		};
+
+		// transactional = false: write the job after the outermost Wheels-managed transaction
+		// resolves, on commit or rollback alike. With no such transaction it's written now.
+		if (!arguments.transactional) {
+			local.outermost = $outermostWheelsTransaction();
+			if (Len(local.outermost)) {
+				ArrayAppend(
+					request.wheels.$txnCallbacks[local.outermost].queue,
+					{object = new wheels.JobDeferredEnqueue(job = this, row = local.row, durable = true), operation = "enqueue", durable = true}
+				);
+				writeLog(
+					text = "Job '#arguments.jobClass#' [#local.id#] for queue '#arguments.queue#' will be enqueued when the open transaction ends, whether it commits or rolls back",
+					type = "information",
+					file = "wheels_jobs"
+				);
+				return {id = local.id, jobClass = arguments.jobClass, status = "deferred", persisted = false, deferred = true};
+			}
+			$persistJobRow(local.row);
+			return {id = local.id, jobClass = arguments.jobClass, status = "pending", persisted = true};
+		}
 
 		// Inside a Wheels-managed transaction on another datasource (a tenant's), the job
 		// is written when that transaction commits and dropped if it rolls back, so the job

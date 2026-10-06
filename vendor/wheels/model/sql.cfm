@@ -285,7 +285,10 @@
 					} else if (Find(".", local.iItem)) {
 						// Prevent SQL injection via dot-notation — only allow table.column identifiers
 						if (REFind("^[a-zA-Z_][a-zA-Z0-9_$]*\.[a-zA-Z_][a-zA-Z0-9_$]*(\s+(ASC|DESC))?$", local.iItem)) {
-							local.rv = ListAppend(local.rv, local.iItem);
+							// Quote it like a bare column when the table is this model's or an
+							// included one; an alias or other table stays as written.
+							local.resolved = $quotedQualifiedOrderItem(local.iItem, local.classes);
+							local.rv = ListAppend(local.rv, Len(local.resolved) ? local.resolved : local.iItem);
 						} else {
 							Throw(
 								type = "Wheels.InvalidOrderClause",
@@ -337,6 +340,39 @@
 			local.rv = "ORDER BY " & local.rv;
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. A validated `table.column [ASC|DESC]` order item with the table
+	 * and column quoted under their real names, the same way a bare property is, so a
+	 * reserved-word table or column works in both forms (4374). Matched case-insensitively
+	 * against the model's and its included associations' tables and columns (or a
+	 * property mapped to the column). "" when the table isn't one of them (an alias, say).
+	 */
+	public string function $quotedQualifiedOrderItem(required string item, required array classes) {
+		local.reference = SpanExcluding(Trim(arguments.item), " ");
+		local.tableName = ListFirst(local.reference, ".");
+		local.columnName = ListLast(local.reference, ".");
+		local.direction = Find(" ", Trim(arguments.item)) ? " " & UCase(Trim(ListLast(Trim(arguments.item), " "))) : "";
+		for (local.classData in arguments.classes) {
+			if (CompareNoCase(local.classData.tableName, local.tableName) != 0) {
+				continue;
+			}
+			for (local.property in local.classData.properties) {
+				local.column = local.classData.properties[local.property].column;
+				if (CompareNoCase(local.column, local.columnName) == 0 || CompareNoCase(local.property, local.columnName) == 0) {
+					return $quotedTableColumn(local.classData.tableName, local.column) & local.direction;
+				}
+			}
+		}
+		return "";
+	}
+
+	/**
+	 * Internal function. `table.column` with each part quoted by the model's adapter.
+	 */
+	public string function $quotedTableColumn(required string tableName, required string columnName) {
+		return variables.wheels.class.adapter.$quoteIdentifier(arguments.tableName) & "." & variables.wheels.class.adapter.$quoteIdentifier(arguments.columnName);
 	}
 
 	/**

@@ -21,12 +21,14 @@ wheels packages show <name>
 wheels packages add <name>[@<version>] [--force]
 wheels packages update <name> --yes
 wheels packages update --all --yes
-wheels packages remove <name>
+wheels packages remove <name> --yes
 wheels packages registry refresh
 wheels packages registry info
 ```
 
 ## Verbs
+
+Running `wheels packages` with no verb runs `list`. An unknown verb prints the valid verbs and exits non-zero.
 
 | Verb | Description |
 |------|-------------|
@@ -35,7 +37,7 @@ wheels packages registry info
 | [`show`](./show) | Detail page for a package: versions, homepage, license, install state. |
 | [`add`](./add) | Download, verify, extract into `vendor/<name>/`. |
 | [`update`](./update) | Re-install the latest compatible version. Explicit: requires `--yes`. |
-| [`remove`](./remove) | Delete `vendor/<name>/`. Refuses dirs without a `package.json`. |
+| [`remove`](./remove) | Delete `vendor/<name>/`. Explicit: requires `--yes`. Refuses dirs without a `package.json`. |
 | [`registry refresh`](./registry/refresh) | Bust the 24h cache. |
 | [`registry info`](./registry/info) | Print registry URL, branch, cache state. |
 

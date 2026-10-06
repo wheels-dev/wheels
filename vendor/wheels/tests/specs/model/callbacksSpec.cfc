@@ -153,10 +153,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is setting properties on multiple objects", () => {
-				postsOrg = g.model("post").findAll(returnAs = "objects", callbacks = "false", orderby = "views DESC")
+				postsOrg = g.model("post").findAll(returnAs = "objects", callbacks = "false", order = "views DESC, id")
 				views1 = postsOrg[1].views + 100
 				views2 = postsOrg[2].views + 100
-				posts = g.model("post").findAll(returnAs = "objects", orderby = "views DESC")
+				posts = g.model("post").findAll(returnAs = "objects", order = "views DESC, id")
 
 				expect(posts[1].title).toBe("setTitle")
 				expect(posts[2].title).toBe("setTitle")

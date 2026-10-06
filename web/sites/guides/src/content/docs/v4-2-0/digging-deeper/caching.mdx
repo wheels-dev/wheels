@@ -14,6 +14,7 @@ This page shows you how to keep expensive work out of the hot path. You'll cache
 
 - How to cache a controller action with `caches()` in `config()`
 - How to cache a partial or query for a fixed number of minutes
+- How to cache your own computed values with `appCacheFetch()` and friends
 - How Wheels stores cache entries and when to reach for an external store
 - How to invalidate cache keys from model callbacks so stale reads never ship
 - How to key caches per user with `appendToKey` — and when not to cache at all
@@ -192,9 +193,71 @@ Query caching is ideal when:
 - Per-request result variation is acceptable (a 5-minute-old revenue number is fine on a dashboard).
 - The view output depends on other per-request data (current user, feature flags) so whole-action caching won't work.
 
+## The per-request query cache
+
+Separate from `findAll(cache=N)` above, Wheels keeps a second, much shorter-lived query cache that is **on by default**: `cacheQueriesDuringRequest`. Within a **single request**, the first time a finder runs a given SQL statement its result is remembered, and an identical finder later in the same request returns that result instead of hitting the database again. It is what keeps a view that calls the same finder in a loop — or across several partials — from running the query many times. The cache lives in `request` scope, so it never outlives the request and is never shared between requests, visitors, or nodes.
+
+You rarely interact with it directly, because Wheels keeps it correct for you:
+
+- **Any ORM write clears the whole per-request cache.** `create()`, `update()`, `delete()`, `save()`, and the bulk forms (`updateAll` / `deleteAll` / `updateByKey` / `deleteByKey` / `insertAll` / `upsertAll`) drop every cached finder result for the rest of the request — not just the written model's. This matters for `include=`: a query that joins another model is cached under the base model, so a write to the included model has to clear it too, or the base finder would keep returning the joined model's pre-write columns.
+- **A transaction rollback clears it too.** A finder that ran inside a transaction can cache rows the transaction then rolled back; clearing on rollback keeps those phantom rows from being served later in the request.
+- **`reload=true` bypasses it for one call:** `model("Post").findByKey(key=id, reload=true)` always goes to the database.
+- **After a raw write you clear it yourself.** A `queryExecute("UPDATE …")` is invisible to the ORM, so cached finders can go stale. Call `forgetCachedQueries(all=true)` after a raw write when the tables you changed are joined by other models' `include=` queries; the single-model form `forgetCachedQueries("Post")` is enough for a raw single-table write that no other cached query joins. The same applies to a **raw `transaction {}` block that rolls back** — the automatic clear only fires for ORM transactions (`model.transaction()` / a write's `transaction=` argument), so after rolling back a raw block call `forgetCachedQueries(all=true)` to drop any rows it cached.
+
+Turn the whole thing off with `set(cacheQueriesDuringRequest=false)` in `config/settings.cfm` if you want every finder to hit the database.
+
+## Cache your own data
+
+When the slow part is a value you compute yourself (a total, a call to another service, a struct built from several queries), cache it with `appCacheFetch()`. It returns the cached value, or calls your function, caches what it returns and returns that:
+
+```cfm {test:compile} title="app/controllers/Dashboard.cfc"
+component extends="Controller" {
+    function index() {
+        // Computed at most once every 10 minutes.
+        stats = appCacheFetch("dashboard-stats", function() {
+            return {
+                orders = model("Order").count(),
+                revenue = model("Order").sum("total")
+            };
+        }, 10);
+    }
+}
+```
+
+| Function | Does |
+| --- | --- |
+| `appCacheFetch(key, callback, time)` | Returns the cached value. On a miss, calls `callback`, caches its result and returns it |
+| `appCacheRead(key, defaultValue)` | The cached value, or `defaultValue` (default `""`) when there's none |
+| `appCacheWrite(key, value, time)` | Caches `value`; returns `false` when the cache is full and it wasn't stored |
+| `appCacheExists(key)` | `true` while an unexpired entry exists |
+| `appCacheDelete(key)` | Removes the entry; `true` if there was one |
+| `appCacheClear()` | Removes every entry these functions wrote, and nothing else |
+
+They're available in controllers, models, views, jobs and specs. How they behave:
+
+- **Works in every environment.** Unlike `caches()`, `cache=` on a partial and `findAll(cache=N)`, these aren't switched off in development, because your code asked for the cache explicitly.
+- **`time`** is in `cacheDatePart` units, minutes by default, like `cache=N`. Leave it out to use `defaultCacheTime`.
+- **A cached `false`, `0` or `""` is a hit.** `appCacheFetch()` doesn't call `callback` again for it, and `appCacheExists()` returns `true`.
+- **Keys** are case-sensitive strings, or a struct or array of values, such as `["user", userId, "orders"]`. Struct key order doesn't matter.
+- **Keys are shared by every request.** The same key reads the same entry for every user, session, tenant and host name. Nothing about the current request is added to it. For anything that differs per user, role or tenant, put that identity in the key, for example `appCacheFetch("digest-" & userId, ...)` or `appCacheFetch(["orders", tenantId, userId], ...)`. Otherwise one user's or tenant's value is served to the next.
+- **Values are copied** in and out, so changing a struct you read doesn't change the cached one.
+- **A callback that returns nothing caches nothing**, and `appCacheFetch()` returns `""`. A callback that throws caches nothing and the error reaches you.
+- **No stampede protection.** The callback runs outside the cache lock, so two requests that miss at the same moment can both compute the value, and the later write wins.
+- **Its own space.** Entries live in a `data` category that the framework never writes to, so `appCacheClear()` never empties the action, page, partial or query caches, and clearing those never removes your entries. It does share the `maximumItemsToCache` limit: when the cache is full, `appCacheWrite()` returns `false`, and `appCacheFetch()` still returns the value it computed but doesn't cache it, so the next call computes it again. Like the rest of the cache, it lives in this server's memory: an application reload or restart empties it, and each server behind a load balancer has its own.
+
+Delete an entry when the data behind it changes, for example from a model callback (see [Invalidate from the model](#invalidate-from-the-model)):
+
+```cfm
+appCacheDelete("dashboard-stats");
+```
+
+<Aside type="note">
+  Like every public framework helper, these names can't be used as controller action names: a request for an action called `appCacheFetch` is refused rather than dispatched.
+</Aside>
+
 ## Where cache entries live
 
-Wheels keeps cache entries in `application.wheels.cache` — an in-memory struct on the CFML application scope, split into categories (`action`, `page`, `partial`, `sql`, `image`, `main`, plus a legacy `query` category that nothing writes to). Reads are struct lookups; writes are struct writes. No external service required.
+Wheels keeps cache entries in `application.wheels.cache` — an in-memory struct on the CFML application scope, split into categories (`action`, `page`, `partial`, `sql`, `image`, `main`, `data` for `appCacheFetch()` and friends, plus a legacy `query` category that nothing writes to). Reads are struct lookups; writes are struct writes. No external service required.
 
 One exception: `findAll(cache=N)` / `findByKey(cache=N)` results do **not** live in this struct. Cached finder results are stored in the CFML engine's native query cache (via `cachedWithin`); only the generated SQL shell lands in the `sql` category.
 
