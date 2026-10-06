@@ -21,6 +21,7 @@ excerpt: >-
   nested join, and a 2.3 validatesConfirmationOf change breaks login.
 coverImage: null
 announcement:
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/4467'
   title: 'From 2.x to 4.x, part 2: the layout move to Wheels 3.0'
   body: |
     New post: **[Pass 1: 2.x to 3.0, the layout move](https://blog.wheels.dev/posts/from-2x-to-41-pass-1-wheels-3/)** — the nine commits that take a real CFWheels 2.2 app to Wheels 3.0.0+33: code into app/, assets into public/, the new public/Application.cfc, and vendor/wheels pinned for the next pass.
