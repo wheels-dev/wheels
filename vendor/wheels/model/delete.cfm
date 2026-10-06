@@ -41,6 +41,7 @@
 		if (arguments.instantiate) {
 			local.rv = 0;
 			local.objects = findAll(
+				callbacks = arguments.callbacks,
 				include = arguments.include,
 				includeSoftDeletes = arguments.includeSoftDeletes,
 				parameterize = arguments.parameterize,
@@ -157,6 +158,7 @@
 			arguments.includeSoftDeletes = true;
 		}
 		local.object = findOne(
+			callbacks = arguments.callbacks,
 			includeSoftDeletes = arguments.includeSoftDeletes,
 			order = arguments.order,
 			reload = arguments.reload,
@@ -264,12 +266,21 @@
 				local.recordCount = $runDeleteStatement(sql = arguments.sql, parameterize = arguments.parameterize);
 				if (local.recordCount == 1) {
 					$markSoftDeleted(arguments.$softDeletedAt);
-					$deleteDependents(softDelete = true, includeSoftDeletes = arguments.includeSoftDeletes, parentSoftDeleted = true);
+					$deleteDependents(
+						softDelete = true,
+						includeSoftDeletes = arguments.includeSoftDeletes,
+						callbacks = arguments.callbacks,
+						parentSoftDeleted = true
+					);
 				}
 			} else {
 				// Delete dependent record(s) before the record itself so foreign key constraints don't
 				// prevent the deletion.
-				$deleteDependents(softDelete = arguments.softDelete, includeSoftDeletes = arguments.includeSoftDeletes);
+				$deleteDependents(
+					softDelete = arguments.softDelete,
+					includeSoftDeletes = arguments.includeSoftDeletes,
+					callbacks = arguments.callbacks
+				);
 				local.recordCount = $runDeleteStatement(sql = arguments.sql, parameterize = arguments.parameterize);
 			}
 			if (local.recordCount == 1 && $callback("afterDelete", arguments.callbacks)) {

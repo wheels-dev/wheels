@@ -204,6 +204,7 @@
 	) {
 		$args(name = "updateOne", args = arguments);
 		local.object = findOne(
+			callbacks = arguments.callbacks,
 			includeSoftDeletes = arguments.includeSoftDeletes,
 			order = arguments.order,
 			reload = arguments.reload,
