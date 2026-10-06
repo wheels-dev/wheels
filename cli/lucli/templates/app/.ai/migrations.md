@@ -2,6 +2,8 @@
 
 Part of the Wheels application guide; start with `../CLAUDE.md`.
 
+Column options are `allowNull`, `default`, `limit`, `precision`, `scale` (`null` is the deprecated pre-3.0 name for `allowNull`; write `allowNull`); with `strictArguments` on (development default), an unknown option such as `nullable=true` is logged instead of ignored.
+
 ## Shared Dev DB Reconciliation
 
 `wheels_migrator_versions` can drift from on-disk files when several developers share a single dev database (peer applied a migration whose file isn't yet in your branch). Detected and surfaced automatically; reconciliation is explicit:

@@ -563,6 +563,9 @@
 	 * @property [see:findFirst].
 	 */
 	public any function findLastOne(string property) {
+		if ($strictArgumentsMode() != "off") {
+			$checkArguments(args = arguments, name = "findLastOne", accepted = $strictArgumentsAccepted("findLastOne"));
+		}
 		arguments.$sort = "DESC";
 		return findFirst(argumentCollection = arguments);
 	}

@@ -75,6 +75,7 @@
 	 * @name Name of the table to map this model to.
 	 */
 	public void function table(required any name) {
+		$checkArguments(args = arguments, name = "table");
 		variables.wheels.class.tableName = arguments.name;
 	}
 

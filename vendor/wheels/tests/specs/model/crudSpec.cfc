@@ -624,7 +624,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is selecting users groupby addresses", () => {
-				q = user.findAll(select = "address", group = "address", order = "address", result = "result")
+				q = user.findAll(select = "address", group = "address", order = "address")
 
 				expect(q.recordcount).toBe(4)
 

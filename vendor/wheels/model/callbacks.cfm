@@ -207,6 +207,7 @@
 	 * Internal function.
 	 */
 	public void function $registerCallback(required string type, required string methods) {
+		$checkArguments(args = arguments, name = arguments.type, accepted = "type,method");
 		// Create this type in the array if it doesn't already exist.
 		if (!StructKeyExists(variables.wheels.class.callbacks, arguments.type)) {
 			variables.wheels.class.callbacks[arguments.type] = [];
@@ -374,6 +375,7 @@
 	 * @on Restrict to one or more operations: create, update, delete (comma-delimited; blank = all).
 	 */
 	public void function afterCommit(string methods = "", string on = "") {
+		$checkArguments(args = arguments, name = "afterCommit");
 		$registerTransactionCallback(type = "afterCommit", methods = arguments.methods, on = arguments.on);
 	}
 
@@ -387,6 +389,7 @@
 	 * @on Restrict to one or more operations: create, update, delete (comma-delimited; blank = all).
 	 */
 	public void function afterRollback(string methods = "", string on = "") {
+		$checkArguments(args = arguments, name = "afterRollback");
 		$registerTransactionCallback(type = "afterRollback", methods = arguments.methods, on = arguments.on);
 	}
 

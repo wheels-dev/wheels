@@ -23,6 +23,7 @@
 	 * @when [see:validatesConfirmationOf].
 	 */
 	public void function validate(string methods = "", string condition = "", string unless = "", string when = "onSave") {
+		$checkArguments(args = arguments, name = "validate", accepted = "method");
 		$registerValidation(argumentCollection = arguments);
 	}
 
@@ -37,6 +38,7 @@
 	 * @unless [see:validatesConfirmationOf].
 	 */
 	public void function validateOnCreate(string methods = "", string condition = "", string unless = "") {
+		$checkArguments(args = arguments, name = "validateOnCreate", accepted = "method");
 		$registerValidation(when = "onCreate", argumentCollection = arguments);
 	}
 
@@ -51,6 +53,7 @@
 	 * @unless [see:validatesConfirmationOf].
 	 */
 	public void function validateOnUpdate(string methods = "", string condition = "", string unless = "") {
+		$checkArguments(args = arguments, name = "validateOnUpdate", accepted = "method");
 		$registerValidation(when = "onUpdate", argumentCollection = arguments);
 	}
 

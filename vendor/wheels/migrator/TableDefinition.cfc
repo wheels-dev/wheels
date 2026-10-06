@@ -168,7 +168,15 @@ component extends="Base" {
 	 */
 	private any function $addTypedColumns(required string columnType, required struct args) {
 		$combineArguments(args = arguments.args, combine = "columnNames,columnName", required = true);
+		// `null` (the option's pre-3.0 name) becomes allowNull first, so the check below doesn't report it.
 		$applyNullAlias(arguments.args);
+		// The options column() and ColumnDefinition read; anything else (`limits`, `nullable`) is ignored.
+		$checkArguments(
+			args = arguments.args,
+			name = arguments.columnType,
+			declared = "columnNames,columnName,columnType,default,allowNull,limit,precision,scale,unsigned,size,autoIncrement,afterColumn",
+			label = arguments.columnType == "biginteger" ? "bigInteger" : arguments.columnType
+		);
 		arguments.args.columnType = arguments.columnType;
 		local.columnNamesArray = ListToArray(arguments.args.columnNames);
 		local.iEnd = ArrayLen(local.columnNamesArray);
