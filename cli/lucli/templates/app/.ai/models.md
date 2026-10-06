@@ -37,7 +37,7 @@ component extends="Model" {
         // run as a savepoint inside an already-open transaction — on a false return or a throw only that
         // unit's own writes roll back and the outer transaction carries on; with no open transaction it
         // behaves like transaction="commit".
-        afterCommit("enqueueSearchIndex", on="create,update");
+        afterCommit(methods="enqueueSearchIndex", on="create,update");
         afterRollback("releaseReservation");
 
         // Calculated SQL properties — select=false keeps them off the default SELECT (hot path)
