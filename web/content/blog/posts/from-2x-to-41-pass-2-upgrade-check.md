@@ -24,6 +24,7 @@ excerpt: >-
   on.
 coverImage: null
 announcement:
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/4473'
   title: 'From 2.x to 4.x, part 3: Wheels 3.x to 4.1 with wheels upgrade check'
   body: |
     New post: **[Pass 2: 3.x to 4.1 with `wheels upgrade check`](https://blog.wheels.dev/posts/from-2x-to-41-pass-2-upgrade-check/)** — reading the real `wheels upgrade check` output before and after, why to run it before swapping vendor/wheels, and the commits that finish the move to 4.1.2.
