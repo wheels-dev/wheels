@@ -587,6 +587,9 @@ component extends="wheels.WheelsTest" {
 				}
 				if (state.dropped) {
 					expect(job.$jobTableHasClaimToken()).toBeFalse("columns should be gone after DROP");
+					// Never added inside a transaction: DDL there commits the caller's work on MySQL/Oracle.
+					application.wo.model("jobTxnProbe").invokeWithTransaction(method = "ensureJobTable", transaction = "commit", marker = "test_fence_txn");
+					expect(job.$jobTableHasClaimToken()).toBeFalse("no DDL may run inside the caller's transaction");
 					var worker = new wheels.JobWorker();
 					worker.processNext(queues = "test_fence_no_such_queue", timeout = 300);
 					expect(job.$jobTableHasClaimToken()).toBeTrue("the normal worker path must add the columns back");

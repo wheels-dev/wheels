@@ -476,13 +476,18 @@ component {
 		}
 
 		local.sql &= " ORDER BY priority DESC, runAt ASC";
+		// Bound the batch in the SQL text, as JobWorker does, rather than with the maxrows option:
+		// BoxLang's PostgreSQL path throws on it ("setLargeMaxRows is not yet implemented"), which
+		// made processQueue() process nothing on PostgreSQL and CockroachDB there.
+		local.limiter = new wheels.JobWorker();
+		local.sql &= local.limiter.$candidateLimitClause(dbType = $detectDatabaseType(), candidateLimit = arguments.limit);
 
 		try {
-			local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource, maxrows = arguments.limit});
+			local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 		} catch (any e) {
 			$ensureJobTable();
 			try {
-				local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource, maxrows = arguments.limit});
+				local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 			} catch (any e2) {
 				ArrayAppend(local.result.errors, e2.message);
 				return local.result;
@@ -1119,6 +1124,12 @@ component {
 	 * exactly as they did before fencing existed.
 	 */
 	public void function $ensureClaimTokenColumns() {
+		// DDL inside an open transaction makes MySQL and Oracle commit the caller's work, so the
+		// columns are never added there (an INSERT failure's table-ensure runs inside the caller's
+		// transaction). A worker poll or a call outside a transaction adds them.
+		if (Len($outermostWheelsTransaction())) {
+			return;
+		}
 		if ($jobTableHasClaimToken()) {
 			$clearClaimTimeoutAlterMemo(memoKey = "$claimTokenAlterFailedAt");
 			return;
