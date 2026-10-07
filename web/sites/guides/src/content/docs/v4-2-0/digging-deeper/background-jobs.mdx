@@ -274,8 +274,12 @@ A worker claims a job by flipping its row to `processing`, then runs it. If that
 
 Recovery is scoped to the queues the poll serves and the requeue is an atomic, guarded `UPDATE`, so running several workers is safe: a worker never reaps a live job on a queue it doesn't process, and two workers reaping the same queue can't requeue or re-count the same job twice. Because the reap window comes from the *claiming* worker's recorded timeout rather than the poller's, workers with **different `timeout` values can share a queue** — a short-timeout worker won't reap a job that a longer-timeout worker is still legitimately running. (A row claimed before this was added, or on a database where the `claimTimeout` column can't be added, simply falls back to the polling worker's timeout.) Because a reaped job may have partly run before its worker died, **recovery is at-least-once** — the same reason `perform()` must be idempotent.
 
+A reaped worker isn't always dead. It may be stalled (a long GC pause, a hung remote call) and finish after its job has been requeued and claimed again. To keep that late finish from overwriting the new attempt, every claim writes a fresh `claimToken` to the row (and the claiming host to `claimedBy`), and an attempt can only complete, retry or fail the job while the row still carries its own token. A late attempt's result is discarded and logged to `wheels_jobs` as `Wheels.Job.Fenced`; `processNext()` returns `fenced: true` for it and `processQueue()` counts it under `fenced`. Its `perform()` still ran, so this guarantees one recorded outcome per attempt, not one execution.
+
 <Aside type="note" title="Restricted database users">
 The `claimTimeout` column is added automatically on an existing `wheels_jobs` table. If the application's database user lacks `ALTER` privilege, the framework backs off (it does not retry the `ALTER` on every poll) and the reaper falls back to the polling worker's timeout. To enable per-worker reap timeouts in that case, have a DBA add the column once: `ALTER TABLE wheels_jobs ADD claimTimeout INT` (SQL Server omits `COLUMN`; Oracle uses `ADD (claimTimeout NUMBER(10))`).
+
+The `claimToken` and `claimedBy` columns are added the same way. Without them, claims run unfenced as they did before 4.2. To add them by hand: `ALTER TABLE wheels_jobs ADD COLUMN claimToken VARCHAR(36)` and `ALTER TABLE wheels_jobs ADD COLUMN claimedBy VARCHAR(128)`.
 </Aside>
 
 To kick failed jobs back into the queue — after you've fixed the bug, say — call `retryFailed()`:
