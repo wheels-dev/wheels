@@ -566,6 +566,42 @@ component extends="wheels.WheelsTest" {
 					StructDelete(application.wheels, "$claimTimeoutAlterFailedAt");
 				}
 			});
+
+			// Kept here, after the claimTimeout drop/re-add specs and with no claims after it: on
+			// PostgreSQL/CockroachDB a column drop invalidates the pool's cached plans ("cached plan
+			// must not change result type"), which errors any later spec that claims or reaps.
+			it("adds the claimToken and claimedBy columns through the normal worker path", function() {
+				var job = new wheels.Job();
+				job.$ensureJobTable();
+				expect(job.$jobTableHasClaimToken()).toBeTrue("the columns should exist after $ensureJobTable");
+
+				// Simulate a table from before fencing. DROP COLUMN isn't supported everywhere, so
+				// degrade gracefully where it isn't.
+				var state = {dropped = false};
+				try {
+					queryExecute("ALTER TABLE wheels_jobs DROP COLUMN claimToken", {}, {datasource = application.wheels.dataSourceName});
+					queryExecute("ALTER TABLE wheels_jobs DROP COLUMN claimedBy", {}, {datasource = application.wheels.dataSourceName});
+					state.dropped = true;
+				} catch (any e) {
+					// engine/DB without DROP COLUMN support — skip the round-trip
+				}
+				if (state.dropped) {
+					expect(job.$jobTableHasClaimToken()).toBeFalse("columns should be gone after DROP");
+					// Never added inside a transaction: DDL there commits the caller's work on MySQL/Oracle.
+					application.wo.model("jobTxnProbe").invokeWithTransaction(method = "ensureJobTable", transaction = "commit", marker = "test_fence_txn");
+					expect(job.$jobTableHasClaimToken()).toBeFalse("no DDL may run inside the caller's transaction");
+					var worker = new wheels.JobWorker();
+					worker.processNext(queues = "test_fence_no_such_queue", timeout = 300);
+					expect(job.$jobTableHasClaimToken()).toBeTrue("the normal worker path must add the columns back");
+				}
+				// The drop/re-add specs above leave re-added columns at the end of the table. Put the
+				// CREATE TABLE layout back so a later run on the same database starts from the layout
+				// a fresh one has: on PostgreSQL/CockroachDB a layout change under a statement the
+				// driver has already server-prepared fails it ("cached plan must not change result
+				// type"), and the jobs specs drop and recreate this table mid-run.
+				queryExecute("DROP TABLE wheels_jobs", {}, {datasource = application.wheels.dataSourceName});
+				expect(new wheels.Job().$ensureJobTable()).toBeTrue();
+			});
 		});
 
 		describe("getStats", function() {
