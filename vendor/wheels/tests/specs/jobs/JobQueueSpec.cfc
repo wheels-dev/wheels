@@ -191,6 +191,23 @@ component extends="wheels.WheelsTest" {
 				expect(local.result).toBeStruct();
 				expect(local.result).toHaveKey("processed");
 			});
+
+			it("processQueue processes every due job with limit 0 and stops at a positive limit", function() {
+				var batch = new wheels.tests._assets.jobs.ProcessOrdersJob();
+				try {
+					// More than the 25-row default of the SQL limit clause, so 0 can't silently mean 25.
+					for (var i = 1; i <= 26; i++) {
+						batch.enqueue(data = {n = i}, queue = "test_limit_zero");
+					}
+					var job = new wheels.Job();
+					var bounded = job.processQueue(queue = "test_limit_zero", limit = 10);
+					expect(bounded.processed).toBe(10);
+					var unbounded = job.processQueue(queue = "test_limit_zero", limit = 0);
+					expect(unbounded.processed).toBe(16, "limit 0 means no limit: every remaining due job is processed");
+				} finally {
+					queryExecute("DELETE FROM wheels_jobs WHERE queue = 'test_limit_zero'", {}, {datasource = application.wheels.dataSourceName});
+				}
+			});
 		});
 
 		describe("Job Claim Guard", function() {

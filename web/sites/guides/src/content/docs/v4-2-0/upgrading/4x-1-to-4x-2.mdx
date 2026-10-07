@@ -344,6 +344,10 @@ Inside a Wheels-managed transaction (a model save or `invokeWithTransaction()`) 
 
 A worker now records the `timeout` it claimed a job with, and a stale job is reaped on the claiming worker's timeout rather than the polling worker's, so workers with different timeouts can share a queue ([#3989](https://github.com/wheels-dev/wheels/issues/3989)). The `wheels_jobs.claimTimeout` column is added for you on first use, including to tables created by 4.1. If the database user can't run `ALTER TABLE`, the worker falls back to the polling worker's timeout and retries the change after a back-off; grant the privilege once (or add the column yourself) to get the new behaviour.
 
+### A reaped job's late finish can no longer overwrite its retry
+
+Every job claim now writes a fresh `claimToken` (and the claiming host, `claimedBy`) to `wheels_jobs`, and a worker can only complete, retry or fail a job while the row still carries its token. In 4.1, a worker whose job was reaped as stale and claimed again could still finish afterwards and mark the new attempt `completed` (or requeue it) while that attempt was running. Its result is now discarded and logged as `Wheels.Job.Fenced`. Both columns are added on first use, like `claimTimeout`. Upgrade every worker: a 4.1 worker still claims and completes without a token, so fencing only holds once no 4.1 worker shares the table. Jobs already `processing` during the upgrade have no token and are reaped as before.
+
 ### Jobs can be enqueued at most once with `uniqueKey`
 
 `enqueue()`, `enqueueIn()` and `enqueueAt()` accept `uniqueKey`, and only one job is written per key ([#4478](https://github.com/wheels-dev/wheels/issues/4478)). A duplicate returns `{enqueued: false, duplicate: true}` with the existing job's `id`. Every `enqueue()` result now includes `enqueued` and `duplicate`. Jobs enqueued without a key behave as before.

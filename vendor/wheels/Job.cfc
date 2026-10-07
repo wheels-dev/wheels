@@ -592,10 +592,10 @@ component {
 	/**
 	 * Process pending jobs from the queue. Call this from a scheduled task or controller action.
 	 * @queue Queue name to process. Default processes all queues.
-	 * @limit Maximum number of jobs to process in this batch.
+	 * @limit Maximum number of jobs to process in this batch. `0` (or less) means no limit: every due job is processed.
 	 */
 	public struct function processQueue(string queue = "", numeric limit = 10) {
-		local.result = {processed = 0, failed = 0, skipped = 0, errors = []};
+		local.result = {processed = 0, failed = 0, skipped = 0, fenced = 0, errors = []};
 		local.params = {
 			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
 		};
@@ -610,13 +610,21 @@ component {
 		}
 
 		local.sql &= " ORDER BY priority DESC, runAt ASC";
+		// Bound the batch in the SQL text, as JobWorker does, rather than with the maxrows option:
+		// BoxLang's PostgreSQL path throws on it ("setLargeMaxRows is not yet implemented"), which
+		// made processQueue() process nothing on PostgreSQL and CockroachDB there.
+		// limit <= 0 keeps its old meaning, no limit (the maxrows option treated 0 as unlimited).
+		if (Val(arguments.limit) > 0) {
+			local.limiter = new wheels.JobWorker();
+			local.sql &= local.limiter.$candidateLimitClause(dbType = $detectDatabaseType(), candidateLimit = arguments.limit);
+		}
 
 		try {
-			local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource, maxrows = arguments.limit});
+			local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 		} catch (any e) {
 			$ensureJobTable();
 			try {
-				local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource, maxrows = arguments.limit});
+				local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 			} catch (any e2) {
 				ArrayAppend(local.result.errors, e2.message);
 				return local.result;
@@ -628,6 +636,11 @@ component {
 			if (local.jobResult.skipped) {
 				// Another worker claimed the job between our SELECT and the claim UPDATE
 				local.result.skipped++;
+				continue;
+			}
+			if (local.jobResult.fenced) {
+				// Ran, but its claim was reaped and re-issued: the outcome was discarded.
+				local.result.fenced++;
 				continue;
 			}
 			if (local.jobResult.success) {
@@ -697,7 +710,14 @@ component {
 	 * Internal: Process a single job row.
 	 */
 	private struct function $processJob(required struct jobRow) {
-		local.result = {success = false, skipped = false, error = ""};
+		local.result = {success = false, skipped = false, fenced = false, error = ""};
+		// The retry/fail UPDATEs run inside a catch, where a local. write doesn't survive on
+		// BoxLang, so a fenced outcome there is carried out through this struct.
+		var fence = {lost = false};
+
+		// Each claim writes a fresh token; this attempt may only complete, retry or fail the
+		// job while the row still carries it (a reaped-and-re-claimed row carries another).
+		local.claimToken = $claimTokenColumnsAvailable() ? $newClaimToken() : "";
 
 		// Mark as processing using optimistic locking: the status guard ensures only
 		// one concurrent worker can claim the job. Use the result option to get the
@@ -705,15 +725,22 @@ component {
 		// separate verification SELECT can fail on BoxLang + PostgreSQL when the
 		// connection pool hands out a different connection that cannot see the
 		// uncommitted UPDATE.
+		local.claimParams = {
+			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
+		};
+		local.setClaim = "";
+		if (Len(local.claimToken)) {
+			local.setClaim = ", claimToken = :claimToken, claimedBy = :claimedBy";
+			local.claimParams.claimToken = {value = local.claimToken, cfsqltype = "cf_sql_varchar"};
+			local.claimParams.claimedBy = {value = $jobHostName(), cfsqltype = "cf_sql_varchar"};
+		}
 		try {
 			queryExecute(
 				"UPDATE wheels_jobs
-				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
+				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt" & local.setClaim & "
 				WHERE id = :id AND status = 'pending'",
-				{
-					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-				},
+				local.claimParams,
 				{datasource = variables.$datasource, result = "local.updateResult"}
 			);
 			if ((local.updateResult.recordCount ?: 0) == 0) {
@@ -769,26 +796,33 @@ component {
 				throw(type = "Wheels.JobFailed", message = local.performOutcome.error);
 			}
 
-			// Mark as completed
+			// Mark as completed — only while the row is still this attempt's claim
+			local.doneParams = {
+				completedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+				updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+				id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
+			};
+			local.doneGuard = $claimTokenGuard(claimToken = local.claimToken, params = local.doneParams);
 			queryExecute(
 				"UPDATE wheels_jobs
 				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
-				WHERE id = :id AND status = 'processing'",
-				{
-					completedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-				},
-				{datasource = variables.$datasource}
+				WHERE id = :id AND status = 'processing'" & local.doneGuard,
+				local.doneParams,
+				{datasource = variables.$datasource, result = "local.doneResult"}
 			);
 
-			writeLog(
-				text = "Job '#arguments.jobRow.jobClass#' [#arguments.jobRow.id#] completed successfully",
-				type = "information",
-				file = "wheels_jobs"
-			);
-
-			local.result.success = true;
+			if (Len(local.claimToken) && Val(local.doneResult.recordCount ?: 0) == 0) {
+				$logFencedAttempt(jobId = arguments.jobRow.id, jobClass = arguments.jobRow.jobClass, outcome = "completed");
+				local.result.fenced = true;
+				local.result.error = "Job #arguments.jobRow.id# (#arguments.jobRow.jobClass#): Wheels.Job.Fenced, its claim was reaped before it completed";
+			} else {
+				writeLog(
+					text = "Job '#arguments.jobRow.jobClass#' [#arguments.jobRow.id#] completed successfully",
+					type = "information",
+					file = "wheels_jobs"
+				);
+				local.result.success = true;
+			}
 
 		} catch (any e) {
 			// Determine retry eligibility
@@ -807,21 +841,29 @@ component {
 				);
 				local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
 
+				local.retryParams = {
+					lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
+					runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
+					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
+				};
+				local.retryGuard = $claimTokenGuard(claimToken = local.claimToken, params = local.retryParams);
+				// A requeued row is nobody's claim: drop the token with it.
+				local.clearToken = Len(local.claimToken) ? ", claimToken = NULL" : "";
 				queryExecute(
 					"UPDATE wheels_jobs
 					SET status = 'pending',
 						lastError = :lastError,
 						runAt = :runAt,
-						updatedAt = :updatedAt
-					WHERE id = :id AND status = 'processing'",
-					{
-						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
-						runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
-						updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-						id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-					},
-					{datasource = variables.$datasource}
+						updatedAt = :updatedAt" & local.clearToken & "
+					WHERE id = :id AND status = 'processing'" & local.retryGuard,
+					local.retryParams,
+					{datasource = variables.$datasource, result = "local.retryResult"}
 				);
+				if (Len(local.claimToken) && Val(local.retryResult.recordCount ?: 0) == 0) {
+					fence.lost = true;
+					$logFencedAttempt(jobId = arguments.jobRow.id, jobClass = arguments.jobRow.jobClass, outcome = "failed, retry");
+				}
 
 				writeLog(
 					text = "Job '#arguments.jobRow.jobClass#' [#arguments.jobRow.id#] failed (attempt #local.currentAttempts#/#local.maxRetries#), retrying in #local.backoffSeconds#s: #e.message#",
@@ -830,21 +872,27 @@ component {
 				);
 			} else {
 				// Max retries exceeded — mark as failed (dead letter)
+				local.failParams = {
+					failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+					lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
+					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
+				};
+				local.failGuard = $claimTokenGuard(claimToken = local.claimToken, params = local.failParams);
 				queryExecute(
 					"UPDATE wheels_jobs
 					SET status = 'failed',
 						failedAt = :failedAt,
 						lastError = :lastError,
 						updatedAt = :updatedAt
-					WHERE id = :id AND status = 'processing'",
-					{
-						failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
-						updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-						id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-					},
-					{datasource = variables.$datasource}
+					WHERE id = :id AND status = 'processing'" & local.failGuard,
+					local.failParams,
+					{datasource = variables.$datasource, result = "local.failResult"}
 				);
+				if (Len(local.claimToken) && Val(local.failResult.recordCount ?: 0) == 0) {
+					fence.lost = true;
+					$logFencedAttempt(jobId = arguments.jobRow.id, jobClass = arguments.jobRow.jobClass, outcome = "failed");
+				}
 
 				writeLog(
 					text = "Job '#arguments.jobRow.jobClass#' [#arguments.jobRow.id#] permanently failed after #local.currentAttempts# attempts (#local.maxRetries# retries): #e.message#",
@@ -854,6 +902,10 @@ component {
 			}
 
 			local.result.error = "Job #arguments.jobRow.id# (#arguments.jobRow.jobClass#): #e.message#";
+		}
+
+		if (fence.lost) {
+			local.result.fenced = true;
 		}
 
 		// Clean up tenant context after job execution
@@ -1014,6 +1066,7 @@ component {
 			// Table exists — make sure the claimTimeout column exists too (#3989). Probed on
 			// every call and never cached: a shared or rebuilt dev DB can lose it (see #2780).
 			$ensureClaimTimeoutColumn();
+			$ensureClaimTokenColumns();
 			$ensureUniqueKeyColumn();
 			return true;
 		} catch (any e) {
@@ -1056,6 +1109,8 @@ component {
 					attempts INT DEFAULT 0 NOT NULL,
 					maxRetries INT DEFAULT 3 NOT NULL,
 					claimTimeout INT,
+					claimToken #local.varcharType#(36),
+					claimedBy #local.varcharType#(128),
 					uniqueKey #local.varcharType#(255),
 					lastError #local.textType#,
 					runAt #local.datetimeType#,
@@ -1213,6 +1268,164 @@ component {
 				file = "wheels_jobs"
 			);
 		}
+	}
+
+	/**
+	 * Add the claimToken / claimedBy columns to an existing wheels_jobs table when they are
+	 * missing, so a table created before claim fencing is upgraded in place. Same contract as
+	 * $ensureClaimTimeoutColumn: probed every call, a failed ALTER backs off for a bounded
+	 * window and logs once, and the missing columns are tolerated — claims then run unfenced,
+	 * exactly as they did before fencing existed.
+	 */
+	public void function $ensureClaimTokenColumns() {
+		// DDL inside an open transaction makes MySQL and Oracle commit the caller's work, so the
+		// columns are never added there (an INSERT failure's table-ensure runs inside the caller's
+		// transaction). A worker poll or a call outside a transaction adds them.
+		if (Len($outermostWheelsTransaction())) {
+			return;
+		}
+		if ($jobTableHasClaimToken()) {
+			$clearClaimTimeoutAlterMemo(memoKey = "$claimTokenAlterFailedAt");
+			return;
+		}
+		if ($claimTimeoutAlterInBackoff(memoKey = "$claimTokenAlterFailedAt")) {
+			return;
+		}
+		try {
+			if (!$jobTableHasColumn("claimToken")) {
+				queryExecute($claimTokenAlterSql(columnName = "claimToken", size = 36), {}, {datasource = variables.$datasource});
+			}
+			if (!$jobTableHasColumn("claimedBy")) {
+				queryExecute($claimTokenAlterSql(columnName = "claimedBy", size = 128), {}, {datasource = variables.$datasource});
+			}
+			$clearClaimTimeoutAlterMemo(memoKey = "$claimTokenAlterFailedAt");
+		} catch (any e) {
+			$recordClaimTimeoutAlterFailure(memoKey = "$claimTokenAlterFailedAt");
+			$warnClaimTokenAlterFailedOnce(e.message);
+		}
+	}
+
+	/**
+	 * True when wheels_jobs has both claim-fencing columns (claimToken and claimedBy).
+	 */
+	public boolean function $jobTableHasClaimToken() {
+		return $jobTableHasColumn("claimToken") && $jobTableHasColumn("claimedBy");
+	}
+
+	/**
+	 * True when wheels_jobs has the named column — the same zero-row SELECT probe as
+	 * $jobTableHasClaimTimeout. Only ever called with framework-owned column names.
+	 */
+	public boolean function $jobTableHasColumn(required string columnName) {
+		try {
+			queryExecute("SELECT #arguments.columnName# FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			return true;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * The per-database "ADD <column> VARCHAR(n)" DDL for a claim-fencing column.
+	 */
+	public string function $claimTokenAlterSql(required string columnName, required numeric size) {
+		local.dbType = $detectDatabaseType();
+		if (local.dbType == "oracle") {
+			return "ALTER TABLE wheels_jobs ADD (#arguments.columnName# VARCHAR2(#arguments.size#))";
+		}
+		if (local.dbType == "sqlserver") {
+			return "ALTER TABLE wheels_jobs ADD #arguments.columnName# VARCHAR(#arguments.size#)";
+		}
+		return "ALTER TABLE wheels_jobs ADD COLUMN #arguments.columnName# VARCHAR(#arguments.size#)";
+	}
+
+	/**
+	 * Log the claim-fencing ALTER failure once per application.
+	 */
+	public void function $warnClaimTokenAlterFailedOnce(required string reason) {
+		if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$claimTokenAlterWarned")) {
+			application.wheels.$claimTokenAlterWarned = true;
+			writeLog(
+				text = "Could not add the wheels_jobs.claimToken/claimedBy columns (#arguments.reason#). Jobs "
+					& "will be claimed without per-attempt fencing, so a reaped attempt that finishes late can "
+					& "still overwrite the attempt that replaced it. Add the columns manually "
+					& "(claimToken VARCHAR(36), claimedBy VARCHAR(128)) to enable fencing.",
+				type = "warning",
+				file = "wheels_jobs"
+			);
+		}
+	}
+
+	/**
+	 * Whether this instance can fence its claims. Memoised per instance; the first call also
+	 * runs the column ensure, so the processQueue() path upgrades an existing table too (it
+	 * only reaches $ensureJobTable when its SELECT fails). Re-run by each new instance (#2780).
+	 */
+	public boolean function $claimTokenColumnsAvailable() {
+		if (!StructKeyExists(variables, "$claimTokenColumnsPresent")) {
+			try {
+				$ensureClaimTokenColumns();
+				variables.$claimTokenColumnsPresent = $jobTableHasClaimToken();
+			} catch (any e) {
+				variables.$claimTokenColumnsPresent = false;
+			}
+		}
+		return variables.$claimTokenColumnsPresent;
+	}
+
+	/**
+	 * A fresh, unique token for one claim of one job.
+	 */
+	public string function $newClaimToken() {
+		return CreateUUID();
+	}
+
+	/**
+	 * The name recorded in claimedBy: this machine's host name (CGI.SERVER_NAME is the same on
+	 * every host behind a load balancer). Cached per application — the lookup can block on DNS.
+	 */
+	public string function $jobHostName() {
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "$jobHostName")) {
+			return application.wheels.$jobHostName;
+		}
+		var host = {name = ""};
+		try {
+			host.name = CreateObject("java", "java.net.InetAddress").getLocalHost().getHostName();
+		} catch (any e) {
+			host.name = Len(CGI.SERVER_NAME) ? CGI.SERVER_NAME : "unknown";
+		}
+		host.name = Left(host.name, 128);
+		if (StructKeyExists(application, "wheels")) {
+			application.wheels.$jobHostName = host.name;
+		}
+		return host.name;
+	}
+
+	/**
+	 * Fence a terminal UPDATE to the attempt that owns the claim: adds the claimToken guard
+	 * (and its parameter) when the attempt holds a token, and nothing when it doesn't (a
+	 * column-less table, or a caller that never claimed).
+	 */
+	public string function $claimTokenGuard(required string claimToken, required struct params) {
+		if (!Len(arguments.claimToken)) {
+			return "";
+		}
+		arguments.params.claimToken = {value = arguments.claimToken, cfsqltype = "cf_sql_varchar"};
+		return " AND claimToken = :claimToken";
+	}
+
+	/**
+	 * Record that an attempt's completion/retry/fail was rejected because the job is no longer
+	 * its claim: it was reaped and requeued (or re-claimed by another worker) while it ran. The
+	 * work itself ran; only its outcome was discarded, so jobs must stay idempotent.
+	 */
+	public void function $logFencedAttempt(required string jobId, required string jobClass, required string outcome) {
+		writeLog(
+			text = "Wheels.Job.Fenced: job '#arguments.jobClass#' [#arguments.jobId#] finished (#arguments.outcome#) "
+				& "after its claim was reaped; the result was discarded so it cannot overwrite the attempt that replaced it.",
+			type = "warning",
+			file = "wheels_jobs"
+		);
 	}
 
 	/**
