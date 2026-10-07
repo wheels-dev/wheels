@@ -351,12 +351,8 @@ component {
 		if ($uniqueKeyColumnAvailable() && $uniqueKeyIndexVerified()) {
 			return;
 		}
-		// The upgrade is DDL, and inside an open transaction MySQL and Oracle would commit the
-		// caller's work implicitly. There, only look: another instance (or the next worker poll,
-		// or an enqueue outside a transaction) does the upgrade.
-		if (!Len($outermostWheelsTransaction())) {
-			$ensureJobTable();
-		}
+		// Inside a transaction this only looks: $ensureUniqueKeyColumn() never runs its DDL there.
+		$ensureJobTable();
 		StructDelete(variables, "$uniqueKeyColumnPresent");
 		if ($uniqueKeyColumnAvailable() && ($uniqueKeyIndexVerified() || $jobTableHasUniqueKeyIndex())) {
 			return;
@@ -1103,6 +1099,12 @@ component {
 	 * falls back to the poller's timeout — a missing/NULL claimTimeout is always tolerated.
 	 */
 	public void function $ensureClaimTimeoutColumn() {
+		// DDL inside an open transaction makes MySQL and Oracle commit the caller's work, so the
+		// column is never added there (an INSERT failure's table-ensure runs inside the caller's
+		// transaction). A worker poll or a call outside a transaction adds it.
+		if (Len($outermostWheelsTransaction())) {
+			return;
+		}
 		if ($jobTableHasClaimTimeout()) {
 			// Column present (possibly added out of band): forget any past ALTER failure.
 			$clearClaimTimeoutAlterMemo();
@@ -1224,6 +1226,12 @@ component {
 	 * holds it, this round is skipped instead of waiting inside an enqueue or a poll.
 	 */
 	public void function $ensureUniqueKeyColumn() {
+		// DDL inside an open transaction makes MySQL and Oracle commit the caller's work, so the
+		// upgrade never runs there, whoever calls this (a keyed enqueue, or the table-ensure an
+		// INSERT failure triggers). A worker poll or an enqueue outside a transaction does it.
+		if (Len($outermostWheelsTransaction())) {
+			return;
+		}
 		local.hasColumn = $jobTableHasUniqueKey();
 		if (!local.hasColumn) {
 			$clearUniqueKeyIndexVerified();

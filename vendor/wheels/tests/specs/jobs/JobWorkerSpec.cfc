@@ -850,6 +850,18 @@ component extends="wheels.WheelsTest" {
 				expect(probeJob.$jobTableHasUniqueKey()).toBeFalse("no DDL may run inside the caller's transaction");
 			});
 
+			it("never runs the upgrade DDL from a table-ensure inside a transaction", function() {
+				$createLegacyJobTable();
+				// The ensure a failed INSERT triggers runs inside the caller's transaction too.
+				application.wo.model("jobTxnProbe").invokeWithTransaction(
+					method = "ensureJobTable",
+					transaction = "commit",
+					marker = "test_unique_legacy"
+				);
+				var probeJob = new wheels.Job();
+				expect(probeJob.$jobTableHasUniqueKey()).toBeFalse("no DDL may run inside the caller's transaction");
+			});
+
 			it("adds the column, backfills it from id and builds the unique index", function() {
 				$createLegacyJobTable();
 				var legacyIds = [CreateUUID(), CreateUUID()];

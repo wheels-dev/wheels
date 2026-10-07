@@ -28,6 +28,13 @@ component extends="Model" {
 		return true;
 	}
 
+	// runs the job-table ensure inside the transaction, as a failed INSERT's retry does
+	public boolean function ensureJobTable(required string marker) {
+		var job = new wheels.Job();
+		job.$ensureJobTable();
+		return true;
+	}
+
 	public boolean function enqueueThenThrow(required string marker) {
 		new wheels.tests._assets.jobs.ProbeJob().enqueue(data = {}, queue = arguments.marker, transactional = false);
 		Throw(type = "JobTxnProbe.Boom", message = "boom");
