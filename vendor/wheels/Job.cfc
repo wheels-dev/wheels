@@ -79,12 +79,14 @@ component {
 	 * @queue Override the default queue name.
 	 * @priority Override the default priority (higher = processed first).
  * @transactional `false` writes the job after the outermost Wheels-managed transaction resolves, on commit or rollback alike, so it survives a rollback. Defaults to the job's `this.transactional` (`true`).
+ * @uniqueKey At most one job is written per key (up to 255 characters): an enqueue whose key is already taken returns `{enqueued: false, duplicate: true}` with the existing job's `id`. A key stays taken while its row exists, whatever its status, until it is purged. Without a key the job's own `id` is its key.
 	 */
 	public struct function enqueue(
 		struct data = {},
 		string queue = this.queue,
 		numeric priority = this.priority,
-		any transactional = ""
+		any transactional = "",
+		string uniqueKey = ""
 	) {
 		return $enqueueJob(
 			jobClass = $persistableJobClass(),
@@ -92,7 +94,8 @@ component {
 			queue = arguments.queue,
 			priority = arguments.priority,
 			runAt = $now(),
-			transactional = $resolveTransactional(arguments.transactional)
+			transactional = $resolveTransactional(arguments.transactional),
+			uniqueKey = arguments.uniqueKey
 		);
 	}
 
@@ -103,13 +106,15 @@ component {
 	 * @queue Override the default queue name.
 	 * @priority Override the default priority.
  * @transactional [see:enqueue].
+ * @uniqueKey [see:enqueue].
 	 */
 	public struct function enqueueIn(
 		required numeric seconds,
 		struct data = {},
 		string queue = this.queue,
 		numeric priority = this.priority,
-		any transactional = ""
+		any transactional = "",
+		string uniqueKey = ""
 	) {
 		return $enqueueJob(
 			jobClass = $persistableJobClass(),
@@ -117,7 +122,8 @@ component {
 			queue = arguments.queue,
 			priority = arguments.priority,
 			runAt = DateAdd("s", arguments.seconds, $now()),
-			transactional = $resolveTransactional(arguments.transactional)
+			transactional = $resolveTransactional(arguments.transactional),
+			uniqueKey = arguments.uniqueKey
 		);
 	}
 
@@ -128,13 +134,15 @@ component {
 	 * @queue Override the default queue name.
 	 * @priority Override the default priority.
  * @transactional [see:enqueue].
+ * @uniqueKey [see:enqueue].
 	 */
 	public struct function enqueueAt(
 		required date runAt,
 		struct data = {},
 		string queue = this.queue,
 		numeric priority = this.priority,
-		any transactional = ""
+		any transactional = "",
+		string uniqueKey = ""
 	) {
 		return $enqueueJob(
 			jobClass = $persistableJobClass(),
@@ -142,7 +150,8 @@ component {
 			queue = arguments.queue,
 			priority = arguments.priority,
 			runAt = arguments.runAt,
-			transactional = $resolveTransactional(arguments.transactional)
+			transactional = $resolveTransactional(arguments.transactional),
+			uniqueKey = arguments.uniqueKey
 		);
 	}
 
@@ -244,24 +253,124 @@ component {
 	}
 
 	/**
-	 * Internal: Writes a job row to the job store, creating the table on first use.
-	 * Throws Wheels.Job.EnqueueFailed when the row can't be written.
+	 * Internal: Writes a job row to the job store, creating the table on first use. Returns
+	 * `{persisted, duplicate, id}`: when the row carries an explicit uniqueKey that another job
+	 * already holds, nothing is written and `id` is that job's. Throws Wheels.Job.EnqueueFailed
+	 * when the row can't be written, and Wheels.Job.UniqueKeyUnavailable when it asks for a
+	 * uniqueKey on a table that can't enforce one.
 	 */
-	public void function $persistJobRow(required struct row) {
+	public struct function $persistJobRow(required struct row) {
+		local.explicitKey = StructKeyExists(arguments.row, "explicitUniqueKey") && arguments.row.explicitUniqueKey;
+		if (local.explicitKey) {
+			$requireUniqueKey(jobClass = arguments.row.jobClass);
+			// Checked before the INSERT so a duplicate normally never raises an INSERT error,
+			// which would abort an enclosing PostgreSQL transaction.
+			local.existingId = $findJobIdByUniqueKey(arguments.row.uniqueKey);
+			if (Len(local.existingId)) {
+				return $duplicateJobRow(row = arguments.row, existingId = local.existingId);
+			}
+		}
 		try {
-			$insertJobRow(argumentCollection = arguments.row);
+			$insertJobRow(argumentCollection = arguments.row, withUniqueKey = $uniqueKeyColumnAvailable());
+			return {persisted = true, duplicate = false, id = arguments.row.id};
 		} catch (any e) {
-			// Auto-create table on first use and retry
+			// Lost a race to a concurrent enqueue with the same key: its row now holds the key.
+			if (local.explicitKey && Len($findJobIdByUniqueKeySafely(arguments.row.uniqueKey))) {
+				return $duplicateJobRow(row = arguments.row, existingId = $findJobIdByUniqueKeySafely(arguments.row.uniqueKey));
+			}
+			// Auto-create table on first use (or pick up a column added since) and retry
 			if ($ensureJobTable()) {
+				StructDelete(variables, "$uniqueKeyColumnPresent");
 				try {
-					$insertJobRow(argumentCollection = arguments.row);
+					$insertJobRow(argumentCollection = arguments.row, withUniqueKey = $uniqueKeyColumnAvailable());
+					return {persisted = true, duplicate = false, id = arguments.row.id};
 				} catch (any e2) {
+					if (local.explicitKey && Len($findJobIdByUniqueKeySafely(arguments.row.uniqueKey))) {
+						return $duplicateJobRow(row = arguments.row, existingId = $findJobIdByUniqueKeySafely(arguments.row.uniqueKey));
+					}
 					$throwEnqueueFailed(jobClass = arguments.row.jobClass, error = e2);
 				}
 			} else {
 				$throwEnqueueFailed(jobClass = arguments.row.jobClass, error = e);
 			}
 		}
+	}
+
+	/**
+	 * Internal: the outcome for a row whose uniqueKey another job already holds, logged so a
+	 * deferred enqueue (written when its transaction resolves) still leaves a trace.
+	 */
+	public struct function $duplicateJobRow(required struct row, required string existingId) {
+		writeLog(
+			text = "Job '#arguments.row.jobClass#' was not enqueued: uniqueKey '#arguments.row.uniqueKey#' is already held by job [#arguments.existingId#]",
+			type = "information",
+			file = "wheels_jobs"
+		);
+		return {persisted = false, duplicate = true, id = arguments.existingId};
+	}
+
+	/**
+	 * Internal: the duplicate check made before the INSERT — the id of the job holding
+	 * `uniqueKey`, or "" when none does.
+	 */
+	public string function $findJobIdByUniqueKey(required string uniqueKey) {
+		return $selectJobIdByUniqueKey(arguments.uniqueKey);
+	}
+
+	/**
+	 * Internal: reads which job holds `uniqueKey` ("" when none does).
+	 */
+	public string function $selectJobIdByUniqueKey(required string uniqueKey) {
+		local.rows = queryExecute(
+			"SELECT id FROM wheels_jobs WHERE uniqueKey = :uniqueKey",
+			{uniqueKey = {value = arguments.uniqueKey, cfsqltype = "cf_sql_varchar"}},
+			{datasource = variables.$datasource}
+		);
+		return local.rows.recordCount ? local.rows.id : "";
+	}
+
+	/**
+	 * Internal: re-reads the key after a failed INSERT to tell a lost race (another job now holds
+	 * the key) from a real failure. The lookup itself can fail there (an aborted PostgreSQL
+	 * transaction, a missing table); it returns "" then, so the INSERT's own error is reported.
+	 */
+	public string function $findJobIdByUniqueKeySafely(required string uniqueKey) {
+		try {
+			return $selectJobIdByUniqueKey(arguments.uniqueKey);
+		} catch (any e) {
+			return "";
+		}
+	}
+
+	/**
+	 * Internal: makes sure the table can de-duplicate on uniqueKey (creating or upgrading it if
+	 * need be), or throws Wheels.Job.UniqueKeyUnavailable. Enqueuing a keyed job without the
+	 * index would silently write duplicates, which is what the caller asked to prevent.
+	 */
+	public void function $requireUniqueKey(required string jobClass) {
+		if ($uniqueKeyColumnAvailable() && $uniqueKeyIndexVerified()) {
+			return;
+		}
+		// The upgrade is DDL, and inside an open transaction MySQL and Oracle would commit the
+		// caller's work implicitly. There, only look: another instance (or the next worker poll,
+		// or an enqueue outside a transaction) does the upgrade.
+		if (!Len($outermostWheelsTransaction())) {
+			$ensureJobTable();
+		}
+		StructDelete(variables, "$uniqueKeyColumnPresent");
+		if ($uniqueKeyColumnAvailable() && ($uniqueKeyIndexVerified() || $jobTableHasUniqueKeyIndex())) {
+			return;
+		}
+		writeLog(
+			text = "Job '#arguments.jobClass#' was not enqueued: it has a uniqueKey and wheels_jobs has no uniqueKey column and index yet",
+			type = "error",
+			file = "wheels_jobs"
+		);
+		Throw(
+			type = "Wheels.Job.UniqueKeyUnavailable",
+			message = "Job '#arguments.jobClass#' was enqueued with a uniqueKey, but wheels_jobs can't enforce one yet, so it was not enqueued.",
+			extendedInfo = "wheels_jobs needs a uniqueKey column (VARCHAR(255), nullable) with a unique index. The framework adds them on a worker poll or an enqueue(uniqueKey=...) made outside a transaction, unless the database user can't ALTER the table or another instance is upgrading it right now. Add them manually: ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255); UPDATE wheels_jobs SET uniqueKey = id; CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) (on SQL Server add WHERE uniqueKey IS NOT NULL)."
+		);
 	}
 
 	/**
@@ -339,8 +448,16 @@ component {
 		required string queue,
 		required numeric priority,
 		required date runAt,
-		boolean transactional = true
+		boolean transactional = true,
+		string uniqueKey = ""
 	) {
+		if (Len(arguments.uniqueKey) > 255) {
+			Throw(
+				type = "Wheels.Job.InvalidUniqueKey",
+				message = "A job's uniqueKey can be at most 255 characters; this one has #Len(arguments.uniqueKey)#.",
+				extendedInfo = "The key is stored in wheels_jobs.uniqueKey (VARCHAR(255)) under a unique index. Hash a longer natural key, for example Hash(longKey, ""SHA-256"")."
+			);
+		}
 		local.id = CreateUUID();
 
 		// Work on a copy so the internal keys below are never added to the caller's
@@ -373,7 +490,10 @@ component {
 			serializedData = local.serializedData,
 			priority = arguments.priority,
 			runAt = arguments.runAt,
-			enqueuedAt = local.now
+			enqueuedAt = local.now,
+			// Without a key the job's own id is its key, so it never collides.
+			uniqueKey = Len(arguments.uniqueKey) ? arguments.uniqueKey : local.id,
+			explicitUniqueKey = Len(arguments.uniqueKey) > 0
 		};
 
 		// transactional = false: write the job after the outermost Wheels-managed transaction
@@ -390,10 +510,9 @@ component {
 					type = "information",
 					file = "wheels_jobs"
 				);
-				return {id = local.id, jobClass = arguments.jobClass, status = "deferred", persisted = false, deferred = true};
+				return {id = local.id, jobClass = arguments.jobClass, status = "deferred", persisted = false, deferred = true, enqueued = true, duplicate = false};
 			}
-			$persistJobRow(local.row);
-			return {id = local.id, jobClass = arguments.jobClass, status = "pending", persisted = true};
+			return $enqueueResult(row = local.row, outcome = $persistJobRow(local.row));
 		}
 
 		// Inside a Wheels-managed transaction on another datasource (a tenant's), the job
@@ -410,18 +529,29 @@ component {
 				type = "information",
 				file = "wheels_jobs"
 			);
-			return {id = local.id, jobClass = arguments.jobClass, status = "deferred", persisted = false, deferred = true};
+			return {id = local.id, jobClass = arguments.jobClass, status = "deferred", persisted = false, deferred = true, enqueued = true, duplicate = false};
 		}
 
-		$persistJobRow(local.row);
+		local.outcome = $persistJobRow(local.row);
+		if (!local.outcome.duplicate) {
+			writeLog(
+				text = "Job '#arguments.jobClass#' [#local.id#] enqueued to queue '#arguments.queue#' with priority #arguments.priority#",
+				type = "information",
+				file = "wheels_jobs"
+			);
+		}
+		return $enqueueResult(row = local.row, outcome = local.outcome);
+	}
 
-		writeLog(
-			text = "Job '#arguments.jobClass#' [#local.id#] enqueued to queue '#arguments.queue#' with priority #arguments.priority#",
-			type = "information",
-			file = "wheels_jobs"
-		);
-
-		return {id = local.id, jobClass = arguments.jobClass, status = "pending", persisted = true};
+	/**
+	 * Internal: what enqueue() returns for a row written now — the new job, or, when its
+	 * uniqueKey was already taken, the existing job's id with `enqueued: false, duplicate: true`.
+	 */
+	public struct function $enqueueResult(required struct row, required struct outcome) {
+		if (arguments.outcome.duplicate) {
+			return {id = arguments.outcome.id, jobClass = arguments.row.jobClass, status = "duplicate", persisted = false, enqueued = false, duplicate = true};
+		}
+		return {id = arguments.row.id, jobClass = arguments.row.jobClass, status = "pending", persisted = true, enqueued = true, duplicate = false};
 	}
 
 	/**
@@ -435,22 +565,30 @@ component {
 		required string serializedData,
 		required numeric priority,
 		required date runAt,
-		required date enqueuedAt
+		required date enqueuedAt,
+		string uniqueKey = "",
+		boolean withUniqueKey = false
 	) {
+		local.keyColumn = arguments.withUniqueKey ? ", uniqueKey" : "";
+		local.keyValue = arguments.withUniqueKey ? ", :uniqueKey" : "";
+		local.params = {
+			id = {value = arguments.id, cfsqltype = "cf_sql_varchar"},
+			jobClass = {value = arguments.jobClass, cfsqltype = "cf_sql_varchar"},
+			queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
+			data = {value = arguments.serializedData, cfsqltype = "cf_sql_longvarchar"},
+			priority = {value = arguments.priority, cfsqltype = "cf_sql_integer"},
+			maxRetries = {value = this.maxRetries, cfsqltype = "cf_sql_integer"},
+			runAt = {value = arguments.runAt, cfsqltype = "cf_sql_timestamp"},
+			createdAt = {value = arguments.enqueuedAt, cfsqltype = "cf_sql_timestamp"},
+			updatedAt = {value = arguments.enqueuedAt, cfsqltype = "cf_sql_timestamp"}
+		};
+		if (arguments.withUniqueKey) {
+			local.params.uniqueKey = {value = Len(arguments.uniqueKey) ? arguments.uniqueKey : arguments.id, cfsqltype = "cf_sql_varchar"};
+		}
 		queryExecute(
-			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
-			VALUES (:id, :jobClass, :queue, :data, :priority, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt)",
-			{
-				id = {value = arguments.id, cfsqltype = "cf_sql_varchar"},
-				jobClass = {value = arguments.jobClass, cfsqltype = "cf_sql_varchar"},
-				queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
-				data = {value = arguments.serializedData, cfsqltype = "cf_sql_longvarchar"},
-				priority = {value = arguments.priority, cfsqltype = "cf_sql_integer"},
-				maxRetries = {value = this.maxRetries, cfsqltype = "cf_sql_integer"},
-				runAt = {value = arguments.runAt, cfsqltype = "cf_sql_timestamp"},
-				createdAt = {value = arguments.enqueuedAt, cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = arguments.enqueuedAt, cfsqltype = "cf_sql_timestamp"}
-			},
+			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt" & local.keyColumn & ")
+			VALUES (:id, :jobClass, :queue, :data, :priority, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt" & local.keyValue & ")",
+			local.params,
 			{datasource = variables.$datasource}
 		);
 	}
@@ -880,6 +1018,7 @@ component {
 			// Table exists — make sure the claimTimeout column exists too (#3989). Probed on
 			// every call and never cached: a shared or rebuilt dev DB can lose it (see #2780).
 			$ensureClaimTimeoutColumn();
+			$ensureUniqueKeyColumn();
 			return true;
 		} catch (any e) {
 			// Table doesn't exist — create it
@@ -921,6 +1060,7 @@ component {
 					attempts INT DEFAULT 0 NOT NULL,
 					maxRetries INT DEFAULT 3 NOT NULL,
 					claimTimeout INT,
+					uniqueKey #local.varcharType#(255),
 					lastError #local.textType#,
 					runAt #local.datetimeType#,
 					completedAt #local.datetimeType#,
@@ -937,6 +1077,15 @@ component {
 				queryExecute("CREATE INDEX idx_wjobs_cleanup ON wheels_jobs (status, completedAt)", {}, {datasource = variables.$datasource});
 			} catch (any indexError) {
 				// Indexes are optional — don't fail if they can't be created
+			}
+			// The uniqueKey index is not optional: it is what de-duplicates enqueue(uniqueKey=).
+			// If it can't be built now, the next $ensureJobTable() retries it (the column is there,
+			// the index isn't), and enqueue(uniqueKey=) refuses to run without it.
+			try {
+				queryExecute($uniqueKeyIndexSql(), {}, {datasource = variables.$datasource});
+				$recordUniqueKeyIndexVerified();
+			} catch (any uniqueIndexError) {
+				writeLog(text = "Could not create the wheels_jobs uniqueKey index: #uniqueIndexError.message#", type = "error", file = "wheels_jobs");
 			}
 
 			writeLog(text = "Auto-created wheels_jobs table", type = "information", file = "wheels_jobs");
@@ -990,20 +1139,20 @@ component {
 	 * True when a claimTimeout ALTER failed within the back-off window. App-scoped (shared
 	 * across the per-poll JobWorker instances) and TIME-BOUNDED — never a permanent flag.
 	 */
-	public boolean function $claimTimeoutAlterInBackoff() {
-		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "$claimTimeoutAlterFailedAt")) {
+	public boolean function $claimTimeoutAlterInBackoff(string memoKey = "$claimTimeoutAlterFailedAt") {
+		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, arguments.memoKey)) {
 			return false;
 		}
-		return DateDiff("s", application.wheels.$claimTimeoutAlterFailedAt, $now()) < $claimTimeoutAlterBackoffWindow();
+		return DateDiff("s", application.wheels[arguments.memoKey], $now()) < $claimTimeoutAlterBackoffWindow();
 	}
 
 	/**
 	 * Record that the claimTimeout ALTER just failed, so the next polls back off rather than
 	 * re-firing the DDL. Safe to call from a catch (writes the application scope, not local).
 	 */
-	public void function $recordClaimTimeoutAlterFailure() {
+	public void function $recordClaimTimeoutAlterFailure(string memoKey = "$claimTimeoutAlterFailedAt") {
 		if (StructKeyExists(application, "wheels")) {
-			application.wheels.$claimTimeoutAlterFailedAt = $now();
+			application.wheels[arguments.memoKey] = $now();
 		}
 	}
 
@@ -1011,9 +1160,9 @@ component {
 	 * Forget any recorded claimTimeout ALTER failure (the column now exists, or the ALTER
 	 * just succeeded), so a later missing-column situation is re-attempted immediately.
 	 */
-	public void function $clearClaimTimeoutAlterMemo() {
-		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "$claimTimeoutAlterFailedAt")) {
-			StructDelete(application.wheels, "$claimTimeoutAlterFailedAt");
+	public void function $clearClaimTimeoutAlterMemo(string memoKey = "$claimTimeoutAlterFailedAt") {
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, arguments.memoKey)) {
+			StructDelete(application.wheels, arguments.memoKey);
 		}
 	}
 
@@ -1058,6 +1207,237 @@ component {
 				text = "Could not add the wheels_jobs.claimTimeout column (#arguments.reason#). The stale-job "
 					& "reaper will fall back to the polling worker's timeout. Add the column manually "
 					& "(ALTER TABLE wheels_jobs ADD claimTimeout INT) to enable per-worker reap timeouts.",
+				type = "warning",
+				file = "wheels_jobs"
+			);
+		}
+	}
+
+	/**
+	 * Bring an existing wheels_jobs table up to de-duplicated enqueue: add a nullable uniqueKey
+	 * column, backfill it from id, and build its unique index. Nullable on purpose — hosts still
+	 * on an older version insert without a key during a rolling upgrade, and NULL keys never
+	 * collide (SQL Server, which allows one NULL in a unique index, gets a filtered index).
+	 * Probed every call like the claimTimeout column; only the "index verified" result is
+	 * remembered per datasource, and it is dropped whenever the column is found missing.
+	 * The DDL runs under the Migrator's cross-process lock taken try-once: when another instance
+	 * holds it, this round is skipped instead of waiting inside an enqueue or a poll.
+	 */
+	public void function $ensureUniqueKeyColumn() {
+		local.hasColumn = $jobTableHasUniqueKey();
+		if (!local.hasColumn) {
+			$clearUniqueKeyIndexVerified();
+		} else if ($uniqueKeyIndexVerified()) {
+			return;
+		} else if ($jobTableHasUniqueKeyIndex()) {
+			$recordUniqueKeyIndexVerified();
+			$clearClaimTimeoutAlterMemo(memoKey = "$uniqueKeyAlterFailedAt");
+			return;
+		}
+		if ($claimTimeoutAlterInBackoff(memoKey = "$uniqueKeyAlterFailedAt")) {
+			return;
+		}
+		local.schemaLock = $tryJobSchemaLock();
+		if (!local.schemaLock.taken) {
+			return;
+		}
+		// Nested rather than try/catch/finally: on BoxLang a finally that shares a try with a catch
+		// is skipped when the request ends with abort, and the lock must always be released.
+		try {
+			try {
+				$upgradeUniqueKeyColumn();
+				$clearClaimTimeoutAlterMemo(memoKey = "$uniqueKeyAlterFailedAt");
+			} catch (any e) {
+				$recordClaimTimeoutAlterFailure(memoKey = "$uniqueKeyAlterFailedAt");
+				$warnUniqueKeyUpgradeFailedOnce(e.message);
+			}
+		} finally {
+			$releaseJobSchemaLock(local.schemaLock);
+		}
+	}
+
+	/**
+	 * The upgrade steps. Each re-probes after a failure, so an instance that upgraded the table a
+	 * moment earlier (without the lock, where none is available) counts as success, not an error.
+	 */
+	public void function $upgradeUniqueKeyColumn() {
+		if (!$jobTableHasUniqueKey()) {
+			try {
+				queryExecute($uniqueKeyAlterSql(), {}, {datasource = variables.$datasource});
+			} catch (any e) {
+				if (!$jobTableHasUniqueKey()) {
+					rethrow;
+				}
+			}
+		}
+		queryExecute("UPDATE wheels_jobs SET uniqueKey = id WHERE uniqueKey IS NULL", {}, {datasource = variables.$datasource});
+		if (!$jobTableHasUniqueKeyIndex()) {
+			try {
+				queryExecute($uniqueKeyIndexSql(), {}, {datasource = variables.$datasource});
+			} catch (any e) {
+				if (!$jobTableHasUniqueKeyIndex()) {
+					rethrow;
+				}
+			}
+		}
+		$recordUniqueKeyIndexVerified();
+	}
+
+	/**
+	 * True when wheels_jobs has a uniqueKey column (the same zero-row probe as claimTimeout).
+	 */
+	public boolean function $jobTableHasUniqueKey() {
+		try {
+			queryExecute("SELECT uniqueKey FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			return true;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * True when wheels_jobs has the uniqueKey unique index, read from the index metadata. Oracle
+	 * and H2 report unquoted table names upper-cased, so an empty answer is asked again that way.
+	 */
+	public boolean function $jobTableHasUniqueKeyIndex() {
+		local.indexes = $jobTableIndexes("wheels_jobs");
+		if (!local.indexes.recordCount) {
+			local.indexes = $jobTableIndexes("WHEELS_JOBS");
+		}
+		for (local.i = 1; local.i <= local.indexes.recordCount; local.i++) {
+			if (CompareNoCase(local.indexes.index_name[local.i], "idx_wjobs_unique_key") == 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * The table's index metadata, or an empty query when it can't be read.
+	 */
+	public query function $jobTableIndexes(required string tableName) {
+		try {
+			cfdbinfo(type = "index", table = "#arguments.tableName#", datasource = "#variables.$datasource#", name = "local.indexes");
+			return local.indexes;
+		} catch (any e) {
+			return QueryNew("index_name");
+		}
+	}
+
+	/**
+	 * Whether this instance's inserts can write uniqueKey. Memoised per instance (one probe per
+	 * job object, like the worker's claimTimeout memo); $persistJobRow re-probes after a failure.
+	 */
+	public boolean function $uniqueKeyColumnAvailable() {
+		if (!StructKeyExists(variables, "$uniqueKeyColumnPresent")) {
+			variables.$uniqueKeyColumnPresent = $jobTableHasUniqueKey();
+		}
+		return variables.$uniqueKeyColumnPresent;
+	}
+
+	/**
+	 * Whether the uniqueKey index was verified on this datasource since the application started.
+	 */
+	public boolean function $uniqueKeyIndexVerified() {
+		return StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "$jobsUniqueKeyIndexVerified")
+			&& StructKeyExists(application.wheels.$jobsUniqueKeyIndexVerified, variables.$datasource);
+	}
+
+	public void function $recordUniqueKeyIndexVerified() {
+		if (!StructKeyExists(application, "wheels")) {
+			return;
+		}
+		if (!StructKeyExists(application.wheels, "$jobsUniqueKeyIndexVerified")) {
+			application.wheels.$jobsUniqueKeyIndexVerified = {};
+		}
+		application.wheels.$jobsUniqueKeyIndexVerified[variables.$datasource] = true;
+	}
+
+	public void function $clearUniqueKeyIndexVerified() {
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "$jobsUniqueKeyIndexVerified")) {
+			StructDelete(application.wheels.$jobsUniqueKeyIndexVerified, variables.$datasource);
+		}
+	}
+
+	/**
+	 * The per-database "ADD uniqueKey" DDL (nullable).
+	 */
+	public string function $uniqueKeyAlterSql() {
+		local.dbType = $detectDatabaseType();
+		if (local.dbType == "oracle") {
+			return "ALTER TABLE wheels_jobs ADD (uniqueKey VARCHAR2(255))";
+		}
+		if (local.dbType == "sqlserver") {
+			return "ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255)";
+		}
+		return "ALTER TABLE wheels_jobs ADD COLUMN uniqueKey VARCHAR(255)";
+	}
+
+	/**
+	 * The uniqueKey unique index: plain everywhere except SQL Server, whose unique indexes allow a
+	 * single NULL, so it is filtered to the non-NULL keys there.
+	 */
+	public string function $uniqueKeyIndexSql() {
+		local.sql = "CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey)";
+		if ($detectDatabaseType() == "sqlserver") {
+			local.sql &= " WHERE uniqueKey IS NOT NULL";
+		}
+		return local.sql;
+	}
+
+	/**
+	 * One attempt at the Migrator's cross-process lock for jobs-table DDL. `taken` is true when
+	 * this instance holds it — or when no lock is available at all (no migrator, or no lock table
+	 * that may be created), where the DDL steps' own re-probing keeps concurrent instances safe.
+	 */
+	public struct function $tryJobSchemaLock() {
+		var lockState = {taken = true, migrationLock = {}, migrator = ""};
+		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "migrator")) {
+			return lockState;
+		}
+		try {
+			var migrator = application.wheels.migrator;
+			var lockDataSource = migrator.$migratorDataSource();
+			if (!migrator.$migrationLockAvailable(lockDataSource)) {
+				return lockState;
+			}
+			var owner = Replace(CreateUUID(), "-", "", "all");
+			lockState.migrationLock = {key = lockDataSource & "|jobs-schema-" & owner, dataSource = lockDataSource, active = true, reentered = false, depth = 1, owner = owner};
+			lockState.migrator = migrator;
+			lockState.taken = migrator.$tryTakeMigrationLock(lockState.migrationLock);
+			if (!lockState.taken) {
+				lockState.migrationLock.active = false;
+			}
+		} catch (any e) {
+			lockState.taken = true;
+			lockState.migrationLock = {};
+		}
+		return lockState;
+	}
+
+	public void function $releaseJobSchemaLock(required struct lockState) {
+		if (
+			IsObject(arguments.lockState.migrator)
+			&& StructKeyExists(arguments.lockState.migrationLock, "active")
+			&& arguments.lockState.migrationLock.active
+		) {
+			arguments.lockState.migrator.$releaseMigrationLock(arguments.lockState.migrationLock);
+		}
+	}
+
+	/**
+	 * Log a failed uniqueKey upgrade once per application.
+	 */
+	public void function $warnUniqueKeyUpgradeFailedOnce(required string reason) {
+		if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$uniqueKeyAlterWarned")) {
+			application.wheels.$uniqueKeyAlterWarned = true;
+			writeLog(
+				text = "Could not add the wheels_jobs.uniqueKey column and index (#arguments.reason#). Jobs enqueued "
+					& "without a uniqueKey are unaffected; enqueue(uniqueKey=...) throws Wheels.Job.UniqueKeyUnavailable "
+					& "until they exist. Add them manually: ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255); "
+					& "UPDATE wheels_jobs SET uniqueKey = id; CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) "
+					& "(on SQL Server add WHERE uniqueKey IS NOT NULL).",
 				type = "warning",
 				file = "wheels_jobs"
 			);

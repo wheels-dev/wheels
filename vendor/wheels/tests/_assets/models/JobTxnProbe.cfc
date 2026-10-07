@@ -22,6 +22,12 @@ component extends="Model" {
 		return arguments.outcome;
 	}
 
+	// enqueues with a uniqueKey inside the transaction (JobWorkerSpec: no upgrade DDL in a transaction)
+	public boolean function enqueueKeyed(required string marker, required string uniqueKey) {
+		new wheels.tests._assets.jobs.ProbeJob().enqueue(data = {}, queue = arguments.marker, uniqueKey = arguments.uniqueKey);
+		return true;
+	}
+
 	public boolean function enqueueThenThrow(required string marker) {
 		new wheels.tests._assets.jobs.ProbeJob().enqueue(data = {}, queue = arguments.marker, transactional = false);
 		Throw(type = "JobTxnProbe.Boom", message = "boom");

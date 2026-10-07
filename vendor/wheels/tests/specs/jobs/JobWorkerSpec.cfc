@@ -784,6 +784,186 @@ component extends="wheels.WheelsTest" {
 				expect(local.job.maxDelay).toBe(600);
 			});
 		});
+
+		// Kept last: these specs drop and recreate wheels_jobs. On PostgreSQL/CockroachDB a table
+		// layout change under a statement the driver has already server-prepared fails it ("cached
+		// plan must not change result type"), so nothing that claims or reaps may run after them,
+		// and the final spec puts the CREATE TABLE layout back for the next run on the same database.
+		describe("uniqueKey on a table created before it existed", function() {
+
+			afterEach(function() {
+				StructDelete(application.wheels, "$uniqueKeyAlterFailedAt");
+			});
+
+			it("enqueues keyless jobs but refuses a uniqueKey while the column can't be added", function() {
+				$createLegacyJobTable();
+				// A just-failed ALTER puts the upgrade in its back-off window, as when the database
+				// user can't ALTER the table.
+				application.wheels.$uniqueKeyAlterFailedAt = Now();
+				var job = new wheels.tests._assets.jobs.ProcessOrdersJob();
+				var plain = job.enqueue(queue = "test_unique_legacy");
+				expect(plain.enqueued).toBeTrue("a job without a key must still enqueue on a table without the column");
+				expect(function() {
+					var keyed = new wheels.tests._assets.jobs.ProcessOrdersJob();
+					keyed.enqueue(queue = "test_unique_legacy", uniqueKey = "legacy:1");
+				}).toThrow("Wheels.Job.UniqueKeyUnavailable");
+			});
+
+			it("skips the upgrade while another instance holds the migration lock", function() {
+				$createLegacyJobTable();
+				var migrator = application.wheels.migrator;
+				var lockDataSource = migrator.$migratorDataSource();
+				if (!migrator.$migrationLockAvailable(lockDataSource)) {
+					return;
+				}
+				var held = {key = lockDataSource & "|spec-holder", dataSource = lockDataSource, active = true, reentered = false, depth = 1, owner = Replace(CreateUUID(), "-", "", "all")};
+				expect(migrator.$tryTakeMigrationLock(held)).toBeTrue();
+				try {
+					var job = new wheels.Job();
+					job.$ensureJobTable();
+					expect(job.$jobTableHasUniqueKey()).toBeFalse("the upgrade must not run, or wait, while another instance holds the lock");
+				} finally {
+					migrator.$releaseMigrationLock(held);
+				}
+				var upgraded = new wheels.Job();
+				upgraded.$ensureJobTable();
+				expect(upgraded.$jobTableHasUniqueKey()).toBeTrue("the next ensure upgrades the table once the lock is free");
+			});
+
+			it("never runs the upgrade DDL inside a transaction", function() {
+				$createLegacyJobTable();
+				// MySQL and Oracle commit an open transaction on DDL, so a keyed enqueue inside one
+				// must not upgrade the table itself: it refuses, and the table is left as it was.
+				var state = {type = ""};
+				try {
+					application.wo.model("jobTxnProbe").invokeWithTransaction(
+						method = "enqueueKeyed",
+						transaction = "commit",
+						marker = "test_unique_legacy",
+						uniqueKey = "in-transaction:1"
+					);
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Wheels.Job.UniqueKeyUnavailable");
+				var probeJob = new wheels.Job();
+				expect(probeJob.$jobTableHasUniqueKey()).toBeFalse("no DDL may run inside the caller's transaction");
+			});
+
+			it("adds the column, backfills it from id and builds the unique index", function() {
+				$createLegacyJobTable();
+				var legacyIds = [CreateUUID(), CreateUUID()];
+				$insertLegacyJobRow(legacyIds[1]);
+				$insertLegacyJobRow(legacyIds[2]);
+
+				var job = new wheels.Job();
+				job.$ensureJobTable();
+				expect(job.$jobTableHasUniqueKey()).toBeTrue();
+				expect(job.$jobTableHasUniqueKeyIndex()).toBeTrue("the upgrade must build the unique index");
+				var backfilled = queryExecute(
+					"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE uniqueKey = id",
+					{},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(Val(backfilled.cnt)).toBe(2, "existing rows must take their id as their key");
+
+				// A host still on the previous version inserts without a key: NULL keys never
+				// collide, including on SQL Server's filtered index.
+				$insertLegacyJobRow(CreateUUID());
+				$insertLegacyJobRow(CreateUUID());
+
+				var keyed = new wheels.tests._assets.jobs.ProcessOrdersJob();
+				var first = keyed.enqueue(queue = "test_unique_legacy", uniqueKey = "upgraded:1");
+				var second = keyed.enqueue(queue = "test_unique_legacy", uniqueKey = "upgraded:1");
+				expect(first.enqueued).toBeTrue();
+				expect(second.duplicate).toBeTrue();
+
+				var state = {rejected = false};
+				try {
+					queryExecute(
+						"UPDATE wheels_jobs SET uniqueKey = 'upgraded:1' WHERE id = :id",
+						{id = {value = legacyIds[1], cfsqltype = "cf_sql_varchar"}},
+						{datasource = application.wheels.dataSourceName}
+					);
+				} catch (any e) {
+					state.rejected = true;
+				}
+				expect(state.rejected).toBeTrue("the index must reject a second row with the same key");
+			});
+
+			it("restores the CREATE TABLE layout for the next run", function() {
+				queryExecute("DROP TABLE wheels_jobs", {}, {datasource = application.wheels.dataSourceName});
+				var job = new wheels.Job();
+				expect(job.$ensureJobTable()).toBeTrue();
+				expect(job.$jobTableHasUniqueKey()).toBeTrue();
+				expect(job.$jobTableHasUniqueKeyIndex()).toBeTrue();
+			});
+		});
+	}
+
+	/**
+	 * Replace wheels_jobs with the shape it had before uniqueKey (claimTimeout included, so only
+	 * the uniqueKey upgrade is pending).
+	 */
+	private void function $createLegacyJobTable() {
+		var job = new wheels.Job();
+		var dbType = job.$detectDatabaseType();
+		var types = {varchar = "VARCHAR", text = "TEXT", stamp = "DATETIME"};
+		if (dbType == "oracle") {
+			types = {varchar = "VARCHAR2", text = "CLOB", stamp = "TIMESTAMP"};
+		} else if (dbType == "postgresql") {
+			types = {varchar = "VARCHAR", text = "TEXT", stamp = "TIMESTAMP"};
+		} else if (dbType == "h2") {
+			types = {varchar = "VARCHAR", text = "CLOB", stamp = "TIMESTAMP"};
+		}
+		try {
+			queryExecute("DROP TABLE wheels_jobs", {}, {datasource = application.wheels.dataSourceName});
+		} catch (any e) {
+		}
+		queryExecute(
+			"CREATE TABLE wheels_jobs (
+				id #types.varchar#(36) NOT NULL PRIMARY KEY,
+				jobClass #types.varchar#(255) NOT NULL,
+				queue #types.varchar#(100) DEFAULT 'default' NOT NULL,
+				data #types.text#,
+				priority INT DEFAULT 0 NOT NULL,
+				status #types.varchar#(20) DEFAULT 'pending' NOT NULL,
+				attempts INT DEFAULT 0 NOT NULL,
+				maxRetries INT DEFAULT 3 NOT NULL,
+				claimTimeout INT,
+				lastError #types.text#,
+				runAt #types.stamp#,
+				completedAt #types.stamp#,
+				failedAt #types.stamp#,
+				createdAt #types.stamp#,
+				updatedAt #types.stamp#
+			)",
+			{},
+			{datasource = application.wheels.dataSourceName}
+		);
+		$clearUniqueKeyMemos();
+	}
+
+	/**
+	 * A row written the way a host on the previous version writes it: no uniqueKey.
+	 */
+	private void function $insertLegacyJobRow(required string id) {
+		queryExecute(
+			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+			VALUES (:id, 'wheels.tests._assets.jobs.ProcessOrdersJob', 'test_unique_legacy', '{}', 0, 'completed', 1, 3, :runAt, :createdAt, :updatedAt)",
+			{
+				id = {value = arguments.id, cfsqltype = "cf_sql_varchar"},
+				runAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+				createdAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+				updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"}
+			},
+			{datasource = application.wheels.dataSourceName}
+		);
+	}
+
+	private void function $clearUniqueKeyMemos() {
+		StructDelete(application.wheels, "$jobsUniqueKeyIndexVerified");
+		StructDelete(application.wheels, "$uniqueKeyAlterFailedAt");
 	}
 
 }
