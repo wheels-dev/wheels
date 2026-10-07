@@ -23,6 +23,10 @@ excerpt: >-
   where strings on 4.1.2, and a reload password the CLI and the app disagreed
   on.
 coverImage: null
+announcement:
+  title: 'From 2.x to 4.x, part 3: Wheels 3.x to 4.1 with wheels upgrade check'
+  body: |
+    New post: **[Pass 2: 3.x to 4.1 with `wheels upgrade check`](https://blog.wheels.dev/posts/from-2x-to-41-pass-2-upgrade-check/)** — reading the real `wheels upgrade check` output before and after, why to run it before swapping vendor/wheels, and the commits that finish the move to 4.1.2.
 ---
 
 Pass 2 takes the example app from Wheels 3.0.0+33 to 4.1.2 in 14 commits on [`upgrade/pass-2-wheels-4.1`](https://github.com/wheels-dev/cfwheels-example-app/tree/upgrade/pass-2-wheels-4.1). [Pass 1](https://blog.wheels.dev/blog/from-2x-to-41-pass-1-wheels-3) did the layout move. This pass is the framework swap and the 4.x breaking changes, and it starts with `wheels upgrade check`.
