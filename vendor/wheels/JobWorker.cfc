@@ -247,32 +247,7 @@ component {
 		}
 		this.jobsFailed++;
 		arguments.result.error = local.processResult.error;
-
-		// Determine retry eligibility
-		local.currentAttempts = Val(arguments.row.attempts) + 1;
-		local.maxRetries = Val(arguments.row.maxRetries);
-		if (local.currentAttempts <= local.maxRetries) {
-			local.recorded = $scheduleRetry(
-				jobId = arguments.row.id,
-				currentAttempts = local.currentAttempts,
-				jobClass = arguments.row.jobClass,
-				maxRetries = local.maxRetries,
-				errorMessage = local.processResult.error,
-				claimToken = local.jobRow.claimToken
-			);
-		} else {
-			local.recorded = $markFailed(
-				jobId = arguments.row.id,
-				jobClass = arguments.row.jobClass,
-				maxRetries = local.maxRetries,
-				errorMessage = local.processResult.error,
-				claimToken = local.jobRow.claimToken
-			);
-		}
-		if (Len(local.jobRow.claimToken) && local.recorded == 0) {
-			$jobBridge().$logFencedAttempt(jobId = arguments.row.id, jobClass = arguments.row.jobClass, outcome = "failed");
-			arguments.result.fenced = true;
-		}
+		arguments.result.fenced = $recordFailedAttempt(jobRow = local.jobRow, processResult = local.processResult);
 		return arguments.result;
 	}
 
@@ -369,12 +344,22 @@ component {
 					expectedAttempts = local.currentAttempts,
 					staleCutoff = local.rowCutoff
 				);
+				// Interrupted is final: it is never run again.
+				if (local.won > 0) {
+					$fireReapedFailure(
+						row = local.row,
+						message = "Job timed out after #local.rowTimeout# seconds and is not idempotent, so it was not retried"
+					);
+				}
 			} else if (local.currentAttempts <= local.maxRetries) {
 				// Reschedule for retry
 				local.won = $scheduleRetry(local.row.id, local.currentAttempts, local.row.jobClass, local.maxRetries, "Job timed out after #local.rowTimeout# seconds", local.currentAttempts, local.rowCutoff);
 			} else {
 				// Exhausted retries
 				local.won = $markFailed(local.row.id, local.row.jobClass, local.maxRetries, "Job timed out after #local.rowTimeout# seconds (max retries exhausted)", local.currentAttempts, local.rowCutoff);
+				if (local.won > 0) {
+					$fireReapedFailure(row = local.row, message = "Job timed out after #local.rowTimeout# seconds (max retries exhausted)");
+				}
 			}
 			if (local.won > 0) {
 				local.recovered++;
@@ -395,7 +380,7 @@ component {
 		if ($claimTimeoutColumnAvailable()) {
 			try {
 				return queryExecute(
-					"SELECT id, jobClass, attempts, maxRetries, updatedAt, claimTimeout
+					"SELECT id, jobClass, queue, attempts, maxRetries, updatedAt, claimTimeout
 					FROM wheels_jobs " & arguments.whereClause,
 					arguments.params,
 					{datasource = variables.$datasource}
@@ -405,7 +390,7 @@ component {
 			}
 		}
 		return queryExecute(
-			"SELECT id, jobClass, attempts, maxRetries, updatedAt
+			"SELECT id, jobClass, queue, attempts, maxRetries, updatedAt
 			FROM wheels_jobs " & arguments.whereClause,
 			arguments.params,
 			{datasource = variables.$datasource}
@@ -821,7 +806,9 @@ component {
 	 * Execute a job's perform() method.
 	 */
 	private struct function $executeJob(required struct jobRow, numeric timeout = 300) {
-		local.result = {success = false, fenced = false, busy = false, retryInSeconds = 0, leaseName = "", leaseLost = false, error = ""};
+		local.result = {success = false, fenced = false, busy = false, retryInSeconds = 0, leaseName = "", leaseLost = false, error = "", errorType = "", errorDetail = "", jobInstance = "", tenantPending = false};
+		// The failure's type/detail for the hooks, filled in by the catch (so not through local.).
+		var failure = {type = "", detail = ""};
 		local.claimToken = StructKeyExists(arguments.jobRow, "claimToken") ? arguments.jobRow.claimToken : "";
 
 		// Initialized before the try so the cleanup below never reads an undefined
@@ -862,6 +849,7 @@ component {
 				claimTimeout = local.workerCap
 			);
 			local.result.leaseLost = local.performOutcome.leaseLost;
+			local.result.jobInstance = local.jobInstance;
 			if (local.performOutcome.busy) {
 				local.result.busy = true;
 				local.result.retryInSeconds = local.performOutcome.retryInSeconds;
@@ -875,6 +863,8 @@ component {
 				throw(type = "Wheels.JobTimeout", message = local.performOutcome.error);
 			}
 			if (!local.performOutcome.success) {
+				failure.type = local.performOutcome.errorType;
+				failure.detail = local.performOutcome.errorDetail;
 				throw(type = "Wheels.JobFailed", message = local.performOutcome.error);
 			}
 
@@ -887,9 +877,10 @@ component {
 				id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 			};
 			local.doneGuard = $jobBridge().$claimTokenGuard(claimToken = local.claimToken, params = local.doneParams);
+			local.resultSet = $jobBridge().$resultAssignment(performOutcome = local.performOutcome, params = local.doneParams);
 			queryExecute(
 				"UPDATE wheels_jobs
-				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
+				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt" & local.resultSet & "
 				WHERE id = :id AND status = 'processing'" & local.doneGuard,
 				local.doneParams,
 				{datasource = variables.$datasource, result = "local.doneResult"}
@@ -906,17 +897,118 @@ component {
 					file = "wheels_jobs"
 				);
 				local.result.success = true;
+				$jobBridge().$fireJobSuccess(
+					jobInstance = local.jobInstance,
+					performOutcome = local.performOutcome,
+					jobId = arguments.jobRow.id,
+					jobClass = arguments.jobRow.jobClass
+				);
 			}
 		} catch (any e) {
 			local.result.error = Left(e.message, 1000);
+			if (!Len(failure.type)) {
+				failure.type = e.type;
+			}
 		}
+		local.result.errorType = failure.type;
+		local.result.errorDetail = failure.detail;
 
-		// Clean up tenant context after job execution
+		// Clean up tenant context after job execution. A failed attempt keeps it until
+		// $recordFailedAttempt() has run the failure hooks, which then clears it.
 		if (local.hasTenantContext) {
-			$jobBridge().$clearTenantContext();
+			if (local.result.success || local.result.fenced) {
+				$jobBridge().$clearTenantContext();
+			} else {
+				local.result.tenantPending = true;
+			}
 		}
 
 		return local.result;
+	}
+
+	/**
+	 * Records a failed attempt (a retry, or failed when retries are exhausted), then runs the
+	 * failure hooks unless the attempt was fenced, and clears the tenant context the attempt
+	 * kept for them. Returns true when the attempt was fenced.
+	 */
+	private boolean function $recordFailedAttempt(required struct jobRow, required struct processResult) {
+		var outcome = {fenced = false};
+		try {
+			local.currentAttempts = Val(arguments.jobRow.attempts) + 1;
+			local.maxRetries = Val(arguments.jobRow.maxRetries);
+			local.isFinal = local.currentAttempts > local.maxRetries;
+			if (!local.isFinal) {
+				local.recorded = $scheduleRetry(
+					jobId = arguments.jobRow.id,
+					currentAttempts = local.currentAttempts,
+					jobClass = arguments.jobRow.jobClass,
+					maxRetries = local.maxRetries,
+					errorMessage = arguments.processResult.error,
+					claimToken = arguments.jobRow.claimToken
+				);
+			} else {
+				local.recorded = $markFailed(
+					jobId = arguments.jobRow.id,
+					jobClass = arguments.jobRow.jobClass,
+					maxRetries = local.maxRetries,
+					errorMessage = arguments.processResult.error,
+					claimToken = arguments.jobRow.claimToken
+				);
+			}
+			if (Len(arguments.jobRow.claimToken) && local.recorded == 0) {
+				$jobBridge().$logFencedAttempt(jobId = arguments.jobRow.id, jobClass = arguments.jobRow.jobClass, outcome = "failed");
+				outcome.fenced = true;
+			} else {
+				$jobBridge().$fireJobFailure(
+					jobInstance = arguments.processResult.jobInstance,
+					jobId = arguments.jobRow.id,
+					jobClass = arguments.jobRow.jobClass,
+					queue = arguments.jobRow.queue,
+					error = $jobBridge().$jobError(
+						type = arguments.processResult.errorType,
+						message = arguments.processResult.error,
+						detail = arguments.processResult.errorDetail
+					),
+					attempt = local.currentAttempts,
+					maxRetries = local.maxRetries,
+					isFinal = local.isFinal
+				);
+			}
+		} finally {
+			if (arguments.processResult.tenantPending) {
+				$jobBridge().$clearTenantContext();
+			}
+		}
+		return outcome.fenced;
+	}
+
+	/**
+	 * Runs the failure hooks for a job the reaper just ended for good: marked failed (its worker
+	 * died or ran past its timeout on its last attempt), or interrupted (not idempotent, so never
+	 * re-run). Best-effort and never blocks the reap loop; the job class
+	 * is loaded on this server, and no tenant context is restored (the row's data isn't read).
+	 */
+	private void function $fireReapedFailure(required struct row, required string message) {
+		try {
+			var instance = "";
+			try {
+				instance = $jobBridge().$instantiateJobClass(jobClass = arguments.row.jobClass);
+			} catch (any loadError) {
+				instance = "";
+			}
+			$jobBridge().$fireJobFailure(
+				jobInstance = instance,
+				jobId = arguments.row.id,
+				jobClass = arguments.row.jobClass,
+				queue = StructKeyExists(arguments.row, "queue") ? arguments.row.queue : "",
+				error = $jobBridge().$jobError(type = "Wheels.JobTimeout", message = arguments.message),
+				attempt = Val(arguments.row.attempts),
+				maxRetries = Val(arguments.row.maxRetries),
+				isFinal = true
+			);
+		} catch (any e) {
+			writeLog(text = "Job '#arguments.row.jobClass#' [#arguments.row.id#] failure hooks after the reap failed: #e.message#", type = "error", file = "wheels_jobs");
+		}
 	}
 
 	/**

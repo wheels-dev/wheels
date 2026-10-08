@@ -28,7 +28,8 @@ name: Distribution install smoke (brew / scoop / apt / yum)
 #      on each channel and assert `wheels --version` reports the current GA.
 #      `wheels --version` is answered by the channel wrapper without starting
 #      LuCLI, so each leg also reads the version the installed LuCLI runtime
-#      carries (lucli/version.properties), requires the tools/lucli.json pin,
+#      carries (lucli/version.properties), requires the tools/lucli.json pin
+#      (or a version tools/lucli-tested.json lists for that release line),
 #      and runs `wheels info`, which boots the JVM and the Wheels module.
 #
 # Runs daily (propagation has settled by then) and on demand. It does NOT run on
@@ -294,9 +295,16 @@ jobs:
       # runner image ubuntu24/20260920 (Homebrew 7.0.4), `brew install` resolves
       # dependencies before auto-tapping core, so `depends_on "openjdk@21"`
       # fails with "No available formula" (#3691). Tap core first.
+      # Tapping core clones its newest formulae, but HOMEBREW_NO_AUTO_UPDATE
+      # keeps the runner image's brew. When core adopts formula DSL newer than
+      # that brew (e.g. test-only `resource "x", :test do`), loading a dependency
+      # fails ("undefined method 'new' for an instance of Symbol"). Update brew
+      # once so brew and core move together, as they do for users.
       - name: Tap homebrew/core (Linuxbrew)
         if: runner.os == 'Linux'
-        run: brew tap homebrew/core
+        run: |
+          brew tap homebrew/core
+          brew update
       - name: brew tap + install (the documented path)
         run: |
           set -euo pipefail
@@ -327,7 +335,7 @@ jobs:
 
       # `wheels --version` is answered by the wrapper without starting LuCLI,
       # so on its own it never proves the runtime works. Read the version the
-      # installed runtime carries, require the pin, and run a command that
+      # installed runtime carries, require the pin (or a tested one), and run a command that
       # boots the JVM and the Wheels module through LuCLI.
       - name: Assert the installed LuCLI runtime is the pin or a tested one, and that it boots
         env:
@@ -477,7 +485,7 @@ jobs:
 
       # `wheels --version` is answered by the wrapper without starting LuCLI,
       # so on its own it never proves the runtime works. Read the version the
-      # installed runtime carries, require the pin, and run a command that
+      # installed runtime carries, require the pin (or a tested one), and run a command that
       # boots the JVM and the Wheels module through LuCLI.
       - name: Assert the installed LuCLI runtime is the pin or a tested one, and that it boots
         env:
@@ -598,7 +606,7 @@ jobs:
 
       # `wheels --version` is answered by the wrapper without starting LuCLI,
       # so on its own it never proves the runtime works. Read the version the
-      # installed runtime carries, require the pin, and run a command that
+      # installed runtime carries, require the pin (or a tested one), and run a command that
       # boots the JVM and the Wheels module through LuCLI.
       - name: Assert the installed LuCLI runtime is the pin or a tested one, and that it boots
         env:
