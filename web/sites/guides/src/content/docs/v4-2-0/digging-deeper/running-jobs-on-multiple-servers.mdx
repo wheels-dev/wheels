@@ -289,7 +289,7 @@ new wheels.JobScheduler().enqueueDue();
 Each due slot is enqueued with a `uniqueKey` of `"<schedule>:<slot time in UTC>"`, so **you can call `enqueueDue()` on every server** and still get exactly one job per slot — the duplicates land as `duplicate: true` and are counted, not run (this rests on the [`uniqueKey`](/v4-2-0/digging-deeper/background-jobs/#enqueue-at-most-once-with-uniquekey) dedupe). The enqueued jobs are then processed like any other, by whatever is draining the queue. Run `enqueueDue()` about once a minute; it's cheap when nothing is due.
 
 <Aside type="note" title="Planned: automatic schedule runner">
-A follow-up in 4.2 (the schedule-runner wiring) calls `enqueueDue()` for you: `JobRunner.tick()` and the CLI worker's poll will check schedules every `jobsScheduleCheckSeconds` (default 30), so `wheels jobs work` and a `tick()` loop fire schedules without a separate call. It's **not built yet** — until it lands, call `enqueueDue()` yourself as above. Once it does, declaring a schedule in `config/schedules.cfm` is all a running worker needs.
+A follow-up in 4.2 (the schedule-runner wiring, [#4509](https://github.com/wheels-dev/wheels/pull/4509)) calls `enqueueDue()` for you: `wheels jobs work`, `processQueue()`, and `JobRunner.tick()` will check schedules roughly every `jobsScheduleCheckSeconds` (default 15), so a running worker fires schedules without a separate call — and a draining host still enqueues due slots, which then run on another server. It's **not built yet** — until it lands, call `enqueueDue()` yourself as above. Once it does, declaring a schedule in `config/schedules.cfm` is all a running worker needs.
 </Aside>
 
 ### Catch-up: missed slots
