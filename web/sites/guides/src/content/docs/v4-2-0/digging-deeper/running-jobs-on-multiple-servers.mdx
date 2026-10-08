@@ -70,8 +70,8 @@ component extends="wheels.Job" {
 
 `heartbeat()` stamps liveness on **this attempt's claim only** (it carries the same `claimToken` guard as a completion). Call it between units of work — after each batch, each file, each page — not in a tight inner loop.
 
-<Aside type="caution" title="A long `timeout` needs a runner that allows it">
-`this.timeout` is only the job's *requested* cap; the runner caps it too. The `wheels jobs work` worker currently caps every job at **300 seconds** whatever its `this.timeout` ([#4517](https://github.com/wheels-dev/wheels/issues/4517) tracks lifting that), so a `this.timeout = 3600` job is still stopped at 300 s under the stock worker. It runs its full `timeout` under `processQueue()`, which honours each job's own timeout — the optional `processQueue(timeout = n)` only *lowers* the cap — or under `JobRunner.tick(timeout = 3600)`, whose own default is 300. The heartbeat grace below is independent of this: it governs *reclaiming* a dead worker's job, whatever cap the job ran under.
+<Aside type="note" title="A long `timeout` and the runner">
+`this.timeout` caps a single attempt (default 300 s). `wheels jobs work` and `processQueue()` each run a job for **its own `timeout`**, so a `this.timeout = 3600` job gets its full hour under either. Lower that where you need to: `wheels jobs work --job-timeout=<seconds>` or `processQueue(timeout = n)`. `JobRunner.tick()` is the exception — its own `timeout` defaults to 300, so pass `tick(timeout = 3600)` for a long job. The heartbeat grace below is independent of all this: it governs *reclaiming* a dead worker's job, whatever cap the job ran under.
 </Aside>
 
 The grace is `jobsHeartbeatGraceSeconds` (default `300`, floor `30`, `0` turns it off), set app-wide with `set(jobsHeartbeatGraceSeconds = n)` or per class with `this.heartbeatGrace`. With it, a heartbeating job whose worker dies is reclaimed about that many seconds after its last beat, instead of waiting for the full claim window (`timeout` plus the reap grace). A job that **never** heartbeats keeps that full claim window — heartbeating is what opts a long job into faster recovery.
@@ -341,10 +341,14 @@ Drain state lives in a `wheels_job_hosts` table — one row per host, carrying i
 
 ## The shared schema
 
-The jobs table [auto-creates on first use](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table), and the multi-server columns are added to an existing table the same way — a guarded `ALTER`, run once, outside any transaction. That's convenient on a single server. **On several servers sharing a production database, apply the schema yourself before the servers go live**, for two reasons:
+The jobs table and its auxiliary tables [auto-create on first use](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table), and the multi-server columns are added to an existing table the same way — a guarded `ALTER`, run once, outside any transaction. That's convenient on a single server. **On several servers sharing a production database, put the schema under your own control instead**, for two reasons: an auto-`ALTER` runs when the first upgraded server happens to poll, against a live, in-use table (on PostgreSQL and CockroachDB especially, you want that DDL on *your* schedule, not at an arbitrary moment under load); and if the application's database user lacks `ALTER` privilege — a common production hardening — the auto-upgrade can't run at all, and the features that need the columns quietly fall back (unfenced claims, `updatedAt` heartbeats).
 
-- An auto-`ALTER` runs when the first upgraded server happens to poll, against a live, in-use table. On PostgreSQL and CockroachDB especially, you want that DDL to run on *your* schedule, in a maintenance window, not at an arbitrary moment under load.
-- If the application's database user lacks `ALTER` privilege — a common production hardening — the auto-upgrade can't run at all, and the features that need the columns quietly fall back (unfenced claims, `updatedAt` heartbeats). Applying the schema with a privileged user once removes that gap.
+Two tools make that clean:
+
+- **`wheels jobs install`** writes a migration — `app/migrator/migrations/<timestamp>_CreateWheelsJobTables.cfc` — from the running app's own schema. It creates the job tables, or tops up the ones Wheels already auto-created, idempotently, and ships a `down()`. Nothing touches the database until `wheels migrate latest`, so the jobs schema applies like any other migration, in your maintenance window. This is the recommended path for a multi-server deploy. (The app's server must be running, so the migration matches its framework version.)
+- **`set(jobsAutoCreateTables = false)`** turns off every runtime `CREATE` and `ALTER` of the job tables, so no server changes the schema under load. With it set and a table missing, `enqueue()` and a worker poll throw `Wheels.Job.SchemaMissing` pointing you at `wheels jobs install`, instead of failing like an empty queue.
+
+So on production: `wheels jobs install`, apply the migration, and set `jobsAutoCreateTables = false`. The columns and indexes it builds are below, for reference — or to apply by hand where a migrator isn't in play.
 
 The columns the multi-server guarantees use, on the `wheels_jobs` table:
 
@@ -372,9 +376,7 @@ CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey);
 
 On PostgreSQL and CockroachDB, write `ADD COLUMN heartbeatAt TIMESTAMP`. On SQL Server, make the unique index filtered — `CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) WHERE uniqueKey IS NOT NULL` — because SQL Server allows only one NULL in a plain unique index. The filtered index needs SQL Server **compatibility level 100 or higher**; below that it can't be built. On such a database, either raise the compatibility level, or create a *plain* unique index (no `WHERE`) — but only **once every server runs 4.2** (and so always writes a key), because a plain unique index allows just one NULL and a server still on 4.1 writes NULL keys that would collide. When the framework's own upgrade can't build the index, its warning and the `Wheels.Job.UniqueKeyUnavailable` error now name the failed step and give the fix for your exact database and SQL Server level. On a large, busy table, do the `uniqueKey` backfill and index build in a maintenance window: it touches every row. See [The jobs table](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table) for the full column list and the per-database notes. The auxiliary tables — `wheels_job_hosts` (the host registry), `wheels_job_locks` (exclusive-job leases), and `wheels_job_schedules` (recurring schedules) — have no backfill and are cheap to auto-create, so you can leave those to the framework; only the `wheels_jobs` column changes above are worth applying by hand up front.
 
-<Aside type="note" title="Planned: a schema command">
-A `wheels jobs install` command and a `jobsAutoCreateTables` setting — so you can apply the schema from the CLI and turn the auto-`ALTER` off entirely on production — are **planned, not built yet** ([#4499](https://github.com/wheels-dev/wheels/issues/4499)). Until then, apply the DDL above by hand.
-</Aside>
+The hand-written DDL above is the fallback — for a DBA applying it directly, or a database with no migrator. Where you can run migrations, prefer `wheels jobs install` ([#4499](https://github.com/wheels-dev/wheels/issues/4499)): it emits the same schema, per database, with a `down()`, and leaves nothing to get wrong by hand.
 
 ## Clocks and skew
 
