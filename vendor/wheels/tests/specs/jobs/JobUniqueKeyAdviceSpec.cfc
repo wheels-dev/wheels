@@ -35,7 +35,7 @@ component extends="wheels.WheelsTest" {
 			it("reads the real compatibility level on SQL Server", function() {
 				var job = new wheels.Job();
 				if (job.$detectDatabaseType() != "sqlserver") {
-					return;
+					skip("Reads sys.databases, so it runs only on SQL Server.");
 				}
 				// The test image runs at a current level (100+), so the advice is the filtered index.
 				expect(job.$sqlServerCompatibilityLevel()).toBeGTE(100);
