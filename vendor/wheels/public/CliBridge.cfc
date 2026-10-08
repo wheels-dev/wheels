@@ -77,7 +77,8 @@ component output="false" displayName="CLI Bridge" {
 			"jobsEnqueue" = "jobsEnqueue",
 			"jobsDrain" = "jobsDrain",
 			"jobsResume" = "jobsResume",
-			"jobsHostStatus" = "jobsHostStatus"
+			"jobsHostStatus" = "jobsHostStatus",
+			"jobsInstallSource" = "jobsInstallSource"
 		};
 		return this;
 	}
@@ -816,14 +817,37 @@ component output="false" displayName="CLI Bridge" {
 		try {
 			local.worker = new wheels.JobWorker();
 			local.jobQueues = structKeyExists(arguments.params, "queues") ? arguments.params.queues : "";
-			local.jobTimeout = structKeyExists(arguments.params, "timeout") ? val(arguments.params.timeout) : 300;
-			local.jobResult = local.worker.processNext(queues = local.jobQueues, timeout = local.jobTimeout);
+			// Each job runs with its own class's timeout, as processQueue() does; `wheels jobs work
+			// --timeout` passes a cap. 300 is the timeout for a job whose class can't be loaded.
+			local.worker.perJobTimeout = true;
+			local.worker.timeoutCap = structKeyExists(arguments.params, "timeout") && val(arguments.params.timeout) > 0 ? val(arguments.params.timeout) : 0;
+			local.pollTimeout = local.worker.timeoutCap > 0 ? local.worker.timeoutCap : 300;
+			local.worker.legacyReapTimeout = Max(local.worker.timeoutCap, 300);
+			local.jobResult = local.worker.processNext(queues = local.jobQueues, timeout = local.pollTimeout);
 			local.rv.success = true;
 			local.rv.jobResult = local.jobResult;
 			local.rv.message = local.jobResult.skipped ? "No jobs available" : "Processed job #local.jobResult.jobId#";
 		} catch (any e) {
 			local.rv.success = false;
 			local.rv.message = "Error processing job: " & e.message;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * `wheels jobs install`: the source of the migration that creates the job tables, built from
+	 * wheels.JobSchema. Read-only: the CLI writes the file, and nothing touches the database.
+	 */
+	public struct function jobsInstallSource(required struct context, required struct params) {
+		local.rv = {};
+		try {
+			local.rv.success = true;
+			local.rv.migrationName = "CreateWheelsJobTables";
+			local.rv.source = new wheels.JobSchema().migrationSource();
+			local.rv.message = "Jobs migration source generated";
+		} catch (any e) {
+			local.rv.success = false;
+			local.rv.message = "Error generating the jobs migration: " & e.message;
 		}
 		return local.rv;
 	}

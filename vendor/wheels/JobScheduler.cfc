@@ -376,34 +376,19 @@ component {
 		if ($schedulesTableExists()) {
 			return true;
 		}
+		if (!variables.$job.$jobSchema().autoCreateEnabled()) {
+			variables.$job.$warnAuxTableMissingOnce("wheels_job_schedules", "schedules aren't enqueued");
+			return false;
+		}
 		if (Len(variables.$job.$outermostWheelsTransaction())) {
 			return false;
 		}
-		local.dbType = variables.$job.$detectDatabaseType();
-		local.varcharType = local.dbType == "oracle" ? "VARCHAR2" : "VARCHAR";
-		local.textType = ListFindNoCase("oracle,h2", local.dbType) ? "CLOB" : "TEXT";
-		local.datetimeType = ListFindNoCase("oracle,postgresql,h2", local.dbType) ? "TIMESTAMP" : "DATETIME";
 		try {
-			queryExecute("
-				CREATE TABLE wheels_job_schedules (
-					name #local.varcharType#(100) NOT NULL PRIMARY KEY,
-					jobClass #local.varcharType#(255) NOT NULL,
-					data #local.textType#,
-					queue #local.varcharType#(100),
-					priority INT,
-					kind #local.varcharType#(10) NOT NULL,
-					spec #local.varcharType#(100) NOT NULL,
-					timezone #local.varcharType#(64),
-					catchUp #local.varcharType#(10),
-					catchUpWindowSeconds INT,
-					enabled INT DEFAULT 1 NOT NULL,
-					source #local.varcharType#(10) DEFAULT 'db' NOT NULL,
-					nextRunAt DECIMAL(15,0),
-					lastEnqueuedFor DECIMAL(15,0),
-					lastError #local.varcharType#(1000),
-					updatedAt #local.datetimeType#
-				)
-			", {}, {datasource = variables.$datasource});
+			queryExecute(
+				variables.$job.$jobSchema().createTableSql(tableName = "wheels_job_schedules", dbType = variables.$job.$detectDatabaseType()),
+				{},
+				{datasource = variables.$datasource}
+			);
 			writeLog(text = "Auto-created wheels_job_schedules table", type = "information", file = "wheels_jobs");
 		} catch (any e) {
 			if (!$schedulesTableExists()) {
