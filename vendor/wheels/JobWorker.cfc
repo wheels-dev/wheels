@@ -286,7 +286,9 @@ component {
 		// a floor cutoff of 60s, since max(60s, …) makes the smallest possible grace ~60s so
 		// a row idle 60s or less can never be reapable. Rows with no claimTimeout (pre-#3989
 		// or an ALTER-blocked table) fall back to this poller's own timeout.
-		local.floorCutoff = DateAdd("s", -60, $now());
+		// The floor is 30s, not 60s: a heartbeating row can be reapable from its heartbeat grace,
+		// whose minimum is 30s.
+		local.floorCutoff = DateAdd("s", -30, $now());
 
 		local.params = {cutoff = {value = local.floorCutoff, cfsqltype = "cf_sql_timestamp"}};
 
@@ -328,6 +330,15 @@ component {
 				local.rowTimeout = Val(local.row.claimTimeout);
 			}
 			local.grace = local.rowTimeout + Max(60, local.rowTimeout);
+			// A job that has heartbeated is also reapable once its heartbeats stop for its
+			// heartbeat grace (#4502), whichever comes first. Rows that never heartbeat keep the
+			// claim window alone.
+			if (StructKeyExists(local.row, "hasBeat") && Val(local.row.hasBeat) == 1) {
+				local.beatGrace = $jobHeartbeatGrace(local.row.jobClass);
+				if (local.beatGrace > 0) {
+					local.grace = Min(local.grace, local.beatGrace);
+				}
+			}
 			local.rowCutoff = DateAdd("s", -local.grace, local.now);
 
 			local.currentAttempts = Val(local.row.attempts);
@@ -382,8 +393,11 @@ component {
 		// a failing SELECT every poll; the catch is a safety net if the memo is stale.
 		if ($claimTimeoutColumnAvailable()) {
 			try {
+				// hasBeat: whether the job has heartbeated (#4502), as a flag so no timestamp is
+				// read in CFML.
+				local.beatColumn = $heartbeatColumnAvailable() ? ", CASE WHEN heartbeatAt IS NULL THEN 0 ELSE 1 END AS hasBeat" : "";
 				return queryExecute(
-					"SELECT id, jobClass, queue, attempts, maxRetries, updatedAt, claimTimeout
+					"SELECT id, jobClass, queue, attempts, maxRetries, updatedAt, claimTimeout" & local.beatColumn & "
 					FROM wheels_jobs " & arguments.whereClause,
 					arguments.params,
 					{datasource = variables.$datasource}
@@ -1178,6 +1192,11 @@ component {
 			}
 			return false;
 		} catch (any e) {
+			// The table is missing and may not be created (jobsAutoCreateTables = false): say so,
+			// with the way to create it, instead of skipping every poll as if the queue were empty.
+			if (e.type == "Wheels.Job.SchemaMissing") {
+				rethrow;
+			}
 			return false;
 		}
 	}
@@ -1273,6 +1292,26 @@ component {
 	 */
 	private string function $lastSeenSql() {
 		return $heartbeatColumnAvailable() ? "COALESCE(heartbeatAt, updatedAt)" : "updatedAt";
+	}
+
+	/**
+	 * A job class's heartbeat grace in seconds (its $heartbeatGraceSeconds()), memoised per
+	 * worker and class. A class that can't be loaded gets the app's setting.
+	 */
+	private numeric function $jobHeartbeatGrace(required string jobClass) {
+		if (!StructKeyExists(variables, "$heartbeatGraceByClass")) {
+			variables.$heartbeatGraceByClass = {};
+		}
+		if (!StructKeyExists(variables.$heartbeatGraceByClass, arguments.jobClass)) {
+			var resolved = {seconds = 0};
+			try {
+				resolved.seconds = $jobBridge().$instantiateJobClass(jobClass = arguments.jobClass).$heartbeatGraceSeconds();
+			} catch (any e) {
+				resolved.seconds = $jobBridge().$heartbeatGraceSeconds();
+			}
+			variables.$heartbeatGraceByClass[arguments.jobClass] = resolved.seconds;
+		}
+		return variables.$heartbeatGraceByClass[arguments.jobClass];
 	}
 
 	/**

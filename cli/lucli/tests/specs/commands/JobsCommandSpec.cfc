@@ -81,6 +81,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		return serializeJSON({success: true, host: {host: "spec-host", running: arguments.running, maxConcurrent: 0, draining: arguments.draining, drainExpiresAt: ""}});
 	}
 
+	// A Module whose `jobs install` gets `source` back from a canned jobsInstallSource response.
+	private any function installModule(required string source) {
+		var m = new cli.lucli.Module(cwd = variables.tempRoot);
+		prepareMock(m);
+		m.$("out");
+		m.$(method = "$requireRunningServer", returns = 61999);
+		m.$("makeHttpRequest", serializeJSON({success: true, migrationName: "CreateWheelsJobTables", source: arguments.source}));
+		return m;
+	}
+
 	private string function printed(required any m) {
 		var said = "";
 		for (var call in arguments.m.$callLog().out) {
@@ -206,6 +216,48 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("work --job-timeout", () => {
+
+			it("defaults to 0, each job's own timeout", () => {
+				expect(mod.$parseJobsArgs({arg1 = "work"}).jobTimeout).toBe(0);
+			});
+
+			it("parses --job-timeout=<seconds>", () => {
+				expect(mod.$parseJobsArgs({arg1 = "work", "job-timeout" = "1800"}).jobTimeout).toBe(1800);
+			});
+
+			it("refuses a negative --job-timeout", () => {
+				expect(() => mod.$parseJobsArgs({arg1 = "work", "job-timeout" = "-1"})).toThrow(type = "Wheels.InvalidArguments");
+			});
+
+			it("doesn't send a timeout without --job-timeout, so each job runs with its own", () => {
+				var m = workerModule([idlePoll()]);
+				m.jobs(arg1 = "work", "stop-when-empty" = "true");
+				expect(m.$callLog().makeBridgePost[1][1]).notToInclude("timeout=");
+				expect(printed(m)).toInclude("each job's own timeout");
+			});
+
+			it("names no option after a LuCLI root option, which the runtime would take before the module", () => {
+				// LuCLI's root command owns --timeout (it stops the whole command), --env and --envfile;
+				// `wheels test` uses --test-timeout for the same reason.
+				var m = new cli.lucli.Module(cwd = variables.tempRoot);
+				makePublic(m, "$commandOptionLines", "$jobsOptionLines");
+				var help = arrayToList(m.$jobsOptionLines("jobs"), chr(10));
+				expect(help).toInclude("--job-timeout");
+				for (var rootOption in ["timeout", "env", "envfile", "verbose", "debug", "timing", "whitespace"]) {
+					expect(reFind("(^|\s)--#rootOption#[\s=<]", help)).toBe(0, "jobs must not define --#rootOption#");
+				}
+			});
+
+			it("sends --job-timeout to the server as the cap", () => {
+				var m = workerModule([idlePoll()]);
+				m.jobs(arg1 = "work", "stop-when-empty" = "true", "job-timeout" = "1800");
+				expect(m.$callLog().makeBridgePost[1][1]).toInclude("&timeout=1800");
+				expect(printed(m)).toInclude("1800s");
+			});
+
+		});
+
 		describe("$formatJobsStatusTable — status rendering", () => {
 
 			it("reports no jobs for an empty stats struct", () => {
@@ -312,6 +364,41 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(line).toInclude("web-1: 2 running, max 4");
 				expect(line).toInclude("draining until 2026-10-08 12:00:00");
 				expect(mod.$formatJobsHostLine({host: "web-2", running: 0, maxConcurrent: 0, draining: false})).toInclude("max no cap");
+			});
+
+		});
+
+		describe("install", () => {
+
+			it("parses install and --force", () => {
+				expect(mod.$parseJobsArgs({arg1 = "install"}).action).toBe("install");
+				expect(mod.$parseJobsArgs({arg1 = "install"}).force).toBeFalse();
+				expect(mod.$parseJobsArgs({arg1 = "install", force = "true"}).force).toBeTrue();
+			});
+
+			it("writes the migration the server generates, once, and rewrites it in place with --force", () => {
+				var dir = variables.tempRoot & "/app/migrator/migrations";
+				if (directoryExists(dir)) {
+					for (var old in directoryList(dir, false, "path", "*_CreateWheelsJobTables.cfc")) {
+						fileDelete(old);
+					}
+				}
+				var m = installModule("// first");
+				m.jobs(arg1 = "install");
+				var written = directoryList(dir, false, "name", "*_CreateWheelsJobTables.cfc");
+				expect(arrayLen(written)).toBe(1);
+				expect(fileRead(dir & "/" & written[1])).toBe("// first");
+				expect(printed(m)).toInclude("jobsAutoCreateTables = false");
+
+				var again = installModule("// second");
+				again.jobs(arg1 = "install");
+				expect(fileRead(dir & "/" & written[1])).toBe("// first", "without --force an existing migration is left alone");
+				expect(printed(again)).toInclude("already exists");
+
+				var forced = installModule("// third");
+				forced.jobs(arg1 = "install", force = "true");
+				expect(directoryList(dir, false, "name", "*_CreateWheelsJobTables.cfc")).toBe(written, "rewritten under the same name and version");
+				expect(fileRead(dir & "/" & written[1])).toBe("// third");
 			});
 
 		});
