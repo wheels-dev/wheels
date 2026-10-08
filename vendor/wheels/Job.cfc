@@ -1744,6 +1744,13 @@ component {
 	}
 
 	/**
+	 * Internal: the JobScheduler $enqueueDueSchedules() runs, a seam for specs.
+	 */
+	public any function $newScheduler() {
+		return new wheels.JobScheduler();
+	}
+
+	/**
 	 * Enqueues due schedules (JobScheduler.enqueueDue()) at most once every
 	 * jobsScheduleCheckSeconds (default 15; 0 = never) per application, so every worker poll,
 	 * processQueue() and JobRunner.tick() keeps schedules running without a separate process.
@@ -1774,7 +1781,7 @@ component {
 		}
 		if (gate.due) {
 			try {
-				local.scheduler = new wheels.JobScheduler();
+				local.scheduler = $newScheduler();
 				if (local.scheduler.$schedulesTableExists()) {
 					local.outcome = local.scheduler.enqueueDue();
 					rv.checked = local.outcome.checked;

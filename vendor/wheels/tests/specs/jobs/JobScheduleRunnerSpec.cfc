@@ -46,6 +46,43 @@ component extends="wheels.WheelsTest" {
 				expect($jobsFor("spec_runner_throttle_2")).toBe(0);
 			});
 
+			it("carries on when the schedule check throws", function() {
+				var job = new wheels.Job();
+				prepareMock(job);
+				var scheduler = createStub();
+				scheduler.$("$schedulesTableExists", true);
+				scheduler.$(method = "enqueueDue", throwException = true, throwType = "Spec.ScheduleBoom", throwMessage = "check failed");
+				job.$("$newScheduler", scheduler);
+				var result = job.$enqueueDueSchedules();
+				expect(result.checked).toBe(0);
+				expect(result.enqueued).toBe(0);
+			});
+
+			it("doesn't check, or create the table, when there are no schedules", function() {
+				var job = new wheels.Job();
+				prepareMock(job);
+				var scheduler = createStub();
+				scheduler.$("$schedulesTableExists", false);
+				scheduler.$("enqueueDue", {checked = 9, enqueued = 9, errors = []});
+				job.$("$newScheduler", scheduler);
+				expect(job.$enqueueDueSchedules().enqueued).toBe(0);
+				expect(scheduler.$count("enqueueDue")).toBe(0);
+			});
+
+			it("still enqueues due slots from a draining server's tick", function() {
+				$insertDueSchedule("spec_runner_drain");
+				var runner = new wheels.JobRunner();
+				runner.drain();
+				try {
+					var result = runner.tick(queues = "test_srun_poll");
+					expect(result.draining).toBeTrue();
+					expect(result.scheduled).toBe(1, "a slot enqueued by a draining server is run by another one");
+				} finally {
+					runner.resume();
+				}
+				expect($jobsFor("spec_runner_drain")).toBe(1);
+			});
+
 			it("never checks with jobsScheduleCheckSeconds = 0", function() {
 				application.wheels.jobsScheduleCheckSeconds = 0;
 				$insertDueSchedule("spec_runner_off");
