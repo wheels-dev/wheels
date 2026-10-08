@@ -852,11 +852,6 @@ component output="false" displayName="CLI Bridge" {
 	}
 
 	/**
-	 * `wheels jobs drain`: this server starts no new jobs until resumed or the drain expires
-	 * (`expiresInSeconds`, default 3600; 0 = until resumed). Jobs already running finish.
-	 * Mutating: POST, loopback, reload password.
-	 */
-	/**
 	 * `wheels jobs tick`: one JobRunner.tick() on this server (record the host, reap, run jobs up to
 	 * the per-host cap). Mutating: it runs jobs.
 	 */
@@ -873,6 +868,11 @@ component output="false" displayName="CLI Bridge" {
 		return local.rv;
 	}
 
+	/**
+	 * `wheels jobs drain`: this server starts no new jobs until resumed or the drain expires
+	 * (`expiresInSeconds`, default 3600; 0 = until resumed). Jobs already running finish.
+	 * Mutating: POST, loopback, reload password.
+	 */
 	public struct function jobsDrain(required struct context, required struct params) {
 		local.rv = {};
 		try {

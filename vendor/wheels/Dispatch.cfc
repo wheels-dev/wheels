@@ -596,23 +596,7 @@ component output="false" extends="wheels.Global"{
 	 * status and content type, and returns the body.
 	 */
 	public string function $respondToJobsTick(required any endpoint, required struct urlScope) {
-		local.method = "";
-		try {
-			local.method = $getRequestMethod();
-		} catch (any e) {
-			local.method = "GET";
-		}
-		local.headers = {};
-		try {
-			local.headers = GetHttpRequestData(false).headers;
-		} catch (any e) {
-			local.headers = {};
-		}
-		local.response = arguments.endpoint.handle(
-			method = local.method,
-			headers = local.headers,
-			queryToken = StructKeyExists(arguments.urlScope, "token") && IsSimpleValue(arguments.urlScope.token) ? arguments.urlScope.token : ""
-		);
+		local.response = arguments.endpoint.respond(urlScope = arguments.urlScope);
 		cfheader(statuscode = local.response.status);
 		cfcontent(type = local.response.contentType);
 		return local.response.body;

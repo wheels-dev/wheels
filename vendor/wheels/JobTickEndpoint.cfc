@@ -7,8 +7,10 @@
  * - the route doesn't exist (404) unless set(jobsRunnerToken = "...") is set;
  * - every call must present the token in the X-Wheels-Jobs-Token header (or, only when
  *   set(jobsRunnerTokenInQuery = true), as ?token=), compared in constant time; else 403;
- * - a request carrying a forwarding header (X-Forwarded-For, Forwarded, X-Real-IP,
- *   CF-Connecting-IP) came through a proxy, so it is refused (403) whatever its token.
+ * - a request carrying any forwarding header (see $forwardingHeaders()), even an empty one,
+ *   came through a proxy, so it is refused (403) whatever its token;
+ * - a request whose method or headers can't be read is refused (500) without running a tick,
+ *   rather than being judged on missing information.
  *
  * handle() takes the request's parts and returns {status, contentType, body}, so the rules are
  * testable without HTTP. Dispatch calls it before routing and before the public-component gate.
@@ -44,8 +46,8 @@ component {
 		if (!ListFindNoCase("GET,POST", arguments.method)) {
 			return $json(405, {ok = false, error = "Use GET or POST."});
 		}
-		for (local.name in ["X-Forwarded-For", "Forwarded", "X-Real-IP", "CF-Connecting-IP"]) {
-			if (Len($header(arguments.headers, local.name))) {
+		for (local.name in $forwardingHeaders()) {
+			if ($hasHeader(arguments.headers, local.name)) {
 				return $json(403, {ok = false, error = "Refused: the request came through a proxy (#local.name#). Call the tick route on the server itself."});
 			}
 		}
@@ -71,7 +73,7 @@ component {
 		lock name="wheels.jobs.tick.#local.host#" type="exclusive" timeout="1" throwOnTimeout="false" {
 			outcome.ran = true;
 			try {
-				outcome.summary = new wheels.JobRunner().tick();
+				outcome.summary = $newRunner().tick();
 			} catch (any e) {
 				outcome.error = e.message;
 			}
@@ -80,8 +82,10 @@ component {
 			return {ok = true, skipped = "A tick is already running on this server.", host = local.host};
 		}
 		if (Len(outcome.error)) {
-			writeLog(text = "Job tick failed: #outcome.error#", type = "error", file = "wheels_jobs");
-			return {ok = false, error = outcome.error, host = local.host};
+			// The caller gets a reference, not the error: details stay in the server log.
+			local.requestId = CreateUUID();
+			writeLog(text = "Job tick #local.requestId# failed: #outcome.error#", type = "error", file = "wheels_jobs");
+			return {ok = false, error = "tick failed", requestId = local.requestId};
 		}
 		local.rv = Duplicate(outcome.summary);
 		local.rv.ok = true;
@@ -101,6 +105,83 @@ component {
 			local.diff = BitOr(local.diff, BitXor(Asc(Mid(local.a, local.i, 1)), Asc(Mid(local.b, local.i, 1))));
 		}
 		return local.diff == 0;
+	}
+
+	/**
+	 * Answers the current HTTP request: reads its method and headers, then handle(). If either
+	 * can't be read, the request is refused (500) without running a tick: the proxy check can't be
+	 * made on information that isn't there. Returns {status, contentType, body}.
+	 */
+	public struct function respond(required struct urlScope) {
+		var incoming = {method = "", headers = {}, readable = true};
+		try {
+			incoming.method = $readMethod();
+			incoming.headers = $readHeaders();
+		} catch (any e) {
+			incoming.readable = false;
+			writeLog(text = "Job tick refused: the request could not be read (#e.message#)", type = "error", file = "wheels_jobs");
+		}
+		if (!incoming.readable || !Len(incoming.method)) {
+			return $json(500, {ok = false, error = "The request could not be read."});
+		}
+		return handle(
+			method = incoming.method,
+			headers = incoming.headers,
+			queryToken = StructKeyExists(arguments.urlScope, "token") && IsSimpleValue(arguments.urlScope.token) ? arguments.urlScope.token : ""
+		);
+	}
+
+	/**
+	 * Internal: the JobRunner a tick runs on.
+	 */
+	public any function $newRunner() {
+		return new wheels.JobRunner();
+	}
+
+	/**
+	 * Internal: the request's method.
+	 */
+	public string function $readMethod() {
+		return GetHttpRequestData(false).method;
+	}
+
+	/**
+	 * Internal: the request's headers.
+	 */
+	public struct function $readHeaders() {
+		return GetHttpRequestData(false).headers;
+	}
+
+	/**
+	 * Internal: the headers whose presence means a request came through a proxy or load balancer.
+	 */
+	public array function $forwardingHeaders() {
+		return [
+			"X-Forwarded-For",
+			"X-Forwarded-Host",
+			"X-Forwarded-Proto",
+			"X-Forwarded-Port",
+			"X-Forwarded-Prefix",
+			"Forwarded",
+			"X-Real-IP",
+			"X-Client-IP",
+			"CF-Connecting-IP",
+			"True-Client-IP",
+			"X-Cluster-Client-IP"
+		];
+	}
+
+	/**
+	 * Internal: whether a header is present at all (any value, even empty), matched without
+	 * regard to case.
+	 */
+	public boolean function $hasHeader(required struct headers, required string name) {
+		for (local.key in arguments.headers) {
+			if (CompareNoCase(local.key, arguments.name) == 0) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

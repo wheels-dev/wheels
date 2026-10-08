@@ -54,6 +54,41 @@ component extends="wheels.WheelsTest" {
 				expect(endpoint.handle(method = "GET", headers = {"x-forwarded-for" = "203.0.113.9", "x-wheels-jobs-token" = "spec-tick-token"}).status).toBe(403, "header names in any case");
 			});
 
+			it("refuses any forwarding header by its presence, even empty, including Host and Proto alone", function() {
+				var endpoint = new wheels.JobTickEndpoint();
+				for (var name in ["X-Forwarded-Host", "X-Forwarded-Proto", "X-Forwarded-Port", "X-Forwarded-Prefix", "X-Client-IP", "True-Client-IP", "X-Cluster-Client-IP"]) {
+					var headers = {"X-Wheels-Jobs-Token" = "spec-tick-token"};
+					headers[name] = "example.test";
+					expect(endpoint.handle(method = "GET", headers = headers).status).toBe(403, name);
+				}
+				expect(endpoint.handle(method = "GET", headers = {"X-Wheels-Jobs-Token" = "spec-tick-token", "X-Forwarded-For" = ""}).status).toBe(403, "an empty X-Forwarded-For");
+				expect(endpoint.handle(method = "GET", headers = {"X-Wheels-Jobs-Token" = "spec-tick-token", "Forwarded" = ""}).status).toBe(403, "an empty Forwarded");
+			});
+
+			it("refuses a request it can't read, without running a tick", function() {
+				var endpoint = new wheels.JobTickEndpoint();
+				prepareMock(endpoint);
+				endpoint.$(method = "$readHeaders", throwException = true, throwType = "Spec.Unreadable", throwMessage = "no request data");
+				endpoint.$("$readMethod", "GET");
+				endpoint.$("$runTick", {ok = true, ran = true});
+				var response = endpoint.respond(urlScope = {});
+				expect(response.status).toBe(500);
+				expect(endpoint.$count("$runTick")).toBe(0);
+			});
+
+			it("reports a failed tick without its error details", function() {
+				var endpoint = new wheels.JobTickEndpoint();
+				prepareMock(endpoint);
+				var runner = createStub();
+				runner.$(method = "tick", throwException = true, throwType = "Spec.TickFailed", throwMessage = "secret detail at /srv/app/db.cfc");
+				endpoint.$("$newRunner", runner);
+				var result = endpoint.$runTick();
+				expect(result.ok).toBeFalse();
+				expect(result.error).toBe("tick failed");
+				expect(Len(result.requestId)).toBeGT(0);
+				expect(SerializeJSON(result)).notToInclude("secret");
+			});
+
 			it("accepts the token in the query string only when jobsRunnerTokenInQuery is true", function() {
 				var endpoint = new wheels.JobTickEndpoint();
 				expect(endpoint.handle(method = "GET", headers = {}, queryToken = "spec-tick-token").status).toBe(403);

@@ -6216,9 +6216,6 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * `wheels jobs resume`: this server starts jobs again.
-	 */
-	/**
 	 * `wheels jobs tick`: one JobRunner.tick() on this project's running server, for a cron job
 	 * or systemd timer that runs jobs without a long-lived worker. Mutating, so it goes through
 	 * the bridge's POST + reload-password gate like `work`.
@@ -6244,6 +6241,9 @@ component extends="modules.BaseModule" {
 		return "";
 	}
 
+	/**
+	 * `wheels jobs resume`: this server starts jobs again.
+	 */
 	private string function runJobsResume(required struct opts) {
 		var serverPort = $requireOwnRunningServer([
 			"Resuming needs this project's running server.",
