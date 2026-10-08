@@ -74,7 +74,10 @@ component output="false" displayName="CLI Bridge" {
 			"jobsRetry" = "jobsRetry",
 			"jobsPurge" = "jobsPurge",
 			"jobsMonitor" = "jobsMonitor",
-			"jobsEnqueue" = "jobsEnqueue"
+			"jobsEnqueue" = "jobsEnqueue",
+			"jobsDrain" = "jobsDrain",
+			"jobsResume" = "jobsResume",
+			"jobsHostStatus" = "jobsHostStatus"
 		};
 		return this;
 	}
@@ -832,10 +835,71 @@ component output="false" displayName="CLI Bridge" {
 			local.jobQueue = structKeyExists(arguments.params, "queue") ? arguments.params.queue : "";
 			local.rv.success = true;
 			local.rv.stats = local.worker.getStats(queue = local.jobQueue);
+			// This server's own state (running jobs, cap, drain), for `wheels jobs status`. Its own
+			// try: a problem reading the hosts registry must not hide the queue stats.
+			try {
+				local.rv.host = new wheels.JobRunner().status();
+			} catch (any hostErr) {
+				writeLog(text = "jobs status: could not read this server's job host state: #hostErr.message#", type = "warning", file = "wheels_jobs");
+			}
 			local.rv.message = "Queue statistics retrieved";
 		} catch (any e) {
 			local.rv.success = false;
 			local.rv.message = "Error getting status: " & e.message;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * `wheels jobs drain`: this server starts no new jobs until resumed or the drain expires
+	 * (`expiresInSeconds`, default 3600; 0 = until resumed). Jobs already running finish.
+	 * Mutating: POST, loopback, reload password.
+	 */
+	public struct function jobsDrain(required struct context, required struct params) {
+		local.rv = {};
+		try {
+			local.expires = StructKeyExists(arguments.params, "expiresInSeconds") && IsNumeric(arguments.params.expiresInSeconds)
+				? Int(arguments.params.expiresInSeconds)
+				: 3600;
+			local.rv.host = new wheels.JobRunner().drain(expiresInSeconds = local.expires);
+			local.rv.success = true;
+			local.rv.message = "Draining #local.rv.host.host#: no new jobs start; #local.rv.host.running# still running";
+		} catch (any e) {
+			local.rv.success = false;
+			local.rv.message = "Error draining: " & e.message;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * `wheels jobs resume`: this server starts jobs again. Mutating, like jobsDrain.
+	 */
+	public struct function jobsResume(required struct context, required struct params) {
+		local.rv = {};
+		try {
+			local.rv.host = new wheels.JobRunner().resume();
+			local.rv.success = true;
+			local.rv.message = "Resumed #local.rv.host.host#";
+		} catch (any e) {
+			local.rv.success = false;
+			local.rv.message = "Error resuming: " & e.message;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * This server's job state (host, running, maxConcurrent, draining, ...). Read-only; polled
+	 * by `wheels jobs drain --wait` until nothing is running.
+	 */
+	public struct function jobsHostStatus(required struct context, required struct params) {
+		local.rv = {};
+		try {
+			local.rv.host = new wheels.JobRunner().status();
+			local.rv.success = true;
+			local.rv.message = "Host status retrieved";
+		} catch (any e) {
+			local.rv.success = false;
+			local.rv.message = "Error getting host status: " & e.message;
 		}
 		return local.rv;
 	}
