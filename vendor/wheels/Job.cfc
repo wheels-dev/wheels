@@ -1740,6 +1740,60 @@ component {
 	}
 
 	/**
+	 * Internal: the JobScheduler $enqueueDueSchedules() runs, a seam for specs.
+	 */
+	public any function $newScheduler() {
+		return new wheels.JobScheduler();
+	}
+
+	/**
+	 * Enqueues due schedules (JobScheduler.enqueueDue()) at most once every
+	 * jobsScheduleCheckSeconds (default 15; 0 = never) per application, so every worker poll,
+	 * processQueue() and JobRunner.tick() keeps schedules running without a separate process.
+	 * Any number of servers may do it: each slot is enqueued once (its uniqueKey). Only when the
+	 * schedules table exists, so an app without schedules never gets one. Never throws: a failed
+	 * check is logged and the poll carries on. Returns {checked, enqueued} (both 0 when skipped).
+	 */
+	public struct function $enqueueDueSchedules() {
+		var rv = {checked = 0, enqueued = 0};
+		if (!StructKeyExists(application, "wheels")) {
+			return rv;
+		}
+		local.interval = StructKeyExists(application.wheels, "jobsScheduleCheckSeconds") && IsNumeric(application.wheels.jobsScheduleCheckSeconds) ? Val(application.wheels.jobsScheduleCheckSeconds) : 15;
+		if (local.interval <= 0 || Len($outermostWheelsTransaction())) {
+			return rv;
+		}
+		local.now = GetTickCount();
+		if (StructKeyExists(application.wheels, "$jobsScheduleCheckedAt") && local.now - application.wheels["$jobsScheduleCheckedAt"] < local.interval * 1000) {
+			return rv;
+		}
+		// One check at a time per application; a poll that finds one running skips.
+		var gate = {due = false};
+		lock name="wheels.jobs.scheduleCheck" type="exclusive" timeout="1" throwOnTimeout="false" {
+			gate.due = !StructKeyExists(application.wheels, "$jobsScheduleCheckedAt") || GetTickCount() - application.wheels["$jobsScheduleCheckedAt"] >= local.interval * 1000;
+			if (gate.due) {
+				application.wheels["$jobsScheduleCheckedAt"] = GetTickCount();
+			}
+		}
+		if (gate.due) {
+			try {
+				local.scheduler = $newScheduler();
+				if (local.scheduler.$schedulesTableExists()) {
+					local.outcome = local.scheduler.enqueueDue();
+					rv.checked = local.outcome.checked;
+					rv.enqueued = local.outcome.enqueued;
+					for (local.error in local.outcome.errors) {
+						writeLog(text = "Schedule check: #local.error#", type = "error", file = "wheels_jobs");
+					}
+				}
+			} catch (any e) {
+				writeLog(text = "Could not check job schedules: #e.message#", type = "error", file = "wheels_jobs");
+			}
+		}
+		return rv;
+	}
+
+	/**
 	 * Throws Wheels.Job.SchemaMissing: a job table or column is missing while jobsAutoCreateTables
 	 * is false, so the framework won't create it. Logged once per application as well, because a
 	 * worker hits this on every poll until the migration runs.
