@@ -37,6 +37,10 @@ component {
 	// false: write the job after the outermost Wheels transaction resolves, on commit or
 	// rollback alike, so it survives a rollback (failure notices, audit records).
 	this.transactional = true;
+	// true: after a reap (its worker stopped heartbeating or died), the job is retried —
+	// at-least-once, so perform() must be idempotent. false: it is not re-run; the reaped
+	// attempt ends 'interrupted' (at-most-once).
+	this.idempotent = true;
 
 	/**
 	 * Constructor
@@ -62,6 +66,48 @@ component {
 	 */
 	public void function perform(struct data = {}) {
 		throw(type = "Wheels.NotImplemented", message = "The perform() method must be implemented in the job subclass.");
+	}
+
+	/**
+	 * Tell the queue this job is still running. Call it from a long perform() more often than
+	 * the job's timeout: the stale-job reaper measures from the latest heartbeat, so a job that
+	 * heartbeats on time is never reaped and run a second time. Throws Wheels.Job.Fenced when
+	 * the job's claim is gone (it was reaped and claimed again): stop working and return, since
+	 * another attempt now owns the job and this one's result will be discarded. Outside a
+	 * worker (perform() called directly) it does nothing.
+	 */
+	public void function heartbeat() {
+		if (!StructKeyExists(variables, "$claim") || !Len(variables.$claim.jobId)) {
+			return;
+		}
+		local.params = {
+			beatAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			id = {value = variables.$claim.jobId, cfsqltype = "cf_sql_varchar"}
+		};
+		local.guard = $claimTokenGuard(claimToken = variables.$claim.claimToken, params = local.params);
+		// Without the heartbeatAt column (an ALTER-blocked table), updatedAt keeps it alive instead.
+		local.column = $heartbeatColumnAvailable() ? "heartbeatAt" : "updatedAt";
+		queryExecute(
+			"UPDATE wheels_jobs SET #local.column# = :beatAt WHERE id = :id AND status = 'processing'" & local.guard,
+			local.params,
+			{datasource = variables.$datasource, result = "local.beat"}
+		);
+		if (Val(local.beat.recordCount ?: 0) == 0) {
+			$logFencedAttempt(jobId = variables.$claim.jobId, jobClass = GetMetadata(this).name, outcome = "heartbeat");
+			Throw(
+				type = "Wheels.Job.Fenced",
+				message = "Job [#variables.$claim.jobId#] no longer holds its claim: it was reaped and claimed again while it ran.",
+				extendedInfo = "Stop working and return from perform(): another attempt owns this job now, and this attempt's result will be discarded."
+			);
+		}
+	}
+
+	/**
+	 * Internal: which queue row and claim this instance is executing, so heartbeat() can renew
+	 * it. Set by the worker (and processQueue) before perform() runs.
+	 */
+	public void function $setClaimContext(required string jobId, string claimToken = "") {
+		variables.$claim = {jobId = arguments.jobId, claimToken = arguments.claimToken};
 	}
 
 	/**
@@ -729,9 +775,10 @@ component {
 			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 			id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 		};
-		local.setClaim = "";
+		// A new claim starts with no heartbeat, so an earlier attempt's can't make it look stale.
+		local.setClaim = $heartbeatColumnAvailable() ? ", heartbeatAt = NULL" : "";
 		if (Len(local.claimToken)) {
-			local.setClaim = ", claimToken = :claimToken, claimedBy = :claimedBy";
+			local.setClaim &= ", claimToken = :claimToken, claimedBy = :claimedBy";
 			local.claimParams.claimToken = {value = local.claimToken, cfsqltype = "cf_sql_varchar"};
 			local.claimParams.claimedBy = {value = $jobHostName(), cfsqltype = "cf_sql_varchar"};
 		}
@@ -769,6 +816,7 @@ component {
 		try {
 			// Instantiate and execute the job
 			local.jobInstance = $instantiateJobClass(jobClass = arguments.jobRow.jobClass, jobId = arguments.jobRow.id);
+			local.jobInstance.$setClaimContext(jobId = arguments.jobRow.id, claimToken = local.claimToken);
 			if (StructKeyExists(local.jobInstance, "baseDelay")) {
 				local.backoffBaseDelay = local.jobInstance.baseDelay;
 			}
@@ -957,7 +1005,7 @@ component {
 	 * @queue Optional queue name to filter by.
 	 */
 	public struct function queueStats(string queue = "") {
-		local.stats = {pending = 0, processing = 0, completed = 0, failed = 0, total = 0};
+		local.stats = {pending = 0, processing = 0, completed = 0, failed = 0, interrupted = 0, total = 0};
 
 		try {
 			local.sql = "SELECT status, COUNT(*) as cnt FROM wheels_jobs";
@@ -1068,6 +1116,7 @@ component {
 			$ensureClaimTimeoutColumn();
 			$ensureClaimTokenColumns();
 			$ensureUniqueKeyColumn();
+			$ensureHeartbeatColumn();
 			return true;
 		} catch (any e) {
 			// Table doesn't exist — create it
@@ -1112,6 +1161,7 @@ component {
 					claimToken #local.varcharType#(36),
 					claimedBy #local.varcharType#(128),
 					uniqueKey #local.varcharType#(255),
+					heartbeatAt #local.datetimeType#,
 					lastError #local.textType#,
 					runAt #local.datetimeType#,
 					completedAt #local.datetimeType#,
@@ -1863,6 +1913,76 @@ component {
 		} catch (any e) {
 			// Lost the race to insert it: the row exists now, so update it.
 			queryExecute(local.updateSql, local.params, {datasource = variables.$datasource});
+		}
+	}
+
+	/**
+	 * Add the heartbeatAt column to an existing wheels_jobs table when it is missing. Same
+	 * contract as the other job columns: probed every call, never inside an open transaction
+	 * (DDL commits the caller's work on MySQL/Oracle), a failed ALTER backs off and logs once.
+	 * Without it, heartbeat() renews updatedAt instead, so jobs still stay alive.
+	 */
+	public void function $ensureHeartbeatColumn() {
+		if (Len($outermostWheelsTransaction())) {
+			return;
+		}
+		if ($jobTableHasColumn("heartbeatAt")) {
+			$clearClaimTimeoutAlterMemo(memoKey = "$heartbeatAlterFailedAt");
+			return;
+		}
+		if ($claimTimeoutAlterInBackoff(memoKey = "$heartbeatAlterFailedAt")) {
+			return;
+		}
+		try {
+			queryExecute($heartbeatAlterSql(), {}, {datasource = variables.$datasource});
+			$clearClaimTimeoutAlterMemo(memoKey = "$heartbeatAlterFailedAt");
+		} catch (any e) {
+			$recordClaimTimeoutAlterFailure(memoKey = "$heartbeatAlterFailedAt");
+			$warnHeartbeatAlterFailedOnce(e.message);
+		}
+	}
+
+	/**
+	 * The per-database "ADD heartbeatAt" DDL, typed like the table's other timestamps.
+	 */
+	public string function $heartbeatAlterSql() {
+		local.dbType = $detectDatabaseType();
+		if (local.dbType == "oracle") {
+			return "ALTER TABLE wheels_jobs ADD (heartbeatAt TIMESTAMP)";
+		}
+		if (local.dbType == "sqlserver") {
+			return "ALTER TABLE wheels_jobs ADD heartbeatAt DATETIME";
+		}
+		if (local.dbType == "postgresql" || local.dbType == "h2") {
+			return "ALTER TABLE wheels_jobs ADD COLUMN heartbeatAt TIMESTAMP";
+		}
+		return "ALTER TABLE wheels_jobs ADD COLUMN heartbeatAt DATETIME";
+	}
+
+	/**
+	 * Whether this instance can write heartbeatAt. Memoised per instance, probe only (no DDL:
+	 * it is read from inside perform(), possibly within the job's own transaction).
+	 */
+	public boolean function $heartbeatColumnAvailable() {
+		if (!StructKeyExists(variables, "$heartbeatColumnPresent")) {
+			variables.$heartbeatColumnPresent = $jobTableHasColumn("heartbeatAt");
+		}
+		return variables.$heartbeatColumnPresent;
+	}
+
+	/**
+	 * Log the heartbeatAt ALTER failure once per application.
+	 */
+	public void function $warnHeartbeatAlterFailedOnce(required string reason) {
+		if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$heartbeatAlterWarned")) {
+			application.wheels.$heartbeatAlterWarned = true;
+			writeLog(
+				text = "Could not add the wheels_jobs.heartbeatAt column (#arguments.reason#). heartbeat() renews "
+					& "updatedAt instead, so jobs still stay alive. Add the column manually "
+					& "(heartbeatAt DATETIME, or TIMESTAMP on PostgreSQL/Oracle/H2).",
+				type = "warning",
+				file = "wheels_jobs"
+			);
 		}
 	}
 

@@ -296,7 +296,8 @@ component {
 
 		// Find candidate rows idle past the floor; the SELECT prefers claimTimeout and falls
 		// back without it when the column is absent.
-		local.whereClause = "WHERE status = 'processing' AND updatedAt < :cutoff" & local.queueFilter;
+		// A job is alive as of its latest heartbeat, or its claim when it never heartbeat.
+		local.whereClause = "WHERE status = 'processing' AND " & $lastSeenSql() & " < :cutoff" & local.queueFilter;
 		try {
 			local.timedOut = $selectStaleCandidates(whereClause = local.whereClause, params = local.params);
 		} catch (any e) {
@@ -325,7 +326,17 @@ component {
 			// bumps attempts, so a finish or re-claim between SELECT and UPDATE matches 0 rows —
 			// and (b) the per-row staleness cutoff, so a row still inside its own window is left
 			// alone. Two concurrent reapers race on the same guard; exactly one wins.
-			if (local.currentAttempts <= local.maxRetries) {
+			if (!$jobIsIdempotent(local.row.jobClass)) {
+				// this.idempotent = false: never run it a second time. The reaped attempt may have
+				// done some or all of its work, so it ends 'interrupted' instead of being retried.
+				local.won = $markInterrupted(
+					jobId = local.row.id,
+					jobClass = local.row.jobClass,
+					errorMessage = "Job timed out after #local.rowTimeout# seconds and is not idempotent, so it was not retried",
+					expectedAttempts = local.currentAttempts,
+					staleCutoff = local.rowCutoff
+				);
+			} else if (local.currentAttempts <= local.maxRetries) {
 				// Reschedule for retry
 				local.won = $scheduleRetry(local.row.id, local.currentAttempts, local.row.jobClass, local.maxRetries, "Job timed out after #local.rowTimeout# seconds", local.currentAttempts, local.rowCutoff);
 			} else {
@@ -375,7 +386,7 @@ component {
 	public struct function getStats(string queue = "") {
 		local.result = {
 			queues = {},
-			totals = {pending = 0, processing = 0, completed = 0, failed = 0, total = 0}
+			totals = {pending = 0, processing = 0, completed = 0, failed = 0, interrupted = 0, total = 0}
 		};
 
 		try {
@@ -396,7 +407,7 @@ component {
 
 		for (local.row in local.rows) {
 			if (!StructKeyExists(local.result.queues, local.row.queue)) {
-				local.result.queues[local.row.queue] = {pending = 0, processing = 0, completed = 0, failed = 0, total = 0};
+				local.result.queues[local.row.queue] = {pending = 0, processing = 0, completed = 0, failed = 0, interrupted = 0, total = 0};
 			}
 			if (StructKeyExists(local.result.queues[local.row.queue], local.row.status)) {
 				local.result.queues[local.row.queue][local.row.status] = local.row.cnt;
@@ -624,8 +635,8 @@ component {
 	 * @queue Optional queue filter.
 	 */
 	public numeric function purge(required string status, numeric days = 7, string queue = "") {
-		if (!ListFindNoCase("completed,failed", arguments.status)) {
-			throw(type = "Wheels.InvalidArgument", message = "Purge status must be 'completed' or 'failed'.");
+		if (!ListFindNoCase("completed,failed,interrupted", arguments.status)) {
+			throw(type = "Wheels.InvalidArgument", message = "Purge status must be 'completed', 'failed' or 'interrupted'.");
 		}
 
 		local.cutoff = DateAdd("d", -arguments.days, $now());
@@ -695,6 +706,7 @@ component {
 			try {
 				variables.$claimTimeoutColumnPresent = $jobBridge().$jobTableHasClaimTimeout();
 				variables.$claimTokenColumnPresent = $jobBridge().$jobTableHasClaimToken();
+				variables.$heartbeatColumnPresent = $jobBridge().$jobTableHasColumn("heartbeatAt");
 				return $claimJobUpdate(
 					jobId = arguments.jobId,
 					claimTimeout = local.claimTimeout,
@@ -724,6 +736,10 @@ component {
 		boolean withClaimToken = false
 	) {
 		local.setClaim = arguments.withClaimTimeout ? ", claimTimeout = :claimTimeout" : "";
+		// A new claim starts with no heartbeat, so an earlier attempt's can't make it look stale.
+		if ($heartbeatColumnAvailable()) {
+			local.setClaim &= ", heartbeatAt = NULL";
+		}
 		local.params = {
 			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 			id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
@@ -786,6 +802,8 @@ component {
 				jobClass = arguments.jobRow.jobClass,
 				jobId = arguments.jobRow.id
 			);
+			// So heartbeat() inside perform() renews this attempt's claim, and only this one's.
+			local.jobInstance.$setClaimContext(jobId = arguments.jobRow.id, claimToken = local.claimToken);
 			local.jobData = DeserializeJSON(arguments.jobRow.data);
 
 			// Restore tenant context if the job was enqueued within a tenant scope and
@@ -906,7 +924,7 @@ component {
 		// on Adobe when diffed in CFML). A row still inside its own window matches 0 rows.
 		local.staleGuard = "";
 		if (IsDate(arguments.staleCutoff)) {
-			local.staleGuard = " AND updatedAt < :staleCutoff";
+			local.staleGuard = " AND " & $lastSeenSql() & " < :staleCutoff";
 			local.params.staleCutoff = {value = arguments.staleCutoff, cfsqltype = "cf_sql_timestamp"};
 		}
 		// Fence (the owning attempt's own retry): only while the row is still its claim.
@@ -960,7 +978,7 @@ component {
 		// Per-row staleness guard built from the row's own claimTimeout, compared SQL-side (#3989).
 		local.staleGuard = "";
 		if (IsDate(arguments.staleCutoff)) {
-			local.staleGuard = " AND updatedAt < :staleCutoff";
+			local.staleGuard = " AND " & $lastSeenSql() & " < :staleCutoff";
 			local.params.staleCutoff = {value = arguments.staleCutoff, cfsqltype = "cf_sql_timestamp"};
 		}
 		local.tokenGuard = $jobBridge().$claimTokenGuard(claimToken = arguments.claimToken, params = local.params);
@@ -1011,6 +1029,7 @@ component {
 				// worker, then straight to the no-column path (#3989 review).
 				variables.$claimTimeoutColumnPresent = $jobBridge().$jobTableHasClaimTimeout();
 				variables.$claimTokenColumnPresent = $jobBridge().$jobTableHasClaimToken();
+				variables.$heartbeatColumnPresent = $jobBridge().$jobTableHasColumn("heartbeatAt");
 				return true;
 			}
 			return false;
@@ -1049,6 +1068,91 @@ component {
 			}
 		}
 		return variables.$claimTokenColumnPresent;
+	}
+
+	/**
+	 * Whether the heartbeatAt column is available to this worker. Memoised per worker like the
+	 * claimTimeout memo: set by $ensureJobTable, or probed lazily on first use.
+	 */
+	private boolean function $heartbeatColumnAvailable() {
+		if (!StructKeyExists(variables, "$heartbeatColumnPresent")) {
+			try {
+				variables.$heartbeatColumnPresent = $jobBridge().$jobTableHasColumn("heartbeatAt");
+			} catch (any e) {
+				variables.$heartbeatColumnPresent = false;
+			}
+		}
+		return variables.$heartbeatColumnPresent;
+	}
+
+	/**
+	 * The SQL for when a processing job was last known alive: its latest heartbeat, or its
+	 * claim (updatedAt) when it never heartbeat or the table has no heartbeatAt column.
+	 */
+	private string function $lastSeenSql() {
+		return $heartbeatColumnAvailable() ? "COALESCE(heartbeatAt, updatedAt)" : "updatedAt";
+	}
+
+	/**
+	 * Whether a reaped job may be retried: its class's this.idempotent, true by default. A class
+	 * that can't be loaded counts as the default; its retry then fails the usual way.
+	 * Memoised per worker and class.
+	 */
+	private boolean function $jobIsIdempotent(required string jobClass) {
+		if (!StructKeyExists(variables, "$idempotentByClass")) {
+			variables.$idempotentByClass = {};
+		}
+		if (!StructKeyExists(variables.$idempotentByClass, arguments.jobClass)) {
+			var verdict = {idempotent = true};
+			try {
+				var instance = $jobBridge().$instantiateJobClass(jobClass = arguments.jobClass);
+				if (StructKeyExists(instance, "idempotent") && IsBoolean(instance.idempotent)) {
+					verdict.idempotent = instance.idempotent;
+				}
+			} catch (any e) {
+				verdict.idempotent = true;
+			}
+			variables.$idempotentByClass[arguments.jobClass] = verdict.idempotent;
+		}
+		return variables.$idempotentByClass[arguments.jobClass];
+	}
+
+	/**
+	 * End a reaped attempt of a non-idempotent job: status 'interrupted', not retried. Guarded
+	 * like the reaper's retry (attempts read + per-row staleness), so it can't race a finish or
+	 * a re-claim. Returns the number of rows changed.
+	 */
+	private numeric function $markInterrupted(
+		required string jobId,
+		required string jobClass,
+		required string errorMessage,
+		required numeric expectedAttempts,
+		required any staleCutoff
+	) {
+		local.params = {
+			failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
+			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"},
+			expectedAttempts = {value = arguments.expectedAttempts, cfsqltype = "cf_sql_integer"},
+			staleCutoff = {value = arguments.staleCutoff, cfsqltype = "cf_sql_timestamp"}
+		};
+		queryExecute(
+			"UPDATE wheels_jobs
+			SET status = 'interrupted',
+				failedAt = :failedAt,
+				lastError = :lastError,
+				updatedAt = :updatedAt
+			WHERE id = :id AND status = 'processing' AND attempts = :expectedAttempts AND " & $lastSeenSql() & " < :staleCutoff",
+			local.params,
+			{datasource = variables.$datasource, result = "local.updateResult"}
+		);
+		writeLog(
+			text = "Job '#arguments.jobClass#' [#arguments.jobId#] was interrupted: its worker stopped responding and the job is not idempotent, so it was not retried",
+			type = "warning",
+			file = "wheels_jobs"
+		);
+		return StructKeyExists(local, "updateResult") ? Val(local.updateResult.recordCount) : 0;
 	}
 
 	/**

@@ -11696,14 +11696,14 @@ component extends="modules.BaseModule" {
 		h2Config &= tab & "// H2 embedded database (configured by wheels new --setup-h2)" & nl;
 		h2Config &= tab & 'this.datasources["#datasourceName#"] = {' & nl;
 		h2Config &= tab & tab & 'class: "org.h2.Driver",' & nl;
-		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & expandPath("../db/h2/#datasourceName#") & ";MODE=MySQL",' & nl;
+		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & this.wheels.projectRoot & "db/h2/#datasourceName#;MODE=MySQL",' & nl;
 		h2Config &= tab & tab & 'username: "sa"' & nl;
 		h2Config &= tab & "};";
 
 		// Also add a test database datasource
 		h2Config &= nl & tab & 'this.datasources["wheelstestdb"] = {' & nl;
 		h2Config &= tab & tab & 'class: "org.h2.Driver",' & nl;
-		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & expandPath("../db/h2/wheelstestdb") & ";MODE=MySQL",' & nl;
+		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & this.wheels.projectRoot & "db/h2/wheelstestdb;MODE=MySQL",' & nl;
 		h2Config &= tab & tab & 'username: "sa"' & nl;
 		h2Config &= tab & "};";
 
@@ -11755,13 +11755,13 @@ component extends="modules.BaseModule" {
 		sqliteConfig &= tab & "// SQLite zero-config database (configured by wheels new)" & nl;
 		sqliteConfig &= tab & 'this.datasources["#datasourceName#"] = {' & nl;
 		sqliteConfig &= tab & tab & 'class: "org.sqlite.JDBC",' & nl;
-		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & expandPath("../db/development.sqlite")' & nl;
+		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & this.wheels.projectRoot & "db/development.sqlite"' & nl;
 		sqliteConfig &= tab & "};";
 
 		// Also add a test database datasource
 		sqliteConfig &= nl & tab & 'this.datasources["#datasourceName#_test"] = {' & nl;
 		sqliteConfig &= tab & tab & 'class: "org.sqlite.JDBC",' & nl;
-		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & expandPath("../db/test.sqlite")' & nl;
+		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & this.wheels.projectRoot & "db/test.sqlite"' & nl;
 		sqliteConfig &= tab & "};";
 
 		// Inject into config/app.cfm at the CLI-Appends-Here marker

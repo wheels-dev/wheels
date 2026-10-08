@@ -898,6 +898,32 @@ component extends="wheels.WheelsTest" {
 				expect(probeJob.$jobTableHasUniqueKey()).toBeFalse("no DDL may run inside the caller's transaction");
 			});
 
+			it("keeps a heartbeating job alive through updatedAt when heartbeatAt can't be added", function() {
+				$createLegacyJobTable();
+				application.wheels.$heartbeatAlterFailedAt = Now();
+				try {
+					var id = CreateUUID();
+					queryExecute(
+						"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+						VALUES (:id, 'wheels.tests._assets.jobs.ProcessOrdersJob', 'test_unique_legacy', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
+						{
+							id = {value = id, cfsqltype = "cf_sql_varchar"},
+							runAt = {value = DateAdd("h", -2, Now()), cfsqltype = "cf_sql_timestamp"},
+							createdAt = {value = DateAdd("h", -2, Now()), cfsqltype = "cf_sql_timestamp"},
+							updatedAt = {value = DateAdd("h", -2, Now()), cfsqltype = "cf_sql_timestamp"}
+						},
+						{datasource = application.wheels.dataSourceName}
+					);
+					var running = new wheels.tests._assets.jobs.ProcessOrdersJob();
+					running.$setClaimContext(jobId = id);
+					running.heartbeat();
+					var reaper = new wheels.JobWorker();
+					expect(reaper.checkTimeouts(timeout = 300, queues = "test_unique_legacy")).toBe(0, "the heartbeat must renew updatedAt when there is no heartbeatAt column");
+				} finally {
+					StructDelete(application.wheels, "$heartbeatAlterFailedAt");
+				}
+			});
+
 			it("adds the column, backfills it from id and builds the unique index", function() {
 				$createLegacyJobTable();
 				var legacyIds = [CreateUUID(), CreateUUID()];
@@ -908,6 +934,7 @@ component extends="wheels.WheelsTest" {
 				job.$ensureJobTable();
 				expect(job.$jobTableHasUniqueKey()).toBeTrue();
 				expect(job.$jobTableHasUniqueKeyIndex()).toBeTrue("the upgrade must build the unique index");
+				expect(job.$jobTableHasColumn("heartbeatAt")).toBeTrue("the ensure must add heartbeatAt too");
 				var backfilled = queryExecute(
 					"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE uniqueKey = id",
 					{},
@@ -1019,6 +1046,7 @@ component extends="wheels.WheelsTest" {
 	private void function $clearUniqueKeyMemos() {
 		StructDelete(application.wheels, "$jobsUniqueKeyIndexVerified");
 		StructDelete(application.wheels, "$uniqueKeyAlterFailedAt");
+		StructDelete(application.wheels, "$heartbeatAlterFailedAt");
 	}
 
 }
