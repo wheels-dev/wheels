@@ -37,6 +37,10 @@ component {
 	// false: write the job after the outermost Wheels transaction resolves, on commit or
 	// rollback alike, so it survives a rollback (failure notices, audit records).
 	this.transactional = true;
+	// true: after a reap (its worker stopped heartbeating or died), the job is retried —
+	// at-least-once, so perform() must be idempotent. false: it is not re-run; the reaped
+	// attempt ends 'interrupted' (at-most-once).
+	this.idempotent = true;
 	// true: never two runs of this job class at once, on any server (a lease in wheels_job_locks).
 	// A job can instead set this.concurrencyKey = "...", or define concurrencyKeyFor(struct data)
 	// (which wins), to share one lease among the jobs with the same key. See $jobLeaseName().
@@ -66,6 +70,48 @@ component {
 	 */
 	public void function perform(struct data = {}) {
 		throw(type = "Wheels.NotImplemented", message = "The perform() method must be implemented in the job subclass.");
+	}
+
+	/**
+	 * Tell the queue this job is still running. Call it from a long perform() more often than
+	 * the job's timeout: the stale-job reaper measures from the latest heartbeat, so a job that
+	 * heartbeats on time is never reaped and run a second time. Throws Wheels.Job.Fenced when
+	 * the job's claim is gone (it was reaped and claimed again): stop working and return, since
+	 * another attempt now owns the job and this one's result will be discarded. Outside a
+	 * worker (perform() called directly) it does nothing.
+	 */
+	public void function heartbeat() {
+		if (!StructKeyExists(variables, "$claim") || !Len(variables.$claim.jobId)) {
+			return;
+		}
+		local.params = {
+			beatAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			id = {value = variables.$claim.jobId, cfsqltype = "cf_sql_varchar"}
+		};
+		local.guard = $claimTokenGuard(claimToken = variables.$claim.claimToken, params = local.params);
+		// Without the heartbeatAt column (an ALTER-blocked table), updatedAt keeps it alive instead.
+		local.column = $heartbeatColumnAvailable() ? "heartbeatAt" : "updatedAt";
+		queryExecute(
+			"UPDATE wheels_jobs SET #local.column# = :beatAt WHERE id = :id AND status = 'processing'" & local.guard,
+			local.params,
+			{datasource = variables.$datasource, result = "local.beat"}
+		);
+		if (Val(local.beat.recordCount ?: 0) == 0) {
+			$logFencedAttempt(jobId = variables.$claim.jobId, jobClass = GetMetadata(this).name, outcome = "heartbeat");
+			Throw(
+				type = "Wheels.Job.Fenced",
+				message = "Job [#variables.$claim.jobId#] no longer holds its claim: it was reaped and claimed again while it ran.",
+				extendedInfo = "Stop working and return from perform(): another attempt owns this job now, and this attempt's result will be discarded."
+			);
+		}
+	}
+
+	/**
+	 * Internal: which queue row and claim this instance is executing, so heartbeat() can renew
+	 * it. Set by the worker (and processQueue) before perform() runs.
+	 */
+	public void function $setClaimContext(required string jobId, string claimToken = "") {
+		variables.$claim = {jobId = arguments.jobId, claimToken = arguments.claimToken};
 	}
 
 	/**
@@ -369,7 +415,7 @@ component {
 		Throw(
 			type = "Wheels.Job.UniqueKeyUnavailable",
 			message = "Job '#arguments.jobClass#' was enqueued with a uniqueKey, but wheels_jobs can't enforce one yet, so it was not enqueued.",
-			extendedInfo = "wheels_jobs needs a uniqueKey column (VARCHAR(255), nullable) with a unique index. The framework adds them on a worker poll or an enqueue(uniqueKey=...) made outside a transaction, unless the database user can't ALTER the table or another instance is upgrading it right now. Add them manually: ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255); UPDATE wheels_jobs SET uniqueKey = id; CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) (on SQL Server add WHERE uniqueKey IS NOT NULL)."
+			extendedInfo = "wheels_jobs needs a uniqueKey column (VARCHAR(255), nullable) with a unique index. The framework adds them on a worker poll or an enqueue(uniqueKey=...) made outside a transaction, unless the database user can't ALTER the table or another instance is upgrading it right now. " & $uniqueKeyLastProblem() & $uniqueKeyManualFix()
 		);
 	}
 
@@ -595,69 +641,55 @@ component {
 
 	/**
 	 * Process pending jobs from the queue. Call this from a scheduled task or controller action.
-	 * @queue Queue name to process. Default processes all queues.
+	 * It runs through the job worker, like `wheels jobs work`: every call first reaps jobs left
+	 * in 'processing' by a worker that died, and each job is claimed and run with its own
+	 * class's timeout, recorded on the row so no other server reaps it early.
+	 * @queue Queue name(s) to process, comma-delimited. Default processes all queues.
 	 * @limit Maximum number of jobs to process in this batch. `0` (or less) means no limit: every due job is processed.
+	 * @timeout Optional cap, in seconds, on each job's own timeout. `0` (default) uses each job's own.
 	 */
-	public struct function processQueue(string queue = "", numeric limit = 10) {
+	public struct function processQueue(string queue = "", numeric limit = 10, numeric timeout = 0) {
 		local.result = {processed = 0, failed = 0, skipped = 0, fenced = 0, leasesLost = 0, errors = []};
-		local.params = {
-			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
-		};
-
-		local.sql = "SELECT id, jobClass, queue, data, attempts, maxRetries
-			FROM wheels_jobs
-			WHERE status = 'pending' AND runAt <= :runAt";
-
-		if (Len(arguments.queue)) {
-			local.sql &= " AND queue = :queue";
-			local.params.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
-		}
-
-		local.sql &= " ORDER BY priority DESC, runAt ASC";
-		// Bound the batch in the SQL text, as JobWorker does, rather than with the maxrows option:
-		// BoxLang's PostgreSQL path throws on it ("setLargeMaxRows is not yet implemented"), which
-		// made processQueue() process nothing on PostgreSQL and CockroachDB there.
-		// limit <= 0 keeps its old meaning, no limit (the maxrows option treated 0 as unlimited).
-		if (Val(arguments.limit) > 0) {
-			local.limiter = new wheels.JobWorker();
-			local.sql &= local.limiter.$candidateLimitClause(dbType = $detectDatabaseType(), candidateLimit = arguments.limit);
-		}
-
-		try {
-			local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
-		} catch (any e) {
-			$ensureJobTable();
-			try {
-				local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
-			} catch (any e2) {
-				ArrayAppend(local.result.errors, e2.message);
-				return local.result;
+		local.worker = new wheels.JobWorker();
+		local.worker.perJobTimeout = true;
+		local.worker.timeoutCap = Val(arguments.timeout) > 0 ? Val(arguments.timeout) : 0;
+		// The poll's own timeout: the reap window for rows that recorded none, and the timeout
+		// for a job whose class can't be loaded.
+		local.pollTimeout = local.worker.timeoutCap > 0 ? local.worker.timeoutCap : this.timeout;
+		// A row that recorded no claimTimeout may still be running under its own (longer)
+		// timeout, so it is never reaped inside this job's timeout, whatever the cap.
+		local.worker.legacyReapTimeout = Max(local.worker.timeoutCap, this.timeout);
+		local.max = Val(arguments.limit) > 0 ? Int(Val(arguments.limit)) : 0;
+		local.lastJobId = "";
+		while (local.max == 0 || local.result.processed + local.result.failed + local.result.fenced < local.max) {
+			local.outcome = local.worker.processNext(queues = arguments.queue, timeout = local.pollTimeout);
+			if (!Len(local.outcome.jobId)) {
+				// Nothing ready (or a database error before any job was claimed).
+				if (Len(local.outcome.error)) {
+					ArrayAppend(local.result.errors, local.outcome.error);
+				}
+				break;
 			}
-		}
-
-		for (local.row in local.jobs) {
-			local.jobResult = $processJob(local.row);
-			if (local.jobResult.leaseLost) {
+			if (local.outcome.jobId == local.lastJobId) {
+				// The same job again (its claim keeps failing): stop rather than loop.
+				break;
+			}
+			local.lastJobId = local.outcome.jobId;
+			if (local.outcome.leaseLost) {
 				local.result.leasesLost++;
 			}
-			if (local.jobResult.skipped) {
-				// Another worker claimed the job between our SELECT and the claim UPDATE
+			if (local.outcome.deferred) {
+				// Another run holds its lease: put back as pending without using an attempt.
 				local.result.skipped++;
-				continue;
-			}
-			if (local.jobResult.fenced) {
-				// Ran, but its claim was reaped and re-issued: the outcome was discarded.
+			} else if (local.outcome.fenced) {
 				local.result.fenced++;
-				continue;
-			}
-			if (local.jobResult.success) {
+			} else if (local.outcome.success) {
 				local.result.processed++;
 			} else {
 				local.result.failed++;
-				ArrayAppend(local.result.errors, local.jobResult.error);
+				ArrayAppend(local.result.errors, "Job #local.outcome.jobId# (#local.outcome.jobClass#): #local.outcome.error#");
 			}
 		}
-
 		return local.result;
 	}
 
@@ -736,9 +768,10 @@ component {
 			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 			id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 		};
-		local.setClaim = "";
+		// A new claim starts with no heartbeat, so an earlier attempt's can't make it look stale.
+		local.setClaim = $heartbeatColumnAvailable() ? ", heartbeatAt = NULL" : "";
 		if (Len(local.claimToken)) {
-			local.setClaim = ", claimToken = :claimToken, claimedBy = :claimedBy";
+			local.setClaim &= ", claimToken = :claimToken, claimedBy = :claimedBy";
 			local.claimParams.claimToken = {value = local.claimToken, cfsqltype = "cf_sql_varchar"};
 			local.claimParams.claimedBy = {value = $jobHostName(), cfsqltype = "cf_sql_varchar"};
 		}
@@ -776,6 +809,7 @@ component {
 		try {
 			// Instantiate and execute the job
 			local.jobInstance = $instantiateJobClass(jobClass = arguments.jobRow.jobClass, jobId = arguments.jobRow.id);
+			local.jobInstance.$setClaimContext(jobId = arguments.jobRow.id, claimToken = local.claimToken);
 			if (StructKeyExists(local.jobInstance, "baseDelay")) {
 				local.backoffBaseDelay = local.jobInstance.baseDelay;
 			}
@@ -984,7 +1018,7 @@ component {
 	 * @queue Optional queue name to filter by.
 	 */
 	public struct function queueStats(string queue = "") {
-		local.stats = {pending = 0, processing = 0, completed = 0, failed = 0, total = 0};
+		local.stats = {pending = 0, processing = 0, completed = 0, failed = 0, interrupted = 0, total = 0};
 
 		try {
 			local.sql = "SELECT status, COUNT(*) as cnt FROM wheels_jobs";
@@ -1095,6 +1129,7 @@ component {
 			$ensureClaimTimeoutColumn();
 			$ensureClaimTokenColumns();
 			$ensureUniqueKeyColumn();
+			$ensureHeartbeatColumn();
 			return true;
 		} catch (any e) {
 			// Table doesn't exist — create it
@@ -1139,6 +1174,7 @@ component {
 					claimToken #local.varcharType#(36),
 					claimedBy #local.varcharType#(128),
 					uniqueKey #local.varcharType#(255),
+					heartbeatAt #local.datetimeType#,
 					lastError #local.textType#,
 					runAt #local.datetimeType#,
 					completedAt #local.datetimeType#,
@@ -1163,7 +1199,7 @@ component {
 				queryExecute($uniqueKeyIndexSql(), {}, {datasource = variables.$datasource});
 				$recordUniqueKeyIndexVerified();
 			} catch (any uniqueIndexError) {
-				writeLog(text = "Could not create the wheels_jobs uniqueKey index: #uniqueIndexError.message#", type = "error", file = "wheels_jobs");
+				writeLog(text = $uniqueKeyUpgradeFailureText(reason = uniqueIndexError.message, step = "index"), type = "error", file = "wheels_jobs");
 			}
 
 			writeLog(text = "Auto-created wheels_jobs table", type = "information", file = "wheels_jobs");
@@ -1412,6 +1448,11 @@ component {
 	 * every host behind a load balancer). Cached per application — the lookup can block on DNS.
 	 */
 	public string function $jobHostName() {
+		// set(jobsHostName = "...") names this app server explicitly: needed when several app
+		// servers (JVMs) share one machine, or they share one per-host cap and drain flag.
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "jobsHostName") && Len(Trim(application.wheels.jobsHostName))) {
+			return Left(Trim(application.wheels.jobsHostName), 128);
+		}
 		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "$jobHostName")) {
 			return application.wheels.$jobHostName;
 		}
@@ -1491,13 +1532,16 @@ component {
 		}
 		// Nested rather than try/catch/finally: on BoxLang a finally that shares a try with a catch
 		// is skipped when the request ends with abort, and the lock must always be released.
+		var progress = {step = ""};
 		try {
 			try {
-				$upgradeUniqueKeyColumn();
+				$upgradeUniqueKeyColumn(progress = progress);
 				$clearClaimTimeoutAlterMemo(memoKey = "$uniqueKeyAlterFailedAt");
+				$clearUniqueKeyUpgradeProblem();
 			} catch (any e) {
 				$recordClaimTimeoutAlterFailure(memoKey = "$uniqueKeyAlterFailedAt");
-				$warnUniqueKeyUpgradeFailedOnce(e.message);
+				$recordUniqueKeyUpgradeProblem(step = progress.step, reason = e.message);
+				$warnUniqueKeyUpgradeFailedOnce(reason = e.message, step = progress.step);
 			}
 		} finally {
 			$releaseJobSchemaLock(local.schemaLock);
@@ -1507,8 +1551,11 @@ component {
 	/**
 	 * The upgrade steps. Each re-probes after a failure, so an instance that upgraded the table a
 	 * moment earlier (without the lock, where none is available) counts as success, not an error.
+	 * `progress.step` names the step under way (column, backfill, index), so a failure can say
+	 * which one failed.
 	 */
-	public void function $upgradeUniqueKeyColumn() {
+	public void function $upgradeUniqueKeyColumn(struct progress = {}) {
+		arguments.progress.step = "column";
 		if (!$jobTableHasUniqueKey()) {
 			try {
 				queryExecute($uniqueKeyAlterSql(), {}, {datasource = variables.$datasource});
@@ -1518,7 +1565,9 @@ component {
 				}
 			}
 		}
+		arguments.progress.step = "backfill";
 		queryExecute("UPDATE wheels_jobs SET uniqueKey = id WHERE uniqueKey IS NULL", {}, {datasource = variables.$datasource});
+		arguments.progress.step = "index";
 		if (!$jobTableHasUniqueKeyIndex()) {
 			try {
 				queryExecute($uniqueKeyIndexSql(), {}, {datasource = variables.$datasource});
@@ -1714,15 +1763,318 @@ component {
 	/**
 	 * Log a failed uniqueKey upgrade once per application.
 	 */
-	public void function $warnUniqueKeyUpgradeFailedOnce(required string reason) {
+	public void function $warnUniqueKeyUpgradeFailedOnce(required string reason, string step = "") {
 		if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$uniqueKeyAlterWarned")) {
 			application.wheels.$uniqueKeyAlterWarned = true;
+			writeLog(text = $uniqueKeyUpgradeFailureText(reason = arguments.reason, step = arguments.step), type = "warning", file = "wheels_jobs");
+		}
+	}
+
+	/**
+	 * The message for a failed uniqueKey upgrade: which step failed and why, what still works,
+	 * and the manual fix for this database.
+	 */
+	public string function $uniqueKeyUpgradeFailureText(required string reason, string step = "") {
+		local.steps = {
+			column = "add the wheels_jobs.uniqueKey column",
+			backfill = "backfill wheels_jobs.uniqueKey from id",
+			index = "build the unique index idx_wjobs_unique_key on wheels_jobs.uniqueKey"
+		};
+		local.what = StructKeyExists(local.steps, arguments.step) ? local.steps[arguments.step] : "add the wheels_jobs.uniqueKey column and index";
+		return "Could not #local.what# (#arguments.reason#). Jobs enqueued without a uniqueKey are unaffected; "
+			& "enqueue(uniqueKey=...) throws Wheels.Job.UniqueKeyUnavailable until it is done. " & $uniqueKeyManualFix();
+	}
+
+	/**
+	 * How to finish the uniqueKey upgrade by hand on this database. On SQL Server the index is
+	 * filtered to non-NULL keys, which needs database compatibility level 100 or higher; below
+	 * that the advice names the level and the real options rather than a statement that fails
+	 * the same way.
+	 */
+	public string function $uniqueKeyManualFix() {
+		local.dbType = $detectDatabaseType();
+		local.column = local.dbType == "oracle" ? "ALTER TABLE wheels_jobs ADD (uniqueKey VARCHAR2(255))" : "ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255)";
+		local.steps = "#local.column#; UPDATE wheels_jobs SET uniqueKey = id WHERE uniqueKey IS NULL; ";
+		local.plainIndex = "CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey)";
+		if (local.dbType != "sqlserver") {
+			return "To do it by hand: #local.steps##local.plainIndex#.";
+		}
+		local.level = $sqlServerCompatibilityLevel();
+		if (local.level > 0 && local.level < 100) {
+			return "This SQL Server database runs at compatibility level #local.level#, and the filtered unique index "
+				& "Wheels uses on SQL Server (WHERE ... IS NOT NULL) needs level 100 or higher. Either raise it "
+				& "(ALTER DATABASE CURRENT SET COMPATIBILITY_LEVEL = 100, or higher) and the framework retries the upgrade, "
+				& "or, once every server runs Wheels 4.2 or later, create a plain unique index yourself: #local.steps##local.plainIndex#. "
+				& "A plain unique index allows only one NULL key, so a server still on 4.1 would fail its second enqueue.";
+		}
+		return "To do it by hand: #local.steps##local.plainIndex# WHERE uniqueKey IS NOT NULL.";
+	}
+
+	/**
+	 * This SQL Server database's compatibility level, or 0 when it can't be read.
+	 */
+	public numeric function $sqlServerCompatibilityLevel() {
+		try {
+			local.rows = queryExecute(
+				"SELECT compatibility_level AS lvl FROM sys.databases WHERE name = DB_NAME()",
+				{},
+				{datasource = variables.$datasource}
+			);
+			return local.rows.recordCount ? Val(local.rows.lvl) : 0;
+		} catch (any e) {
+			return 0;
+		}
+	}
+
+	/**
+	 * Remember the last failed upgrade step (app-wide), so UniqueKeyUnavailable can repeat it.
+	 */
+	public void function $recordUniqueKeyUpgradeProblem(required string step, required string reason) {
+		if (StructKeyExists(application, "wheels")) {
+			application.wheels.$uniqueKeyUpgradeProblem = {step = arguments.step, reason = arguments.reason};
+		}
+	}
+
+	public void function $clearUniqueKeyUpgradeProblem() {
+		if (StructKeyExists(application, "wheels")) {
+			StructDelete(application.wheels, "$uniqueKeyUpgradeProblem");
+		}
+	}
+
+	/**
+	 * "The last attempt (step: ...) failed: <reason>. " or "" when none is recorded.
+	 */
+	public string function $uniqueKeyLastProblem() {
+		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "$uniqueKeyUpgradeProblem")) {
+			return "";
+		}
+		local.p = application.wheels.$uniqueKeyUpgradeProblem;
+		return "The last attempt (step: #local.p.step#) failed: #local.p.reason#. ";
+	}
+
+	/**
+	 * The per-host concurrency cap from set(jobsMaxConcurrentPerHost = n); 0 (the default)
+	 * means no cap.
+	 */
+	public numeric function $jobsMaxConcurrentPerHost() {
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "jobsMaxConcurrentPerHost")) {
+			return Max(0, Int(Val(application.wheels.jobsMaxConcurrentPerHost)));
+		}
+		return 0;
+	}
+
+	/**
+	 * What this deployment reports as its code version in wheels_job_hosts:
+	 * set(jobsCodeVersion = ...) (e.g. a git SHA), else the Wheels version.
+	 */
+	public string function $jobsCodeVersion() {
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "jobsCodeVersion") && Len(application.wheels.jobsCodeVersion)) {
+			return Left(application.wheels.jobsCodeVersion, 64);
+		}
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "version")) {
+			return Left(application.wheels.version, 64);
+		}
+		return "unknown";
+	}
+
+	/**
+	 * Create the wheels_job_hosts registry when it is missing. Never inside an open transaction
+	 * (DDL commits the caller's work on MySQL/Oracle). Returns whether the table exists now.
+	 */
+	public boolean function $ensureHostsTable() {
+		if ($hostsTableExists()) {
+			return true;
+		}
+		if (Len($outermostWheelsTransaction())) {
+			return false;
+		}
+		local.dbType = $detectDatabaseType();
+		local.varcharType = local.dbType == "oracle" ? "VARCHAR2" : "VARCHAR";
+		local.datetimeType = ListFindNoCase("oracle,postgresql,h2", local.dbType) ? "TIMESTAMP" : "DATETIME";
+		try {
+			queryExecute("
+				CREATE TABLE wheels_job_hosts (
+					host #local.varcharType#(128) NOT NULL PRIMARY KEY,
+					lastSeenAt #local.datetimeType#,
+					startedAt #local.datetimeType#,
+					running INT DEFAULT 0 NOT NULL,
+					maxConcurrent INT DEFAULT 0 NOT NULL,
+					draining INT DEFAULT 0 NOT NULL,
+					drainExpiresAt #local.datetimeType#,
+					codeVersion #local.varcharType#(64)
+				)
+			", {}, {datasource = variables.$datasource});
+			writeLog(text = "Auto-created wheels_job_hosts table", type = "information", file = "wheels_jobs");
+		} catch (any e) {
+			// Another instance may have created it at the same moment; only a still-missing
+			// table is a failure.
+			if (!$hostsTableExists()) {
+				writeLog(text = "Failed to auto-create wheels_job_hosts table: #e.message#", type = "error", file = "wheels_jobs");
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public boolean function $hostsTableExists() {
+		try {
+			queryExecute("SELECT host FROM wheels_job_hosts WHERE 1=0", {}, {datasource = variables.$datasource});
+			return true;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Whether `host` is draining right now: its drain flag is set and has not expired. A missing
+	 * registry (nothing ever drained) means not draining. Any other failure is logged and
+	 * rethrown: treating a broken registry as "not draining" would let a drained host start jobs
+	 * mid-deploy. Compared SQL-side, on the same clock the drain was written with.
+	 */
+	public boolean function $hostDraining(required string host) {
+		try {
+			local.rows = queryExecute(
+				"SELECT COUNT(*) AS cnt FROM wheels_job_hosts
+				WHERE host = :host AND draining = 1 AND (drainExpiresAt IS NULL OR drainExpiresAt > :now)",
+				{
+					host = {value = arguments.host, cfsqltype = "cf_sql_varchar"},
+					now = {value = $now(), cfsqltype = "cf_sql_timestamp"}
+				},
+				{datasource = variables.$datasource}
+			);
+			return Val(local.rows.cnt) > 0;
+		} catch (any e) {
+			if (!$hostsTableExists()) {
+				return false;
+			}
+			writeLog(text = "Could not read the drain state of jobs host '#arguments.host#' from wheels_job_hosts (no job will start on this host until it can): #e.message#", type = "error", file = "wheels_jobs");
+			rethrow;
+		}
+	}
+
+	/**
+	 * How many jobs `host` is running now: processing rows it claimed (claimedBy). Without the
+	 * claimedBy column (an ALTER-blocked table) the count can't be taken: 0, logged once, so
+	 * the cap degrades to none rather than blocking every job.
+	 */
+	public numeric function $runningOnHost(required string host) {
+		try {
+			local.rows = queryExecute(
+				"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = 'processing' AND claimedBy = :host",
+				{host = {value = arguments.host, cfsqltype = "cf_sql_varchar"}},
+				{datasource = variables.$datasource}
+			);
+			return Val(local.rows.cnt);
+		} catch (any e) {
+			if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$jobsHostCapWarned")) {
+				application.wheels.$jobsHostCapWarned = true;
+				writeLog(
+					text = "Could not count this host's running jobs (#e.message#): wheels_jobs.claimedBy is missing, so jobsMaxConcurrentPerHost is not enforced.",
+					type = "warning",
+					file = "wheels_jobs"
+				);
+			}
+			return 0;
+		}
+	}
+
+	/**
+	 * Write `fields` (column => struct param) to this host's registry row, creating it on first
+	 * sight. UPDATE first, INSERT when there was no row, and UPDATE again if another instance
+	 * inserted it in between: no engine-specific upsert syntax.
+	 */
+	public void function $writeHostRow(required string host, required struct fields) {
+		local.sets = [];
+		local.params = {host = {value = arguments.host, cfsqltype = "cf_sql_varchar"}};
+		for (local.column in arguments.fields) {
+			ArrayAppend(local.sets, "#local.column# = :#local.column#");
+			local.params[local.column] = arguments.fields[local.column];
+		}
+		local.updateSql = "UPDATE wheels_job_hosts SET #ArrayToList(local.sets, ", ")# WHERE host = :host";
+		queryExecute(local.updateSql, local.params, {datasource = variables.$datasource, result = "local.updated"});
+		if (Val(local.updated.recordCount ?: 0) > 0) {
+			return;
+		}
+		local.columns = "host, startedAt";
+		local.values = ":host, :startedAt";
+		local.insertParams = Duplicate(local.params);
+		local.insertParams.startedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"};
+		for (local.column in arguments.fields) {
+			local.columns &= ", #local.column#";
+			local.values &= ", :#local.column#";
+		}
+		try {
+			queryExecute("INSERT INTO wheels_job_hosts (#local.columns#) VALUES (#local.values#)", local.insertParams, {datasource = variables.$datasource});
+		} catch (any e) {
+			// Lost the race to insert it: the row exists now, so update it.
+			queryExecute(local.updateSql, local.params, {datasource = variables.$datasource});
+		}
+	}
+
+	/**
+	 * Add the heartbeatAt column to an existing wheels_jobs table when it is missing. Same
+	 * contract as the other job columns: probed every call, never inside an open transaction
+	 * (DDL commits the caller's work on MySQL/Oracle), a failed ALTER backs off and logs once.
+	 * Without it, heartbeat() renews updatedAt instead, so jobs still stay alive.
+	 */
+	public void function $ensureHeartbeatColumn() {
+		if (Len($outermostWheelsTransaction())) {
+			return;
+		}
+		if ($jobTableHasColumn("heartbeatAt")) {
+			$clearClaimTimeoutAlterMemo(memoKey = "$heartbeatAlterFailedAt");
+			return;
+		}
+		if ($claimTimeoutAlterInBackoff(memoKey = "$heartbeatAlterFailedAt")) {
+			return;
+		}
+		try {
+			queryExecute($heartbeatAlterSql(), {}, {datasource = variables.$datasource});
+			$clearClaimTimeoutAlterMemo(memoKey = "$heartbeatAlterFailedAt");
+		} catch (any e) {
+			$recordClaimTimeoutAlterFailure(memoKey = "$heartbeatAlterFailedAt");
+			$warnHeartbeatAlterFailedOnce(e.message);
+		}
+	}
+
+	/**
+	 * The per-database "ADD heartbeatAt" DDL, typed like the table's other timestamps.
+	 */
+	public string function $heartbeatAlterSql() {
+		local.dbType = $detectDatabaseType();
+		if (local.dbType == "oracle") {
+			return "ALTER TABLE wheels_jobs ADD (heartbeatAt TIMESTAMP)";
+		}
+		if (local.dbType == "sqlserver") {
+			return "ALTER TABLE wheels_jobs ADD heartbeatAt DATETIME";
+		}
+		if (local.dbType == "postgresql" || local.dbType == "h2") {
+			return "ALTER TABLE wheels_jobs ADD COLUMN heartbeatAt TIMESTAMP";
+		}
+		return "ALTER TABLE wheels_jobs ADD COLUMN heartbeatAt DATETIME";
+	}
+
+	/**
+	 * Whether this instance can write heartbeatAt. Memoised per instance, probe only (no DDL:
+	 * it is read from inside perform(), possibly within the job's own transaction).
+	 */
+	public boolean function $heartbeatColumnAvailable() {
+		if (!StructKeyExists(variables, "$heartbeatColumnPresent")) {
+			variables.$heartbeatColumnPresent = $jobTableHasColumn("heartbeatAt");
+		}
+		return variables.$heartbeatColumnPresent;
+	}
+
+	/**
+	 * Log the heartbeatAt ALTER failure once per application.
+	 */
+	public void function $warnHeartbeatAlterFailedOnce(required string reason) {
+		if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$heartbeatAlterWarned")) {
+			application.wheels.$heartbeatAlterWarned = true;
 			writeLog(
-				text = "Could not add the wheels_jobs.uniqueKey column and index (#arguments.reason#). Jobs enqueued "
-					& "without a uniqueKey are unaffected; enqueue(uniqueKey=...) throws Wheels.Job.UniqueKeyUnavailable "
-					& "until they exist. Add them manually: ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255); "
-					& "UPDATE wheels_jobs SET uniqueKey = id; CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) "
-					& "(on SQL Server add WHERE uniqueKey IS NOT NULL).",
+				text = "Could not add the wheels_jobs.heartbeatAt column (#arguments.reason#). heartbeat() renews "
+					& "updatedAt instead, so jobs still stay alive. Add the column manually "
+					& "(heartbeatAt DATETIME, or TIMESTAMP on PostgreSQL/Oracle/H2).",
 				type = "warning",
 				file = "wheels_jobs"
 			);
@@ -1942,7 +2294,7 @@ component {
 		required string claimToken,
 		required numeric claimTimeout
 	) {
-		local.rv = {held = false, busy = false, retryInSeconds = 0, name = "", owner = ""};
+		local.rv = {held = false, busy = false, retryInSeconds = 0, name = "", owner = "", windowSeconds = 0};
 		local.rv.name = $jobLeaseName(jobInstance = arguments.jobInstance, jobData = arguments.jobData, jobClass = arguments.jobClass);
 		if (!Len(local.rv.name)) {
 			return local.rv;
@@ -1951,7 +2303,8 @@ component {
 		local.leaseLock = $jobLeaseLock();
 		local.claimSeconds = Val(arguments.claimTimeout) > 0 ? Val(arguments.claimTimeout) : 300;
 		local.now = local.leaseLock.nowMs();
-		local.expiresAt = local.now + (local.claimSeconds + Max(60, local.claimSeconds)) * 1000;
+		local.rv.windowSeconds = local.claimSeconds + Max(60, local.claimSeconds);
+		local.expiresAt = local.now + local.rv.windowSeconds * 1000;
 		if (local.leaseLock.tryAcquire(name = local.rv.name, owner = local.rv.owner, host = $jobHostName(), now = local.now, expiresAt = local.expiresAt)) {
 			local.rv.held = true;
 			return local.rv;
