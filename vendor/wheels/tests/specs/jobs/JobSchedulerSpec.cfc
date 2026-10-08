@@ -71,7 +71,7 @@ component extends="wheels.WheelsTest" {
 
 			it("reads cron in the schedule's time zone", function() {
 				if (!$javaTime()) {
-					return;
+					skip("needs java.time; this engine schedules in UTC only");
 				}
 				var c = new wheels.JobCron();
 				// 07:00 in New York in October is 11:00 UTC (EDT).
@@ -81,7 +81,7 @@ component extends="wheels.WheelsTest" {
 
 			it("runs a nonexistent local time at the next valid instant (spring forward)", function() {
 				if (!$javaTime()) {
-					return;
+					skip("needs java.time; this engine schedules in UTC only");
 				}
 				var c = new wheels.JobCron();
 				// 2026-03-08 02:30 doesn't exist in New York; clocks jump from 02:00 EST to 03:00 EDT (07:00Z).
@@ -91,7 +91,7 @@ component extends="wheels.WheelsTest" {
 
 			it("runs a repeated local time once, at its first occurrence (fall back)", function() {
 				if (!$javaTime()) {
-					return;
+					skip("needs java.time; this engine schedules in UTC only");
 				}
 				var c = new wheels.JobCron();
 				var cron = c.parse("30 1 * * *");
@@ -103,7 +103,7 @@ component extends="wheels.WheelsTest" {
 
 			it("refuses a non-UTC zone on an engine without java.time", function() {
 				if ($javaTime()) {
-					return;
+					skip("this engine has java.time; the refusal applies only to engines without it");
 				}
 				var state = {threw = false};
 				try {
