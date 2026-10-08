@@ -274,7 +274,7 @@ UPDATE wheels_jobs SET uniqueKey = id;
 CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey);
 ```
 
-On PostgreSQL and CockroachDB, write `ADD COLUMN heartbeatAt TIMESTAMP`. On SQL Server, make the unique index filtered — `CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) WHERE uniqueKey IS NOT NULL` — because SQL Server allows only one NULL in a plain unique index. On a large, busy table, do the `uniqueKey` backfill and index build in a maintenance window: it touches every row. See [The jobs table](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table) for the full column list and the per-database notes. The `wheels_job_hosts` registry has no backfill and is cheap to auto-create; you can leave it to the framework.
+On PostgreSQL and CockroachDB, write `ADD COLUMN heartbeatAt TIMESTAMP`. On SQL Server, make the unique index filtered — `CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) WHERE uniqueKey IS NOT NULL` — because SQL Server allows only one NULL in a plain unique index. The filtered index needs SQL Server **compatibility level 100 or higher**; below that it can't be built. On such a database, either raise the compatibility level, or create a *plain* unique index (no `WHERE`) — but only **once every server runs 4.2** (and so always writes a key), because a plain unique index allows just one NULL and a server still on 4.1 writes NULL keys that would collide. When the framework's own upgrade can't build the index, its warning and the `Wheels.Job.UniqueKeyUnavailable` error now name the failed step and give the fix for your exact database and SQL Server level. On a large, busy table, do the `uniqueKey` backfill and index build in a maintenance window: it touches every row. See [The jobs table](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table) for the full column list and the per-database notes. The `wheels_job_hosts` registry has no backfill and is cheap to auto-create; you can leave it to the framework.
 
 <Aside type="note" title="Planned: a schema command">
 A `wheels jobs install` command and a `jobsAutoCreateTables` setting — so you can apply the schema from the CLI and turn the auto-`ALTER` off entirely on production — are **planned, not built yet** ([#4499](https://github.com/wheels-dev/wheels/issues/4499)). Until then, apply the DDL above by hand.
@@ -294,7 +294,6 @@ More of the multi-server story is landing through 4.2. These are **not available
 
 - **Exclusive jobs and concurrency keys** — `this.exclusive` and a `concurrencyKeyFor(data)` on a shared lease lock, so at most one job of a kind (or per key) runs across all servers ([#4496](https://github.com/wheels-dev/wheels/issues/4496)).
 - **Lifecycle hooks and a stored result** — per-job lifecycle hooks, an app-wide `jobsOnFailure` hook, and a stored job result ([#4498](https://github.com/wheels-dev/wheels/issues/4498)).
-- **Old SQL Server index levels** — a clearer error when the `uniqueKey` filtered index can't be built on an old SQL Server compatibility level ([#4494](https://github.com/wheels-dev/wheels/issues/4494)).
 
 ## Upgrading from 4.1
 
