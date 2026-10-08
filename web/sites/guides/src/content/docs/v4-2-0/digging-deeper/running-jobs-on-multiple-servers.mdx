@@ -16,6 +16,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 - How a job records liveness with `heartbeat()`, why `timeout` is a hard cap, and what `Wheels.Job.Fenced` means
 - How `this.idempotent` chooses at-least-once or at-most-once recovery
 - How to cap how many jobs one server runs at once
+- How to make a job exclusive, or one-per-key, across the whole fleet
 - How to run the queue: a CLI worker, a process supervisor, or a scheduled task
 - How to declare recurring schedules that produce one job per slot across the fleet
 - How to drain a server before a deploy so it finishes its work and stops cleanly
@@ -71,7 +72,7 @@ component extends="wheels.Job" {
 If the claim is gone — the job was already reaped and handed to another worker while this one stalled — `heartbeat()` throws `Wheels.Job.Fenced`. That's your signal to **stop and return from `perform()`**: another attempt owns the job now, and anything more this attempt does will be discarded. Let the exception propagate; don't catch it to keep working.
 
 <Aside type="note" title="What liveness does today, and what's coming">
-Because `timeout` already caps each attempt, recording liveness has a limited effect on today's reaper. It's the foundation for two changes landing in 4.2: once [#4496](https://github.com/wheels-dev/wheels/issues/4496) lands, `heartbeat()` also renews an exclusive or concurrency-keyed job's lease, so a long run keeps its slot while it works; and [#4502](https://github.com/wheels-dev/wheels/issues/4502) will make a heartbeating long job detectable as dead sooner when its worker actually dies. Call `heartbeat()` in long jobs now, and it gains teeth as those land. It never extends the per-attempt `timeout`.
+`heartbeat()` also renews an [exclusive or concurrency-keyed job's](#exclusive-jobs-and-concurrency-keys) lease — each beat extends it, so a long exclusive run keeps its slot instead of having the lease expire out from under it. Beyond that, because `timeout` already caps each attempt, recording liveness has a limited effect on today's reaper; [#4502](https://github.com/wheels-dev/wheels/issues/4502) will make a heartbeating long job detectable as dead sooner when its worker actually dies. Either way, `heartbeat()` never extends the per-attempt `timeout`.
 </Aside>
 
 <Aside type="note" title="Restricted database users">
@@ -133,6 +134,43 @@ The cap is enforced by every runner that goes through the worker — the CLI wor
 
 <Aside type="note" title="What counts as a host">
 A host is the name a worker records in `wheels_jobs.claimedBy` — the machine's host name by default. When several app servers (JVMs) run on one machine, or you want several processes to share one cap and one drain flag, name each explicitly with `set(jobsHostName = "web-1")`. Two processes with the same host name share a cap; two with different names don't.
+</Aside>
+
+## Exclusive jobs and concurrency keys
+
+The per-host cap bounds *how many* jobs a server runs. A different need is making sure two runs of a *particular* job never overlap across the whole fleet — a nightly billing run that must not double, a per-account sync that mustn't race itself. Declare that in the job class:
+
+```cfm {test:compile} title="app/jobs/NightlyBillingJob.cfc"
+component extends="wheels.Job" {
+    function config() {
+        super.config();
+        this.exclusive = true;   // at most one run of this class at a time, across all servers
+    }
+    public void function perform(struct data = {}) {
+        runBilling();
+    }
+}
+```
+
+- **`this.exclusive = true`** (default `false`) — at most one run of this job class at a time, on any server. While a run holds it, another server that claims the same class puts the job **back to `pending`** (its attempt is handed back, not spent) and tries again once the lease frees.
+- **`this.concurrencyKey = "..."`** — instead of locking the whole class, share one lease among jobs with the same key. Two jobs with different keys run concurrently; two with the same key don't.
+- **`concurrencyKeyFor(struct data)`** — a key computed from the job's data, for per-record exclusion. It **wins over** `this.concurrencyKey` when both are set:
+
+```cfm {test:compile} title="app/jobs/SyncAccountJob.cfc"
+component extends="wheels.Job" {
+    public string function concurrencyKeyFor(struct data = {}) {
+        return "account:" & arguments.data.accountId;   // one sync per account at a time
+    }
+    public void function perform(struct data = {}) {
+        syncAccount(arguments.data.accountId);
+    }
+}
+```
+
+The lease lives in a `wheels_job_locks` table (auto-created on first use, never inside a transaction), owned by the running attempt's claim token, and lasts as long as the claim's window (the job's `timeout` plus the reap grace). A long run should [`heartbeat()`](#record-liveness-with-heartbeat), which extends the lease each beat so it doesn't expire mid-run. If a run does lose its lease before it finishes — taken over after expiry — that's logged and counted (as `leasesLost` in a `processQueue()` result), and the run is **not** failed for it; make the work idempotent so a rare overlap is harmless.
+
+<Aside type="caution">
+A busy lease is retried, not dropped, so an exclusive job that always finds its lease held (a run that never ends, a key that's too coarse) will keep being put back to `pending` and never make progress. Scope `concurrencyKeyFor()` as narrowly as correctness allows, and make sure exclusive jobs actually finish.
 </Aside>
 
 ## Running the queue on each server
@@ -274,7 +312,7 @@ UPDATE wheels_jobs SET uniqueKey = id;
 CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey);
 ```
 
-On PostgreSQL and CockroachDB, write `ADD COLUMN heartbeatAt TIMESTAMP`. On SQL Server, make the unique index filtered — `CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) WHERE uniqueKey IS NOT NULL` — because SQL Server allows only one NULL in a plain unique index. The filtered index needs SQL Server **compatibility level 100 or higher**; below that it can't be built. On such a database, either raise the compatibility level, or create a *plain* unique index (no `WHERE`) — but only **once every server runs 4.2** (and so always writes a key), because a plain unique index allows just one NULL and a server still on 4.1 writes NULL keys that would collide. When the framework's own upgrade can't build the index, its warning and the `Wheels.Job.UniqueKeyUnavailable` error now name the failed step and give the fix for your exact database and SQL Server level. On a large, busy table, do the `uniqueKey` backfill and index build in a maintenance window: it touches every row. See [The jobs table](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table) for the full column list and the per-database notes. The `wheels_job_hosts` registry has no backfill and is cheap to auto-create; you can leave it to the framework.
+On PostgreSQL and CockroachDB, write `ADD COLUMN heartbeatAt TIMESTAMP`. On SQL Server, make the unique index filtered — `CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) WHERE uniqueKey IS NOT NULL` — because SQL Server allows only one NULL in a plain unique index. The filtered index needs SQL Server **compatibility level 100 or higher**; below that it can't be built. On such a database, either raise the compatibility level, or create a *plain* unique index (no `WHERE`) — but only **once every server runs 4.2** (and so always writes a key), because a plain unique index allows just one NULL and a server still on 4.1 writes NULL keys that would collide. When the framework's own upgrade can't build the index, its warning and the `Wheels.Job.UniqueKeyUnavailable` error now name the failed step and give the fix for your exact database and SQL Server level. On a large, busy table, do the `uniqueKey` backfill and index build in a maintenance window: it touches every row. See [The jobs table](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table) for the full column list and the per-database notes. The auxiliary tables — `wheels_job_hosts` (the host registry), `wheels_job_locks` (exclusive-job leases), and `wheels_job_schedules` (recurring schedules) — have no backfill and are cheap to auto-create, so you can leave those to the framework; only the `wheels_jobs` column changes above are worth applying by hand up front.
 
 <Aside type="note" title="Planned: a schema command">
 A `wheels jobs install` command and a `jobsAutoCreateTables` setting — so you can apply the schema from the CLI and turn the auto-`ALTER` off entirely on production — are **planned, not built yet** ([#4499](https://github.com/wheels-dev/wheels/issues/4499)). Until then, apply the DDL above by hand.
@@ -292,7 +330,6 @@ Writing and comparing all job timestamps on one UTC database clock — removing 
 
 More of the multi-server story is landing through 4.2. These are **not available yet**; each links its tracking issue, and this page gains a full section as it merges.
 
-- **Exclusive jobs and concurrency keys** — `this.exclusive` and a `concurrencyKeyFor(data)` on a shared lease lock, so at most one job of a kind (or per key) runs across all servers ([#4496](https://github.com/wheels-dev/wheels/issues/4496)).
 - **Lifecycle hooks and a stored result** — per-job lifecycle hooks, an app-wide `jobsOnFailure` hook, and a stored job result ([#4498](https://github.com/wheels-dev/wheels/issues/4498)).
 
 ## Upgrading from 4.1
