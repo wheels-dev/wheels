@@ -1782,8 +1782,9 @@ component {
 
 	/**
 	 * Whether `host` is draining right now: its drain flag is set and has not expired. A missing
-	 * registry (nothing ever drained) means not draining. Compared SQL-side, on the same clock
-	 * the drain was written with.
+	 * registry (nothing ever drained) means not draining. Any other failure is logged and
+	 * rethrown: treating a broken registry as "not draining" would let a drained host start jobs
+	 * mid-deploy. Compared SQL-side, on the same clock the drain was written with.
 	 */
 	public boolean function $hostDraining(required string host) {
 		try {
@@ -1798,7 +1799,11 @@ component {
 			);
 			return Val(local.rows.cnt) > 0;
 		} catch (any e) {
-			return false;
+			if (!$hostsTableExists()) {
+				return false;
+			}
+			writeLog(text = "Could not read the drain state of jobs host '#arguments.host#' from wheels_job_hosts (no job will start on this host until it can): #e.message#", type = "error", file = "wheels_jobs");
+			rethrow;
 		}
 	}
 
