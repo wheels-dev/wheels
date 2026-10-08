@@ -72,7 +72,7 @@ component extends="wheels.Job" {
 If the claim is gone — the job was already reaped and handed to another worker while this one stalled — `heartbeat()` throws `Wheels.Job.Fenced`. That's your signal to **stop and return from `perform()`**: another attempt owns the job now, and anything more this attempt does will be discarded. Let the exception propagate; don't catch it to keep working.
 
 <Aside type="note" title="What liveness does today, and what's coming">
-`heartbeat()` also renews an [exclusive or concurrency-keyed job's](#exclusive-jobs-and-concurrency-keys) lease — each beat extends it, so a long exclusive run keeps its slot instead of having the lease expire out from under it. Beyond that, because `timeout` already caps each attempt, recording liveness has a limited effect on today's reaper; [#4502](https://github.com/wheels-dev/wheels/issues/4502) will make a heartbeating long job detectable as dead sooner when its worker actually dies. Either way, `heartbeat()` never extends the per-attempt `timeout`.
+`heartbeat()` also renews an [exclusive or concurrency-keyed job's](#exclusive-jobs-and-concurrency-keys) lease, extending it with each beat. Like its effect on the reaper, this is mostly groundwork today: because `timeout` hard-caps each attempt and the lease is sized to outlast that, the lease can't expire mid-run as things stand, and [#4502](https://github.com/wheels-dev/wheels/issues/4502) will make a heartbeating long job detectable as dead sooner when its worker actually dies. Either way, `heartbeat()` never extends the per-attempt `timeout`.
 </Aside>
 
 <Aside type="note" title="Restricted database users">
@@ -167,7 +167,7 @@ component extends="wheels.Job" {
 }
 ```
 
-The lease lives in a `wheels_job_locks` table (auto-created on first use, never inside a transaction), owned by the running attempt's claim token, and lasts as long as the claim's window (the job's `timeout` plus the reap grace). A long run should [`heartbeat()`](#record-liveness-with-heartbeat), which extends the lease each beat so it doesn't expire mid-run. If a run does lose its lease before it finishes — taken over after expiry — that's logged and counted (as `leasesLost` in a `processQueue()` result), and the run is **not** failed for it; make the work idempotent so a rare overlap is harmless.
+The lease lives in a `wheels_job_locks` table (auto-created on first use, never inside a transaction), owned by the running attempt's claim token, and lasts as long as the attempt's reap window — the timeout it was claimed with plus the reap grace — so it covers the run. A long run can [`heartbeat()`](#record-liveness-with-heartbeat) to extend the lease as it goes. If a run does lose its lease before it finishes — taken over after expiry — that's logged and counted (as `leasesLost` in a `processQueue()` result), and the run is **not** failed for it; make the work idempotent so a rare overlap is harmless.
 
 <Aside type="caution">
 A busy lease is retried, not dropped, so an exclusive job that always finds its lease held (a run that never ends, a key that's too coarse) will keep being put back to `pending` and never make progress. Scope `concurrencyKeyFor()` as narrowly as correctness allows, and make sure exclusive jobs actually finish.
