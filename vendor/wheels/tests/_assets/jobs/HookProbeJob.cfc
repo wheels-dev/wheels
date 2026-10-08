@@ -29,6 +29,12 @@ component extends="wheels.Job" {
 		if (local.mode == "long") {
 			return RepeatString("x", 5000);
 		}
+		if (local.mode == "unicode") {
+			return "caf" & Chr(233) & " " & Chr(8211) & " " & Chr(26085) & Chr(26412) & " " & Chr(10003);
+		}
+		if (local.mode == "unicodeLong") {
+			return RepeatString(Chr(26085) & Chr(26412), 1500);
+		}
 		if (local.mode == "void") {
 			return;
 		}

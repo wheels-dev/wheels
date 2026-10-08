@@ -61,6 +61,29 @@ component extends="wheels.WheelsTest" {
 				expect(Right(stored, 14)).toBe("...[truncated]");
 			});
 
+			it("stores a non-ASCII result intact", function() {
+				var id = $insertJob(queue = "test_hooks_unicode", data = {mode = "unicode"});
+				new wheels.JobWorker().processNext(queues = "test_hooks_unicode", timeout = 300);
+				expect($row(id).result).toBe("caf" & Chr(233) & " " & Chr(8211) & " " & Chr(26085) & Chr(26412) & " " & Chr(10003));
+			});
+
+			it("cuts a long non-ASCII result at what the column counts, never mid-character", function() {
+				var id = $insertJob(queue = "test_hooks_unicodelong", data = {mode = "unicodeLong"});
+				new wheels.JobWorker().processNext(queues = "test_hooks_unicodelong", timeout = 300);
+				var stored = $row(id).result;
+				var original = RepeatString(Chr(26085) & Chr(26412), 1500);
+				if (new wheels.Job().$detectDatabaseType() == "sqlserver") {
+					// NVARCHAR(4000) counts characters: 3000 fit whole.
+					expect(stored).toBe(original);
+				} else {
+					// 9000 UTF-8 bytes: cut to 4000 bytes, on a character boundary.
+					expect(Right(stored, 14)).toBe("...[truncated]");
+					expect(Len(CharsetDecode(stored, "utf-8"))).toBeLTE(4000);
+					var kept = Left(stored, Len(stored) - 14);
+					expect(Left(original, Len(kept))).toBe(kept);
+				}
+			});
+
 			it("calls onFailure and the app's hook with isFinal = false when the job will be retried", function() {
 				var id = $insertJob(queue = "test_hooks_retry", data = {mode = "fail"});
 				var result = new wheels.JobWorker().processNext(queues = "test_hooks_retry", timeout = 300);

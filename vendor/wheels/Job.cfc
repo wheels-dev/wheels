@@ -1146,7 +1146,7 @@ component {
 					claimToken #local.varcharType#(36),
 					claimedBy #local.varcharType#(128),
 					uniqueKey #local.varcharType#(255),
-					result #local.varcharType#(4000),
+					result #$resultColumnType(local.dbType)#,
 					lastError #local.textType#,
 					runAt #local.datetimeType#,
 					completedAt #local.datetimeType#,
@@ -1425,7 +1425,7 @@ component {
 			return;
 		}
 		try {
-			queryExecute($claimTokenAlterSql(columnName = "result", size = 4000), {}, {datasource = variables.$datasource});
+			queryExecute($resultAlterSql(), {}, {datasource = variables.$datasource});
 			$clearClaimTimeoutAlterMemo(memoKey = "$resultAlterFailedAt");
 		} catch (any e) {
 			$recordClaimTimeoutAlterFailure(memoKey = "$resultAlterFailedAt");
@@ -1458,38 +1458,85 @@ component {
 	}
 
 	/**
+	 * The result column's type: NVARCHAR(4000) on SQL Server, whose VARCHAR silently mangles
+	 * non-ASCII text, and VARCHAR(4000) (VARCHAR2 on Oracle) elsewhere.
+	 */
+	public string function $resultColumnType(required string dbType) {
+		if (arguments.dbType == "sqlserver") {
+			return "NVARCHAR(4000)";
+		}
+		return (arguments.dbType == "oracle" ? "VARCHAR2" : "VARCHAR") & "(4000)";
+	}
+
+	/**
+	 * The per-database "ADD result" DDL.
+	 */
+	public string function $resultAlterSql() {
+		local.dbType = $detectDatabaseType();
+		local.definition = "result #$resultColumnType(local.dbType)#";
+		if (local.dbType == "oracle") {
+			return "ALTER TABLE wheels_jobs ADD (#local.definition#)";
+		}
+		if (local.dbType == "sqlserver") {
+			return "ALTER TABLE wheels_jobs ADD #local.definition#";
+		}
+		return "ALTER TABLE wheels_jobs ADD COLUMN #local.definition#";
+	}
+
+	/**
 	 * The completion UPDATE's result assignment and parameter: perform()'s return value, or NULL
-	 * when it returned nothing (or the column isn't there, when the fragment is empty).
+	 * when it returned nothing (or the column isn't there, when the fragment is empty). An empty
+	 * string is stored as NULL too: Oracle can't tell the two apart.
 	 */
 	public string function $resultAssignment(required struct performOutcome, required struct params) {
 		if (!$resultColumnAvailable()) {
 			return "";
 		}
-		local.text = arguments.performOutcome.hasResult ? $serializeJobResult(arguments.performOutcome.result) : "";
-		arguments.params.result = {value = local.text, cfsqltype = "cf_sql_varchar", null = !Len(local.text)};
+		// Detected once per instance: this runs on every completion.
+		if (!StructKeyExists(variables, "$resultDbType")) {
+			variables.$resultDbType = $detectDatabaseType();
+		}
+		local.dbType = variables.$resultDbType;
+		local.text = arguments.performOutcome.hasResult ? $serializeJobResult(value = arguments.performOutcome.result, dbType = local.dbType) : "";
+		arguments.params.result = {
+			value = local.text,
+			cfsqltype = local.dbType == "sqlserver" ? "cf_sql_nvarchar" : "cf_sql_varchar",
+			null = !Len(local.text)
+		};
 		return ", result = :result";
 	}
 
 	/**
 	 * perform()'s return value as stored text: a simple value as-is, anything else as JSON. A value
-	 * over the column's 4000 bytes (UTF-8) is cut short and ends with a visible marker.
+	 * over the column's limit is cut short and ends with a visible marker. The limit is what the
+	 * column counts: 4000 characters (UTF-16 code units) for SQL Server's NVARCHAR, and 4000 UTF-8
+	 * bytes elsewhere (Oracle's VARCHAR2 counts bytes; for the databases that count characters,
+	 * bytes is the safe bound). The trim loop only runs for a value over the limit.
 	 */
-	public string function $serializeJobResult(any value) {
+	public string function $serializeJobResult(any value, string dbType = "") {
 		if (IsNull(arguments.value)) {
 			return "";
 		}
 		local.text = IsSimpleValue(arguments.value) ? ToString(arguments.value) : SerializeJSON(arguments.value);
 		local.limit = 4000;
-		if (Len(CharsetDecode(local.text, "utf-8")) <= local.limit) {
+		local.countChars = arguments.dbType == "sqlserver";
+		if ($resultSize(local.text, local.countChars) <= local.limit) {
 			return local.text;
 		}
 		local.marker = "...[truncated]";
 		local.keep = local.limit - Len(local.marker);
 		local.text = Left(local.text, local.keep);
-		while (Len(local.text) > 0 && Len(CharsetDecode(local.text, "utf-8")) > local.keep) {
+		while (Len(local.text) > 0 && $resultSize(local.text, local.countChars) > local.keep) {
 			local.text = Left(local.text, Len(local.text) - 1);
 		}
 		return local.text & local.marker;
+	}
+
+	/**
+	 * Internal: a text's size as a result column counts it, in characters or UTF-8 bytes.
+	 */
+	public numeric function $resultSize(required string text, required boolean countChars) {
+		return arguments.countChars ? Len(arguments.text) : Len(CharsetDecode(arguments.text, "utf-8"));
 	}
 
 	/**
