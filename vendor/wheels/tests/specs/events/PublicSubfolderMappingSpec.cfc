@@ -16,7 +16,9 @@ component extends="wheels.WheelsTest" {
 		variables.probeFile = ExpandPath("/files/") & "_wheels_subdir_probe_" & LCase(Left(Hash(CreateUUID()), 8)) & ".cfm";
 		FileWrite(
 			variables.probeFile,
-			'<cfcontent type="text/plain" reset="true"><cfoutput>ok|##GetApplicationSettings().mappings["/wheels"]##</cfoutput>'
+			// ExpandPath() of a mapped path shows the mapping on every engine (Adobe has no
+			// GetApplicationSettings()).
+			'<cfcontent type="text/plain" reset="true"><cfoutput>ok|##ExpandPath("/wheels/Global.cfc")##</cfoutput>'
 		);
 		variables.probePath = "/files/" & GetFileFromPath(variables.probeFile);
 	}
@@ -36,7 +38,7 @@ component extends="wheels.WheelsTest" {
 				tc.get(variables.probePath).assertOk();
 				expect(ListFirst(tc.content(), "|")).toBe("ok");
 				var mapped = Replace(ListRest(tc.content(), "|"), "\", "/", "all");
-				expect(mapped).toInclude("/vendor/wheels");
+				expect(mapped).toInclude("/vendor/wheels/Global.cfc");
 				expect(mapped).notToInclude("/public/vendor");
 			});
 
