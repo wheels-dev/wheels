@@ -570,6 +570,10 @@ component {
 			}
 		}
 
+		// Sync the code-defined recurring job schedules (config/schedules.cfm) to
+		// wheels_job_schedules. Runs after any boot migration and never fails the start.
+		$syncJobSchedules();
+
 		// Redirect away from reloads on GET requests.
 		if (application.wheels.redirectAfterReload && StructKeyExists(url, "reload") && cgi.request_method == "get") {
 			if (StructKeyExists(cgi, "path_info") && Len(cgi.path_info)) {
@@ -698,6 +702,26 @@ component {
 	/**
 	 * The WHEELS_MIGRATE_ON_BOOT environment variable, or "" when it is not set.
 	 */
+	/**
+	 * Internal function. Sync config/schedules.cfm to wheels_job_schedules (a missing file
+	 * disables code-defined schedules already there). Logged, never thrown: a schedules problem
+	 * must not stop the application starting.
+	 */
+	public void function $syncJobSchedules() {
+		try {
+			if (FileExists(ExpandPath("/config/schedules.cfm"))) {
+				new wheels.JobScheduler().$syncFromConfig();
+			} else {
+				local.scheduler = new wheels.JobScheduler();
+				if (local.scheduler.$schedulesTableExists()) {
+					local.scheduler.$syncFromConfig();
+				}
+			}
+		} catch (any e) {
+			WriteLog(type = "error", file = "wheels_jobs", text = "Could not sync config/schedules.cfm: #e.message#");
+		}
+	}
+
 	public string function $bootMigrationEnvValue() {
 		return $readEnvironmentVariable("WHEELS_MIGRATE_ON_BOOT");
 	}
