@@ -176,7 +176,8 @@ component extends="wheels.WheelsTest" {
 		struct data = {},
 		numeric attempts = 0,
 		string status = "pending",
-		boolean stale = false
+		boolean stale = false,
+		string jobClass = "wheels.tests._assets.jobs.HookProbeJob"
 	) {
 		var id = CreateUUID();
 		var stamp = arguments.stale ? DateAdd("h", -2, Now()) : DateAdd("s", -5, Now());
@@ -185,7 +186,7 @@ component extends="wheels.WheelsTest" {
 			VALUES (:id, :jobClass, :queue, :data, 0, :status, :attempts, 1, :runAt, :createdAt, :updatedAt)",
 			{
 				id = {value = id, cfsqltype = "cf_sql_varchar"},
-				jobClass = {value = "wheels.tests._assets.jobs.HookProbeJob", cfsqltype = "cf_sql_varchar"},
+				jobClass = {value = arguments.jobClass, cfsqltype = "cf_sql_varchar"},
 				queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
 				data = {value = SerializeJSON(arguments.data), cfsqltype = "cf_sql_longvarchar"},
 				status = {value = arguments.status, cfsqltype = "cf_sql_varchar"},

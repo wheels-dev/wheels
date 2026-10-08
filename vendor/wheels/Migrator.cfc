@@ -474,10 +474,7 @@ component output="false" extends="wheels.Global"{
 		}
 		StructDelete(local.held, arguments.migrationLock.key);
 		try {
-			$migrationLockQuery(
-				sql = "DELETE FROM #$migrationLockTable()# WHERE lockname = :lockName AND lockowner = :owner",
-				params = {lockName = $migrationLockText($migrationLockName()), owner = $migrationLockText(arguments.migrationLock.owner)}
-			);
+			$runMigrationLockStatement($migrationLease().releaseStatement(name = $migrationLockName(), owner = arguments.migrationLock.owner));
 		} catch (any e) {
 			WriteLog(type = "error", file = "wheels", text = "Migrator: could not release the migration lock: #e.message#");
 		}
@@ -495,13 +492,8 @@ component output="false" extends="wheels.Global"{
 			return;
 		}
 		local.migrationLock = local.held[local.key];
-		$migrationLockQuery(
-			sql = "UPDATE #$migrationLockTable()# SET expiresat = :expiresAt WHERE lockname = :lockName AND lockowner = :owner",
-			params = {
-				expiresAt = $migrationLockMs($migrationLockExpiry()),
-				lockName = $migrationLockText($migrationLockName()),
-				owner = $migrationLockText(local.migrationLock.owner)
-			}
+		$runMigrationLockStatement(
+			$migrationLease().renewStatement(name = $migrationLockName(), owner = local.migrationLock.owner, expiresAt = $migrationLockExpiry())
 		);
 		if ($migrationLockOwner() != local.migrationLock.owner) {
 			StructDelete(local.held, local.key);
@@ -545,15 +537,14 @@ component output="false" extends="wheels.Global"{
 			return $takeOverExpiredMigrationLock(migrationLock = arguments.migrationLock, now = local.now);
 		}
 		try {
-			$migrationLockQuery(
-				sql = "INSERT INTO #$migrationLockTable()# (lockname, lockowner, lockhost, acquiredat, expiresat) VALUES (:lockName, :owner, :host, :acquiredAt, :expiresAt)",
-				params = {
-					lockName = $migrationLockText($migrationLockName()),
-					owner = $migrationLockText(arguments.migrationLock.owner),
-					host = $migrationLockText($migrationLockHost()),
-					acquiredAt = $migrationLockMs(local.now),
-					expiresAt = $migrationLockMs($migrationLockExpiry())
-				}
+			$runMigrationLockStatement(
+				$migrationLease().insertStatement(
+					name = $migrationLockName(),
+					owner = arguments.migrationLock.owner,
+					host = $migrationLockHost(),
+					acquiredAt = local.now,
+					expiresAt = $migrationLockExpiry()
+				)
 			);
 			return true;
 		} catch (any e) {
@@ -572,15 +563,14 @@ component output="false" extends="wheels.Global"{
 	 * WHERE makes it atomic; reading the owner back tells whether this migration lock won.
 	 */
 	public boolean function $takeOverExpiredMigrationLock(required struct migrationLock, required numeric now) {
-		$migrationLockQuery(
-			sql = "UPDATE #$migrationLockTable()# SET lockowner = :owner, lockhost = :host, acquiredat = :now, expiresat = :expiresAt WHERE lockname = :lockName AND expiresat < :now",
-			params = {
-				owner = $migrationLockText(arguments.migrationLock.owner),
-				host = $migrationLockText($migrationLockHost()),
-				now = $migrationLockMs(arguments.now),
-				expiresAt = $migrationLockMs($migrationLockExpiry()),
-				lockName = $migrationLockText($migrationLockName())
-			}
+		$runMigrationLockStatement(
+			$migrationLease().takeOverStatement(
+				name = $migrationLockName(),
+				owner = arguments.migrationLock.owner,
+				host = $migrationLockHost(),
+				now = arguments.now,
+				expiresAt = $migrationLockExpiry()
+			)
 		);
 		return $migrationLockOwner() == arguments.migrationLock.owner;
 	}
@@ -604,7 +594,7 @@ component output="false" extends="wheels.Global"{
 		try {
 			$query(
 				datasource = arguments.dataSource,
-				sql = "CREATE TABLE #local.table# (lockname VARCHAR(100) NOT NULL PRIMARY KEY, lockowner VARCHAR(64) NOT NULL, lockhost VARCHAR(255), acquiredat DECIMAL(15,0) NOT NULL, expiresat DECIMAL(15,0) NOT NULL)"
+				sql = $migrationLease().createTableSql()
 			);
 		} catch (any e) {
 			// Tolerate "already exists" from another instance creating it at the same time.
@@ -639,10 +629,7 @@ component output="false" extends="wheels.Global"{
 	 * Internal function. The owner id holding the migration lock, or "" when it is free.
 	 */
 	public string function $migrationLockOwner() {
-		local.rows = $migrationLockQuery(
-			sql = "SELECT lockowner FROM #$migrationLockTable()# WHERE lockname = :lockName",
-			params = {lockName = $migrationLockText($migrationLockName())}
-		);
+		local.rows = $runMigrationLockStatement($migrationLease().ownerStatement($migrationLockName()));
 		return local.rows.recordCount ? local.rows.lockowner : "";
 	}
 
@@ -677,10 +664,7 @@ component output="false" extends="wheels.Global"{
 		if (!$migratorTableExists($migratorDataSource(), $migrationLockTable())) {
 			return local.rv;
 		}
-		local.rows = $migrationLockQuery(
-			sql = "SELECT lockowner, lockhost, acquiredat, expiresat FROM #$migrationLockTable()# WHERE lockname = :lockName",
-			params = {lockName = $migrationLockText($migrationLockName())}
-		);
+		local.rows = $runMigrationLockStatement($migrationLease().readStatement($migrationLockName()));
 		if (!local.rows.recordCount) {
 			return local.rv;
 		}
@@ -712,19 +696,35 @@ component output="false" extends="wheels.Global"{
 		if (!local.rv.lock.held) {
 			return local.rv;
 		}
-		local.sql = "DELETE FROM #$migrationLockTable()# WHERE lockname = :lockName AND lockowner = :owner";
-		local.params = {lockName = $migrationLockText($migrationLockName()), owner = $migrationLockText(local.rv.lock.owner)};
-		if (!arguments.force) {
-			// In the DELETE itself, so a holder renewing its lease meanwhile keeps it.
-			local.sql &= " AND expiresat < :now";
-			local.params.now = $migrationLockMs(GetTickCount());
-		}
-		$migrationLockQuery(sql = local.sql, params = local.params);
+		// Without force, the expiry test is in the DELETE itself, so a holder renewing its lease
+		// meanwhile keeps it.
+		$runMigrationLockStatement(
+			$migrationLease().releaseStatement(
+				name = $migrationLockName(),
+				owner = local.rv.lock.owner,
+				expiredBefore = arguments.force ? "" : GetTickCount()
+			)
+		);
 		// Read back, not compared with the old owner: an instance that took the lease between the
 		// read and the DELETE keeps it, and that is not a release.
 		local.rv["heldBy"] = $migrationLockOwner();
 		local.rv["released"] = !Len(local.rv.heldBy);
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. The lease lock over the migration lock table. Builds the lock's SQL; the
+	 * Migrator runs it through $migrationLockQuery() for its datasource credentials.
+	 */
+	public any function $migrationLease() {
+		return new wheels.LeaseLock(table = $migrationLockTable());
+	}
+
+	/**
+	 * Internal function. Runs a LeaseLock statement through $migrationLockQuery().
+	 */
+	public query function $runMigrationLockStatement(required struct statement) {
+		return $migrationLockQuery(sql = arguments.statement.sql, params = arguments.statement.params);
 	}
 
 	/**

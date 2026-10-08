@@ -70,16 +70,20 @@ An app installed with CommandBox (`box install wheels-base-template`) has the sa
 
 ## How the pieces find each other
 
-There is no magic registry and no generated wiring. `public/Application.cfc` defines six CFML mappings, all relative to the `public/` folder:
+There is no magic registry and no generated wiring. `public/Application.cfc` defines six CFML mappings, all built from the project root one level above the `public/` folder:
 
 ```cfm
-this.mappings["/app"]     = expandPath("../app/");
-this.mappings["/vendor"]  = expandPath("../vendor/");
-this.mappings["/wheels"]  = expandPath("../vendor/wheels/");
-this.mappings["/tests"]   = expandPath("../tests");
-this.mappings["/config"]  = expandPath("../config");
-this.mappings["/plugins"] = expandPath("../plugins");
+this.wheels.projectRoot = REReplace(this.wheels.rootPath, "[^/\\]+[/\\]$", "");
+
+this.mappings["/app"]     = this.wheels.projectRoot & "app/";
+this.mappings["/vendor"]  = this.wheels.projectRoot & "vendor/";
+this.mappings["/wheels"]  = this.wheels.projectRoot & "vendor/wheels/";
+this.mappings["/tests"]   = this.wheels.projectRoot & "tests";
+this.mappings["/config"]  = this.wheels.projectRoot & "config";
+this.mappings["/plugins"] = this.wheels.projectRoot & "plugins";
 ```
+
+`this.wheels.rootPath` is the directory of `Application.cfc` itself, so the mappings are the same whichever page under `public/` was requested.
 
 That's the whole contract. Point any CFML-capable web server at `public/` and the app can find its own code, no matter where on disk the folder sits or what tool put it there. It also means everything *outside* `public/` — your models, your config, your `.env`, the framework itself — is unreachable from a browser.
 
