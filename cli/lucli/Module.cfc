@@ -586,7 +586,7 @@ component extends="modules.BaseModule" {
 
 	private any function jobsArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "action", default = "status", description = "work (long-lived worker loop), status (queue snapshot) or enqueue (add a job). Defaults to status")
+			.positional(name = "action", default = "status", description = "work (long-lived worker loop), status (queue snapshot), enqueue (add a job), drain (stop this server starting new jobs) or resume. Defaults to status")
 			.positional(name = "job", default = "", description = "enqueue only: the job class under app/jobs/, e.g. SendWelcomeEmailJob or billing.InvoiceJob")
 			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. enqueue: the queue to put the job on (default: the job's own). Empty = all queues")
 			.option(name = "data", default = "", description = "enqueue only: the job's data, a JSON object passed to perform()")
@@ -597,7 +597,9 @@ component extends="modules.BaseModule" {
 			.option(name = "max-jobs", default = 0, type = "numeric", description = "work only: stop after this many jobs (successes + failures count). 0 = run until stopped")
 			.flag(name = "stop-when-empty", default = false, description = "work only: exit when a poll finds no job ready to run, instead of waiting for more. For one-shot batches from cron or CI; combines with --max-jobs")
 			.flag(name = "quiet", default = false, description = "work only: suppress per-job completion output, only print failures")
-			.option(name = "format", default = "table", description = "status and enqueue: output format, table or json");
+			.option(name = "format", default = "table", description = "status, enqueue, drain and resume: output format, table or json")
+			.option(name = "wait", default = "", type = "any", description = "drain only: after draining, wait until this server has no running jobs (--wait = up to 600 seconds, --wait=<seconds> for another limit). Exits with an error if jobs are still running at the limit")
+			.option(name = "expires", default = 3600, type = "numeric", description = "drain only: seconds until the drain lifts itself if nothing resumes it. 0 = until wheels jobs resume");
 	}
 
 	private any function dbArgSpec() {
@@ -5831,7 +5833,9 @@ component extends="modules.BaseModule" {
 			data = trim(parsed.data),
 			priority = trim(parsed.priority),
 			"in" = trim(parsed["in"]),
-			at = trim(parsed.at)
+			at = trim(parsed.at),
+			wait = $jobsWaitSeconds(trim(parsed.wait)),
+			expires = parsed.expires
 		};
 		if (!len(opts.action)) {
 			opts.action = "status";
@@ -5848,6 +5852,20 @@ component extends="modules.BaseModule" {
 				message = "--max-jobs must be zero (unlimited) or a positive number."
 			);
 		}
+		// `--wait 30` (a space, not =) reaches here as a bare --wait plus a stray positional "30",
+		// which would silently mean the 600-second default. Refuse it instead of guessing.
+		if (listFindNoCase("drain,resume", opts.action) && len(opts.job)) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "wheels jobs #opts.action# takes no value '#opts.job#'. For a wait limit write --wait=<seconds>, with an equals sign."
+			);
+		}
+		if (opts.expires < 0) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "--expires must be zero (until resumed) or a positive number of seconds."
+			);
+		}
 		if (!listFindNoCase("table,json", opts.format)) {
 			throw(
 				type = "Wheels.InvalidArguments",
@@ -5858,7 +5876,7 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts (--format=json for machines), `enqueue <JobName>` adds a job now or after a delay. retry/purge/monitor are tracked follow-ups (issue 3090).
+	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts and this server's running jobs, cap and drain (--format=json for machines), `enqueue <JobName>` adds a job now or after a delay, `drain [--wait]` stops this server starting new jobs (for deploys) and `resume` lifts it. retry/purge/monitor are tracked follow-ups (issue 3090).
 	 */
 	public string function jobs() {
 		var opts = $parseJobsArgs(structuredArgs(arguments));
@@ -5870,6 +5888,10 @@ component extends="modules.BaseModule" {
 				return runJobsStatus(opts);
 			case "enqueue":
 				return runJobsEnqueue(opts);
+			case "drain":
+				return runJobsDrain(opts);
+			case "resume":
+				return runJobsResume(opts);
 			// The framework bridge (vendor/wheels/public/views/cli.cfm) already
 			// implements jobsRetry/jobsPurge/jobsMonitor — the CLI verbs are
 			// deliberate follow-ups tracked in ##3090. Fail loudly with the
@@ -5888,7 +5910,7 @@ component extends="modules.BaseModule" {
 				);
 			default:
 				out("Unknown jobs action: #opts.action#", "red");
-				out("Usage: wheels jobs [work|status|enqueue <JobName>] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--format=table|json]");
+				out("Usage: wheels jobs [work|status|enqueue <JobName>|drain|resume] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--wait[=<seconds>]] [--expires=<seconds>] [--format=table|json]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
 		}
 	}
@@ -6133,14 +6155,159 @@ component extends="modules.BaseModule" {
 		var result = parseCliResponse(httpResult, "Jobs status");
 		var stats = structKeyExists(result, "stats") && isStruct(result.stats) ? result.stats : {};
 
+		var host = structKeyExists(result, "host") && isStruct(result.host) ? result.host : {};
+
 		if (arguments.opts.format == "json") {
-			out(serializeJSON(stats));
+			var payload = duplicate(stats);
+			if (!structIsEmpty(host)) {
+				payload.host = host;
+			}
+			out(serializeJSON(payload));
 			return "";
 		}
 
 		out("Job Queue Status", "cyan");
 		out($formatJobsStatusTable(stats));
+		if (!structIsEmpty(host)) {
+			out($formatJobsHostLine(host));
+		}
 		return "";
+	}
+
+	/**
+	 * `wheels jobs drain`: this server starts no new jobs (deploys). With --wait, keep polling
+	 * until it has no running jobs, so the deploy can stop it safely; refuse (non-zero exit) if
+	 * jobs are still running when the wait runs out.
+	 */
+	private string function runJobsDrain(required struct opts) {
+		var serverPort = $requireOwnRunningServer([
+			"Draining needs this project's running server.",
+			"Start it with: wheels start"
+		]);
+		var base = $serverUrlBase(serverPort);
+		var httpResult = "";
+		try {
+			httpResult = makeBridgePost("#base#/wheels/cli?command=jobsDrain&format=json&expiresInSeconds=#int(arguments.opts.expires)#");
+		} catch (any httpErr) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Drain failed (connection error): #httpErr.message#");
+		}
+		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {success: false, message: "Invalid response from the server."};
+		if (!(parsed.success ?: false) || !isStruct(parsed.host ?: "")) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Drain failed: " & (parsed.message ?: "no reason given."));
+		}
+		var host = parsed.host;
+		if (arguments.opts.wait > 0) {
+			host = $jobsWaitForDrain(base = base, host = host, waitSeconds = arguments.opts.wait);
+		}
+		if (arguments.opts.format == "json") {
+			out(serializeJSON(host));
+			return "";
+		}
+		out("Draining #host.host#: no new jobs will start there.", "green");
+		out($formatJobsHostLine(host));
+		if (arguments.opts.wait > 0) {
+			out("No jobs are running on #host.host#; it is safe to stop.", "green");
+		} else {
+			out("Resume with: wheels jobs resume");
+		}
+		return "";
+	}
+
+	/**
+	 * `wheels jobs resume`: this server starts jobs again.
+	 */
+	private string function runJobsResume(required struct opts) {
+		var serverPort = $requireOwnRunningServer([
+			"Resuming needs this project's running server.",
+			"Start it with: wheels start"
+		]);
+		var httpResult = "";
+		try {
+			httpResult = makeBridgePost("#$serverUrlBase(serverPort)#/wheels/cli?command=jobsResume&format=json");
+		} catch (any httpErr) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Resume failed (connection error): #httpErr.message#");
+		}
+		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {success: false, message: "Invalid response from the server."};
+		if (!(parsed.success ?: false) || !isStruct(parsed.host ?: "")) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Resume failed: " & (parsed.message ?: "no reason given."));
+		}
+		if (arguments.opts.format == "json") {
+			out(serializeJSON(parsed.host));
+			return "";
+		}
+		out("Resumed #parsed.host.host#: it starts jobs again.", "green");
+		out($formatJobsHostLine(parsed.host));
+		return "";
+	}
+
+	/**
+	 * Poll this server's job state until nothing is running, checking every 2 seconds for up
+	 * to waitSeconds. Returns the last state; throws Wheels.JobsDrainTimeout when jobs are
+	 * still running at the limit. Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public struct function $jobsWaitForDrain(required string base, required struct host, required numeric waitSeconds) {
+		var state = arguments.host;
+		var pollSeconds = 2;
+		var polls = ceiling(arguments.waitSeconds / pollSeconds);
+		for (var poll = 0; poll <= polls; poll++) {
+			if (val(state.running ?: 0) <= 0) {
+				return state;
+			}
+			if (poll == polls) {
+				break;
+			}
+			out("Waiting for #state.running# running job(s) on #state.host# to finish...");
+			$jobsPause(pollSeconds);
+			var httpResult = makeHttpRequest("#arguments.base#/wheels/cli?command=jobsHostStatus&format=json");
+			var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {};
+			if (isStruct(parsed.host ?: "")) {
+				state = parsed.host;
+			}
+		}
+		throw(
+			type = "Wheels.JobsDrainTimeout",
+			message = "#state.host# is draining, but #state.running# job(s) were still running after #arguments.waitSeconds# seconds.",
+			detail = "Don't stop the server yet: wait longer (--wait=<seconds>), or check the jobs with: wheels jobs status"
+		);
+	}
+
+	/**
+	 * --wait's value in seconds: "" = don't wait, a bare --wait = 600, a number = that many.
+	 * Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public numeric function $jobsWaitSeconds(required string wait) {
+		if (!len(arguments.wait) || arguments.wait == "false") {
+			return 0;
+		}
+		if (arguments.wait == "true") {
+			return 600;
+		}
+		if (!reFind("^[0-9]+$", arguments.wait)) {
+			throw(type = "Wheels.InvalidArguments", message = "--wait must be a whole number of seconds (or just --wait for up to 600).");
+		}
+		return val(arguments.wait);
+	}
+
+	/**
+	 * Pause between drain polls. Its own method so specs can skip the wait.
+	 */
+	public void function $jobsPause(required numeric seconds) {
+		sleep(arguments.seconds * 1000);
+	}
+
+	/**
+	 * One line describing this server's job state, from JobRunner.status(). Public for specs.
+	 */
+	public string function $formatJobsHostLine(required struct host) {
+		var hostName = arguments.host.host ?: "";
+		var running = val(arguments.host.running ?: 0);
+		var cap = val(arguments.host.maxConcurrent ?: 0) > 0 ? arguments.host.maxConcurrent : "no cap";
+		var line = "Host #hostName#: #running# running, max #cap#";
+		if (arguments.host.draining ?: false) {
+			var expires = len(arguments.host.drainExpiresAt ?: "") ? " until #arguments.host.drainExpiresAt#" : " until resumed";
+			line &= ", draining#expires#";
+		}
+		return line;
 	}
 
 	/**
@@ -11696,14 +11863,14 @@ component extends="modules.BaseModule" {
 		h2Config &= tab & "// H2 embedded database (configured by wheels new --setup-h2)" & nl;
 		h2Config &= tab & 'this.datasources["#datasourceName#"] = {' & nl;
 		h2Config &= tab & tab & 'class: "org.h2.Driver",' & nl;
-		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & expandPath("../db/h2/#datasourceName#") & ";MODE=MySQL",' & nl;
+		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & this.wheels.projectRoot & "db/h2/#datasourceName#;MODE=MySQL",' & nl;
 		h2Config &= tab & tab & 'username: "sa"' & nl;
 		h2Config &= tab & "};";
 
 		// Also add a test database datasource
 		h2Config &= nl & tab & 'this.datasources["wheelstestdb"] = {' & nl;
 		h2Config &= tab & tab & 'class: "org.h2.Driver",' & nl;
-		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & expandPath("../db/h2/wheelstestdb") & ";MODE=MySQL",' & nl;
+		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & this.wheels.projectRoot & "db/h2/wheelstestdb;MODE=MySQL",' & nl;
 		h2Config &= tab & tab & 'username: "sa"' & nl;
 		h2Config &= tab & "};";
 
@@ -11755,13 +11922,13 @@ component extends="modules.BaseModule" {
 		sqliteConfig &= tab & "// SQLite zero-config database (configured by wheels new)" & nl;
 		sqliteConfig &= tab & 'this.datasources["#datasourceName#"] = {' & nl;
 		sqliteConfig &= tab & tab & 'class: "org.sqlite.JDBC",' & nl;
-		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & expandPath("../db/development.sqlite")' & nl;
+		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & this.wheels.projectRoot & "db/development.sqlite"' & nl;
 		sqliteConfig &= tab & "};";
 
 		// Also add a test database datasource
 		sqliteConfig &= nl & tab & 'this.datasources["#datasourceName#_test"] = {' & nl;
 		sqliteConfig &= tab & tab & 'class: "org.sqlite.JDBC",' & nl;
-		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & expandPath("../db/test.sqlite")' & nl;
+		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & this.wheels.projectRoot & "db/test.sqlite"' & nl;
 		sqliteConfig &= tab & "};";
 
 		// Inject into config/app.cfm at the CLI-Appends-Here marker
