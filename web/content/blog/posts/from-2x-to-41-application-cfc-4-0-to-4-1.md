@@ -24,7 +24,7 @@ excerpt: >-
   ColdFusion 2025 after each edit.
 coverImage: null
 announcement:
-  title: 'From 2.x to 4.x, part 4: the file the upgrade doesn''t touch'
+  title: "From 2.x to 4.x, part 4: the file the upgrade doesn't touch"
   body: |
     New post: **[The file the upgrade doesn't touch: `public/Application.cfc` from 4.0 to 4.1](https://blog.wheels.dev/posts/from-2x-to-41-application-cfc-4-0-to-4-1/)** — `public/Application.cfc` is app-owned, so a vendor/wheels swap never updates it. This post replays every template change from 4.0.0 to 4.1.2, one commit at a time.
 ---
