@@ -417,7 +417,7 @@ A job that calls `heartbeat()` is now reclaimed once its beats stop for a **hear
 
 ### `wheels jobs work` runs each job for its own timeout
 
-The `wheels jobs work` worker used to cap every job at 300 seconds, whatever its `this.timeout` ([#4517](https://github.com/wheels-dev/wheels/issues/4517)). It now claims and runs each job with its own class timeout, as `processQueue()` does, so a job with `this.timeout = 900` gets its full fifteen minutes. `wheels jobs work --job-timeout=<seconds>` caps that (not `--timeout`, which is the CLI runtime's own option and stops the whole worker). A job class with a long `timeout` that relied on being cut off at 300 now runs longer; set `--job-timeout` or lower its `this.timeout`.
+The `wheels jobs work` worker used to cap every job at 300 seconds, whatever its `this.timeout` ([#4517](https://github.com/wheels-dev/wheels/issues/4517)). It now claims and runs each job with its own class timeout, as `processQueue()` does, so a job with `this.timeout = 900` gets its full fifteen minutes. `wheels jobs work --job-timeout=<seconds>` caps that (not `--timeout`, which on some CLI runtimes is the runtime's own root option and would stop the whole worker). A job class with a long `timeout` that relied on being cut off at 300 now runs longer; set `--job-timeout` or lower its `this.timeout`.
 
 ### Installing the job schema as a migration
 
