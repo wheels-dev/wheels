@@ -1385,6 +1385,11 @@ component {
 	 * every host behind a load balancer). Cached per application — the lookup can block on DNS.
 	 */
 	public string function $jobHostName() {
+		// set(jobsHostName = "...") names this app server explicitly: needed when several app
+		// servers (JVMs) share one machine, or they share one per-host cap and drain flag.
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "jobsHostName") && Len(Trim(application.wheels.jobsHostName))) {
+			return Left(Trim(application.wheels.jobsHostName), 128);
+		}
 		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "$jobHostName")) {
 			return application.wheels.$jobHostName;
 		}
@@ -1699,6 +1704,160 @@ component {
 				type = "warning",
 				file = "wheels_jobs"
 			);
+		}
+	}
+
+	/**
+	 * The per-host concurrency cap from set(jobsMaxConcurrentPerHost = n); 0 (the default)
+	 * means no cap.
+	 */
+	public numeric function $jobsMaxConcurrentPerHost() {
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "jobsMaxConcurrentPerHost")) {
+			return Max(0, Int(Val(application.wheels.jobsMaxConcurrentPerHost)));
+		}
+		return 0;
+	}
+
+	/**
+	 * What this deployment reports as its code version in wheels_job_hosts:
+	 * set(jobsCodeVersion = ...) (e.g. a git SHA), else the Wheels version.
+	 */
+	public string function $jobsCodeVersion() {
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "jobsCodeVersion") && Len(application.wheels.jobsCodeVersion)) {
+			return Left(application.wheels.jobsCodeVersion, 64);
+		}
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "version")) {
+			return Left(application.wheels.version, 64);
+		}
+		return "unknown";
+	}
+
+	/**
+	 * Create the wheels_job_hosts registry when it is missing. Never inside an open transaction
+	 * (DDL commits the caller's work on MySQL/Oracle). Returns whether the table exists now.
+	 */
+	public boolean function $ensureHostsTable() {
+		if ($hostsTableExists()) {
+			return true;
+		}
+		if (Len($outermostWheelsTransaction())) {
+			return false;
+		}
+		local.dbType = $detectDatabaseType();
+		local.varcharType = local.dbType == "oracle" ? "VARCHAR2" : "VARCHAR";
+		local.datetimeType = ListFindNoCase("oracle,postgresql,h2", local.dbType) ? "TIMESTAMP" : "DATETIME";
+		try {
+			queryExecute("
+				CREATE TABLE wheels_job_hosts (
+					host #local.varcharType#(128) NOT NULL PRIMARY KEY,
+					lastSeenAt #local.datetimeType#,
+					startedAt #local.datetimeType#,
+					running INT DEFAULT 0 NOT NULL,
+					maxConcurrent INT DEFAULT 0 NOT NULL,
+					draining INT DEFAULT 0 NOT NULL,
+					drainExpiresAt #local.datetimeType#,
+					codeVersion #local.varcharType#(64)
+				)
+			", {}, {datasource = variables.$datasource});
+			writeLog(text = "Auto-created wheels_job_hosts table", type = "information", file = "wheels_jobs");
+		} catch (any e) {
+			// Another instance may have created it at the same moment; only a still-missing
+			// table is a failure.
+			if (!$hostsTableExists()) {
+				writeLog(text = "Failed to auto-create wheels_job_hosts table: #e.message#", type = "error", file = "wheels_jobs");
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public boolean function $hostsTableExists() {
+		try {
+			queryExecute("SELECT host FROM wheels_job_hosts WHERE 1=0", {}, {datasource = variables.$datasource});
+			return true;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Whether `host` is draining right now: its drain flag is set and has not expired. A missing
+	 * registry (nothing ever drained) means not draining. Compared SQL-side, on the same clock
+	 * the drain was written with.
+	 */
+	public boolean function $hostDraining(required string host) {
+		try {
+			local.rows = queryExecute(
+				"SELECT COUNT(*) AS cnt FROM wheels_job_hosts
+				WHERE host = :host AND draining = 1 AND (drainExpiresAt IS NULL OR drainExpiresAt > :now)",
+				{
+					host = {value = arguments.host, cfsqltype = "cf_sql_varchar"},
+					now = {value = $now(), cfsqltype = "cf_sql_timestamp"}
+				},
+				{datasource = variables.$datasource}
+			);
+			return Val(local.rows.cnt) > 0;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * How many jobs `host` is running now: processing rows it claimed (claimedBy). Without the
+	 * claimedBy column (an ALTER-blocked table) the count can't be taken: 0, logged once, so
+	 * the cap degrades to none rather than blocking every job.
+	 */
+	public numeric function $runningOnHost(required string host) {
+		try {
+			local.rows = queryExecute(
+				"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = 'processing' AND claimedBy = :host",
+				{host = {value = arguments.host, cfsqltype = "cf_sql_varchar"}},
+				{datasource = variables.$datasource}
+			);
+			return Val(local.rows.cnt);
+		} catch (any e) {
+			if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$jobsHostCapWarned")) {
+				application.wheels.$jobsHostCapWarned = true;
+				writeLog(
+					text = "Could not count this host's running jobs (#e.message#): wheels_jobs.claimedBy is missing, so jobsMaxConcurrentPerHost is not enforced.",
+					type = "warning",
+					file = "wheels_jobs"
+				);
+			}
+			return 0;
+		}
+	}
+
+	/**
+	 * Write `fields` (column => struct param) to this host's registry row, creating it on first
+	 * sight. UPDATE first, INSERT when there was no row, and UPDATE again if another instance
+	 * inserted it in between: no engine-specific upsert syntax.
+	 */
+	public void function $writeHostRow(required string host, required struct fields) {
+		local.sets = [];
+		local.params = {host = {value = arguments.host, cfsqltype = "cf_sql_varchar"}};
+		for (local.column in arguments.fields) {
+			ArrayAppend(local.sets, "#local.column# = :#local.column#");
+			local.params[local.column] = arguments.fields[local.column];
+		}
+		local.updateSql = "UPDATE wheels_job_hosts SET #ArrayToList(local.sets, ", ")# WHERE host = :host";
+		queryExecute(local.updateSql, local.params, {datasource = variables.$datasource, result = "local.updated"});
+		if (Val(local.updated.recordCount ?: 0) > 0) {
+			return;
+		}
+		local.columns = "host, startedAt";
+		local.values = ":host, :startedAt";
+		local.insertParams = Duplicate(local.params);
+		local.insertParams.startedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"};
+		for (local.column in arguments.fields) {
+			local.columns &= ", #local.column#";
+			local.values &= ", :#local.column#";
+		}
+		try {
+			queryExecute("INSERT INTO wheels_job_hosts (#local.columns#) VALUES (#local.values#)", local.insertParams, {datasource = variables.$datasource});
+		} catch (any e) {
+			// Lost the race to insert it: the row exists now, so update it.
+			queryExecute(local.updateSql, local.params, {datasource = variables.$datasource});
 		}
 	}
 

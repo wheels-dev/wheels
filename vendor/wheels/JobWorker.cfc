@@ -16,6 +16,9 @@ component {
 		this.startedAt = Now();
 		this.jobsProcessed = 0;
 		this.jobsFailed = 0;
+		// Per-host concurrency cap for this worker's polls: -1 = use set(jobsMaxConcurrentPerHost),
+		// 0 = none, n = at most n jobs running on this host at once (JobRunner.tick sets it).
+		this.maxConcurrentPerHost = -1;
 		variables.$datasource = "";
 		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "dataSourceName")) {
 			variables.$datasource = application.wheels.dataSourceName;
@@ -31,7 +34,7 @@ component {
 	 * @timeout Timeout in seconds for a single job execution.
 	 */
 	public struct function processNext(string queues = "", numeric timeout = 300) {
-		local.result = {success = false, jobId = "", jobClass = "", error = "", skipped = false, fenced = false};
+		local.result = {success = false, jobId = "", jobClass = "", error = "", skipped = false, fenced = false, capped = false, draining = false};
 
 		// Ensure the table (and the claimTimeout column) on the normal path, so an existing
 		// install gets the column once per worker rather than only when a query happens to
@@ -48,6 +51,14 @@ component {
 		// so we never reap another worker's live job on a queue we don't process. Cheap when
 		// nothing is stuck.
 		this.checkTimeouts(timeout = arguments.timeout, queues = arguments.queues);
+
+		// A draining host starts nothing new (in-flight jobs finish; the reap above still runs).
+		local.host = $jobBridge().$jobHostName();
+		if ($jobBridge().$hostDraining(local.host)) {
+			local.result.skipped = true;
+			local.result.draining = true;
+			return local.result;
+		}
 
 		// Find the next candidate job
 		local.params = {
@@ -103,81 +114,144 @@ component {
 			return local.result;
 		}
 
-		// Try to claim each candidate with optimistic locking
-		for (local.row in local.candidates) {
-			try {
-				local.claimFn = this["$claimJob"];
-				local.claimed = local.claimFn(local.row.id, arguments.timeout);
-			} catch (any e) {
-				// Persist/claim errors are contained — they must not look like an idle skip.
-				local.result.skipped = false;
-				local.result.success = false;
-				local.result.jobId = local.row.id;
-				local.result.jobClass = local.row.jobClass;
-				local.result.error = Left(e.message, 1000);
-				return local.result;
-			}
-			if (local.claimed) {
-				// We claimed it — fetch the payload for just this job, then process
-				local.jobRow = {
-					id = local.row.id,
-					jobClass = local.row.jobClass,
-					queue = local.row.queue,
-					data = $fetchJobData(local.row.id),
-					attempts = local.row.attempts,
-					maxRetries = local.row.maxRetries,
-					claimToken = $takeClaimToken(local.row.id)
-				};
-				local.processResult = $executeJob(jobRow = local.jobRow, timeout = arguments.timeout);
-				local.result.jobId = local.row.id;
-				local.result.jobClass = local.row.jobClass;
-
-				if (local.processResult.fenced) {
-					// Ran, but the claim was reaped and re-issued while it did: the completion
-					// was rejected, and retrying it would requeue the attempt that replaced it.
-					local.result.fenced = true;
-					local.result.error = local.processResult.error;
-				} else if (local.processResult.success) {
-					this.jobsProcessed++;
-					local.result.success = true;
-				} else {
-					this.jobsFailed++;
-					local.result.error = local.processResult.error;
-
-					// Determine retry eligibility
-					local.currentAttempts = Val(local.row.attempts) + 1;
-					local.maxRetries = Val(local.row.maxRetries);
-
-					if (local.currentAttempts <= local.maxRetries) {
-						local.recorded = $scheduleRetry(
-							jobId = local.row.id,
-							currentAttempts = local.currentAttempts,
-							jobClass = local.row.jobClass,
-							maxRetries = local.maxRetries,
-							errorMessage = local.processResult.error,
-							claimToken = local.jobRow.claimToken
-						);
-					} else {
-						local.recorded = $markFailed(
-							jobId = local.row.id,
-							jobClass = local.row.jobClass,
-							maxRetries = local.maxRetries,
-							errorMessage = local.processResult.error,
-							claimToken = local.jobRow.claimToken
-						);
-					}
-					if (Len(local.jobRow.claimToken) && local.recorded == 0) {
-						$jobBridge().$logFencedAttempt(jobId = local.row.id, jobClass = local.row.jobClass, outcome = "failed");
-						local.result.fenced = true;
-					}
+		// Claim one candidate. With a per-host cap, counting this host's running jobs and claiming
+		// happen under one exclusive lock per host, so two polls on this server can't both take
+		// the last free slot; the job itself runs outside the lock. Servers sharing a host name
+		// share the cap but not the lock: give each its own jobsHostName.
+		local.cap = $hostCap();
+		if (local.cap > 0) {
+			local.claim = {claimed = false, capped = true, error = "", row = {}};
+			lock name="wheels.jobs.host.#local.host#" type="exclusive" timeout="10" throwOnTimeout="false" {
+				if ($jobBridge().$runningOnHost(local.host) < local.cap) {
+					local.claim = $claimFirstCandidate(candidates = local.candidates, timeout = arguments.timeout);
 				}
-				return local.result;
 			}
+		} else {
+			local.claim = $claimFirstCandidate(candidates = local.candidates, timeout = arguments.timeout);
+		}
+		if (local.claim.capped) {
+			local.result.skipped = true;
+			local.result.capped = true;
+			return local.result;
+		}
+		if (Len(local.claim.error)) {
+			// Persist/claim errors are contained — they must not look like an idle skip.
+			local.result.skipped = false;
+			local.result.success = false;
+			local.result.jobId = local.claim.row.id;
+			local.result.jobClass = local.claim.row.jobClass;
+			local.result.error = local.claim.error;
+			return local.result;
+		}
+		if (local.claim.claimed) {
+			return $runClaimedJob(row = local.claim.row, timeout = arguments.timeout, result = local.result);
 		}
 
 		// All candidates were claimed by other workers
 		local.result.skipped = true;
 		return local.result;
+	}
+
+	/**
+	 * Try each candidate in turn with the optimistic claim until one is won. Returns
+	 * `{claimed, capped, error, row}`; a persist/claim error stops at that row.
+	 */
+	private struct function $claimFirstCandidate(required query candidates, numeric timeout = 300) {
+		var outcome = {claimed = false, capped = false, error = "", row = {}};
+		for (local.row in arguments.candidates) {
+			try {
+				local.claimFn = this["$claimJob"];
+				local.won = local.claimFn(local.row.id, arguments.timeout);
+			} catch (any e) {
+				outcome.error = Left(e.message, 1000);
+				outcome.row = {id = local.row.id, jobClass = local.row.jobClass};
+				return outcome;
+			}
+			if (local.won) {
+				outcome.claimed = true;
+				outcome.row = {
+					id = local.row.id,
+					jobClass = local.row.jobClass,
+					queue = local.row.queue,
+					attempts = local.row.attempts,
+					maxRetries = local.row.maxRetries
+				};
+				return outcome;
+			}
+		}
+		return outcome;
+	}
+
+	/**
+	 * Run a job this worker claimed and record its outcome in `result`: completed, retried or
+	 * failed — or fenced, when its claim was reaped and re-issued while it ran.
+	 */
+	private struct function $runClaimedJob(required struct row, required numeric timeout, required struct result) {
+		local.jobRow = {
+			id = arguments.row.id,
+			jobClass = arguments.row.jobClass,
+			queue = arguments.row.queue,
+			data = $fetchJobData(arguments.row.id),
+			attempts = arguments.row.attempts,
+			maxRetries = arguments.row.maxRetries,
+			claimToken = $takeClaimToken(arguments.row.id)
+		};
+		local.processResult = $executeJob(jobRow = local.jobRow, timeout = arguments.timeout);
+		arguments.result.jobId = arguments.row.id;
+		arguments.result.jobClass = arguments.row.jobClass;
+
+		if (local.processResult.fenced) {
+			// Ran, but the claim was reaped and re-issued while it did: the completion
+			// was rejected, and retrying it would requeue the attempt that replaced it.
+			arguments.result.fenced = true;
+			arguments.result.error = local.processResult.error;
+			return arguments.result;
+		}
+		if (local.processResult.success) {
+			this.jobsProcessed++;
+			arguments.result.success = true;
+			return arguments.result;
+		}
+		this.jobsFailed++;
+		arguments.result.error = local.processResult.error;
+
+		// Determine retry eligibility
+		local.currentAttempts = Val(arguments.row.attempts) + 1;
+		local.maxRetries = Val(arguments.row.maxRetries);
+		if (local.currentAttempts <= local.maxRetries) {
+			local.recorded = $scheduleRetry(
+				jobId = arguments.row.id,
+				currentAttempts = local.currentAttempts,
+				jobClass = arguments.row.jobClass,
+				maxRetries = local.maxRetries,
+				errorMessage = local.processResult.error,
+				claimToken = local.jobRow.claimToken
+			);
+		} else {
+			local.recorded = $markFailed(
+				jobId = arguments.row.id,
+				jobClass = arguments.row.jobClass,
+				maxRetries = local.maxRetries,
+				errorMessage = local.processResult.error,
+				claimToken = local.jobRow.claimToken
+			);
+		}
+		if (Len(local.jobRow.claimToken) && local.recorded == 0) {
+			$jobBridge().$logFencedAttempt(jobId = arguments.row.id, jobClass = arguments.row.jobClass, outcome = "failed");
+			arguments.result.fenced = true;
+		}
+		return arguments.result;
+	}
+
+	/**
+	 * This worker's per-host cap: maxConcurrentPerHost when the caller set it (JobRunner.tick),
+	 * else set(jobsMaxConcurrentPerHost = n). 0 = no cap.
+	 */
+	private numeric function $hostCap() {
+		if (IsNumeric(this.maxConcurrentPerHost) && this.maxConcurrentPerHost >= 0) {
+			return Int(this.maxConcurrentPerHost);
+		}
+		return $jobBridge().$jobsMaxConcurrentPerHost();
 	}
 
 	/**
