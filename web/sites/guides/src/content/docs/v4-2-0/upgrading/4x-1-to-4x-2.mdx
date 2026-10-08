@@ -348,6 +348,12 @@ A worker now records the `timeout` it claimed a job with, and a stale job is rea
 
 Every job claim now writes a fresh `claimToken` (and the claiming host, `claimedBy`) to `wheels_jobs`, and a worker can only complete, retry or fail a job while the row still carries its token. In 4.1, a worker whose job was reaped as stale and claimed again could still finish afterwards and mark the new attempt `completed` (or requeue it) while that attempt was running. Its result is now discarded and logged as `Wheels.Job.Fenced`. Both columns are added on first use, like `claimTimeout`. Upgrade every worker: a 4.1 worker still claims and completes without a token, so fencing only holds once no 4.1 worker shares the table. Jobs already `processing` during the upgrade have no token and are reaped as before.
 
+### Jobs can be enqueued at most once with `uniqueKey`
+
+`enqueue()`, `enqueueIn()` and `enqueueAt()` accept `uniqueKey`, and only one job is written per key ([#4478](https://github.com/wheels-dev/wheels/issues/4478)). A duplicate returns `{enqueued: false, duplicate: true}` with the existing job's `id`. Every `enqueue()` result now includes `enqueued` and `duplicate`. Jobs enqueued without a key behave as before.
+
+The `wheels_jobs` table gains a nullable `uniqueKey` column with a unique index, filtered to non-NULL keys on SQL Server. On an existing table, the first worker poll or `enqueue(uniqueKey=...)` after the upgrade adds the column, sets it to each row's `id`, and builds the index under the migration lock. It doesn't wait if another instance holds the lock. Servers still on 4.1 keep enqueuing during a rolling upgrade: their rows get a NULL key, which never collides. On a large table, or where the database user can't `ALTER`, apply the change yourself first; the statements are in [The jobs table](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table).
+
 ### CSRF accepts the `X-CSRF-Token` header on any request
 
 A valid `X-CSRF-Token` header now passes CSRF protection on any non-GET request ([#3959](https://github.com/wheels-dev/wheels/issues/3959)). In 4.1 the header was read only when the request also sent `X-Requested-With: XMLHttpRequest`, which Turbo and `fetch()` don't send. Nothing breaks: clients that send both keep working, and a request passes when either the form field or the header holds a valid token. `startFormTag()` and `buttonTo()` gain `authenticityToken=false` to leave the hidden field out of markup that is cached and shared.

@@ -88,6 +88,29 @@ component extends="Controller" {
 
 `enqueue()`, `enqueueIn()`, and `enqueueAt()` all return a struct with the persisted row's `id`. The controller keeps responding fast — the actual email send happens when the next `processQueue()` poll picks the row up.
 
+### Enqueue at most once with `uniqueKey`
+
+When several servers (or several requests) may enqueue the same piece of work, give it a `uniqueKey`. Only one job is written per key:
+
+```cfm
+result = new app.jobs.DailyReportJob().enqueue(
+    data = {day: "2026-10-12"},
+    uniqueKey = "daily-report:2026-10-12"
+);
+if (result.duplicate) {
+    // Already enqueued by someone else: result.id is that job's id.
+}
+```
+
+`enqueueIn()` and `enqueueAt()` take `uniqueKey` too. A first enqueue returns `enqueued: true, duplicate: false`. One whose key is already taken writes nothing and returns `{enqueued: false, duplicate: true, status: "duplicate"}` with the existing job's `id`; it doesn't throw. That holds for two enqueues racing each other as well: the database's unique index decides, and the loser is reported as a duplicate.
+
+- A key stays taken while its row exists, **whatever its status**: a completed or failed job still holds it until the row is purged. Build the key from what makes the work unique, such as a date or a record id.
+- Keys can be up to 255 characters; a longer one throws `Wheels.Job.InvalidUniqueKey`. Hash a longer natural key (`Hash(longKey, "SHA-256")`).
+- Without a `uniqueKey` nothing changes: each job gets its own `id` as its key.
+- For a job enqueued with `transactional=false`, or inside a transaction on another datasource, the row is written when the transaction ends, so `enqueue()` returns `{status: "deferred", enqueued: true}` before the key is checked. If the key turns out to be taken at that point, the write is skipped and logged to `wheels_jobs`.
+- Inside a transaction on the job store's own datasource, an enqueue that loses a race to the same key can't always be told apart from a failure. On PostgreSQL the failed INSERT aborts the transaction, and on MySQL the re-read sees the transaction's own snapshot. It then surfaces as `Wheels.Job.EnqueueFailed` rather than `duplicate: true`. The common duplicate, a key already committed before the enqueue, is still found before the INSERT and reported as a duplicate.
+- The key needs the table's `uniqueKey` column and its unique index, which are added for you (see [The jobs table](#the-jobs-table)). If they can't be added, `enqueue(uniqueKey=...)` throws `Wheels.Job.UniqueKeyUnavailable` rather than writing a duplicate. Jobs without a key still enqueue. An enqueue inside a transaction never adds them itself, because DDL would commit the transaction on MySQL and Oracle; a worker poll or an enqueue outside a transaction does it.
+
 ### Enqueue from the command line
 
 `wheels jobs enqueue` adds a job without writing code: to kick one off by hand, re-run a one-off task, or enqueue from a deploy script. It needs this app's server running, started with `wheels start`.
@@ -338,7 +361,7 @@ Alert on two signals: `failed` growing, and `pending` not shrinking between poll
 
 ## The jobs table
 
-Jobs persist to a `wheels_jobs` table keyed by UUID. The base class auto-creates it the first time `enqueue()` or `processQueue()` runs — no migration needed. Columns: `id`, `jobClass`, `queue`, `data` (JSON), `priority`, `status` (`pending`/`processing`/`completed`/`failed`), `attempts`, `maxRetries`, `lastError`, `runAt`, `completedAt`, `failedAt`, `createdAt`, `updatedAt`. See `vendor/wheels/Job.cfc` (`$ensureJobTable`) for the exact schema — it adapts column types per database (MySQL, PostgreSQL, SQL Server, H2, SQLite, Oracle).
+Jobs persist to a `wheels_jobs` table keyed by UUID. The base class auto-creates it the first time `enqueue()` or `processQueue()` runs — no migration needed. Columns: `id`, `jobClass`, `queue`, `data` (JSON), `priority`, `status` (`pending`/`processing`/`completed`/`failed`), `attempts`, `maxRetries`, `claimTimeout`, `uniqueKey`, `lastError`, `runAt`, `completedAt`, `failedAt`, `createdAt`, `updatedAt`. See `vendor/wheels/Job.cfc` (`$ensureJobTable`) for the exact schema — it adapts column types per database (MySQL, PostgreSQL, SQL Server, H2, SQLite, Oracle).
 
 You never need to touch the table directly. Query it through `queueStats()`:
 
@@ -353,6 +376,10 @@ component extends="Controller" {
 ```
 
 `stats` is a struct with `pending`, `processing`, `completed`, `failed`, and `total`.
+
+`uniqueKey` is nullable, with a unique index named `idx_wjobs_unique_key`. The index is plain on every database except SQL Server, where it is filtered to non-NULL keys (`WHERE uniqueKey IS NOT NULL`), because SQL Server's unique indexes allow only one NULL. The framework always writes a key, so a row you insert yourself without one is valid but isn't deduplicated.
+
+On a table created before 4.2, the first worker poll (`wheels jobs work`) or the first `enqueue(uniqueKey=...)` adds the column, sets `uniqueKey = id` on the existing rows, and builds the index. It runs under the migration lock, taken without waiting: if another instance holds it, the upgrade waits for a later call. Servers still on 4.1 keep enqueuing meanwhile; their rows get a NULL key, which never collides. If the database user can't `ALTER` the table, run the change yourself: `ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255)` (`VARCHAR2` on Oracle), `UPDATE wheels_jobs SET uniqueKey = id`, then `CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey)`, adding `WHERE uniqueKey IS NOT NULL` on SQL Server. On a large table, do this in a maintenance window: the backfill touches every row, and it runs as one statement under the migration lock without renewing the lock's lease, so it must finish within `migrationLockLease` (default 3600 seconds).
 
 ## Testing jobs
 

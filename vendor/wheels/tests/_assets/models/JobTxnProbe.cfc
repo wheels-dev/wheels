@@ -22,6 +22,12 @@ component extends="Model" {
 		return arguments.outcome;
 	}
 
+	// enqueues with a uniqueKey inside the transaction (JobWorkerSpec: no upgrade DDL in a transaction)
+	public boolean function enqueueKeyed(required string marker, required string uniqueKey) {
+		new wheels.tests._assets.jobs.ProbeJob().enqueue(data = {}, queue = arguments.marker, uniqueKey = arguments.uniqueKey);
+		return true;
+	}
+
 	// runs the job-table ensure inside the transaction, as a failed INSERT's retry does
 	public boolean function ensureJobTable(required string marker) {
 		var job = new wheels.Job();
