@@ -23,6 +23,10 @@ excerpt: >-
   it fails safe, and the post shows what changed on Lucee 7 and Adobe
   ColdFusion 2025 after each edit.
 coverImage: null
+announcement:
+  title: "From 2.x to 4.x, part 4: the file the upgrade doesn't touch"
+  body: |
+    New post: **[The file the upgrade doesn't touch: `public/Application.cfc` from 4.0 to 4.1](https://blog.wheels.dev/posts/from-2x-to-41-application-cfc-4-0-to-4-1/)** — `public/Application.cfc` is app-owned, so a vendor/wheels swap never updates it. This post replays every template change from 4.0.0 to 4.1.2, one commit at a time.
 ---
 
 Swapping `vendor/wheels/` upgrades the framework. It doesn't upgrade `public/Application.cfc`, because that file belongs to your app: `wheels new` writes it once and never touches it again. Between 4.0.0 and 4.1.2 the template copy changed in seven releases (676 lines added, 98 removed), and several of those changes only work once they're in your copy.
