@@ -13,7 +13,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 **You'll learn:**
 
 - What running across servers guarantees — and what it asks of your `perform()`
-- How a long-running job stays alive with `heartbeat()`, and what `Wheels.Job.Fenced` means
+- How a job records liveness with `heartbeat()`, why `timeout` is a hard cap, and what `Wheels.Job.Fenced` means
 - How `this.idempotent` chooses at-least-once or at-most-once recovery
 - How to cap how many jobs one server runs at once
 - How to run the queue: a CLI worker, a process supervisor, or a scheduled task
@@ -42,9 +42,9 @@ Two consequences for your code:
 When several servers (or several requests) might enqueue the *same* piece of work — a nightly report, a per-record follow-up — give the job a `uniqueKey` so only one row is written, whichever server gets there first. It's the natural companion to processing on many servers. See [Enqueue at most once with `uniqueKey`](/v4-2-0/digging-deeper/background-jobs/#enqueue-at-most-once-with-uniquekey).
 </Aside>
 
-## Keep a long job alive with `heartbeat()`
+## Record liveness with `heartbeat()`
 
-The reaper decides a job is stale from how long its row has sat in `processing`. A job that legitimately runs longer than its `timeout` would be reaped and run a second time. To prevent that, call `heartbeat()` from inside `perform()` as the work proceeds:
+A job's `timeout` is a **hard cap on a single attempt**: `perform()` runs in a bounded thread and is stopped when the timeout elapses, however much work is left (the attempt is then retried or failed like any timeout). `heartbeat()` does **not** extend that cap — a job can't run past its `timeout`. What it does is record that this attempt is *alive*: call it from inside `perform()` as the work proceeds, and it stamps the row's liveness for the reaper to read.
 
 ```cfm {test:compile} title="app/jobs/RebuildSearchIndexJob.cfc"
 component extends="wheels.Job" {
@@ -58,19 +58,23 @@ component extends="wheels.Job" {
         var job = this;
         var onBatch = function(batch) {
             reindex(batch);
-            job.heartbeat();   // "still alive" — resets the reap clock for this claim
+            job.heartbeat();   // "still alive" — stamps liveness for the reaper (doesn't extend the timeout)
         };
         model("Product").findInBatches(batchSize = 500, callback = onBatch);
     }
 }
 ```
 
-`heartbeat()` renews the reaper's clock for **this attempt's claim only** (it carries the same `claimToken` guard as a completion). The reaper measures staleness from the latest heartbeat, so a job that heartbeats on time is never reaped out from under itself. Call it between units of work — after each batch, each file, each page — not in a tight inner loop.
+`heartbeat()` stamps liveness on **this attempt's claim only** (it carries the same `claimToken` guard as a completion). Call it between units of work — after each batch, each file, each page — not in a tight inner loop.
 
 If the claim is gone — the job was already reaped and handed to another worker while this one stalled — `heartbeat()` throws `Wheels.Job.Fenced`. That's your signal to **stop and return from `perform()`**: another attempt owns the job now, and anything more this attempt does will be discarded. Let the exception propagate; don't catch it to keep working.
 
+<Aside type="note" title="What liveness does today, and what's coming">
+Because `timeout` already caps each attempt, recording liveness has a limited effect on today's reaper. It's the foundation for two changes landing in 4.2: renewing the job's lease so an exclusive or concurrency-keyed job keeps its slot while it runs ([#4496](https://github.com/wheels-dev/wheels/issues/4496)), and making a heartbeating long job detectable as dead sooner when its worker actually dies ([#4502](https://github.com/wheels-dev/wheels/issues/4502)). Call `heartbeat()` in long jobs now, and it gains teeth as those land. It never extends the per-attempt `timeout`.
+</Aside>
+
 <Aside type="note" title="Restricted database users">
-`heartbeat()` renews a `wheels_jobs.heartbeatAt` column. On a table whose database user can't `ALTER` it, the column is absent and `heartbeat()` renews `updatedAt` instead — still correct, just coarser. See [The shared schema](#the-shared-schema) to add the column once by hand.
+`heartbeat()` stamps a `wheels_jobs.heartbeatAt` column. On a table whose database user can't `ALTER` it, the column is absent and `heartbeat()` stamps `updatedAt` instead — still correct, just coarser. See [The shared schema](#the-shared-schema) to add the column once by hand.
 </Aside>
 
 ## Idempotency and `this.idempotent`
@@ -108,7 +112,13 @@ component extends="Controller" {
 }
 ```
 
-An `interrupted` row is a job that may not have finished and deliberately won't be retried, so treat a non-zero `interrupted` count as something to look at — decide per entry whether the work needs re-queuing by hand. Like `failed` rows, `interrupted` rows persist: `purgeCompleted()` only removes `completed` rows, so clear interrupted ones with your own SQL once you've dealt with them.
+An `interrupted` row is a job that may not have finished and deliberately won't be retried, so treat a non-zero `interrupted` count as something to look at — decide per entry whether the work needs re-queuing by hand. Like `failed` rows, `interrupted` rows persist (`purgeCompleted()` only touches `completed` rows). Once you've dealt with them, clear the old ones with `purge()`:
+
+```cfm {test:compile} title="prune interrupted rows"
+new wheels.JobWorker().purge(status = "interrupted", days = 30);   // interrupted rows older than 30 days
+```
+
+`purge(status, days, queue)` accepts `"completed"`, `"failed"`, or `"interrupted"`, so it's also how you prune failed rows once you've extracted what you need from `lastError`.
 
 ## Cap how many jobs a server runs at once
 
@@ -118,7 +128,11 @@ By default a server runs as many jobs as its workers claim. To bound the load on
 set(jobsMaxConcurrentPerHost = 4);   // this server runs at most 4 jobs at once; 0 (default) = no cap
 ```
 
-The cap is enforced for **every** runner on the host — the CLI worker, `processQueue()`, and `JobRunner.tick()` below all honour it. A server at its cap claims nothing new until a running job finishes; other servers keep working to their own caps. The count is per *host*, so the cap governs all the workers and pollers on one server together, not each process on its own.
+The cap is enforced by the CLI worker (`wheels jobs work`) and by `JobRunner.tick()`. A server at its cap claims nothing new until a running job finishes; other servers keep working to their own caps. The count is per *host*, so the cap governs all the workers and `tick()` callers on one server together, not each process on its own.
+
+<Aside type="note" title="processQueue() and the cap">
+A bare `processQueue()` does **not** yet honour the per-host cap or the drain flag, and doesn't reap stale jobs — it just claims and runs ready jobs. If you process the queue with `processQueue()` and want the cap, the drain flag, and reaping, drive it through `JobRunner.tick()` (below), which wraps all three. Routing `processQueue()` itself through the worker so it honours them directly is landing in [#4495](https://github.com/wheels-dev/wheels/issues/4495).
+</Aside>
 
 <Aside type="note" title="What counts as a host">
 A host is the name a worker records in `wheels_jobs.claimedBy` — the machine's host name by default. When several app servers (JVMs) run on one machine, or you want several processes to share one cap and one drain flag, name each explicitly with `set(jobsHostName = "web-1")`. Two processes with the same host name share a cap; two with different names don't.
@@ -129,8 +143,8 @@ A host is the name a worker records in `wheels_jobs.claimedBy` — the machine's
 [Background Jobs](/v4-2-0/digging-deeper/background-jobs/#process-the-queue) covers the two ways to process the queue. Across servers, run one of them on **each** server; they coordinate through the shared table.
 
 - **The CLI worker** — `wheels jobs work` under a process supervisor (systemd, Docker's restart policy, a Kamal accessory). When it loses its app server it exits non-zero and the supervisor restarts it. Run one (or several) per app server. This is the simplest option and the one to reach for first.
-- **A scheduled `processQueue()`** — call `processQueue()` from a CFML scheduled task or a cron-invoked script on each server, at whatever cadence your latency allows. No long-lived process to supervise.
-- **`JobRunner.tick()`** — one call that registers the server in the host registry, reaps stale jobs, and runs a bounded batch, all honouring the per-host cap and drain flag. It's the right building block for a scheduled task, because it keeps the host registry (and so `wheels jobs status` and drain-aware deploys) current:
+- **A scheduled `processQueue()`** — call `processQueue()` from a CFML scheduled task or a cron-invoked script on each server, at whatever cadence your latency allows. No long-lived process to supervise. Note that a bare `processQueue()` ignores the per-host cap and drain flag and doesn't reap (see above); for those, use `JobRunner.tick()` instead.
+- **`JobRunner.tick()`** — one call that registers the server in the host registry, reaps stale jobs, and runs a bounded batch, all honouring the per-host cap and drain flag. It's the right building block for a scheduled task, because it keeps the host registry (and so `wheels jobs status` and drain-aware deploys) current, and it's the cap/drain/reap-aware way to drive the queue from a scheduler:
 
 ```cfm {test:compile} title="a scheduled task on each server"
 // Run every minute from a CFML scheduled task or a cron-invoked script.
@@ -192,22 +206,22 @@ The columns the multi-server guarantees use, on the `wheels_jobs` table:
 | `claimTimeout` | `INT` | Reaping a stale job on the *claiming* worker's timeout, so workers with different timeouts can share a queue |
 | `claimToken` | `VARCHAR(36)` | Fencing — a terminal update only lands while the row still carries the attempt's token |
 | `claimedBy` | `VARCHAR(128)` | The host that owns a claim (and the per-host cap and drain) |
-| `heartbeatAt` | `DATETIME` | `heartbeat()` renewing a long job's reap clock |
+| `heartbeatAt` | `DATETIME` / `TIMESTAMP` | `heartbeat()` stamping a long job's liveness |
 | `uniqueKey` | `VARCHAR(255)` | Enqueue-once dedupe (nullable, with a unique index) |
 
-To add them by hand (adjust types per database — SQL Server omits `COLUMN`; Oracle uses `VARCHAR2` and `ADD (col TYPE)`):
+Adjust types per database. `heartbeatAt` is a timestamp column, so it's `DATETIME` on MySQL, SQL Server, and SQLite but **`TIMESTAMP` on PostgreSQL, CockroachDB, Oracle, and H2** (PostgreSQL and CockroachDB have no `DATETIME` type). SQL Server omits `COLUMN`; Oracle uses `VARCHAR2` for the string columns and the `ADD (col TYPE)` form. For MySQL (and SQLite, which ignores the exact spelling):
 
 ```sql
 ALTER TABLE wheels_jobs ADD COLUMN claimTimeout INT;
 ALTER TABLE wheels_jobs ADD COLUMN claimToken VARCHAR(36);
 ALTER TABLE wheels_jobs ADD COLUMN claimedBy VARCHAR(128);
-ALTER TABLE wheels_jobs ADD COLUMN heartbeatAt DATETIME;
+ALTER TABLE wheels_jobs ADD COLUMN heartbeatAt DATETIME;      -- TIMESTAMP on PostgreSQL / CockroachDB / Oracle / H2
 ALTER TABLE wheels_jobs ADD COLUMN uniqueKey VARCHAR(255);
 UPDATE wheels_jobs SET uniqueKey = id;
 CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey);
 ```
 
-On SQL Server, make the unique index filtered — `CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) WHERE uniqueKey IS NOT NULL` — because SQL Server allows only one NULL in a plain unique index. On a large, busy table, do the `uniqueKey` backfill and index build in a maintenance window: it touches every row. See [The jobs table](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table) for the full column list and the per-database notes. The `wheels_job_hosts` registry has no backfill and is cheap to auto-create; you can leave it to the framework.
+On PostgreSQL and CockroachDB, write `ADD COLUMN heartbeatAt TIMESTAMP`. On SQL Server, make the unique index filtered — `CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) WHERE uniqueKey IS NOT NULL` — because SQL Server allows only one NULL in a plain unique index. On a large, busy table, do the `uniqueKey` backfill and index build in a maintenance window: it touches every row. See [The jobs table](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table) for the full column list and the per-database notes. The `wheels_job_hosts` registry has no backfill and is cheap to auto-create; you can leave it to the framework.
 
 <Aside type="note" title="Planned: a schema command">
 A `wheels jobs install` command and a `jobsAutoCreateTables` setting — so you can apply the schema from the CLI and turn the auto-`ALTER` off entirely on production — are **planned, not built yet** ([#4499](https://github.com/wheels-dev/wheels/issues/4499)). Until then, apply the DDL above by hand.
@@ -215,7 +229,7 @@ A `wheels jobs install` command and a `jobsAutoCreateTables` setting — so you 
 
 ## Clocks and skew
 
-Every guarantee here is timed against the **database's** clock where it can be — but reap windows, heartbeats, and `runAt` comparisons are currently written with each server's application clock. If two servers disagree about the time, a job can look stale to one and fresh to another. Keep every app server's clock in sync (NTP, or your platform's time service); a few seconds of skew is harmless, minutes are not.
+All job timestamps — reap windows, heartbeats, `runAt` comparisons — are currently written and compared with **each server's own application clock** (`Now()`), not the database's. If two servers disagree about the time, a job can look stale to one and fresh to another. Keep every app server's clock in sync (NTP, or your platform's time service); a few seconds of skew is harmless, minutes are not.
 
 <Aside type="note" title="Planned: a single database clock">
 Writing and comparing all job timestamps on one UTC database clock — removing app-server skew from the reaper entirely — is **planned, not built yet** ([#4486](https://github.com/wheels-dev/wheels/issues/4486)). Until it lands, NTP on every app server is what keeps the reaper honest.
@@ -233,7 +247,7 @@ More of the multi-server story is landing through 4.2. These are **not available
 
 ## Upgrading from 4.1
 
-All of this is additive: existing jobs keep working, the new settings default to today's behaviour, and the schema is added for you unless you turn it off. The one rule that matters during a rolling upgrade is that **fencing only holds once every worker is on 4.2** — so expect the old recovery behaviour until the last 4.1 worker is gone. The job-related entries on the [4.1 → 4.2 upgrade guide](/v4-2-0/upgrading/4x-1-to-4x-2/) cover each change, the columns added, and what fails safe if skipped.
+All of this is additive: existing jobs keep working, the new settings default to today's behaviour, and the schema is added for you on first use. The one rule that matters during a rolling upgrade is that **fencing only holds once every worker is on 4.2** — so expect the old recovery behaviour until the last 4.1 worker is gone. The job-related entries on the [4.1 → 4.2 upgrade guide](/v4-2-0/upgrading/4x-1-to-4x-2/) cover each change, the columns added, and what fails safe if skipped.
 
 ## Related guides
 
