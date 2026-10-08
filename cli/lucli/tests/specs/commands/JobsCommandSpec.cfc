@@ -206,30 +206,42 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
-		describe("work --timeout", () => {
+		describe("work --job-timeout", () => {
 
 			it("defaults to 0, each job's own timeout", () => {
-				expect(mod.$parseJobsArgs({arg1 = "work"}).timeout).toBe(0);
+				expect(mod.$parseJobsArgs({arg1 = "work"}).jobTimeout).toBe(0);
 			});
 
-			it("parses --timeout=<seconds>", () => {
-				expect(mod.$parseJobsArgs({arg1 = "work", timeout = "1800"}).timeout).toBe(1800);
+			it("parses --job-timeout=<seconds>", () => {
+				expect(mod.$parseJobsArgs({arg1 = "work", "job-timeout" = "1800"}).jobTimeout).toBe(1800);
 			});
 
-			it("refuses a negative --timeout", () => {
-				expect(() => mod.$parseJobsArgs({arg1 = "work", timeout = "-1"})).toThrow(type = "Wheels.InvalidArguments");
+			it("refuses a negative --job-timeout", () => {
+				expect(() => mod.$parseJobsArgs({arg1 = "work", "job-timeout" = "-1"})).toThrow(type = "Wheels.InvalidArguments");
 			});
 
-			it("doesn't send a timeout without --timeout, so each job runs with its own", () => {
+			it("doesn't send a timeout without --job-timeout, so each job runs with its own", () => {
 				var m = workerModule([idlePoll()]);
 				m.jobs(arg1 = "work", "stop-when-empty" = "true");
 				expect(m.$callLog().makeBridgePost[1][1]).notToInclude("timeout=");
 				expect(printed(m)).toInclude("each job's own timeout");
 			});
 
-			it("sends --timeout to the server as the cap", () => {
+			it("names no option after a LuCLI root option, which the runtime would take before the module", () => {
+				// LuCLI's root command owns --timeout (it stops the whole command), --env and --envfile;
+				// `wheels test` uses --test-timeout for the same reason.
+				var m = new cli.lucli.Module(cwd = variables.tempRoot);
+				makePublic(m, "$commandOptionLines", "$jobsOptionLines");
+				var help = arrayToList(m.$jobsOptionLines("jobs"), chr(10));
+				expect(help).toInclude("--job-timeout");
+				for (var rootOption in ["timeout", "env", "envfile", "verbose", "debug", "timing", "whitespace"]) {
+					expect(reFind("(^|\s)--#rootOption#[\s=<]", help)).toBe(0, "jobs must not define --#rootOption#");
+				}
+			});
+
+			it("sends --job-timeout to the server as the cap", () => {
 				var m = workerModule([idlePoll()]);
-				m.jobs(arg1 = "work", "stop-when-empty" = "true", timeout = "1800");
+				m.jobs(arg1 = "work", "stop-when-empty" = "true", "job-timeout" = "1800");
 				expect(m.$callLog().makeBridgePost[1][1]).toInclude("&timeout=1800");
 				expect(printed(m)).toInclude("1800s");
 			});
