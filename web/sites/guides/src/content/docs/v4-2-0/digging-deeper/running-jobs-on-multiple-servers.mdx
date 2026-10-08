@@ -70,12 +70,16 @@ component extends="wheels.Job" {
 
 `heartbeat()` stamps liveness on **this attempt's claim only** (it carries the same `claimToken` guard as a completion). Call it between units of work — after each batch, each file, each page — not in a tight inner loop.
 
+<Aside type="caution" title="A long `timeout` needs a runner that allows it">
+`this.timeout` is only the job's *requested* cap; the runner caps it too. The `wheels jobs work` worker caps every job at **300 seconds** (it doesn't run a job longer than its own default), so a `this.timeout = 3600` job is still stopped at 300 s under the stock worker. To actually run a long job, drive it from a runner you give a longer timeout — `processQueue(timeout = 3600)` or `JobRunner.tick(timeout = 3600)` — on a server set aside for it. The heartbeat grace below is independent of this: it governs *reclaiming* a dead worker's job, whatever cap the job ran under.
+</Aside>
+
 The grace is `jobsHeartbeatGraceSeconds` (default `300`, floor `30`, `0` turns it off), set app-wide with `set(jobsHeartbeatGraceSeconds = n)` or per class with `this.heartbeatGrace`. With it, a heartbeating job whose worker dies is reclaimed about that many seconds after its last beat, instead of waiting for the full claim window (`timeout` plus the reap grace). A job that **never** heartbeats keeps that full claim window — heartbeating is what opts a long job into faster recovery.
 
 If the claim is gone — the job was already reaped and handed to another worker while this one stalled — `heartbeat()` throws `Wheels.Job.Fenced`. That's your signal to **stop and return from `perform()`**: another attempt owns the job now, and anything more this attempt does will be discarded. Let the exception propagate; don't catch it to keep working.
 
 <Aside type="note" title="Heartbeats and the exclusive lease">
-For an [exclusive or concurrency-keyed job](#exclusive-jobs-and-concurrency-keys), each `heartbeat()` also renews the run's lease by the grace window, so the lease frees on the same clock the job is reclaimed on: stop beating, and both the claim and the lease lapse together after the grace. `heartbeat()` never extends the per-attempt `timeout`.
+For an [exclusive or concurrency-keyed job](#exclusive-jobs-and-concurrency-keys), each `heartbeat()` also renews the run's lease — to a window sized from the same grace (`grace + at least 60 s`), a little longer than the reclaim grace itself. So when a job stops beating, its claim is reclaimed after the grace and its old lease frees shortly after; the brief overlap is why a lost lease is logged and counted, not treated as a failure. `heartbeat()` never extends the per-attempt `timeout`.
 </Aside>
 
 <Aside type="note" title="Restricted database users">
@@ -219,7 +223,7 @@ component extends="wheels.Job" {
 }
 ```
 
-The lease lives in a `wheels_job_locks` table (auto-created on first use, never inside a transaction), owned by the running attempt's claim token, and lasts as long as the attempt's reap window — the timeout it was claimed with plus the reap grace — so it covers the run. A long run that [`heartbeat()`](#record-liveness-with-heartbeat)s renews the lease by the heartbeat grace on each beat, so a job that stops beating loses its lease on the very clock it is reclaimed on. If a run does lose its lease before it finishes — taken over after expiry — that's logged and counted (as `leasesLost` in a `processQueue()` result), and the run is **not** failed for it; make the work idempotent so a rare overlap is harmless.
+The lease lives in a `wheels_job_locks` table (auto-created on first use, never inside a transaction), owned by the running attempt's claim token, and lasts as long as the attempt's reap window — the timeout it was claimed with plus the reap grace — so it covers the run. A long run that [`heartbeat()`](#record-liveness-with-heartbeat)s renews the lease on each beat, to a window a little longer than the reclaim grace, so a job that stops beating is reclaimed after the grace and its old lease frees shortly after. If a run does lose its lease before it finishes — taken over after expiry — that's logged and counted (as `leasesLost` in a `processQueue()` result), and the run is **not** failed for it; make the work idempotent so a rare overlap is harmless.
 
 <Aside type="caution">
 A busy lease is retried, not dropped, so an exclusive job that always finds its lease held (a run that never ends, a key that's too coarse) will keep being put back to `pending` and never make progress. Scope `concurrencyKeyFor()` as narrowly as correctness allows, and make sure exclusive jobs actually finish.
