@@ -714,6 +714,8 @@ component {
 		// The retry/fail UPDATEs run inside a catch, where a local. write doesn't survive on
 		// BoxLang, so a fenced outcome there is carried out through this struct.
 		var fence = {lost = false};
+		// The failure the hooks report, filled in by the same catch (so not through local.).
+		var failure = {recorded = false, isFinal = false, attempt = 0, type = "", message = "", detail = ""};
 
 		// Each claim writes a fresh token; this attempt may only complete, retry or fail the
 		// job while the row still carries it (a reaped-and-re-claimed row carries another).
@@ -793,6 +795,8 @@ component {
 				throw(type = "Wheels.JobTimeout", message = local.performOutcome.error);
 			}
 			if (!local.performOutcome.success) {
+				failure.type = local.performOutcome.errorType;
+				failure.detail = local.performOutcome.errorDetail;
 				throw(type = "Wheels.JobFailed", message = local.performOutcome.error);
 			}
 
@@ -803,9 +807,10 @@ component {
 				id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 			};
 			local.doneGuard = $claimTokenGuard(claimToken = local.claimToken, params = local.doneParams);
+			local.resultSet = $resultAssignment(performOutcome = local.performOutcome, params = local.doneParams);
 			queryExecute(
 				"UPDATE wheels_jobs
-				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
+				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt" & local.resultSet & "
 				WHERE id = :id AND status = 'processing'" & local.doneGuard,
 				local.doneParams,
 				{datasource = variables.$datasource, result = "local.doneResult"}
@@ -822,12 +827,23 @@ component {
 					file = "wheels_jobs"
 				);
 				local.result.success = true;
+				$fireJobSuccess(
+					jobInstance = local.jobInstance,
+					performOutcome = local.performOutcome,
+					jobId = arguments.jobRow.id,
+					jobClass = arguments.jobRow.jobClass
+				);
 			}
 
 		} catch (any e) {
 			// Determine retry eligibility
 			local.currentAttempts = Val(arguments.jobRow.attempts) + 1;
 			local.maxRetries = Val(arguments.jobRow.maxRetries);
+			failure.attempt = local.currentAttempts;
+			failure.message = e.message;
+			if (!Len(failure.type)) {
+				failure.type = e.type;
+			}
 
 			if (local.currentAttempts <= local.maxRetries) {
 				// Schedule retry with configurable exponential backoff, capped at maxDelay.
@@ -863,6 +879,8 @@ component {
 				if (Len(local.claimToken) && Val(local.retryResult.recordCount ?: 0) == 0) {
 					fence.lost = true;
 					$logFencedAttempt(jobId = arguments.jobRow.id, jobClass = arguments.jobRow.jobClass, outcome = "failed, retry");
+				} else {
+					failure.recorded = true;
 				}
 
 				writeLog(
@@ -892,6 +910,9 @@ component {
 				if (Len(local.claimToken) && Val(local.failResult.recordCount ?: 0) == 0) {
 					fence.lost = true;
 					$logFencedAttempt(jobId = arguments.jobRow.id, jobClass = arguments.jobRow.jobClass, outcome = "failed");
+				} else {
+					failure.recorded = true;
+					failure.isFinal = true;
 				}
 
 				writeLog(
@@ -906,6 +927,18 @@ component {
 
 		if (fence.lost) {
 			local.result.fenced = true;
+		}
+		if (failure.recorded) {
+			$fireJobFailure(
+				jobInstance = StructKeyExists(local, "jobInstance") ? local.jobInstance : "",
+				jobId = arguments.jobRow.id,
+				jobClass = arguments.jobRow.jobClass,
+				queue = StructKeyExists(arguments.jobRow, "queue") ? arguments.jobRow.queue : "",
+				error = $jobError(type = failure.type, message = failure.message, detail = failure.detail),
+				attempt = failure.attempt,
+				maxRetries = Val(arguments.jobRow.maxRetries),
+				isFinal = failure.isFinal
+			);
 		}
 
 		// Clean up tenant context after job execution
@@ -1068,6 +1101,7 @@ component {
 			$ensureClaimTimeoutColumn();
 			$ensureClaimTokenColumns();
 			$ensureUniqueKeyColumn();
+			$ensureResultColumn();
 			return true;
 		} catch (any e) {
 			// Table doesn't exist — create it
@@ -1112,6 +1146,7 @@ component {
 					claimToken #local.varcharType#(36),
 					claimedBy #local.varcharType#(128),
 					uniqueKey #local.varcharType#(255),
+					result #local.varcharType#(4000),
 					lastError #local.textType#,
 					runAt #local.datetimeType#,
 					completedAt #local.datetimeType#,
@@ -1371,6 +1406,178 @@ component {
 			}
 		}
 		return variables.$claimTokenColumnsPresent;
+	}
+
+	/**
+	 * Add the result column (perform()'s return value) to an existing wheels_jobs table. Never
+	 * inside a Wheels transaction (DDL there commits the caller's work on MySQL and Oracle);
+	 * a failed ALTER backs off and logs once, and jobs then run without storing their result.
+	 */
+	public void function $ensureResultColumn() {
+		if (Len($outermostWheelsTransaction())) {
+			return;
+		}
+		if ($jobTableHasColumn("result")) {
+			$clearClaimTimeoutAlterMemo(memoKey = "$resultAlterFailedAt");
+			return;
+		}
+		if ($claimTimeoutAlterInBackoff(memoKey = "$resultAlterFailedAt")) {
+			return;
+		}
+		try {
+			queryExecute($claimTokenAlterSql(columnName = "result", size = 4000), {}, {datasource = variables.$datasource});
+			$clearClaimTimeoutAlterMemo(memoKey = "$resultAlterFailedAt");
+		} catch (any e) {
+			$recordClaimTimeoutAlterFailure(memoKey = "$resultAlterFailedAt");
+			if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$resultAlterWarned")) {
+				application.wheels.$resultAlterWarned = true;
+				writeLog(
+					text = "Could not add the wheels_jobs.result column (#e.message#). Jobs run as before but "
+						& "their return values aren't stored. Add it manually (result VARCHAR(4000)) to store them.",
+					type = "warning",
+					file = "wheels_jobs"
+				);
+			}
+		}
+	}
+
+	/**
+	 * Whether this instance can store results. Memoised per instance; the first call also runs
+	 * the column ensure, like $claimTokenColumnsAvailable().
+	 */
+	public boolean function $resultColumnAvailable() {
+		if (!StructKeyExists(variables, "$resultColumnPresent")) {
+			try {
+				$ensureResultColumn();
+				variables.$resultColumnPresent = $jobTableHasColumn("result");
+			} catch (any e) {
+				variables.$resultColumnPresent = false;
+			}
+		}
+		return variables.$resultColumnPresent;
+	}
+
+	/**
+	 * The completion UPDATE's result assignment and parameter: perform()'s return value, or NULL
+	 * when it returned nothing (or the column isn't there, when the fragment is empty).
+	 */
+	public string function $resultAssignment(required struct performOutcome, required struct params) {
+		if (!$resultColumnAvailable()) {
+			return "";
+		}
+		local.text = arguments.performOutcome.hasResult ? $serializeJobResult(arguments.performOutcome.result) : "";
+		arguments.params.result = {value = local.text, cfsqltype = "cf_sql_varchar", null = !Len(local.text)};
+		return ", result = :result";
+	}
+
+	/**
+	 * perform()'s return value as stored text: a simple value as-is, anything else as JSON. A value
+	 * over the column's 4000 bytes (UTF-8) is cut short and ends with a visible marker.
+	 */
+	public string function $serializeJobResult(any value) {
+		if (IsNull(arguments.value)) {
+			return "";
+		}
+		local.text = IsSimpleValue(arguments.value) ? ToString(arguments.value) : SerializeJSON(arguments.value);
+		local.limit = 4000;
+		if (Len(CharsetDecode(local.text, "utf-8")) <= local.limit) {
+			return local.text;
+		}
+		local.marker = "...[truncated]";
+		local.keep = local.limit - Len(local.marker);
+		local.text = Left(local.text, local.keep);
+		while (Len(local.text) > 0 && Len(CharsetDecode(local.text, "utf-8")) > local.keep) {
+			local.text = Left(local.text, Len(local.text) - 1);
+		}
+		return local.text & local.marker;
+	}
+
+	/**
+	 * Calls the job's onSuccess(result) after its completion was recorded. Best-effort: a throw
+	 * is logged and never changes the job's outcome.
+	 */
+	public void function $fireJobSuccess(required any jobInstance, required struct performOutcome, required string jobId, required string jobClass) {
+		if (!IsObject(arguments.jobInstance) || !StructKeyExists(arguments.jobInstance, "onSuccess")) {
+			return;
+		}
+		try {
+			if (arguments.performOutcome.hasResult) {
+				arguments.jobInstance.onSuccess(arguments.performOutcome.result);
+			} else {
+				arguments.jobInstance.onSuccess();
+			}
+		} catch (any e) {
+			writeLog(text = "Job '#arguments.jobClass#' [#arguments.jobId#] onSuccess() failed: #e.message#", type = "error", file = "wheels_jobs");
+		}
+	}
+
+	/**
+	 * Calls the job's onFailure(error, attempt, isFinal), then the app's jobsOnFailure hook, after a
+	 * failed attempt was recorded. `isFinal` is true when the job won't be tried again. Both are
+	 * best-effort: a throw is logged and never changes the job's outcome. `jobInstance` may be ""
+	 * when the job class couldn't be loaded; the global hook still runs.
+	 */
+	public void function $fireJobFailure(
+		required any jobInstance,
+		required string jobId,
+		required string jobClass,
+		required string queue,
+		required struct error,
+		required numeric attempt,
+		required numeric maxRetries,
+		required boolean isFinal
+	) {
+		if (IsObject(arguments.jobInstance) && StructKeyExists(arguments.jobInstance, "onFailure")) {
+			try {
+				// Positional, so the hook may name its parameters freely (`final` itself isn't a
+				// valid parameter name on Adobe CF).
+				arguments.jobInstance.onFailure(arguments.error, arguments.attempt, arguments.isFinal);
+			} catch (any e) {
+				writeLog(text = "Job '#arguments.jobClass#' [#arguments.jobId#] onFailure() failed: #e.message#", type = "error", file = "wheels_jobs");
+			}
+		}
+		local.event = {};
+		local.event["jobId"] = arguments.jobId;
+		local.event["jobClass"] = arguments.jobClass;
+		local.event["queue"] = arguments.queue;
+		local.event["attempt"] = arguments.attempt;
+		local.event["maxRetries"] = arguments.maxRetries;
+		local.event["isFinal"] = arguments.isFinal;
+		local.event["error"] = arguments.error;
+		$callJobsOnFailure(local.event);
+	}
+
+	/**
+	 * Calls the app's global failure hook, set(jobsOnFailure = "component.path.method"), with one
+	 * struct describing the failure ({jobId, jobClass, queue, attempt, maxRetries, isFinal, error}) (no job data: it can hold secrets). The method receives it as
+	 * its `event` argument. Best-effort; a hook that can't be called is logged once per app.
+	 */
+	public void function $callJobsOnFailure(required struct event) {
+		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "jobsOnFailure")) {
+			return;
+		}
+		local.target = Trim(application.wheels.jobsOnFailure);
+		if (ListLen(local.target, ".") < 2) {
+			return;
+		}
+		local.method = ListLast(local.target, ".");
+		local.path = Left(local.target, Len(local.target) - Len(local.method) - 1);
+		try {
+			local.hook = CreateObject("component", local.path);
+			Invoke(local.hook, local.method, {event = arguments.event});
+		} catch (any e) {
+			if (!StructKeyExists(application.wheels, "$jobsOnFailureWarned")) {
+				application.wheels.$jobsOnFailureWarned = true;
+				writeLog(text = "The jobsOnFailure hook '#local.target#' failed: #e.message#", type = "error", file = "wheels_jobs");
+			}
+		}
+	}
+
+	/**
+	 * The error struct the failure hooks receive.
+	 */
+	public struct function $jobError(string type = "", string message = "", string detail = "") {
+		return {type = Len(arguments.type) ? arguments.type : "Wheels.JobFailed", message = arguments.message, detail = arguments.detail};
 	}
 
 	/**
@@ -1785,7 +1992,7 @@ component {
 		required struct jobData,
 		required numeric timeoutSeconds
 	) {
-		local.rv = {success = false, error = "", timedOut = false};
+		local.rv = {success = false, error = "", timedOut = false, hasResult = false, result = "", errorType = "", errorDetail = ""};
 		local.timeoutMs = Max(1, Int(arguments.timeoutSeconds)) * 1000;
 		local.threadName = "wheelsJob" & Replace(CreateUUID(), "-", "", "all");
 		local.box = {instance = arguments.jobInstance, data = arguments.jobData, ok = false, err = ""};
@@ -1793,12 +2000,30 @@ component {
 		try {
 			thread name="#local.threadName#" action="run" box="#local.box#" {
 				try {
-					attributes.box.instance.perform(data = attributes.box.data);
+					// beforePerform/afterPerform are part of the work: they run under the same
+					// timeout, and a throw from either fails the attempt.
+					if (StructKeyExists(attributes.box.instance, "beforePerform")) {
+						attributes.box.instance.beforePerform(data = attributes.box.data);
+					}
+					performResult = attributes.box.instance.perform(data = attributes.box.data);
+					thread.hasResult = !IsNull(performResult);
+					if (thread.hasResult) {
+						thread.result = performResult;
+					}
+					if (StructKeyExists(attributes.box.instance, "afterPerform")) {
+						if (thread.hasResult) {
+							attributes.box.instance.afterPerform(data = attributes.box.data, result = performResult);
+						} else {
+							attributes.box.instance.afterPerform(data = attributes.box.data);
+						}
+					}
 					thread.ok = true;
 					thread.err = "";
 				} catch (any e) {
 					thread.ok = false;
 					thread.err = e.message;
+					thread.errType = e.type;
+					thread.errDetail = e.detail;
 				}
 			}
 			thread action="join" name="#local.threadName#" timeout="#local.timeoutMs#";
@@ -1815,9 +2040,15 @@ component {
 			}
 			if (StructKeyExists(local.meta, "ok") && local.meta.ok) {
 				local.rv.success = true;
+				if (StructKeyExists(local.meta, "hasResult") && local.meta.hasResult && StructKeyExists(local.meta, "result")) {
+					local.rv.hasResult = true;
+					local.rv.result = local.meta.result;
+				}
 				return local.rv;
 			}
 			local.rv.error = (StructKeyExists(local.meta, "err") && Len(local.meta.err)) ? local.meta.err : "Job failed";
+			local.rv.errorType = StructKeyExists(local.meta, "errType") ? local.meta.errType : "";
+			local.rv.errorDetail = StructKeyExists(local.meta, "errDetail") ? local.meta.errDetail : "";
 			return local.rv;
 		} catch (any threadErr) {
 			// Fail closed. Inline perform() would hang until the job finished.
