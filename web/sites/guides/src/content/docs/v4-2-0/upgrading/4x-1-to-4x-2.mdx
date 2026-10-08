@@ -108,6 +108,24 @@ Replace the `return local.redirectPath;` at the end of `$buildRedirectUrl()` wit
 
 **Fails safe at the site root:** nothing changes for an app served at `/`. **Does not fail safe under a subfolder:** the app restarts, but the browser is redirected to a path outside it.
 
+### Mappings anchored to `public/Application.cfc` (4.2.0)
+
+`public/Application.cfc` built its mappings with `expandPath("../app/")`, `expandPath("../vendor/")` and so on, and the SQLite and H2 datasources in `config/app.cfm` used `expandPath("../db/...")`. `expandPath()` resolves against the directory of the page that was requested, so a `.cfm` in a subfolder of `public/` (for example `public/reports/export.cfm`) got mappings pointing inside `public/`, and the request failed with `can't find component [wheels.events.EventMethods]` ([#4470](https://github.com/wheels-dev/wheels/issues/4470)). The 4.2 template builds every path from the folder above `public/Application.cfc` instead.
+
+In `public/Application.cfc`, add this line after the one that sets `this.wheels.rootPath`:
+
+```cfm title="public/Application.cfc"
+this.wheels.projectRoot = REReplace(this.wheels.rootPath, "[^/\\]+[/\\]$", "");
+```
+
+Then replace each `expandPath("../` in that file with `this.wheels.projectRoot & "`. For example, `expandPath("../vendor/")` becomes `this.wheels.projectRoot & "vendor/"`. Do the same for any `expandPath("../db/...")` in `config/app.cfm`, which `public/Application.cfc` includes after the mappings are set:
+
+```cfm title="config/app.cfm"
+connectionString: "jdbc:sqlite:" & this.wheels.projectRoot & "db/development.sqlite"
+```
+
+**Fails safe** for an app that only serves pages through `public/index.cfm`. **Does not fail safe** for a `.cfm` in a subfolder of `public/` that runs your `Application.cfc`: every request to it fails.
+
 ### Event templates without leading whitespace (4.2.0)
 
 The `app/events/*.cfm` templates (`onrequeststart.cfm`, `onrequestend.cfm`, `onsessionstart.cfm` and their siblings) are included straight into the response buffer, where a bare `cfscript` block and a trailing newline put blank lines before every response ([#3882](https://github.com/wheels-dev/wheels/issues/3882)). New apps wrap them in `cfsilent` with no trailing newline.
@@ -156,7 +174,7 @@ For a SQLite app, `wheels new` already adds the test datasource to `config/app.c
 ```cfm title="config/app.cfm"
 this.datasources["myapp_test"] = {
 	class: "org.sqlite.JDBC",
-	connectionString: "jdbc:sqlite:" & expandPath("../db/test.sqlite")
+	connectionString: "jdbc:sqlite:" & this.wheels.projectRoot & "db/test.sqlite"
 };
 ```
 
