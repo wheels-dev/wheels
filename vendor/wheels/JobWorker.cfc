@@ -344,6 +344,13 @@ component {
 					expectedAttempts = local.currentAttempts,
 					staleCutoff = local.rowCutoff
 				);
+				// Interrupted is final: it is never run again.
+				if (local.won > 0) {
+					$fireReapedFailure(
+						row = local.row,
+						message = "Job timed out after #local.rowTimeout# seconds and is not idempotent, so it was not retried"
+					);
+				}
 			} else if (local.currentAttempts <= local.maxRetries) {
 				// Reschedule for retry
 				local.won = $scheduleRetry(local.row.id, local.currentAttempts, local.row.jobClass, local.maxRetries, "Job timed out after #local.rowTimeout# seconds", local.currentAttempts, local.rowCutoff);
@@ -351,7 +358,7 @@ component {
 				// Exhausted retries
 				local.won = $markFailed(local.row.id, local.row.jobClass, local.maxRetries, "Job timed out after #local.rowTimeout# seconds (max retries exhausted)", local.currentAttempts, local.rowCutoff);
 				if (local.won > 0) {
-					$fireReapedFailure(row = local.row, seconds = local.rowTimeout);
+					$fireReapedFailure(row = local.row, message = "Job timed out after #local.rowTimeout# seconds (max retries exhausted)");
 				}
 			}
 			if (local.won > 0) {
@@ -976,11 +983,12 @@ component {
 	}
 
 	/**
-	 * Runs the failure hooks for a job the reaper just marked failed: its worker died or ran past
-	 * its timeout on its last attempt. Best-effort and never blocks the reap loop; the job class
+	 * Runs the failure hooks for a job the reaper just ended for good: marked failed (its worker
+	 * died or ran past its timeout on its last attempt), or interrupted (not idempotent, so never
+	 * re-run). Best-effort and never blocks the reap loop; the job class
 	 * is loaded on this server, and no tenant context is restored (the row's data isn't read).
 	 */
-	private void function $fireReapedFailure(required struct row, required numeric seconds) {
+	private void function $fireReapedFailure(required struct row, required string message) {
 		try {
 			var instance = "";
 			try {
@@ -993,7 +1001,7 @@ component {
 				jobId = arguments.row.id,
 				jobClass = arguments.row.jobClass,
 				queue = StructKeyExists(arguments.row, "queue") ? arguments.row.queue : "",
-				error = $jobBridge().$jobError(type = "Wheels.JobTimeout", message = "Job timed out after #arguments.seconds# seconds (max retries exhausted)"),
+				error = $jobBridge().$jobError(type = "Wheels.JobTimeout", message = arguments.message),
 				attempt = Val(arguments.row.attempts),
 				maxRetries = Val(arguments.row.maxRetries),
 				isFinal = true

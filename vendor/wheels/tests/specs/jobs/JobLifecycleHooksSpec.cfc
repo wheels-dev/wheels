@@ -154,6 +154,14 @@ component extends="wheels.WheelsTest" {
 				expect(application["$hookSpecGlobal"].isFinal).toBeTrue();
 			});
 
+			it("calls the hooks with isFinal = true when the reaper interrupts a job that isn't idempotent", function() {
+				var id = $insertJob(queue = "test_hooks_interrupt", data = {mode = "text"}, attempts = 1, status = "processing", stale = true, jobClass = "wheels.tests._assets.jobs.NonIdempotentHookJob");
+				new wheels.JobWorker().checkTimeouts(timeout = 300, queues = "test_hooks_interrupt");
+				expect($row(id).status).toBe("interrupted");
+				expect(application["$hookSpecLog"]).toBe("failure:1:true:Wheels.JobTimeout");
+				expect(application["$hookSpecGlobal"].isFinal).toBeTrue();
+			});
+
 			it("doesn't call the hooks when the reaper schedules a retry", function() {
 				$insertJob(queue = "test_hooks_reapretry", data = {mode = "text"}, attempts = 1, status = "processing", stale = true);
 				new wheels.JobWorker().checkTimeouts(timeout = 300, queues = "test_hooks_reapretry");
