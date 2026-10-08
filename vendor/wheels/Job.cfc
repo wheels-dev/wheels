@@ -591,66 +591,46 @@ component {
 
 	/**
 	 * Process pending jobs from the queue. Call this from a scheduled task or controller action.
-	 * @queue Queue name to process. Default processes all queues.
+	 * It runs through the job worker, like `wheels jobs work`: every call first reaps jobs left
+	 * in 'processing' by a worker that died, and each job is claimed and run with its own
+	 * class's timeout, recorded on the row so no other server reaps it early.
+	 * @queue Queue name(s) to process, comma-delimited. Default processes all queues.
 	 * @limit Maximum number of jobs to process in this batch. `0` (or less) means no limit: every due job is processed.
+	 * @timeout Optional cap, in seconds, on each job's own timeout. `0` (default) uses each job's own.
 	 */
-	public struct function processQueue(string queue = "", numeric limit = 10) {
+	public struct function processQueue(string queue = "", numeric limit = 10, numeric timeout = 0) {
 		local.result = {processed = 0, failed = 0, skipped = 0, fenced = 0, errors = []};
-		local.params = {
-			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
-		};
-
-		local.sql = "SELECT id, jobClass, queue, data, attempts, maxRetries
-			FROM wheels_jobs
-			WHERE status = 'pending' AND runAt <= :runAt";
-
-		if (Len(arguments.queue)) {
-			local.sql &= " AND queue = :queue";
-			local.params.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
-		}
-
-		local.sql &= " ORDER BY priority DESC, runAt ASC";
-		// Bound the batch in the SQL text, as JobWorker does, rather than with the maxrows option:
-		// BoxLang's PostgreSQL path throws on it ("setLargeMaxRows is not yet implemented"), which
-		// made processQueue() process nothing on PostgreSQL and CockroachDB there.
-		// limit <= 0 keeps its old meaning, no limit (the maxrows option treated 0 as unlimited).
-		if (Val(arguments.limit) > 0) {
-			local.limiter = new wheels.JobWorker();
-			local.sql &= local.limiter.$candidateLimitClause(dbType = $detectDatabaseType(), candidateLimit = arguments.limit);
-		}
-
-		try {
-			local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
-		} catch (any e) {
-			$ensureJobTable();
-			try {
-				local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
-			} catch (any e2) {
-				ArrayAppend(local.result.errors, e2.message);
-				return local.result;
+		local.worker = new wheels.JobWorker();
+		local.worker.perJobTimeout = true;
+		local.worker.timeoutCap = Val(arguments.timeout) > 0 ? Val(arguments.timeout) : 0;
+		// The poll's own timeout: the reap window for rows that recorded none, and the timeout
+		// for a job whose class can't be loaded.
+		local.pollTimeout = local.worker.timeoutCap > 0 ? local.worker.timeoutCap : this.timeout;
+		local.max = Val(arguments.limit) > 0 ? Int(Val(arguments.limit)) : 0;
+		local.lastJobId = "";
+		while (local.max == 0 || local.result.processed + local.result.failed + local.result.fenced < local.max) {
+			local.outcome = local.worker.processNext(queues = arguments.queue, timeout = local.pollTimeout);
+			if (!Len(local.outcome.jobId)) {
+				// Nothing ready (or a database error before any job was claimed).
+				if (Len(local.outcome.error)) {
+					ArrayAppend(local.result.errors, local.outcome.error);
+				}
+				break;
 			}
-		}
-
-		for (local.row in local.jobs) {
-			local.jobResult = $processJob(local.row);
-			if (local.jobResult.skipped) {
-				// Another worker claimed the job between our SELECT and the claim UPDATE
-				local.result.skipped++;
-				continue;
+			if (local.outcome.jobId == local.lastJobId) {
+				// The same job again (its claim keeps failing): stop rather than loop.
+				break;
 			}
-			if (local.jobResult.fenced) {
-				// Ran, but its claim was reaped and re-issued: the outcome was discarded.
+			local.lastJobId = local.outcome.jobId;
+			if (local.outcome.fenced) {
 				local.result.fenced++;
-				continue;
-			}
-			if (local.jobResult.success) {
+			} else if (local.outcome.success) {
 				local.result.processed++;
 			} else {
 				local.result.failed++;
-				ArrayAppend(local.result.errors, local.jobResult.error);
+				ArrayAppend(local.result.errors, "Job #local.outcome.jobId# (#local.outcome.jobClass#): #local.outcome.error#");
 			}
 		}
-
 		return local.result;
 	}
 

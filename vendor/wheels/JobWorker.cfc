@@ -16,6 +16,10 @@ component {
 		this.startedAt = Now();
 		this.jobsProcessed = 0;
 		this.jobsFailed = 0;
+		// Per-job timeouts (processQueue): when true, each candidate is claimed and run with its
+		// own job class's timeout (capped by timeoutCap when that is > 0) instead of this poll's.
+		this.perJobTimeout = false;
+		this.timeoutCap = 0;
 		variables.$datasource = "";
 		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "dataSourceName")) {
 			variables.$datasource = application.wheels.dataSourceName;
@@ -105,9 +109,12 @@ component {
 
 		// Try to claim each candidate with optimistic locking
 		for (local.row in local.candidates) {
+			// Resolved before the claim so the claim itself records the right claimTimeout (the
+			// reap window) and the job runs with the same value.
+			local.jobTimeout = $claimTimeoutFor(jobClass = local.row.jobClass, pollTimeout = arguments.timeout);
 			try {
 				local.claimFn = this["$claimJob"];
-				local.claimed = local.claimFn(local.row.id, arguments.timeout);
+				local.claimed = local.claimFn(local.row.id, local.jobTimeout);
 			} catch (any e) {
 				// Persist/claim errors are contained — they must not look like an idle skip.
 				local.result.skipped = false;
@@ -128,7 +135,7 @@ component {
 					maxRetries = local.row.maxRetries,
 					claimToken = $takeClaimToken(local.row.id)
 				};
-				local.processResult = $executeJob(jobRow = local.jobRow, timeout = arguments.timeout);
+				local.processResult = $executeJob(jobRow = local.jobRow, timeout = local.jobTimeout);
 				local.result.jobId = local.row.id;
 				local.result.jobClass = local.row.jobClass;
 
@@ -719,11 +726,13 @@ component {
 			// perform() — shared with Job.$processJob so both processing paths run
 			// tenant jobs against the correct tenant datasource.
 			local.hasTenantContext = $jobBridge().$restoreTenantContext(local.jobData);
-			local.fromRow = $jobBridge().$takeJobTimeout(jobData = local.jobData, fallback = 300);
 			local.workerCap = Val(arguments.timeout);
 			if (local.workerCap <= 0) {
 				local.workerCap = 300;
 			}
+			// With per-job timeouts the timeout passed in is already this job's own, so it is also
+			// the fallback for a payload that carries none.
+			local.fromRow = $jobBridge().$takeJobTimeout(jobData = local.jobData, fallback = this.perJobTimeout ? local.workerCap : 300);
 			local.timeoutSeconds = Min(local.fromRow, local.workerCap);
 			local.performOutcome = $jobBridge().$runPerformWithTimeout(
 				jobInstance = local.jobInstance,
@@ -975,6 +984,44 @@ component {
 			}
 		}
 		return variables.$claimTokenColumnPresent;
+	}
+
+	/**
+	 * The timeout to claim and run a candidate with: this poll's timeout, or — with per-job
+	 * timeouts — the candidate's own job class's timeout, capped by timeoutCap. A class that
+	 * can't be loaded falls back to this poll's timeout (its run then fails as it always has).
+	 */
+	private numeric function $claimTimeoutFor(required string jobClass, required numeric pollTimeout) {
+		if (!this.perJobTimeout) {
+			return arguments.pollTimeout;
+		}
+		local.own = $jobClassTimeout(jobClass = arguments.jobClass, fallback = arguments.pollTimeout);
+		if (IsNumeric(this.timeoutCap) && this.timeoutCap > 0) {
+			return Min(local.own, this.timeoutCap);
+		}
+		return local.own;
+	}
+
+	/**
+	 * A job class's own timeout (this.timeout), memoised per worker and class.
+	 */
+	private numeric function $jobClassTimeout(required string jobClass, required numeric fallback) {
+		if (!StructKeyExists(variables, "$timeoutByClass")) {
+			variables.$timeoutByClass = {};
+		}
+		if (!StructKeyExists(variables.$timeoutByClass, arguments.jobClass)) {
+			var resolved = {seconds = arguments.fallback};
+			try {
+				var instance = $jobBridge().$instantiateJobClass(jobClass = arguments.jobClass);
+				if (StructKeyExists(instance, "timeout") && IsNumeric(instance.timeout) && instance.timeout > 0) {
+					resolved.seconds = instance.timeout;
+				}
+			} catch (any e) {
+				resolved.seconds = arguments.fallback;
+			}
+			variables.$timeoutByClass[arguments.jobClass] = resolved.seconds;
+		}
+		return variables.$timeoutByClass[arguments.jobClass];
 	}
 
 	/**
