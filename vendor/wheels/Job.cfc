@@ -2166,7 +2166,7 @@ component {
 			return true;
 		}
 		if (!$jobSchema().autoCreateEnabled()) {
-			$warnAuxTableMissingOnce("wheels_job_hosts", "the per-host cap and drain are unavailable");
+			$warnAuxTableMissingOnce("wheels_job_hosts", "this server's drain/resume and its host record in jobs status are unavailable (the per-host cap still works)");
 			return false;
 		}
 		if (Len($outermostWheelsTransaction())) {

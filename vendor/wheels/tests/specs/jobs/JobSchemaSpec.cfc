@@ -167,9 +167,9 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("with jobsAutoCreateTables = false, reports a probe failure as itself when the table exists", function() {
-				// The catalog says the table is there but the probe fails (a lost connection, a
-				// permission): that error surfaces, not a misleading "missing table".
-				$dropJobTable();
+				// The catalog says the table is there but the probe fails (here: a datasource that
+				// doesn't exist, as for a lost connection): that error surfaces, not a misleading
+				// "missing table". Independent of the table's state, so no DROP is involved.
 				application.wheels.jobsAutoCreateTables = false;
 				var schema = new wheels.JobSchema();
 				prepareMock(schema);
@@ -177,6 +177,7 @@ component extends="wheels.WheelsTest" {
 				var job = new wheels.Job();
 				prepareMock(job);
 				job.$("$jobSchema", schema);
+				job.$property(propertyName = "$datasource", propertyScope = "variables", mock = "wheels_spec_no_such_datasource");
 				var probed = {type = "", message = ""};
 				try {
 					job.$ensureJobTable();
@@ -262,12 +263,29 @@ component extends="wheels.WheelsTest" {
 		}
 	}
 
+	/**
+	 * Drops wheels_jobs and makes sure it's gone: a DROP that fails (a lock) must fail the spec
+	 * with its own error, not leave the table in place for the spec to misread.
+	 */
 	private void function $dropJobTable() {
-		try {
-			queryExecute("DROP TABLE wheels_jobs", {}, {datasource = application.wheels.dataSourceName});
-		} catch (any e) {
-		}
+		$dropTableOrFail("wheels_jobs");
 		$clearUniqueKeyMemos();
+	}
+
+	private void function $dropTableOrFail(required string tableName) {
+		var outcome = {error = ""};
+		var schema = new wheels.JobSchema();
+		if (!schema.hasTable(arguments.tableName)) {
+			return;
+		}
+		try {
+			queryExecute("DROP TABLE #arguments.tableName#", {}, {datasource = application.wheels.dataSourceName});
+		} catch (any e) {
+			outcome.error = e.message & " " & e.detail;
+		}
+		if (schema.hasTable(arguments.tableName)) {
+			Throw(type = "Spec.DropFailed", message = "Could not drop #arguments.tableName# for the spec: #outcome.error#");
+		}
 	}
 
 	/**
@@ -285,10 +303,7 @@ component extends="wheels.WheelsTest" {
 
 	private void function $dropAllJobTables() {
 		for (var tableDef in new wheels.JobSchema().tables()) {
-			try {
-				queryExecute("DROP TABLE #tableDef.name#", {}, {datasource = application.wheels.dataSourceName});
-			} catch (any e) {
-			}
+			$dropTableOrFail(tableDef.name);
 		}
 		$clearUniqueKeyMemos();
 	}
