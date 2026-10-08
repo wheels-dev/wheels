@@ -29,30 +29,33 @@ component extends="wheels.WheelsTest" {
 				$rebuildAutoCreated();
 			});
 
-			it("is what auto-create builds: every column and index", function() {
+			it("is what auto-create builds: every table, column and index", function() {
 				$rebuildAutoCreated();
 				var schema = new wheels.JobSchema();
-				for (var column in schema.tableDef("wheels_jobs").columns) {
-					expect(schema.hasColumn("wheels_jobs", column.name)).toBeTrue(column.name);
-				}
-				for (var index in schema.tableDef("wheels_jobs").indexes) {
-					expect(schema.hasIndex("wheels_jobs", index.name)).toBeTrue(index.name);
+				for (var tableDef in schema.tables()) {
+					expect(schema.hasTable(tableDef.name)).toBeTrue(tableDef.name);
+					for (var column in tableDef.columns) {
+						expect(schema.hasColumn(tableDef.name, column.name)).toBeTrue(tableDef.name & "." & column.name);
+					}
+					for (var index in tableDef.indexes) {
+						expect(schema.hasIndex(tableDef.name, index.name)).toBeTrue(index.name);
+					}
 				}
 				expect(schema.hasTable("wheels_jobs")).toBeTrue();
 				expect(schema.hasTable("wheels_no_such_table")).toBeFalse();
 				expect(schema.hasColumn("wheels_jobs", "noSuchColumn")).toBeFalse();
 			});
 
-			it("writes an install migration that builds the same table as auto-create", function() {
+			it("writes an install migration that builds the same tables as auto-create", function() {
 				$rebuildAutoCreated();
 				var schema = new wheels.JobSchema();
-				var autoCreated = schema.catalogColumns("wheels_jobs");
+				var autoCreated = $snapshot(schema, "catalogColumns");
 
-				$dropJobTable();
+				$dropAllJobTables();
 				var migration = $generatedMigration();
 				migration.up();
 
-				expect(schema.catalogColumns("wheels_jobs")).toBe(autoCreated, "same columns, same nullability");
+				expect($snapshot(schema, "catalogColumns")).toBe(autoCreated, "same tables, columns and nullability");
 				for (var index in schema.tableDef("wheels_jobs").indexes) {
 					expect(schema.hasIndex("wheels_jobs", index.name)).toBeTrue(index.name);
 				}
@@ -74,8 +77,10 @@ component extends="wheels.WheelsTest" {
 
 				var migration = $generatedMigration();
 				migration.up();
-				for (var column in schema.tableDef("wheels_jobs").columns) {
-					expect(schema.hasColumn("wheels_jobs", column.name)).toBeTrue(column.name);
+				for (var tableDef in schema.tables()) {
+					for (var column in tableDef.columns) {
+						expect(schema.hasColumn(tableDef.name, column.name)).toBeTrue(tableDef.name & "." & column.name);
+					}
 				}
 				expect(schema.hasIndex("wheels_jobs", "idx_wjobs_unique_key")).toBeTrue();
 				var row = queryExecute(
@@ -92,25 +97,37 @@ component extends="wheels.WheelsTest" {
 			it("runs up, down and up again through the migrator, building auto-create's column types", function() {
 				$rebuildAutoCreated();
 				var schema = new wheels.JobSchema();
-				var autoFamilies = schema.catalogColumnFamilies("wheels_jobs");
-				var autoColumns = schema.catalogColumns("wheels_jobs");
-				expect(autoFamilies.id).toBe(schema.databaseType() == "sqlite" ? "text" : "string");
-				expect(autoFamilies.priority).toBe("integer");
-				expect(autoFamilies.runat).toBe("datetime");
+				var autoFamilies = $snapshot(schema, "catalogColumnFamilies");
+				var autoColumns = $snapshot(schema, "catalogColumns");
+				expect(autoFamilies.wheels_jobs.id).toBe(schema.databaseType() == "sqlite" ? "text" : "string");
+				expect(autoFamilies.wheels_jobs.priority).toBe("integer");
+				expect(autoFamilies.wheels_jobs.runat).toBe("datetime");
+				expect(autoFamilies.wheels_job_locks.expiresat).toBe("integer");
 
-				$dropJobTable();
+				$dropAllJobTables();
 				var migrator = $installMigrator();
 				var output = migrator.migrateTo($installVersion());
 				expect(schema.hasTable("wheels_jobs")).toBeTrue(output);
-				expect(schema.catalogColumnFamilies("wheels_jobs")).toBe(autoFamilies, "same type family for every column");
-				expect(schema.catalogColumns("wheels_jobs")).toBe(autoColumns, "same nullability");
+				expect($snapshot(schema, "catalogColumnFamilies")).toBe(autoFamilies, "same type family for every column");
+				expect($snapshot(schema, "catalogColumns")).toBe(autoColumns, "same nullability");
+				if (schema.databaseType() == "sqlserver") {
+					// Type families can't tell VARCHAR from NVARCHAR; the result column must be NVARCHAR.
+					var resultType = queryExecute(
+						"SELECT DATA_TYPE AS dt FROM INFORMATION_SCHEMA.COLUMNS WHERE LOWER(TABLE_NAME) = 'wheels_jobs' AND LOWER(COLUMN_NAME) = 'result'",
+						{},
+						{datasource = application.wheels.dataSourceName}
+					);
+					expect(LCase(resultType.dt)).toBe("nvarchar");
+				}
 
 				output = migrator.migrateTo("0");
-				expect(schema.hasTable("wheels_jobs")).toBeFalse("down() drops the table: " & output);
+				for (var tableDef in schema.tables()) {
+					expect(schema.hasTable(tableDef.name)).toBeFalse("down() drops " & tableDef.name & ": " & output);
+				}
 
 				output = migrator.migrateTo($installVersion());
 				expect(schema.hasTable("wheels_jobs")).toBeTrue(output);
-				expect(schema.catalogColumnFamilies("wheels_jobs")).toBe(autoFamilies);
+				expect($snapshot(schema, "catalogColumnFamilies")).toBe(autoFamilies);
 				for (var index in schema.tableDef("wheels_jobs").indexes) {
 					expect(schema.hasIndex("wheels_jobs", index.name)).toBeTrue(index.name);
 				}
@@ -253,10 +270,43 @@ component extends="wheels.WheelsTest" {
 		$clearUniqueKeyMemos();
 	}
 
+	/**
+	 * Every job table rebuilt by auto-create, in the layout the rest of the suite expects.
+	 */
 	private void function $rebuildAutoCreated() {
-		$dropJobTable();
-		new wheels.Job().$ensureJobTable();
+		$dropAllJobTables();
+		var job = new wheels.Job();
+		job.$ensureJobTable();
+		job.$ensureHostsTable();
+		new wheels.JobScheduler().$ensureSchedulesTable();
+		job.$jobLeaseLock();
 		$clearUniqueKeyMemos();
+	}
+
+	private void function $dropAllJobTables() {
+		for (var tableDef in new wheels.JobSchema().tables()) {
+			try {
+				queryExecute("DROP TABLE #tableDef.name#", {}, {datasource = application.wheels.dataSourceName});
+			} catch (any e) {
+			}
+		}
+		$clearUniqueKeyMemos();
+	}
+
+	/**
+	 * One catalog view of every job table: table name -> schema.catalogColumns() or
+	 * schema.catalogColumnFamilies().
+	 */
+	private struct function $snapshot(required any schema, required string view) {
+		var rv = {};
+		for (var tableDef in arguments.schema.tables()) {
+			if (arguments.view == "catalogColumns") {
+				rv[tableDef.name] = arguments.schema.catalogColumns(tableDef.name);
+			} else {
+				rv[tableDef.name] = arguments.schema.catalogColumnFamilies(tableDef.name);
+			}
+		}
+		return rv;
 	}
 
 	private void function $clearUniqueKeyMemos() {

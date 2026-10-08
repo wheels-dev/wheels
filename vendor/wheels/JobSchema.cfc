@@ -3,8 +3,10 @@
  * upgrades) builds its DDL from it, and `wheels jobs install` writes a migration from it, so the
  * two build the same tables, columns and indexes.
  *
- * Each table lists its columns in creation order, as {name, type, limit, nullable, default,
- * primaryKey}, with type one of string, integer, text or datetime, and its indexes as
+ * Each table lists its columns in creation order, as {name, type, limit, precision, nullable,
+ * default, primaryKey}, with type one of string, unicodeString (NVARCHAR on SQL Server, whose
+ * VARCHAR mangles non-ASCII text), integer, decimal (whole numbers, used for epoch
+ * milliseconds), text or datetime, and its indexes as
  * {name, columns, unique, optional}. An optional index is a performance index that auto-create
  * tolerates failing to build; a non-optional one is relied on (the uniqueKey index de-duplicates
  * enqueue). On SQL Server the uniqueKey index is filtered to non-NULL keys, because a SQL Server
@@ -47,6 +49,8 @@ component {
 					{name = "claimToken", type = "string", limit = 36, nullable = true},
 					{name = "claimedBy", type = "string", limit = 128, nullable = true},
 					{name = "uniqueKey", type = "string", limit = 255, nullable = true},
+					{name = "heartbeatAt", type = "datetime", nullable = true},
+					{name = "result", type = "unicodeString", limit = 4000, nullable = true},
 					{name = "lastError", type = "text", nullable = true},
 					{name = "runAt", type = "datetime", nullable = true},
 					{name = "completedAt", type = "datetime", nullable = true},
@@ -60,6 +64,56 @@ component {
 					{name = "idx_wjobs_cleanup", columns = "status,completedAt", unique = false, optional = true},
 					{name = "idx_wjobs_unique_key", columns = "uniqueKey", unique = true, optional = false}
 				]
+			},
+			{
+				// One row per server running jobs: its concurrency cap, drain state and last poll.
+				name = "wheels_job_hosts",
+				columns = [
+					{name = "host", type = "string", limit = 128, nullable = false, primaryKey = true},
+					{name = "lastSeenAt", type = "datetime", nullable = true},
+					{name = "startedAt", type = "datetime", nullable = true},
+					{name = "running", type = "integer", nullable = false, default = 0},
+					{name = "maxConcurrent", type = "integer", nullable = false, default = 0},
+					{name = "draining", type = "integer", nullable = false, default = 0},
+					{name = "drainExpiresAt", type = "datetime", nullable = true},
+					{name = "codeVersion", type = "string", limit = 64, nullable = true}
+				],
+				indexes = []
+			},
+			{
+				// Recurring schedules; times are epoch milliseconds.
+				name = "wheels_job_schedules",
+				columns = [
+					{name = "name", type = "string", limit = 100, nullable = false, primaryKey = true},
+					{name = "jobClass", type = "string", limit = 255, nullable = false},
+					{name = "data", type = "text", nullable = true},
+					{name = "queue", type = "string", limit = 100, nullable = true},
+					{name = "priority", type = "integer", nullable = true},
+					{name = "kind", type = "string", limit = 10, nullable = false},
+					{name = "spec", type = "string", limit = 100, nullable = false},
+					{name = "timezone", type = "string", limit = 64, nullable = true},
+					{name = "catchUp", type = "string", limit = 10, nullable = true},
+					{name = "catchUpWindowSeconds", type = "integer", nullable = true},
+					{name = "enabled", type = "integer", nullable = false, default = 1},
+					{name = "source", type = "string", limit = 10, nullable = false, default = "db"},
+					{name = "nextRunAt", type = "decimal", precision = 15, nullable = true},
+					{name = "lastEnqueuedFor", type = "decimal", precision = 15, nullable = true},
+					{name = "lastError", type = "string", limit = 1000, nullable = true},
+					{name = "updatedAt", type = "datetime", nullable = true}
+				],
+				indexes = []
+			},
+			{
+				// Exclusive-job leases (wheels.LeaseLock); times are epoch milliseconds.
+				name = "wheels_job_locks",
+				columns = [
+					{name = "lockname", type = "string", limit = 100, nullable = false, primaryKey = true},
+					{name = "lockowner", type = "string", limit = 64, nullable = false},
+					{name = "lockhost", type = "string", limit = 255, nullable = true},
+					{name = "acquiredat", type = "decimal", precision = 15, nullable = false},
+					{name = "expiresat", type = "decimal", precision = 15, nullable = false}
+				],
+				indexes = []
 			}
 		];
 	}
@@ -113,6 +167,10 @@ component {
 		switch (arguments.column.type) {
 			case "string":
 				return "#local.varcharType#(#arguments.column.limit#)";
+			case "unicodeString":
+				return arguments.dbType == "sqlserver" ? "NVARCHAR(#arguments.column.limit#)" : "#local.varcharType#(#arguments.column.limit#)";
+			case "decimal":
+				return "DECIMAL(#arguments.column.precision#,0)";
 			case "text":
 				return local.textType;
 			case "datetime":
@@ -326,21 +384,42 @@ component {
 		ArrayAppend(local.lines, " */");
 		ArrayAppend(local.lines, "component extends=""wheels.migrator.Migration"" {");
 		ArrayAppend(local.lines, "");
+		ArrayAppend(local.lines, "	// Runs outside the migrator's per-step transaction: it is idempotent (a partial run is");
+		ArrayAppend(local.lines, "	// finished by running it again), and its DDL can't share one transaction everywhere");
+		ArrayAppend(local.lines, "	// (CockroachDB under read-committed isolation; MySQL and Oracle commit each statement).");
+		ArrayAppend(local.lines, "	this.useTransaction = false;");
+		ArrayAppend(local.lines, "");
 		ArrayAppend(local.lines, "	function up() {");
 		ArrayAppend(local.lines, "		var schema = new wheels.JobSchema(datasource = $migratorDataSource(), credentials = $migratorDataSourceCredentials());");
 		for (local.t in tables()) {
 			ArrayAppend(local.lines, "");
 			ArrayAppend(local.lines, "		if (!schema.hasTable(""#local.t.name#"")) {");
-			ArrayAppend(local.lines, "			var t = createTable(name = ""#local.t.name#"", id = false);");
+			ArrayAppend(local.lines, "			local.t = createTable(name = ""#local.t.name#"", id = false);");
 			for (local.c in local.t.columns) {
 				ArrayAppend(local.lines, "			" & $dslColumn(local.c));
 			}
-			ArrayAppend(local.lines, "			t.create();");
+			ArrayAppend(local.lines, "			local.t.create();");
+			for (local.c in local.t.columns) {
+				if (local.c.type == "unicodeString") {
+					ArrayAppend(local.lines, "			// SQL Server's VARCHAR mangles non-ASCII text, so the column is NVARCHAR there.");
+					ArrayAppend(local.lines, "			if (schema.databaseType() == ""sqlserver"") {");
+					ArrayAppend(local.lines, "				execute(""ALTER TABLE #local.t.name# ALTER COLUMN #local.c.name# NVARCHAR(#local.c.limit#)" & (local.c.nullable ? " NULL" : " NOT NULL") & """);");
+					ArrayAppend(local.lines, "			}");
+				}
+			}
 			ArrayAppend(local.lines, "		} else {");
 			for (local.c in local.t.columns) {
 				if (local.c.nullable) {
 					ArrayAppend(local.lines, "			if (!schema.hasColumn(""#local.t.name#"", ""#local.c.name#"")) {");
-					ArrayAppend(local.lines, "				" & $dslAddColumn(local.t.name, local.c));
+					if (local.c.type == "unicodeString") {
+						ArrayAppend(local.lines, "				if (schema.databaseType() == ""sqlserver"") {");
+						ArrayAppend(local.lines, "					execute(""ALTER TABLE #local.t.name# ADD #local.c.name# NVARCHAR(#local.c.limit#)"");");
+						ArrayAppend(local.lines, "				} else {");
+						ArrayAppend(local.lines, "					" & $dslAddColumn(local.t.name, local.c));
+						ArrayAppend(local.lines, "				}");
+					} else {
+						ArrayAppend(local.lines, "				" & $dslAddColumn(local.t.name, local.c));
+					}
 					if (local.c.name == "uniqueKey") {
 						ArrayAppend(local.lines, "				execute(""UPDATE #local.t.name# SET uniqueKey = id WHERE uniqueKey IS NULL"");");
 					}
@@ -384,9 +463,9 @@ component {
 	 */
 	public string function $dslColumn(required struct column) {
 		if (StructKeyExists(arguments.column, "primaryKey") && arguments.column.primaryKey) {
-			return "t.primaryKey(name = ""#arguments.column.name#"", type = ""#arguments.column.type#"", limit = #arguments.column.limit#);";
+			return "local.t.primaryKey(name = ""#arguments.column.name#"", type = ""#arguments.column.type#"", limit = #arguments.column.limit#);";
 		}
-		return "t.#$dslType(arguments.column)#(#$dslOptions(arguments.column)#);";
+		return "local.t.#$dslType(arguments.column)#(#$dslOptions(arguments.column)#);";
 	}
 
 	/**
@@ -397,6 +476,9 @@ component {
 		if (StructKeyExists(arguments.column, "limit")) {
 			local.call &= ", limit = #arguments.column.limit#";
 		}
+		if (StructKeyExists(arguments.column, "precision")) {
+			local.call &= ", precision = #arguments.column.precision#, scale = 0";
+		}
 		return local.call & ", allowNull = true);";
 	}
 
@@ -404,7 +486,8 @@ component {
 	 * Internal: the TableDefinition helper for a column type.
 	 */
 	public string function $dslType(required struct column) {
-		return arguments.column.type;
+		// The column helpers have no unicode string: SQL Server's NVARCHAR is set by execute().
+		return arguments.column.type == "unicodeString" ? "string" : arguments.column.type;
 	}
 
 	/**
@@ -414,6 +497,9 @@ component {
 		local.options = ["columnNames = ""#arguments.column.name#"""];
 		if (StructKeyExists(arguments.column, "limit")) {
 			ArrayAppend(local.options, "limit = #arguments.column.limit#");
+		}
+		if (StructKeyExists(arguments.column, "precision")) {
+			ArrayAppend(local.options, "precision = #arguments.column.precision#, scale = 0");
 		}
 		if (StructKeyExists(arguments.column, "default")) {
 			ArrayAppend(local.options, "default = " & (IsNumeric(arguments.column.default) ? arguments.column.default : """#arguments.column.default#"""));
