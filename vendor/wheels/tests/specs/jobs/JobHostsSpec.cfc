@@ -137,6 +137,28 @@ component extends="wheels.WheelsTest" {
 				expect(status.draining).toBeTrue();
 			});
 
+			// Kept last: it replaces wheels_job_hosts, then puts the real table back.
+			it("fails closed when the registry exists but can't be read", function() {
+				var job = new wheels.Job();
+				job.$ensureHostsTable();
+				queryExecute("DROP TABLE wheels_job_hosts", {}, {datasource = application.wheels.dataSourceName});
+				// A table without drainExpiresAt: the drain query fails although the table exists.
+				queryExecute("CREATE TABLE wheels_job_hosts (host VARCHAR(128) NOT NULL PRIMARY KEY, draining INT DEFAULT 0 NOT NULL)", {}, {datasource = application.wheels.dataSourceName});
+				try {
+					var state = {threw = false};
+					try {
+						job.$hostDraining(request.$wheelsHostsSpec.host);
+					} catch (any e) {
+						state.threw = true;
+					}
+					expect(state.threw).toBeTrue("a registry that exists but can't be read must not count as 'not draining'");
+				} finally {
+					queryExecute("DROP TABLE wheels_job_hosts", {}, {datasource = application.wheels.dataSourceName});
+					job.$ensureHostsTable();
+				}
+				expect(job.$hostDraining(request.$wheelsHostsSpec.host)).toBeFalse();
+			});
+
 		});
 	}
 
