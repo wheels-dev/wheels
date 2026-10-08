@@ -365,7 +365,7 @@ component {
 		Throw(
 			type = "Wheels.Job.UniqueKeyUnavailable",
 			message = "Job '#arguments.jobClass#' was enqueued with a uniqueKey, but wheels_jobs can't enforce one yet, so it was not enqueued.",
-			extendedInfo = "wheels_jobs needs a uniqueKey column (VARCHAR(255), nullable) with a unique index. The framework adds them on a worker poll or an enqueue(uniqueKey=...) made outside a transaction, unless the database user can't ALTER the table or another instance is upgrading it right now. Add them manually: ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255); UPDATE wheels_jobs SET uniqueKey = id; CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) (on SQL Server add WHERE uniqueKey IS NOT NULL)."
+			extendedInfo = "wheels_jobs needs a uniqueKey column (VARCHAR(255), nullable) with a unique index. The framework adds them on a worker poll or an enqueue(uniqueKey=...) made outside a transaction, unless the database user can't ALTER the table or another instance is upgrading it right now. " & $uniqueKeyLastProblem() & $uniqueKeyManualFix()
 		);
 	}
 
@@ -1136,7 +1136,7 @@ component {
 				queryExecute($uniqueKeyIndexSql(), {}, {datasource = variables.$datasource});
 				$recordUniqueKeyIndexVerified();
 			} catch (any uniqueIndexError) {
-				writeLog(text = "Could not create the wheels_jobs uniqueKey index: #uniqueIndexError.message#", type = "error", file = "wheels_jobs");
+				writeLog(text = $uniqueKeyUpgradeFailureText(reason = uniqueIndexError.message, step = "index"), type = "error", file = "wheels_jobs");
 			}
 
 			writeLog(text = "Auto-created wheels_jobs table", type = "information", file = "wheels_jobs");
@@ -1464,13 +1464,16 @@ component {
 		}
 		// Nested rather than try/catch/finally: on BoxLang a finally that shares a try with a catch
 		// is skipped when the request ends with abort, and the lock must always be released.
+		var progress = {step = ""};
 		try {
 			try {
-				$upgradeUniqueKeyColumn();
+				$upgradeUniqueKeyColumn(progress = progress);
 				$clearClaimTimeoutAlterMemo(memoKey = "$uniqueKeyAlterFailedAt");
+				$clearUniqueKeyUpgradeProblem();
 			} catch (any e) {
 				$recordClaimTimeoutAlterFailure(memoKey = "$uniqueKeyAlterFailedAt");
-				$warnUniqueKeyUpgradeFailedOnce(e.message);
+				$recordUniqueKeyUpgradeProblem(step = progress.step, reason = e.message);
+				$warnUniqueKeyUpgradeFailedOnce(reason = e.message, step = progress.step);
 			}
 		} finally {
 			$releaseJobSchemaLock(local.schemaLock);
@@ -1480,8 +1483,11 @@ component {
 	/**
 	 * The upgrade steps. Each re-probes after a failure, so an instance that upgraded the table a
 	 * moment earlier (without the lock, where none is available) counts as success, not an error.
+	 * `progress.step` names the step under way (column, backfill, index), so a failure can say
+	 * which one failed.
 	 */
-	public void function $upgradeUniqueKeyColumn() {
+	public void function $upgradeUniqueKeyColumn(struct progress = {}) {
+		arguments.progress.step = "column";
 		if (!$jobTableHasUniqueKey()) {
 			try {
 				queryExecute($uniqueKeyAlterSql(), {}, {datasource = variables.$datasource});
@@ -1491,7 +1497,9 @@ component {
 				}
 			}
 		}
+		arguments.progress.step = "backfill";
 		queryExecute("UPDATE wheels_jobs SET uniqueKey = id WHERE uniqueKey IS NULL", {}, {datasource = variables.$datasource});
+		arguments.progress.step = "index";
 		if (!$jobTableHasUniqueKeyIndex()) {
 			try {
 				queryExecute($uniqueKeyIndexSql(), {}, {datasource = variables.$datasource});
@@ -1687,19 +1695,93 @@ component {
 	/**
 	 * Log a failed uniqueKey upgrade once per application.
 	 */
-	public void function $warnUniqueKeyUpgradeFailedOnce(required string reason) {
+	public void function $warnUniqueKeyUpgradeFailedOnce(required string reason, string step = "") {
 		if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$uniqueKeyAlterWarned")) {
 			application.wheels.$uniqueKeyAlterWarned = true;
-			writeLog(
-				text = "Could not add the wheels_jobs.uniqueKey column and index (#arguments.reason#). Jobs enqueued "
-					& "without a uniqueKey are unaffected; enqueue(uniqueKey=...) throws Wheels.Job.UniqueKeyUnavailable "
-					& "until they exist. Add them manually: ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255); "
-					& "UPDATE wheels_jobs SET uniqueKey = id; CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) "
-					& "(on SQL Server add WHERE uniqueKey IS NOT NULL).",
-				type = "warning",
-				file = "wheels_jobs"
-			);
+			writeLog(text = $uniqueKeyUpgradeFailureText(reason = arguments.reason, step = arguments.step), type = "warning", file = "wheels_jobs");
 		}
+	}
+
+	/**
+	 * The message for a failed uniqueKey upgrade: which step failed and why, what still works,
+	 * and the manual fix for this database.
+	 */
+	public string function $uniqueKeyUpgradeFailureText(required string reason, string step = "") {
+		local.steps = {
+			column = "add the wheels_jobs.uniqueKey column",
+			backfill = "backfill wheels_jobs.uniqueKey from id",
+			index = "build the unique index idx_wjobs_unique_key on wheels_jobs.uniqueKey"
+		};
+		local.what = StructKeyExists(local.steps, arguments.step) ? local.steps[arguments.step] : "add the wheels_jobs.uniqueKey column and index";
+		return "Could not #local.what# (#arguments.reason#). Jobs enqueued without a uniqueKey are unaffected; "
+			& "enqueue(uniqueKey=...) throws Wheels.Job.UniqueKeyUnavailable until it is done. " & $uniqueKeyManualFix();
+	}
+
+	/**
+	 * How to finish the uniqueKey upgrade by hand on this database. On SQL Server the index is
+	 * filtered to non-NULL keys, which needs database compatibility level 100 or higher; below
+	 * that the advice names the level and the real options rather than a statement that fails
+	 * the same way.
+	 */
+	public string function $uniqueKeyManualFix() {
+		local.dbType = $detectDatabaseType();
+		local.column = local.dbType == "oracle" ? "ALTER TABLE wheels_jobs ADD (uniqueKey VARCHAR2(255))" : "ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255)";
+		local.steps = "#local.column#; UPDATE wheels_jobs SET uniqueKey = id WHERE uniqueKey IS NULL; ";
+		local.plainIndex = "CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey)";
+		if (local.dbType != "sqlserver") {
+			return "To do it by hand: #local.steps##local.plainIndex#.";
+		}
+		local.level = $sqlServerCompatibilityLevel();
+		if (local.level > 0 && local.level < 100) {
+			return "This SQL Server database runs at compatibility level #local.level#, and the filtered unique index "
+				& "Wheels uses on SQL Server (WHERE ... IS NOT NULL) needs level 100 or higher. Either raise it "
+				& "(ALTER DATABASE CURRENT SET COMPATIBILITY_LEVEL = 100, or higher) and the framework retries the upgrade, "
+				& "or, once every server runs Wheels 4.2 or later, create a plain unique index yourself: #local.steps##local.plainIndex#. "
+				& "A plain unique index allows only one NULL key, so a server still on 4.1 would fail its second enqueue.";
+		}
+		return "To do it by hand: #local.steps##local.plainIndex# WHERE uniqueKey IS NOT NULL.";
+	}
+
+	/**
+	 * This SQL Server database's compatibility level, or 0 when it can't be read.
+	 */
+	public numeric function $sqlServerCompatibilityLevel() {
+		try {
+			local.rows = queryExecute(
+				"SELECT compatibility_level AS lvl FROM sys.databases WHERE name = DB_NAME()",
+				{},
+				{datasource = variables.$datasource}
+			);
+			return local.rows.recordCount ? Val(local.rows.lvl) : 0;
+		} catch (any e) {
+			return 0;
+		}
+	}
+
+	/**
+	 * Remember the last failed upgrade step (app-wide), so UniqueKeyUnavailable can repeat it.
+	 */
+	public void function $recordUniqueKeyUpgradeProblem(required string step, required string reason) {
+		if (StructKeyExists(application, "wheels")) {
+			application.wheels.$uniqueKeyUpgradeProblem = {step = arguments.step, reason = arguments.reason};
+		}
+	}
+
+	public void function $clearUniqueKeyUpgradeProblem() {
+		if (StructKeyExists(application, "wheels")) {
+			StructDelete(application.wheels, "$uniqueKeyUpgradeProblem");
+		}
+	}
+
+	/**
+	 * "The last attempt (step: ...) failed: <reason>. " or "" when none is recorded.
+	 */
+	public string function $uniqueKeyLastProblem() {
+		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "$uniqueKeyUpgradeProblem")) {
+			return "";
+		}
+		local.p = application.wheels.$uniqueKeyUpgradeProblem;
+		return "The last attempt (step: #local.p.step#) failed: #local.p.reason#. ";
 	}
 
 	public boolean function $isAllowedJobClass(required string jobClass) {
