@@ -41,6 +41,10 @@ component {
 	// at-least-once, so perform() must be idempotent. false: it is not re-run; the reaped
 	// attempt ends 'interrupted' (at-most-once).
 	this.idempotent = true;
+	// true: never two runs of this job class at once, on any server (a lease in wheels_job_locks).
+	// A job can instead set this.concurrencyKey = "...", or define concurrencyKeyFor(struct data)
+	// (which wins), to share one lease among the jobs with the same key. See $jobLeaseName().
+	this.exclusive = false;
 
 	/**
 	 * Constructor
@@ -74,7 +78,9 @@ component {
 	 * heartbeats on time is never reaped and run a second time. Throws Wheels.Job.Fenced when
 	 * the job's claim is gone (it was reaped and claimed again): stop working and return, since
 	 * another attempt now owns the job and this one's result will be discarded. Outside a
-	 * worker (perform() called directly) it does nothing.
+	 * worker (perform() called directly) it does nothing. For an exclusive job (this.exclusive
+	 * or a concurrency key) it also extends the run's lease, so a run that keeps heartbeating
+	 * keeps its lease.
 	 */
 	public void function heartbeat() {
 		if (!StructKeyExists(variables, "$claim") || !Len(variables.$claim.jobId)) {
@@ -100,6 +106,8 @@ component {
 				extendedInfo = "Stop working and return from perform(): another attempt owns this job now, and this attempt's result will be discarded."
 			);
 		}
+		// An exclusive run's lease lives as long as its heartbeats do.
+		$renewJobLease();
 	}
 
 	/**
@@ -108,6 +116,45 @@ component {
 	 */
 	public void function $setClaimContext(required string jobId, string claimToken = "") {
 		variables.$claim = {jobId = arguments.jobId, claimToken = arguments.claimToken};
+	}
+
+	/**
+	 * Internal: the exclusive lease this instance's run holds (this.exclusive or a concurrency
+	 * key), so heartbeat() extends it too. Set by $runPerformExclusively() once the lease is taken.
+	 */
+	public void function $setLeaseContext(required string name, required string owner, required numeric windowSeconds) {
+		variables.$lease = {name = arguments.name, owner = arguments.owner, windowSeconds = arguments.windowSeconds};
+	}
+
+	/**
+	 * Internal: extends this run's exclusive lease by its window from now. A lease that is no
+	 * longer this run's (it expired and another run took it) is logged once and left alone; the
+	 * end of the run reports it as a lost lease.
+	 */
+	public void function $renewJobLease() {
+		if (!StructKeyExists(variables, "$lease")) {
+			return;
+		}
+		var leaseState = {renewed = true};
+		try {
+			local.leaseLock = $jobLeaseLock();
+			leaseState.renewed = local.leaseLock.renew(
+				name = variables.$lease.name,
+				owner = variables.$lease.owner,
+				expiresAt = local.leaseLock.nowMs() + variables.$lease.windowSeconds * 1000
+			);
+		} catch (any e) {
+			writeLog(text = "Job lease '#variables.$lease.name#' could not be renewed: #e.message#", type = "error", file = "wheels_jobs");
+			return;
+		}
+		if (!leaseState.renewed && !StructKeyExists(variables.$lease, "lostLogged")) {
+			variables.$lease.lostLogged = true;
+			writeLog(
+				text = "Job lease '#variables.$lease.name#' was lost before a heartbeat could renew it: another run may be running at the same time.",
+				type = "warning",
+				file = "wheels_jobs"
+			);
+		}
 	}
 
 	/**
@@ -645,7 +692,7 @@ component {
 	 * @timeout Optional cap, in seconds, on each job's own timeout. `0` (default) uses each job's own.
 	 */
 	public struct function processQueue(string queue = "", numeric limit = 10, numeric timeout = 0) {
-		local.result = {processed = 0, failed = 0, skipped = 0, fenced = 0, errors = []};
+		local.result = {processed = 0, failed = 0, skipped = 0, fenced = 0, leasesLost = 0, errors = []};
 		local.worker = new wheels.JobWorker();
 		local.worker.perJobTimeout = true;
 		local.worker.timeoutCap = Val(arguments.timeout) > 0 ? Val(arguments.timeout) : 0;
@@ -671,7 +718,13 @@ component {
 				break;
 			}
 			local.lastJobId = local.outcome.jobId;
-			if (local.outcome.fenced) {
+			if (local.outcome.leaseLost) {
+				local.result.leasesLost++;
+			}
+			if (local.outcome.deferred) {
+				// Another run holds its lease: put back as pending without using an attempt.
+				local.result.skipped++;
+			} else if (local.outcome.fenced) {
 				local.result.fenced++;
 			} else if (local.outcome.success) {
 				local.result.processed++;
@@ -739,7 +792,7 @@ component {
 	 * Internal: Process a single job row.
 	 */
 	private struct function $processJob(required struct jobRow) {
-		local.result = {success = false, skipped = false, fenced = false, error = ""};
+		local.result = {success = false, skipped = false, fenced = false, leaseLost = false, error = ""};
 		// The retry/fail UPDATEs run inside a catch, where a local. write doesn't survive on
 		// BoxLang, so a fenced outcome there is carried out through this struct.
 		var fence = {lost = false};
@@ -815,11 +868,31 @@ component {
 			// strip the internal $wheelsTenantContext key before passing data to perform()
 			local.hasTenantContext = $restoreTenantContext(local.jobData);
 			local.timeoutSeconds = $takeJobTimeout(local.jobData, local.jobInstance.timeout ?: 300);
-			local.performOutcome = $runPerformWithTimeout(
+			local.performOutcome = $runPerformExclusively(
 				jobInstance = local.jobInstance,
 				jobData = local.jobData,
-				timeoutSeconds = local.timeoutSeconds
+				timeoutSeconds = local.timeoutSeconds,
+				jobId = arguments.jobRow.id,
+				jobClass = arguments.jobRow.jobClass,
+				claimToken = local.claimToken,
+				claimTimeout = local.timeoutSeconds
 			);
+			if (local.performOutcome.busy) {
+				// Another run holds the job's lease: wait for it without using up an attempt.
+				$deferJobForLease(
+					jobId = arguments.jobRow.id,
+					jobClass = arguments.jobRow.jobClass,
+					claimToken = local.claimToken,
+					delaySeconds = local.performOutcome.retryInSeconds,
+					leaseName = local.performOutcome.leaseName
+				);
+				local.result.skipped = true;
+				if (local.hasTenantContext) {
+					$clearTenantContext();
+				}
+				return local.result;
+			}
+			local.result.leaseLost = local.performOutcome.leaseLost;
 			if (local.performOutcome.timedOut) {
 				throw(type = "Wheels.JobTimeout", message = local.performOutcome.error);
 			}
@@ -2173,6 +2246,263 @@ component {
 			local.rv.timedOut = true;
 			local.rv.error = "Job timed out after #arguments.timeoutSeconds# seconds";
 			return local.rv;
+		}
+	}
+
+	/**
+	 * Internal: runs perform() like $runPerformWithTimeout(), under the job's lease when it is
+	 * exclusive or has a concurrency key. When another run holds the lease, perform() does not
+	 * run: the outcome is `busy`, with `retryInSeconds` until the job should be tried again.
+	 * The lease is released afterwards, except after a timeout: perform() may still be running
+	 * in its thread then, so the lease is left to expire. `leaseLost` is true when the lease had
+	 * already been taken over by the time the job finished.
+	 */
+	public struct function $runPerformExclusively(
+		required any jobInstance,
+		required struct jobData,
+		required numeric timeoutSeconds,
+		required string jobId,
+		required string jobClass,
+		required string claimToken,
+		required numeric claimTimeout
+	) {
+		local.lease = $acquireJobLease(
+			jobInstance = arguments.jobInstance,
+			jobData = arguments.jobData,
+			jobClass = arguments.jobClass,
+			claimToken = arguments.claimToken,
+			claimTimeout = arguments.claimTimeout
+		);
+		if (local.lease.busy) {
+			return {success = false, error = "", timedOut = false, busy = true, retryInSeconds = local.lease.retryInSeconds, leaseName = local.lease.name, leaseLost = false};
+		}
+		if (local.lease.held) {
+			// So heartbeat() inside perform() renews the lease as well as the claim.
+			arguments.jobInstance.$setLeaseContext(name = local.lease.name, owner = local.lease.owner, windowSeconds = local.lease.windowSeconds);
+		}
+		local.outcome = $runPerformWithTimeout(
+			jobInstance = arguments.jobInstance,
+			jobData = arguments.jobData,
+			timeoutSeconds = arguments.timeoutSeconds
+		);
+		local.outcome.busy = false;
+		local.outcome.retryInSeconds = 0;
+		local.outcome.leaseName = local.lease.name;
+		local.outcome.leaseLost = false;
+		if (local.lease.held && !local.outcome.timedOut) {
+			local.outcome.leaseLost = !$releaseJobLease(lease = local.lease, jobId = arguments.jobId, jobClass = arguments.jobClass);
+		}
+		return local.outcome;
+	}
+
+	/**
+	 * Internal: the lease a job run must hold, or "" when it needs none. A concurrency key (the
+	 * job's concurrencyKeyFor(data) method, or else its this.concurrencyKey) names a lease shared
+	 * by every job with that key; otherwise this.exclusive = true leases the job class. A name that
+	 * would not fit the lock table is hashed.
+	 */
+	public string function $jobLeaseName(required any jobInstance, required struct jobData, required string jobClass) {
+		local.key = "";
+		if (StructKeyExists(arguments.jobInstance, "concurrencyKeyFor") && !IsSimpleValue(arguments.jobInstance.concurrencyKeyFor)) {
+			local.key = arguments.jobInstance.concurrencyKeyFor(arguments.jobData);
+		} else if (StructKeyExists(arguments.jobInstance, "concurrencyKey") && IsSimpleValue(arguments.jobInstance.concurrencyKey)) {
+			local.key = arguments.jobInstance.concurrencyKey;
+		}
+		if (Len(Trim(local.key))) {
+			return $fitLeaseName(prefix = "key:", value = Trim(local.key));
+		}
+		if (StructKeyExists(arguments.jobInstance, "exclusive") && IsBoolean(arguments.jobInstance.exclusive) && arguments.jobInstance.exclusive) {
+			return $fitLeaseName(prefix = "job:", value = arguments.jobClass);
+		}
+		return "";
+	}
+
+	/**
+	 * Internal: prefix & value, or prefix & the value's SHA-256 when that is longer than the lock
+	 * table's 100-character name.
+	 */
+	public string function $fitLeaseName(required string prefix, required string value) {
+		if (Len(arguments.prefix & arguments.value) <= 100) {
+			return arguments.prefix & arguments.value;
+		}
+		return arguments.prefix & LCase(Hash(arguments.value, "SHA-256"));
+	}
+
+	/**
+	 * Internal: takes the job's lease for this attempt, if it needs one. The owner is the
+	 * attempt's claim token, and the lease lasts as long as the claim does before the row itself
+	 * can be reaped (claimTimeout + Max(60, claimTimeout)), so it never ends inside the claim
+	 * timeout. Returns `held`, `busy` (another run holds it), `retryInSeconds`, `name` and `owner`.
+	 */
+	public struct function $acquireJobLease(
+		required any jobInstance,
+		required struct jobData,
+		required string jobClass,
+		required string claimToken,
+		required numeric claimTimeout
+	) {
+		local.rv = {held = false, busy = false, retryInSeconds = 0, name = "", owner = "", windowSeconds = 0};
+		local.rv.name = $jobLeaseName(jobInstance = arguments.jobInstance, jobData = arguments.jobData, jobClass = arguments.jobClass);
+		if (!Len(local.rv.name)) {
+			return local.rv;
+		}
+		local.rv.owner = Len(arguments.claimToken) ? arguments.claimToken : CreateUUID();
+		local.leaseLock = $jobLeaseLock();
+		local.claimSeconds = Val(arguments.claimTimeout) > 0 ? Val(arguments.claimTimeout) : 300;
+		local.now = local.leaseLock.nowMs();
+		local.rv.windowSeconds = local.claimSeconds + Max(60, local.claimSeconds);
+		local.expiresAt = local.now + local.rv.windowSeconds * 1000;
+		if (local.leaseLock.tryAcquire(name = local.rv.name, owner = local.rv.owner, host = $jobHostName(), now = local.now, expiresAt = local.expiresAt)) {
+			local.rv.held = true;
+			return local.rv;
+		}
+		// Try again once the holder's lease runs out, but at least every 30 seconds: the holder
+		// usually finishes and releases it well before then.
+		local.holder = local.leaseLock.read(local.rv.name);
+		local.remaining = local.holder.held ? Ceiling((local.holder.expiresAt - local.now) / 1000) : 1;
+		local.rv.busy = true;
+		local.rv.retryInSeconds = Min(30, Max(1, local.remaining));
+		return local.rv;
+	}
+
+	/**
+	 * Internal: releases a held job lease. False, with a warning logged, when the lease had
+	 * already expired and been taken over (or removed): exclusivity is only as strong as the
+	 * lease, and a run that outlives it may have overlapped another.
+	 */
+	public boolean function $releaseJobLease(required struct lease, required string jobId, required string jobClass) {
+		var state = {released = false};
+		try {
+			state.released = $jobLeaseLock().release(name = arguments.lease.name, owner = arguments.lease.owner);
+		} catch (any e) {
+			WriteLog(type = "error", file = "wheels_jobs", text = "Job '#arguments.jobClass#' [#arguments.jobId#] could not release its lease '#arguments.lease.name#': #e.message#. It expires on its own.");
+			return true;
+		}
+		if (!state.released) {
+			WriteLog(
+				type = "warning",
+				file = "wheels_jobs",
+				text = "Job '#arguments.jobClass#' [#arguments.jobId#] finished after losing its lease '#arguments.lease.name#': the lease expired while it ran, so another run may have overlapped it."
+			);
+		}
+		return state.released;
+	}
+
+	/**
+	 * Internal: puts a job whose lease is busy back to 'pending' to run in `delaySeconds`, and
+	 * gives back the attempt its claim counted, so waiting on a busy lease never uses up retries.
+	 * Fenced on the claim token like the other end-of-attempt UPDATEs. Returns the rows changed.
+	 */
+	public numeric function $deferJobForLease(
+		required string jobId,
+		required string jobClass,
+		required string claimToken,
+		required numeric delaySeconds,
+		required string leaseName
+	) {
+		local.params = {
+			runAt = {value = DateAdd("s", arguments.delaySeconds, $now()), cfsqltype = "cf_sql_timestamp"},
+			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
+		};
+		local.guard = $claimTokenGuard(claimToken = arguments.claimToken, params = local.params);
+		local.clearToken = Len(arguments.claimToken) ? ", claimToken = NULL" : "";
+		queryExecute(
+			"UPDATE wheels_jobs
+			SET status = 'pending', attempts = attempts - 1, runAt = :runAt, updatedAt = :updatedAt" & local.clearToken & "
+			WHERE id = :id AND status = 'processing' AND attempts > 0" & local.guard,
+			local.params,
+			{datasource = variables.$datasource, result = "local.deferResult"}
+		);
+		WriteLog(
+			type = "information",
+			file = "wheels_jobs",
+			text = "Job '#arguments.jobClass#' [#arguments.jobId#] waits #arguments.delaySeconds#s: another run holds its lease '#arguments.leaseName#'"
+		);
+		return Val(local.deferResult.recordCount ?: 0);
+	}
+
+	/**
+	 * Internal: the lease lock over wheels_job_locks, creating the table on first use. Not inside
+	 * a Wheels transaction: DDL there commits the open transaction on MySQL and Oracle, so the
+	 * job fails with the reason instead and is retried outside it.
+	 */
+	public any function $jobLeaseLock() {
+		if (!StructKeyExists(variables, "$jobLeaseLockInstance")) {
+			local.leaseLock = new wheels.LeaseLock(table = "wheels_job_locks", datasource = variables.$datasource);
+			$ensureJobLockTable(local.leaseLock);
+			variables.$jobLeaseLockInstance = local.leaseLock;
+		}
+		return variables.$jobLeaseLockInstance;
+	}
+
+	/**
+	 * Internal: creates wheels_job_locks when it is missing.
+	 */
+	public void function $ensureJobLockTable(required any leaseLock) {
+		if ($jobLockTableExists()) {
+			return;
+		}
+		if (Len($outermostWheelsTransaction())) {
+			Throw(
+				type = "Wheels.JobLockTableMissing",
+				message = "wheels_job_locks doesn't exist yet, and it can't be created inside a transaction. Run the job outside a transaction once, or create the table: #arguments.leaseLock.createTableSql()#"
+			);
+		}
+		try {
+			queryExecute(arguments.leaseLock.createTableSql(), {}, {datasource = variables.$datasource});
+		} catch (any e) {
+			// Tolerate "already exists" from another server creating it at the same time.
+			if (!$jobLockTableExists()) {
+				rethrow;
+			}
+		}
+	}
+
+	/**
+	 * Internal: whether wheels_job_locks exists, asked of the database's catalog. A failing probe
+	 * query would abort an enclosing PostgreSQL transaction, so one only runs outside a
+	 * transaction, for a database without a known catalog query.
+	 */
+	public boolean function $jobLockTableExists() {
+		local.catalogSql = $jobLockTableCatalogSql();
+		if (Len(local.catalogSql)) {
+			try {
+				return queryExecute(local.catalogSql, {}, {datasource = variables.$datasource}).recordCount > 0;
+			} catch (any e) {
+				// Fall back to the probe below.
+			}
+		}
+		if (Len($outermostWheelsTransaction())) {
+			return false;
+		}
+		try {
+			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_job_locks WHERE 1=0", {}, {datasource = variables.$datasource});
+			return true;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Internal: the catalog query that finds wheels_job_locks ("" for an unknown database).
+	 */
+	public string function $jobLockTableCatalogSql() {
+		switch ($detectDatabaseType()) {
+			case "postgresql":
+				return "SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND LOWER(table_name) = 'wheels_job_locks'";
+			case "mysql":
+				return "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND LOWER(table_name) = 'wheels_job_locks'";
+			case "sqlserver":
+				return "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE LOWER(TABLE_NAME) = 'wheels_job_locks' AND TABLE_SCHEMA = SCHEMA_NAME()";
+			case "oracle":
+				return "SELECT 1 FROM user_tables WHERE UPPER(table_name) = 'WHEELS_JOB_LOCKS'";
+			case "h2":
+				return "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE UPPER(TABLE_NAME) = 'WHEELS_JOB_LOCKS'";
+			case "sqlite":
+				return "SELECT 1 FROM sqlite_master WHERE type = 'table' AND LOWER(name) = 'wheels_job_locks'";
+			default:
+				return "";
 		}
 	}
 
