@@ -78,7 +78,9 @@ component {
 	 * heartbeats on time is never reaped and run a second time. Throws Wheels.Job.Fenced when
 	 * the job's claim is gone (it was reaped and claimed again): stop working and return, since
 	 * another attempt now owns the job and this one's result will be discarded. Outside a
-	 * worker (perform() called directly) it does nothing.
+	 * worker (perform() called directly) it does nothing. For an exclusive job (this.exclusive
+	 * or a concurrency key) it also extends the run's lease, so a run that keeps heartbeating
+	 * keeps its lease.
 	 */
 	public void function heartbeat() {
 		if (!StructKeyExists(variables, "$claim") || !Len(variables.$claim.jobId)) {
@@ -104,6 +106,8 @@ component {
 				extendedInfo = "Stop working and return from perform(): another attempt owns this job now, and this attempt's result will be discarded."
 			);
 		}
+		// An exclusive run's lease lives as long as its heartbeats do.
+		$renewJobLease();
 	}
 
 	/**
@@ -112,6 +116,45 @@ component {
 	 */
 	public void function $setClaimContext(required string jobId, string claimToken = "") {
 		variables.$claim = {jobId = arguments.jobId, claimToken = arguments.claimToken};
+	}
+
+	/**
+	 * Internal: the exclusive lease this instance's run holds (this.exclusive or a concurrency
+	 * key), so heartbeat() extends it too. Set by $runPerformExclusively() once the lease is taken.
+	 */
+	public void function $setLeaseContext(required string name, required string owner, required numeric windowSeconds) {
+		variables.$lease = {name = arguments.name, owner = arguments.owner, windowSeconds = arguments.windowSeconds};
+	}
+
+	/**
+	 * Internal: extends this run's exclusive lease by its window from now. A lease that is no
+	 * longer this run's (it expired and another run took it) is logged once and left alone; the
+	 * end of the run reports it as a lost lease.
+	 */
+	public void function $renewJobLease() {
+		if (!StructKeyExists(variables, "$lease")) {
+			return;
+		}
+		var leaseState = {renewed = true};
+		try {
+			local.leaseLock = $jobLeaseLock();
+			leaseState.renewed = local.leaseLock.renew(
+				name = variables.$lease.name,
+				owner = variables.$lease.owner,
+				expiresAt = local.leaseLock.nowMs() + variables.$lease.windowSeconds * 1000
+			);
+		} catch (any e) {
+			writeLog(text = "Job lease '#variables.$lease.name#' could not be renewed: #e.message#", type = "error", file = "wheels_jobs");
+			return;
+		}
+		if (!leaseState.renewed && !StructKeyExists(variables.$lease, "lostLogged")) {
+			variables.$lease.lostLogged = true;
+			writeLog(
+				text = "Job lease '#variables.$lease.name#' was lost before a heartbeat could renew it: another run may be running at the same time.",
+				type = "warning",
+				file = "wheels_jobs"
+			);
+		}
 	}
 
 	/**
@@ -2232,6 +2275,10 @@ component {
 		);
 		if (local.lease.busy) {
 			return {success = false, error = "", timedOut = false, busy = true, retryInSeconds = local.lease.retryInSeconds, leaseName = local.lease.name, leaseLost = false};
+		}
+		if (local.lease.held) {
+			// So heartbeat() inside perform() renews the lease as well as the claim.
+			arguments.jobInstance.$setLeaseContext(name = local.lease.name, owner = local.lease.owner, windowSeconds = local.lease.windowSeconds);
 		}
 		local.outcome = $runPerformWithTimeout(
 			jobInstance = arguments.jobInstance,

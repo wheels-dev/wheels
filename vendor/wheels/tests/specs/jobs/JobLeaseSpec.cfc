@@ -133,6 +133,17 @@ component extends="wheels.WheelsTest" {
 				expect(application["$leaseSpecRuns"]).toBe(1);
 			});
 
+			it("extends the run's lease when the job heartbeats", function() {
+				application["$leaseSpecBefore"] = 0;
+				application["$leaseSpecAfter"] = 0;
+				var id = $insertJob(queue = "test_lease_heartbeat", jobClass = "wheels.tests._assets.jobs.HeartbeatLeaseJob");
+				var result = new wheels.JobWorker().processNext(queues = "test_lease_heartbeat", timeout = 300);
+				expect(result.success).toBeTrue(result.error);
+				expect(application["$leaseSpecBefore"]).toBeGT(0, "the lease is held while perform() runs");
+				expect(application["$leaseSpecAfter"]).toBeGT(application["$leaseSpecBefore"], "heartbeat() moves the lease's expiry forward");
+				expect($leaseRows("job:wheels.tests._assets.jobs.HeartbeatLeaseJob")).toBe(0, "released afterwards");
+			});
+
 			it("finishes a job whose lease was taken over while it ran, and reports the lost lease", function() {
 				var id = $insertJob(queue = "test_lease_lost", jobClass = "wheels.tests._assets.jobs.LeaseThiefJob");
 				var worker = new wheels.JobWorker();
