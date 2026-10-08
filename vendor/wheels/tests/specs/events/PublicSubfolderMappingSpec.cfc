@@ -3,28 +3,27 @@
  * mappings with expandPath("../vendor/") and friends, which resolve against the requested
  * template's directory: for /sub/page.cfm that is public/vendor/, so /wheels pointed at a
  * folder that doesn't exist and the request failed with "can't find component
- * [wheels.events.EventMethods]". The spec writes a throwaway page under public/files/,
+ * [wheels.events.EventMethods]". The spec writes a throwaway page in public/files/,
  * requests it over HTTP, and removes it.
  */
 component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
-		// Under public/files/: a folder the rewrite rules serve directly (other paths go to
-		// index.cfm) and that has no Application.cfc of its own, so public/Application.cfc
-		// handles the request.
-		variables.probeName = "_wheels_subdir_probe_" & LCase(Left(Hash(CreateUUID()), 8));
-		variables.probeDir = ExpandPath("/files/") & variables.probeName & "/";
-		DirectoryCreate(variables.probeDir);
+		// Directly in public/files/: a folder the rewrite rules serve as is (other paths go
+		// to index.cfm) with no Application.cfc of its own, so public/Application.cfc handles
+		// the request. One level down, as in the issue: Wheels answers 404 for a requested
+		// page nested deeper than vendor/wheels/ ($abortInvalidRequest()).
+		variables.probeFile = ExpandPath("/files/") & "_wheels_subdir_probe_" & LCase(Left(Hash(CreateUUID()), 8)) & ".cfm";
 		FileWrite(
-			variables.probeDir & "probe.cfm",
+			variables.probeFile,
 			'<cfcontent type="text/plain" reset="true"><cfoutput>ok|##GetApplicationSettings().mappings["/wheels"]##</cfoutput>'
 		);
-		variables.probePath = "/files/" & variables.probeName & "/probe.cfm";
+		variables.probePath = "/files/" & GetFileFromPath(variables.probeFile);
 	}
 
 	function afterAll() {
-		if (DirectoryExists(variables.probeDir)) {
-			DirectoryDelete(variables.probeDir, true);
+		if (FileExists(variables.probeFile)) {
+			FileDelete(variables.probeFile);
 		}
 	}
 
