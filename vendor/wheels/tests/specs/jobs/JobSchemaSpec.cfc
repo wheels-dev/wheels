@@ -149,6 +149,29 @@ component extends="wheels.WheelsTest" {
 				expect(new wheels.JobSchema().hasTable("wheels_jobs")).toBeFalse();
 			});
 
+			it("with jobsAutoCreateTables = false, reports a probe failure as itself when the table exists", function() {
+				// The catalog says the table is there but the probe fails (a lost connection, a
+				// permission): that error surfaces, not a misleading "missing table".
+				$dropJobTable();
+				application.wheels.jobsAutoCreateTables = false;
+				var schema = new wheels.JobSchema();
+				prepareMock(schema);
+				schema.$("hasTable", true);
+				var job = new wheels.Job();
+				prepareMock(job);
+				job.$("$jobSchema", schema);
+				var probed = {type = "", message = ""};
+				try {
+					job.$ensureJobTable();
+				} catch (any e) {
+					probed.type = e.type;
+					probed.message = e.message;
+				}
+				expect(Len(probed.message)).toBeGT(0, "the probe's own error is rethrown");
+				expect(probed.type).notToBe("Wheels.Job.SchemaMissing");
+				expect(probed.message).notToInclude("jobsAutoCreateTables");
+			});
+
 			it("with jobsAutoCreateTables = false, doesn't alter an existing table", function() {
 				$createLegacyJobTable();
 				application.wheels.jobsAutoCreateTables = false;

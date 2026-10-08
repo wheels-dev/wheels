@@ -1079,7 +1079,14 @@ component {
 		}
 
 		if (!$jobSchema().autoCreateEnabled()) {
-			$throwJobSchemaMissing("The wheels_jobs table");
+			// The probe can fail for reasons other than a missing table (a lost connection, a
+			// permission). Only the catalog's answer makes it a missing schema; otherwise run the
+			// probe again here, so its own error is what the caller sees.
+			if (!$jobSchema().hasTable("wheels_jobs")) {
+				$throwJobSchemaMissing("The wheels_jobs table");
+			}
+			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			return true;
 		}
 
 		try {
