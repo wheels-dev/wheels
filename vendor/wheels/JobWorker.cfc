@@ -16,6 +16,8 @@ component {
 		this.startedAt = Now();
 		this.jobsProcessed = 0;
 		this.jobsFailed = 0;
+		// Runs that finished after their exclusive lease had expired and been taken over.
+		this.leasesLost = 0;
 		variables.$datasource = "";
 		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "dataSourceName")) {
 			variables.$datasource = application.wheels.dataSourceName;
@@ -31,7 +33,7 @@ component {
 	 * @timeout Timeout in seconds for a single job execution.
 	 */
 	public struct function processNext(string queues = "", numeric timeout = 300) {
-		local.result = {success = false, jobId = "", jobClass = "", error = "", skipped = false, fenced = false};
+		local.result = {success = false, jobId = "", jobClass = "", error = "", skipped = false, fenced = false, deferred = false, leaseLost = false};
 
 		// Ensure the table (and the claimTimeout column) on the normal path, so an existing
 		// install gets the column once per worker rather than only when a query happens to
@@ -131,8 +133,23 @@ component {
 				local.processResult = $executeJob(jobRow = local.jobRow, timeout = arguments.timeout);
 				local.result.jobId = local.row.id;
 				local.result.jobClass = local.row.jobClass;
+				if (local.processResult.leaseLost) {
+					this.leasesLost++;
+					local.result.leaseLost = true;
+				}
 
-				if (local.processResult.fenced) {
+				if (local.processResult.busy) {
+					// Another run holds the job's lease: it waits without using up an attempt.
+					$jobBridge().$deferJobForLease(
+						jobId = local.row.id,
+						jobClass = local.row.jobClass,
+						claimToken = local.jobRow.claimToken,
+						delaySeconds = local.processResult.retryInSeconds,
+						leaseName = local.processResult.leaseName
+					);
+					local.result.skipped = true;
+					local.result.deferred = true;
+				} else if (local.processResult.fenced) {
 					// Ran, but the claim was reaped and re-issued while it did: the completion
 					// was rejected, and retrying it would requeue the attempt that replaced it.
 					local.result.fenced = true;
@@ -698,7 +715,7 @@ component {
 	 * Execute a job's perform() method.
 	 */
 	private struct function $executeJob(required struct jobRow, numeric timeout = 300) {
-		local.result = {success = false, fenced = false, error = ""};
+		local.result = {success = false, fenced = false, busy = false, retryInSeconds = 0, leaseName = "", leaseLost = false, error = ""};
 		local.claimToken = StructKeyExists(arguments.jobRow, "claimToken") ? arguments.jobRow.claimToken : "";
 
 		// Initialized before the try so the cleanup below never reads an undefined
@@ -725,11 +742,25 @@ component {
 				local.workerCap = 300;
 			}
 			local.timeoutSeconds = Min(local.fromRow, local.workerCap);
-			local.performOutcome = $jobBridge().$runPerformWithTimeout(
+			local.performOutcome = $jobBridge().$runPerformExclusively(
 				jobInstance = local.jobInstance,
 				jobData = local.jobData,
-				timeoutSeconds = local.timeoutSeconds
+				timeoutSeconds = local.timeoutSeconds,
+				jobId = arguments.jobRow.id,
+				jobClass = arguments.jobRow.jobClass,
+				claimToken = local.claimToken,
+				claimTimeout = local.workerCap
 			);
+			local.result.leaseLost = local.performOutcome.leaseLost;
+			if (local.performOutcome.busy) {
+				local.result.busy = true;
+				local.result.retryInSeconds = local.performOutcome.retryInSeconds;
+				local.result.leaseName = local.performOutcome.leaseName;
+				if (local.hasTenantContext) {
+					$jobBridge().$clearTenantContext();
+				}
+				return local.result;
+			}
 			if (local.performOutcome.timedOut) {
 				throw(type = "Wheels.JobTimeout", message = local.performOutcome.error);
 			}
