@@ -27,6 +27,14 @@ component extends="wheels.WheelsTest" {
 				expect(c.isoUtc(next)).toBe("2026-02-06T00:00:00Z");
 			});
 
+			it("ANDs the day fields when either is starred (Vixie)", function() {
+				var c = new wheels.JobCron();
+				// Odd days that are also Mondays: from Tuesday 2026-10-06, Monday the 12th is even,
+				// so the next match is Monday the 19th.
+				var next = c.nextCron(c.parse("0 0 */2 * MON"), c.msFromIsoUtc("2026-10-06T00:00Z"));
+				expect(c.isoUtc(next)).toBe("2026-10-19T00:00:00Z");
+			});
+
 			it("supports the @ aliases and month/day names", function() {
 				var c = new wheels.JobCron();
 				expect(c.isoUtc(c.nextCron(c.parse("@daily"), c.msFromIsoUtc("2026-10-12T07:30Z")))).toBe("2026-10-13T00:00:00Z");
@@ -43,7 +51,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("refuses malformed and unsupported expressions", function() {
-				var bad = ["0 0 * *", "61 * * * *", "0 25 * * *", "0 0 L * *", "0 0 15W * *", "0 0 ? * MON", "0 0 * * 6##3", "@sometimes", "5-1 * * * *", "*/0 * * * *"];
+				var bad = ["0 0 * *", "61 * * * *", "0 25 * * *", "0 0 L * *", "0 0 15W * *", "0 0 ? * MON", "0 0 * * 6##3", "@sometimes", "5-1 * * * *", "*/0 * * * *", "1--5 * * * *", "1-2-3 * * * *", "*/ * * * *", "5/ * * * *"];
 				for (var expression in bad) {
 					var state = {threw = false};
 					try {
@@ -93,6 +101,19 @@ component extends="wheels.WheelsTest" {
 				expect(c.isoUtc(c.nextCron(cron, first, "America/New_York"))).toBe("2026-11-02T06:30:00Z", "the second 01:30 must not run");
 			});
 
+			it("refuses a non-UTC zone on an engine without java.time", function() {
+				if ($javaTime()) {
+					return;
+				}
+				var state = {threw = false};
+				try {
+					new wheels.JobCron().validateTimeZone("America/New_York");
+				} catch (any e) {
+					state.threw = e.type == "Wheels.Job.InvalidSchedule";
+				}
+				expect(state.threw).toBeTrue("without java.time only UTC schedules can be computed");
+			});
+
 			it("refuses an unknown time zone", function() {
 				var state = {threw = false};
 				try {
@@ -106,6 +127,13 @@ component extends="wheels.WheelsTest" {
 		});
 
 		describe("JobScheduler.enqueueDue", function() {
+
+			it("reads the current time as epoch milliseconds", function() {
+				var nowMs = new wheels.JobScheduler().$nowMs();
+				var epochDay = Floor(nowMs / 86400000);
+				var localDay = DateDiff("d", CreateDate(1970, 1, 1), Now());
+				expect(Abs(epochDay - localDay)).toBeLTE(1, "the scheduler's clock must be epoch time, not an uptime counter");
+			});
 
 			beforeEach(function() {
 				var bootstrapJob = new wheels.Job();
@@ -279,13 +307,9 @@ component extends="wheels.WheelsTest" {
 		});
 	}
 
+	// The same probe the scheduler uses: an engine with a partial java.time counts as without.
 	private boolean function $javaTime() {
-		try {
-			CreateObject("java", "java.time.ZoneId").of("America/New_York");
-			return true;
-		} catch (any e) {
-			return false;
-		}
+		return new wheels.JobCron().$javaTimeAvailable();
 	}
 
 	private void function $cleanup() {

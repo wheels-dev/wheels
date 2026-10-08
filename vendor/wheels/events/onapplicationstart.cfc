@@ -700,9 +700,6 @@ component {
 	}
 
 	/**
-	 * The WHEELS_MIGRATE_ON_BOOT environment variable, or "" when it is not set.
-	 */
-	/**
 	 * Internal function. Sync config/schedules.cfm to wheels_job_schedules (a missing file
 	 * disables code-defined schedules already there). Logged, never thrown: a schedules problem
 	 * must not stop the application starting.
@@ -722,6 +719,9 @@ component {
 		}
 	}
 
+	/**
+	 * The WHEELS_MIGRATE_ON_BOOT environment variable, or "" when it is not set.
+	 */
 	public string function $bootMigrationEnvValue() {
 		return $readEnvironmentVariable("WHEELS_MIGRATE_ON_BOOT");
 	}

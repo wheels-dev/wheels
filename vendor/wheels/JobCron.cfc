@@ -49,14 +49,16 @@ component {
 			days = $field(local.fields[3], 1, 31, "day-of-month", ""),
 			months = $field(local.fields[4], 1, 12, "month", "JAN,FEB,MAR,APR,MAY,JUN,JUL,AUG,SEP,OCT,NOV,DEC"),
 			weekdays = $weekdayField(local.fields[5]),
-			dayRestricted = Left(local.fields[3], 1) != "*",
-			weekdayRestricted = Left(local.fields[5], 1) != "*"
+			// Vixie cron: a day field that starts with "*" (including "*/2") is "starred".
+			dayStarred = Left(local.fields[3], 1) == "*",
+			weekdayStarred = Left(local.fields[5], 1) == "*"
 		};
 	}
 
 	/**
 	 * The first cron slot strictly after `afterMs`, as epoch ms, or -1 when the expression never
-	 * fires within 5 years (e.g. February 31st).
+	 * fires within 5 years (e.g. February 31st). Five years covers every real calendar pattern,
+	 * including February 29th.
 	 */
 	public numeric function nextCron(required struct cron, required numeric afterMs, string timeZone = "UTC") {
 		local.zone = $zone(arguments.timeZone);
@@ -172,6 +174,11 @@ component {
 		if (!Len(local.text)) {
 			$invalid("Empty value in the #arguments.label# field.");
 		}
+		// One shape only: * or N or NAME, optionally -M, optionally /STEP.
+		if (!REFind("^(\*|[A-Z0-9]+(-[A-Z0-9]+)?)(/[0-9]+)?$", local.text)
+			&& !Find("##", local.text) && !Find("?", local.text)) {
+			$invalid("'#arguments.part#' isn't a valid #arguments.label# value.");
+		}
 		// Quartz forms: L, 5L, L-3, 15W, LW, 6##3, ?. (Not a bare W/L test: WED contains a W.)
 		if (Find("##", local.text) || Find("?", local.text) || REFind("^([0-9]*L|L-?[0-9]*|[0-9]+W|LW)$", ListFirst(local.text, "/"))) {
 			$invalid("'#arguments.part#' in the #arguments.label# field uses a Quartz extension (L, W, ## or ?), which isn't supported.");
@@ -220,21 +227,16 @@ component {
 	}
 
 	/**
-	 * Vixie cron: when both day-of-month and day-of-week are restricted, either may match.
+	 * Vixie cron: when either day field is starred (starts with an asterisk, with or without a
+	 * step), a day must match both; when neither is, matching either is enough.
 	 */
 	private boolean function $dayMatches(required struct cron, required struct f) {
 		local.dayOk = arguments.cron.days[arguments.f.day];
 		local.weekdayOk = arguments.cron.weekdays[arguments.f.weekday + 1];
-		if (arguments.cron.dayRestricted && arguments.cron.weekdayRestricted) {
-			return local.dayOk || local.weekdayOk;
+		if (arguments.cron.dayStarred || arguments.cron.weekdayStarred) {
+			return local.dayOk && local.weekdayOk;
 		}
-		if (arguments.cron.dayRestricted) {
-			return local.dayOk;
-		}
-		if (arguments.cron.weekdayRestricted) {
-			return local.weekdayOk;
-		}
-		return true;
+		return local.dayOk || local.weekdayOk;
 	}
 
 	/**
@@ -246,6 +248,9 @@ component {
 		if (!Len(local.name) || ListFindNoCase("UTC,Etc/UTC,Z,GMT,Etc/GMT", local.name)) {
 			return "";
 		}
+		if (!$javaTimeAvailable()) {
+			$invalid("Time zone '#local.name#' needs java.time, which this CFML engine doesn't provide. Use timezone(""UTC"") and write the cron in UTC.");
+		}
 		var outcome = {zone = "", error = ""};
 		try {
 			outcome.zone = CreateObject("java", "java.time.ZoneId").of(local.name);
@@ -256,6 +261,40 @@ component {
 			$invalid("Time zone '#local.name#' can't be used: #outcome.error# Use an IANA name such as America/New_York (UTC needs no time zone support).");
 		}
 		return outcome.zone;
+	}
+
+	/**
+	 * Whether this engine has the java.time this component uses, probed once per application:
+	 * a New York local time converted to an instant and back, and an unknown zone rejected. A
+	 * partial implementation (no LocalDateTime.of, or a ZoneId.of that accepts anything) is
+	 * treated as missing, so non-UTC schedules are refused instead of computed wrongly.
+	 */
+	public boolean function $javaTimeAvailable() {
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "$jobsJavaTimeAvailable")) {
+			return application.wheels.$jobsJavaTimeAvailable;
+		}
+		var probe = {ok = false};
+		try {
+			var zone = CreateObject("java", "java.time.ZoneId").of("America/New_York");
+			var ldt = CreateObject("java", "java.time.LocalDateTime").of(JavaCast("int", 2026), JavaCast("int", 1), JavaCast("int", 15), JavaCast("int", 12), JavaCast("int", 0));
+			var instantMs = ldt.atZone(zone).toInstant().toEpochMilli();
+			var hourBack = CreateObject("java", "java.time.Instant").ofEpochMilli(JavaCast("long", instantMs)).atZone(zone).toLocalDateTime().getHour();
+			probe.ok = instantMs == msFromIsoUtc("2026-01-15T17:00Z") && hourBack == 12;
+		} catch (any e) {
+			probe.ok = false;
+		}
+		if (probe.ok) {
+			try {
+				CreateObject("java", "java.time.ZoneId").of("Mars/Olympus_Mons");
+				probe.ok = false;
+			} catch (any e) {
+				// An unknown zone must be refused.
+			}
+		}
+		if (StructKeyExists(application, "wheels")) {
+			application.wheels.$jobsJavaTimeAvailable = probe.ok;
+		}
+		return probe.ok;
 	}
 
 	private numeric function $localMinute(required numeric epochMs, required any zone) {

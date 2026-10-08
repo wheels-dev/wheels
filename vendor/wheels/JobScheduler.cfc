@@ -438,9 +438,16 @@ component {
 		return {value = arguments.value, cfsqltype = "cf_sql_bigint"};
 	}
 
-	/** Now in epoch milliseconds (the JVM clock, as the migration lock uses). */
-	private numeric function $nowMs() {
-		return GetTickCount();
+	/**
+	 * Now in epoch milliseconds: System.currentTimeMillis() where Java is available, else
+	 * GetTickCount() (epoch milliseconds on Lucee, Adobe and BoxLang).
+	 */
+	public numeric function $nowMs() {
+		try {
+			return CreateObject("java", "java.lang.System").currentTimeMillis();
+		} catch (any e) {
+			return GetTickCount();
+		}
 	}
 
 	/** Now() truncated to whole seconds, as the job tables are written everywhere else. */
