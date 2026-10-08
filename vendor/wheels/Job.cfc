@@ -38,8 +38,8 @@ component {
 	// rollback alike, so it survives a rollback (failure notices, audit records).
 	this.transactional = true;
 	// true: never two runs of this job class at once, on any server (a lease in wheels_job_locks).
-	// A job can instead set this.concurrencyKey = "...", or define concurrencyKey(struct data), to
-	// share one lease among the jobs with the same key. See $jobLeaseName().
+	// A job can instead set this.concurrencyKey = "...", or define concurrencyKeyFor(struct data)
+	// (which wins), to share one lease among the jobs with the same key. See $jobLeaseName().
 	this.exclusive = false;
 
 	/**
@@ -1898,18 +1898,16 @@ component {
 
 	/**
 	 * Internal: the lease a job run must hold, or "" when it needs none. A concurrency key (the
-	 * job's concurrencyKey(data) method, or else its this.concurrencyKey) names a lease shared by
-	 * every job with that key; otherwise this.exclusive = true leases the job class. A name that
+	 * job's concurrencyKeyFor(data) method, or else its this.concurrencyKey) names a lease shared
+	 * by every job with that key; otherwise this.exclusive = true leases the job class. A name that
 	 * would not fit the lock table is hashed.
 	 */
 	public string function $jobLeaseName(required any jobInstance, required struct jobData, required string jobClass) {
 		local.key = "";
-		if (StructKeyExists(arguments.jobInstance, "concurrencyKey")) {
-			if (IsSimpleValue(arguments.jobInstance.concurrencyKey)) {
-				local.key = arguments.jobInstance.concurrencyKey;
-			} else {
-				local.key = arguments.jobInstance.concurrencyKey(arguments.jobData);
-			}
+		if (StructKeyExists(arguments.jobInstance, "concurrencyKeyFor") && !IsSimpleValue(arguments.jobInstance.concurrencyKeyFor)) {
+			local.key = arguments.jobInstance.concurrencyKeyFor(arguments.jobData);
+		} else if (StructKeyExists(arguments.jobInstance, "concurrencyKey") && IsSimpleValue(arguments.jobInstance.concurrencyKey)) {
+			local.key = arguments.jobInstance.concurrencyKey;
 		}
 		if (Len(Trim(local.key))) {
 			return $fitLeaseName(prefix = "key:", value = Trim(local.key));
@@ -1950,17 +1948,17 @@ component {
 			return local.rv;
 		}
 		local.rv.owner = Len(arguments.claimToken) ? arguments.claimToken : CreateUUID();
-		local.lock = $jobLeaseLock();
+		local.leaseLock = $jobLeaseLock();
 		local.claimSeconds = Val(arguments.claimTimeout) > 0 ? Val(arguments.claimTimeout) : 300;
-		local.now = local.lock.nowMs();
+		local.now = local.leaseLock.nowMs();
 		local.expiresAt = local.now + (local.claimSeconds + Max(60, local.claimSeconds)) * 1000;
-		if (local.lock.tryAcquire(name = local.rv.name, owner = local.rv.owner, host = $jobHostName(), now = local.now, expiresAt = local.expiresAt)) {
+		if (local.leaseLock.tryAcquire(name = local.rv.name, owner = local.rv.owner, host = $jobHostName(), now = local.now, expiresAt = local.expiresAt)) {
 			local.rv.held = true;
 			return local.rv;
 		}
 		// Try again once the holder's lease runs out, but at least every 30 seconds: the holder
 		// usually finishes and releases it well before then.
-		local.holder = local.lock.read(local.rv.name);
+		local.holder = local.leaseLock.read(local.rv.name);
 		local.remaining = local.holder.held ? Ceiling((local.holder.expiresAt - local.now) / 1000) : 1;
 		local.rv.busy = true;
 		local.rv.retryInSeconds = Min(30, Max(1, local.remaining));
@@ -2031,9 +2029,9 @@ component {
 	 */
 	public any function $jobLeaseLock() {
 		if (!StructKeyExists(variables, "$jobLeaseLockInstance")) {
-			local.lock = new wheels.LeaseLock(table = "wheels_job_locks", datasource = variables.$datasource);
-			$ensureJobLockTable(local.lock);
-			variables.$jobLeaseLockInstance = local.lock;
+			local.leaseLock = new wheels.LeaseLock(table = "wheels_job_locks", datasource = variables.$datasource);
+			$ensureJobLockTable(local.leaseLock);
+			variables.$jobLeaseLockInstance = local.leaseLock;
 		}
 		return variables.$jobLeaseLockInstance;
 	}
@@ -2041,18 +2039,18 @@ component {
 	/**
 	 * Internal: creates wheels_job_locks when it is missing.
 	 */
-	public void function $ensureJobLockTable(required any lock) {
+	public void function $ensureJobLockTable(required any leaseLock) {
 		if ($jobLockTableExists()) {
 			return;
 		}
 		if (Len($outermostWheelsTransaction())) {
 			Throw(
 				type = "Wheels.JobLockTableMissing",
-				message = "wheels_job_locks doesn't exist yet, and it can't be created inside a transaction. Run the job outside a transaction once, or create the table: #arguments.lock.createTableSql()#"
+				message = "wheels_job_locks doesn't exist yet, and it can't be created inside a transaction. Run the job outside a transaction once, or create the table: #arguments.leaseLock.createTableSql()#"
 			);
 		}
 		try {
-			queryExecute(arguments.lock.createTableSql(), {}, {datasource = variables.$datasource});
+			queryExecute(arguments.leaseLock.createTableSql(), {}, {datasource = variables.$datasource});
 		} catch (any e) {
 			// Tolerate "already exists" from another server creating it at the same time.
 			if (!$jobLockTableExists()) {
@@ -2062,14 +2060,49 @@ component {
 	}
 
 	/**
-	 * Internal: whether wheels_job_locks exists.
+	 * Internal: whether wheels_job_locks exists, asked of the database's catalog. A failing probe
+	 * query would abort an enclosing PostgreSQL transaction, so one only runs outside a
+	 * transaction, for a database without a known catalog query.
 	 */
 	public boolean function $jobLockTableExists() {
+		local.catalogSql = $jobLockTableCatalogSql();
+		if (Len(local.catalogSql)) {
+			try {
+				return queryExecute(local.catalogSql, {}, {datasource = variables.$datasource}).recordCount > 0;
+			} catch (any e) {
+				// Fall back to the probe below.
+			}
+		}
+		if (Len($outermostWheelsTransaction())) {
+			return false;
+		}
 		try {
 			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_job_locks WHERE 1=0", {}, {datasource = variables.$datasource});
 			return true;
 		} catch (any e) {
 			return false;
+		}
+	}
+
+	/**
+	 * Internal: the catalog query that finds wheels_job_locks ("" for an unknown database).
+	 */
+	public string function $jobLockTableCatalogSql() {
+		switch ($detectDatabaseType()) {
+			case "postgresql":
+				return "SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND LOWER(table_name) = 'wheels_job_locks'";
+			case "mysql":
+				return "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND LOWER(table_name) = 'wheels_job_locks'";
+			case "sqlserver":
+				return "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE LOWER(TABLE_NAME) = 'wheels_job_locks' AND TABLE_SCHEMA = SCHEMA_NAME()";
+			case "oracle":
+				return "SELECT 1 FROM user_tables WHERE UPPER(table_name) = 'WHEELS_JOB_LOCKS'";
+			case "h2":
+				return "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE UPPER(TABLE_NAME) = 'WHEELS_JOB_LOCKS'";
+			case "sqlite":
+				return "SELECT 1 FROM sqlite_master WHERE type = 'table' AND LOWER(name) = 'wheels_job_locks'";
+			default:
+				return "";
 		}
 	}
 

@@ -20,34 +20,34 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("lets one owner take a free lease, and no other until it is released", function() {
-				var lock = $lock();
-				expect(lock.tryAcquire(name = "spec:one", owner = "a", host = "h1", now = 1000, expiresAt = 9000000000000)).toBeTrue();
-				expect(lock.tryAcquire(name = "spec:one", owner = "b", host = "h2", now = 2000, expiresAt = 9000000000000)).toBeFalse();
-				expect(lock.ownerOf("spec:one")).toBe("a");
-				expect(lock.release(name = "spec:one", owner = "b")).toBeFalse("only the owner can release it");
-				expect(lock.release(name = "spec:one", owner = "a")).toBeTrue();
-				expect(lock.tryAcquire(name = "spec:one", owner = "b", host = "h2", now = 3000, expiresAt = 9000000000000)).toBeTrue();
+				var leaseLock = $lock();
+				expect(leaseLock.tryAcquire(name = "spec:one", owner = "a", host = "h1", now = 1000, expiresAt = 9000000000000)).toBeTrue();
+				expect(leaseLock.tryAcquire(name = "spec:one", owner = "b", host = "h2", now = 2000, expiresAt = 9000000000000)).toBeFalse();
+				expect(leaseLock.ownerOf("spec:one")).toBe("a");
+				expect(leaseLock.release(name = "spec:one", owner = "b")).toBeFalse("only the owner can release it");
+				expect(leaseLock.release(name = "spec:one", owner = "a")).toBeTrue();
+				expect(leaseLock.tryAcquire(name = "spec:one", owner = "b", host = "h2", now = 3000, expiresAt = 9000000000000)).toBeTrue();
 			});
 
 			it("takes over an expired lease, and the old owner can neither renew nor release it", function() {
-				var lock = $lock();
-				lock.tryAcquire(name = "spec:two", owner = "a", host = "h1", now = 1000, expiresAt = 5000);
-				expect(lock.tryAcquire(name = "spec:two", owner = "b", host = "h2", now = 4000, expiresAt = 90000)).toBeFalse("not expired yet");
-				expect(lock.tryAcquire(name = "spec:two", owner = "b", host = "h2", now = 6000, expiresAt = 90000)).toBeTrue();
-				expect(lock.renew(name = "spec:two", owner = "a", expiresAt = 99000)).toBeFalse();
-				expect(lock.release(name = "spec:two", owner = "a")).toBeFalse();
-				var row = lock.read("spec:two");
+				var leaseLock = $lock();
+				leaseLock.tryAcquire(name = "spec:two", owner = "a", host = "h1", now = 1000, expiresAt = 5000);
+				expect(leaseLock.tryAcquire(name = "spec:two", owner = "b", host = "h2", now = 4000, expiresAt = 90000)).toBeFalse("not expired yet");
+				expect(leaseLock.tryAcquire(name = "spec:two", owner = "b", host = "h2", now = 6000, expiresAt = 90000)).toBeTrue();
+				expect(leaseLock.renew(name = "spec:two", owner = "a", expiresAt = 99000)).toBeFalse();
+				expect(leaseLock.release(name = "spec:two", owner = "a")).toBeFalse();
+				var row = leaseLock.read("spec:two");
 				expect(row.owner).toBe("b");
 				expect(row.host).toBe("h2");
 				expect(row.expiresAt).toBe(90000);
 			});
 
 			it("extends the lease while the owner holds it", function() {
-				var lock = $lock();
-				lock.tryAcquire(name = "spec:three", owner = "a", host = "h1", now = 1000, expiresAt = 5000);
-				expect(lock.renew(name = "spec:three", owner = "a", expiresAt = 1791039632175)).toBeTrue();
-				expect(lock.read("spec:three").expiresAt).toBe(1791039632175, "epoch milliseconds survive the round trip");
-				expect(lock.tryAcquire(name = "spec:three", owner = "b", host = "h2", now = 6000, expiresAt = 90000)).toBeFalse();
+				var leaseLock = $lock();
+				leaseLock.tryAcquire(name = "spec:three", owner = "a", host = "h1", now = 1000, expiresAt = 5000);
+				expect(leaseLock.renew(name = "spec:three", owner = "a", expiresAt = 1791039632175)).toBeTrue();
+				expect(leaseLock.read("spec:three").expiresAt).toBe(1791039632175, "epoch milliseconds survive the round trip");
+				expect(leaseLock.tryAcquire(name = "spec:three", owner = "b", host = "h2", now = 6000, expiresAt = 90000)).toBeFalse();
 			});
 
 			it("builds the Migrator's lock statements for the migrator's own table", function() {
@@ -148,7 +148,7 @@ component extends="wheels.WheelsTest" {
 
 		describe("job lease names", function() {
 
-			it("uses the concurrencyKey(data) method, then this.concurrencyKey, then the job class", function() {
+			it("uses the concurrencyKeyFor(data) method over this.concurrencyKey, then the job class", function() {
 				var bridge = new wheels.Job();
 				var keyed = new wheels.tests._assets.jobs.KeyedProbeJob();
 				expect(bridge.$jobLeaseName(jobInstance = keyed, jobData = {account = "a1"}, jobClass = "x.KeyedProbeJob")).toBe("key:acct-a1");
