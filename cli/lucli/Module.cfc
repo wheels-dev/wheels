@@ -586,7 +586,7 @@ component extends="modules.BaseModule" {
 
 	private any function jobsArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "action", default = "status", description = "work (long-lived worker loop), status (queue snapshot), enqueue (add a job), drain (stop this server starting new jobs) or resume. Defaults to status")
+			.positional(name = "action", default = "status", description = "work (long-lived worker loop), status (queue snapshot), enqueue (add a job), drain (stop this server starting new jobs), resume, or install (write a migration that creates the job tables). Defaults to status")
 			.positional(name = "job", default = "", description = "enqueue only: the job class under app/jobs/, e.g. SendWelcomeEmailJob or billing.InvoiceJob")
 			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. enqueue: the queue to put the job on (default: the job's own). Empty = all queues")
 			.option(name = "data", default = "", description = "enqueue only: the job's data, a JSON object passed to perform()")
@@ -600,7 +600,8 @@ component extends="modules.BaseModule" {
 			.option(name = "job-timeout", default = 0, type = "numeric", description = "work only: cap, in seconds, on each job's run time. 0 = each job runs with its own timeout (this.timeout, default 300). Not --timeout: that is the runtime's own option and stops the whole worker")
 			.option(name = "format", default = "table", description = "status, enqueue, drain and resume: output format, table or json")
 			.option(name = "wait", default = "", type = "any", description = "drain only: after draining, wait until this server has no running jobs (--wait = up to 600 seconds, --wait=<seconds> for another limit). Exits with an error if jobs are still running at the limit")
-			.option(name = "expires", default = 3600, type = "numeric", description = "drain only: seconds until the drain lifts itself if nothing resumes it. 0 = until wheels jobs resume");
+			.option(name = "expires", default = 3600, type = "numeric", description = "drain only: seconds until the drain lifts itself if nothing resumes it. 0 = until wheels jobs resume")
+			.flag(name = "force", default = false, description = "install only: overwrite the jobs migration this command wrote before");
 	}
 
 	private any function dbArgSpec() {
@@ -5837,7 +5838,8 @@ component extends="modules.BaseModule" {
 			"in" = trim(parsed["in"]),
 			at = trim(parsed.at),
 			wait = $jobsWaitSeconds(trim(parsed.wait)),
-			expires = parsed.expires
+			expires = parsed.expires,
+			force = parsed.force
 		};
 		if (!len(opts.action)) {
 			opts.action = "status";
@@ -5884,7 +5886,7 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts and this server's running jobs, cap and drain (--format=json for machines), `enqueue <JobName>` adds a job now or after a delay, `drain [--wait]` stops this server starting new jobs (for deploys) and `resume` lifts it. retry/purge/monitor are tracked follow-ups (issue 3090).
+	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts and this server's running jobs, cap and drain (--format=json for machines), `enqueue <JobName>` adds a job now or after a delay, `drain [--wait]` stops this server starting new jobs (for deploys) and `resume` lifts it, `install` writes a migration that creates the job tables. retry/purge/monitor are tracked follow-ups (issue 3090).
 	 */
 	public string function jobs() {
 		var opts = $parseJobsArgs(structuredArgs(arguments));
@@ -5900,6 +5902,8 @@ component extends="modules.BaseModule" {
 				return runJobsDrain(opts);
 			case "resume":
 				return runJobsResume(opts);
+			case "install":
+				return runJobsInstall(opts);
 			// The framework bridge (vendor/wheels/public/views/cli.cfm) already
 			// implements jobsRetry/jobsPurge/jobsMonitor — the CLI verbs are
 			// deliberate follow-ups tracked in ##3090. Fail loudly with the
@@ -5918,7 +5922,7 @@ component extends="modules.BaseModule" {
 				);
 			default:
 				out("Unknown jobs action: #opts.action#", "red");
-				out("Usage: wheels jobs [work|status|enqueue <JobName>|drain|resume] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--job-timeout=<seconds>] [--wait[=<seconds>]] [--expires=<seconds>] [--format=table|json]");
+				out("Usage: wheels jobs [work|status|enqueue <JobName>|drain|resume|install [--force]] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--job-timeout=<seconds>] [--wait[=<seconds>]] [--expires=<seconds>] [--format=table|json]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
 		}
 	}
@@ -6018,6 +6022,59 @@ component extends="modules.BaseModule" {
 				sleep(arguments.opts.interval * 1000);
 			}
 		}
+	}
+
+	/**
+	 * `wheels jobs install`: write app/migrator/migrations/<timestamp>_CreateWheelsJobTables.cfc,
+	 * the migration that creates the job tables (or tops up the ones Wheels already created), so a
+	 * multi-server app applies the jobs schema once, under migration control. The source comes from
+	 * the running app (wheels.JobSchema) so it matches what auto-create builds; nothing touches the
+	 * database until `wheels migrate latest`.
+	 */
+	private string function runJobsInstall(required struct opts) {
+		var serverPort = $requireRunningServer(
+			hints = ["Start one with: wheels start (the migration is generated from the app's own framework version)"]
+		);
+		var httpResult = "";
+		try {
+			httpResult = makeHttpRequest("#$serverUrlBase(serverPort)#/wheels/cli?command=jobsInstallSource&format=json");
+		} catch (any httpErr) {
+			throw(
+				type    = "Wheels.Cli.CommandFailed",
+				message = "Jobs install failed (connection error): #httpErr.message#",
+				detail  = httpErr.detail ?: ""
+			);
+		}
+		var result = parseCliResponse(httpResult, "Jobs install");
+		if (!len(result.source ?: "")) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Jobs install: the server returned no migration source.");
+		}
+
+		var migrationDir = variables.projectRoot & "/app/migrator/migrations";
+		$ensureProjectDirectory(migrationDir);
+		var existing = directoryList(migrationDir, false, "name", "*_#result.migrationName#.cfc");
+		var fileName = "";
+		if (arrayLen(existing)) {
+			if (!arguments.opts.force) {
+				out("The jobs migration already exists: app/migrator/migrations/#existing[1]#", "yellow");
+				out("Run it with: wheels migrate latest. To rewrite it from this framework version, pass --force.");
+				return "";
+			}
+			// Same file name, so a migration that already ran keeps its version.
+			fileName = existing[1];
+		} else {
+			fileName = getService("helpers").generateMigrationTimestamp() & "_" & result.migrationName & ".cfc";
+		}
+		fileWrite(migrationDir & "/" & fileName, result.source);
+
+		out("Wrote app/migrator/migrations/#fileName#", "green");
+		out("");
+		out("Next:");
+		out("  1. Review it, then apply it: wheels migrate latest");
+		out("     It creates the job tables, or adds what existing ones are missing.");
+		out("  2. In config/settings.cfm: set(jobsAutoCreateTables = false)");
+		out("     so servers never change the job tables at startup.");
+		return "";
 	}
 
 	/**

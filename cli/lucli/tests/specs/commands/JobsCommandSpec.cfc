@@ -81,6 +81,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		return serializeJSON({success: true, host: {host: "spec-host", running: arguments.running, maxConcurrent: 0, draining: arguments.draining, drainExpiresAt: ""}});
 	}
 
+	// A Module whose `jobs install` gets `source` back from a canned jobsInstallSource response.
+	private any function installModule(required string source) {
+		var m = new cli.lucli.Module(cwd = variables.tempRoot);
+		prepareMock(m);
+		m.$("out");
+		m.$(method = "$requireRunningServer", returns = 61999);
+		m.$("makeHttpRequest", serializeJSON({success: true, migrationName: "CreateWheelsJobTables", source: arguments.source}));
+		return m;
+	}
+
 	private string function printed(required any m) {
 		var said = "";
 		for (var call in arguments.m.$callLog().out) {
@@ -354,6 +364,41 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(line).toInclude("web-1: 2 running, max 4");
 				expect(line).toInclude("draining until 2026-10-08 12:00:00");
 				expect(mod.$formatJobsHostLine({host: "web-2", running: 0, maxConcurrent: 0, draining: false})).toInclude("max no cap");
+			});
+
+		});
+
+		describe("install", () => {
+
+			it("parses install and --force", () => {
+				expect(mod.$parseJobsArgs({arg1 = "install"}).action).toBe("install");
+				expect(mod.$parseJobsArgs({arg1 = "install"}).force).toBeFalse();
+				expect(mod.$parseJobsArgs({arg1 = "install", force = "true"}).force).toBeTrue();
+			});
+
+			it("writes the migration the server generates, once, and rewrites it in place with --force", () => {
+				var dir = variables.tempRoot & "/app/migrator/migrations";
+				if (directoryExists(dir)) {
+					for (var old in directoryList(dir, false, "path", "*_CreateWheelsJobTables.cfc")) {
+						fileDelete(old);
+					}
+				}
+				var m = installModule("// first");
+				m.jobs(arg1 = "install");
+				var written = directoryList(dir, false, "name", "*_CreateWheelsJobTables.cfc");
+				expect(arrayLen(written)).toBe(1);
+				expect(fileRead(dir & "/" & written[1])).toBe("// first");
+				expect(printed(m)).toInclude("jobsAutoCreateTables = false");
+
+				var again = installModule("// second");
+				again.jobs(arg1 = "install");
+				expect(fileRead(dir & "/" & written[1])).toBe("// first", "without --force an existing migration is left alone");
+				expect(printed(again)).toInclude("already exists");
+
+				var forced = installModule("// third");
+				forced.jobs(arg1 = "install", force = "true");
+				expect(directoryList(dir, false, "name", "*_CreateWheelsJobTables.cfc")).toBe(written, "rewritten under the same name and version");
+				expect(fileRead(dir & "/" & written[1])).toBe("// third");
 			});
 
 		});

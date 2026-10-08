@@ -31,7 +31,7 @@ component extends="wheels.WheelsTest" {
 					& "migrationLockStatus,migrationUnlock,"
 					& "dbStatus,dbVersion,dbRollback,dbSchema,introspect,dbSeed,routes,dbCreate,dbDrop,"
 					& "dbReset,dbSetup,dbDump,dbRestore,dbShell,jobsProcessNext,jobsStatus,jobsRetry,"
-					& "jobsPurge,jobsMonitor,jobsEnqueue,jobsDrain,jobsResume,jobsHostStatus";
+					& "jobsPurge,jobsMonitor,jobsEnqueue,jobsDrain,jobsResume,jobsHostStatus,jobsInstallSource";
 				for (var cmd in ListToArray(declared)) {
 					expect(bridge.handles(cmd)).toBeTrue("CliBridge should handle '" & cmd & "'");
 				}

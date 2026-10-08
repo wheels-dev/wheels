@@ -348,6 +348,9 @@ component {
 		// one at a time. A waiting instance gives up after migrationLockTimeout seconds; a holder
 		// that died frees the lock once its lease (renewed before each step) runs out.
 		application.$wheels.migratorLockTableName = "wheels_migrator_locks";
+		// Background-job tables: true creates and upgrades them automatically at runtime; false
+		// leaves them to the app's own migration (`wheels jobs install`), for multi-server apps.
+		application.$wheels.jobsAutoCreateTables = true;
 		// A background job that has heartbeated is reclaimed once its heartbeats stop for this many
 		// seconds, even inside its timeout (0 = off; minimum 30). A job's this.heartbeatGrace wins.
 		application.$wheels.jobsHeartbeatGraceSeconds = 300;
