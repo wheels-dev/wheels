@@ -131,7 +131,7 @@ wheels jobs enqueue billing.InvoiceJob --queue=billing --priority=5
 | `--at` | Run it at this time, in ISO 8601: with `Z` or an offset (`2026-10-06T11:00:00+02:00`), or without one for this machine's local time (`2026-10-06 09:00`). A time in the past is refused. |
 | `--format=json` | Print the enqueued job as JSON. |
 
-"Scheduling" here means one delayed run (`--in` / `--at`, the same as `enqueueIn()` / `enqueueAt()`). Wheels has no recurring, cron-style schedule; for that, run `wheels jobs enqueue` or `processQueue()` from your system's scheduler.
+"Scheduling" here means one delayed run (`--in` / `--at`, the same as `enqueueIn()` / `enqueueAt()`). For a *recurring*, cron-style schedule, declare it in `config/schedules.cfm` — see [Recurring schedules](/v4-2-0/digging-deeper/running-jobs-on-multiple-servers/#recurring-schedules).
 
 The class must be a component under `app/jobs/` (or a `jobClassPrefixes` path, the same list the worker accepts) that extends `wheels.Job`. Anything else is refused before it's loaded, and an unknown name lists the job classes it found. Enqueueing writes a row, so like `wheels jobs work` it only talks to this project's own server and sends the reload password.
 

@@ -1,6 +1,6 @@
 ---
 title: Running Jobs on Multiple Servers
-description: Process one job queue safely from several app servers — fencing, heartbeats, idempotency, a per-host concurrency cap, draining a server for a deploy, and the shared schema the guarantees rest on.
+description: Process one job queue safely from several app servers — fencing, heartbeats, idempotency, a per-host concurrency cap, recurring schedules, draining a server for a deploy, and the shared schema the guarantees rest on.
 type: howto
 sidebar:
   order: 4
@@ -17,6 +17,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 - How `this.idempotent` chooses at-least-once or at-most-once recovery
 - How to cap how many jobs one server runs at once
 - How to run the queue: a CLI worker, a process supervisor, or a scheduled task
+- How to declare recurring schedules that produce one job per slot across the fleet
 - How to drain a server before a deploy so it finishes its work and stops cleanly
 - Which schema to apply yourself, rather than let a live server alter the table
 - Why every server must agree on the time
@@ -158,6 +159,58 @@ new wheels.JobRunner().tick(
 An engine scheduled task that can only make an HTTP request — rather than run CFML directly — will be able to drive `tick()` through a token-gated `/wheels/jobs/tick` route, so you can schedule the queue from the engine's own task scheduler. That route is **not built yet** ([#4482](https://github.com/wheels-dev/wheels/issues/4482)); until it lands, drive `tick()` from a scheduled task that runs CFML, as above.
 </Aside>
 
+## Recurring schedules
+
+Everything above runs a job *once*. For work that recurs — a nightly digest, a health check every fifteen minutes — declare a schedule. On several servers this is where deduplication would normally bite (every server's cron fires the same minute); the scheduler handles it for you, producing **one job per time slot** no matter how many servers run it.
+
+Declare schedules in `config/schedules.cfm` with a small DSL (`wheels new` doesn't create the file — add it when you need one):
+
+```cfm title="config/schedules.cfm"
+schedule("digest")
+    .job("DigestJob")
+    .cron("0 7 * * MON")
+    .timezone("America/New_York");
+
+schedule("health-check")
+    .job("HealthCheckJob")
+    .every(15, "minutes")
+    .queue("maintenance");
+```
+
+- **`.job(class)`** — the job class under `app/jobs/`, as for `enqueue`.
+- **`.cron(expression)`** — a standard 5-field cron expression (`minute hour day-of-month month day-of-week`), read in the schedule's time zone. Lists, ranges, steps (`*/5`), and names (`MON`, `JAN`) work, as do the `@hourly` … `@yearly` aliases. Seconds and Quartz extensions are refused.
+- **`.every(count, "minutes" | "hours")`** — a fixed interval, aligned to the epoch. For a daily or longer cadence, use `.cron()` instead.
+- **`.timezone(zone)`** — the IANA zone `.cron()` is read in (default `UTC`), e.g. `Europe/London`.
+- **`.catchUp(mode)`**, **`.catchUpWindow(seconds)`**, **`.queue()`**, **`.priority()`**, **`.data(struct)`**, **`.enabled(boolean)`** — tune catch-up (below), and set the same options you'd pass to `enqueue`.
+
+### Running the schedules
+
+Schedules don't run themselves. Call `enqueueDue()` regularly — from a scheduled task, or right next to your job worker — and it enqueues each schedule whose slot has come due:
+
+```cfm {test:compile} title="run the schedules (every minute)"
+new wheels.JobScheduler().enqueueDue();
+// {checked, enqueued, duplicates, skipped, errors}
+```
+
+Each due slot is enqueued with a `uniqueKey` of `"<schedule>:<slot time in UTC>"`, so **you can call `enqueueDue()` on every server** and still get exactly one job per slot — the duplicates land as `duplicate: true` and are counted, not run (this rests on the [`uniqueKey`](/v4-2-0/digging-deeper/background-jobs/#enqueue-at-most-once-with-uniquekey) dedupe). The enqueued jobs are then processed like any other, by whatever is draining the queue. Run `enqueueDue()` about once a minute; it's cheap when nothing is due.
+
+### Catch-up: missed slots
+
+If nothing calls `enqueueDue()` for a while — a deploy, an outage — slots are missed. `catchUp` decides what happens when it runs again:
+
+- **`"latest"`** (the default) — run only the **newest** missed slot, and only if it's within `catchUpWindow` (default 3600 seconds). Older missed slots are skipped. This is what you want for an idempotent digest: you get one run, not a backlog.
+- **`"none"`** — run a slot only if it's current; never a missed one.
+
+Either way, a slot at or before the last one already enqueued never runs again, and a brand-new schedule starts from *now* — it doesn't fire slots from before it existed. Keep `catchUpWindow` below your [purge retention](#idempotency-and-thisidempotent) so a caught-up slot's `uniqueKey` row still exists to dedupe against.
+
+### Where schedules live
+
+Schedules are rows in a `wheels_job_schedules` table (auto-created on first use, never inside a transaction). `config/schedules.cfm` is synced into it at application start as *code* schedules: edit the file and restart, and the table follows. A code schedule you remove from the file is **disabled, not deleted**, so its history survives. An app can also insert its own rows at runtime (for example from an admin page) as *db* schedules; the start-up sync never touches those, and on a name clash the db row wins.
+
+<Aside type="note" title="Time zones need java.time">
+Non-UTC zones use the JVM's `java.time`. A UTC schedule works everywhere; a non-UTC one on an engine without `java.time` is refused with `Wheels.Job.InvalidSchedule` rather than computed wrongly. Around a DST change, a local time the clock skips runs at the next valid instant, and a local time that repeats runs once, at its first occurrence.
+</Aside>
+
 ## Drain a server before a deploy
 
 The problem a rolling deploy creates: you need to stop a server, but it may be running jobs. Killing it mid-job strands that work (it's reaped and retried elsewhere, but only after its timeout). `wheels jobs work --stop-when-empty` stops one worker loop, not the server, and not any other worker on it. **Draining** is the clean answer: mark the server so it starts nothing new, let its running jobs finish, then stop it.
@@ -235,7 +288,6 @@ Writing and comparing all job timestamps on one UTC database clock — removing 
 
 More of the multi-server story is landing through 4.2. These are **not available yet**; each links its tracking issue, and this page gains a full section as it merges.
 
-- **Recurring schedules** — cron-style and interval schedules declared in `config/schedules.cfm`, with time zones, catch-up policy, and one job per slot across the fleet ([#4493](https://github.com/wheels-dev/wheels/issues/4493)). This is the piece that turns "run this once, later" into "run this every night", with the schedule-runner wiring to drive it.
 - **Exclusive jobs and concurrency keys** — `this.exclusive` and a `concurrencyKeyFor(data)` on a shared lease lock, so at most one job of a kind (or per key) runs across all servers ([#4496](https://github.com/wheels-dev/wheels/issues/4496)).
 - **Lifecycle hooks and a stored result** — per-job lifecycle hooks, an app-wide `jobsOnFailure` hook, and a stored job result ([#4498](https://github.com/wheels-dev/wheels/issues/4498)).
 - **Old SQL Server index levels** — a clearer error when the `uniqueKey` filtered index can't be built on an old SQL Server compatibility level ([#4494](https://github.com/wheels-dev/wheels/issues/4494)).
