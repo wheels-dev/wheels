@@ -586,7 +586,7 @@ component extends="modules.BaseModule" {
 
 	private any function jobsArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "action", default = "status", description = "work (long-lived worker loop), status (queue snapshot) or enqueue (add a job). Defaults to status")
+			.positional(name = "action", default = "status", description = "work (long-lived worker loop), status (queue snapshot), enqueue (add a job), drain (stop this server starting new jobs) or resume. Defaults to status")
 			.positional(name = "job", default = "", description = "enqueue only: the job class under app/jobs/, e.g. SendWelcomeEmailJob or billing.InvoiceJob")
 			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. enqueue: the queue to put the job on (default: the job's own). Empty = all queues")
 			.option(name = "data", default = "", description = "enqueue only: the job's data, a JSON object passed to perform()")
@@ -5850,6 +5850,14 @@ component extends="modules.BaseModule" {
 			throw(
 				type = "Wheels.InvalidArguments",
 				message = "--max-jobs must be zero (unlimited) or a positive number."
+			);
+		}
+		// `--wait 30` (a space, not =) reaches here as a bare --wait plus a stray positional "30",
+		// which would silently mean the 600-second default. Refuse it instead of guessing.
+		if (listFindNoCase("drain,resume", opts.action) && len(opts.job)) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "wheels jobs #opts.action# takes no value '#opts.job#'. For a wait limit write --wait=<seconds>, with an equals sign."
 			);
 		}
 		if (opts.expires < 0) {

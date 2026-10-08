@@ -835,8 +835,13 @@ component output="false" displayName="CLI Bridge" {
 			local.jobQueue = structKeyExists(arguments.params, "queue") ? arguments.params.queue : "";
 			local.rv.success = true;
 			local.rv.stats = local.worker.getStats(queue = local.jobQueue);
-			// This server's own state (running jobs, cap, drain), for `wheels jobs status`.
-			local.rv.host = new wheels.JobRunner().status();
+			// This server's own state (running jobs, cap, drain), for `wheels jobs status`. Its own
+			// try: a problem reading the hosts registry must not hide the queue stats.
+			try {
+				local.rv.host = new wheels.JobRunner().status();
+			} catch (any hostErr) {
+				writeLog(text = "jobs status: could not read this server's job host state: #hostErr.message#", type = "warning", file = "wheels_jobs");
+			}
 			local.rv.message = "Queue statistics retrieved";
 		} catch (any e) {
 			local.rv.success = false;

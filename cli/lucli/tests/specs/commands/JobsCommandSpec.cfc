@@ -266,6 +266,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(() => mod.$parseJobsArgs({arg1: "drain", wait: "soon"})).toThrow("Wheels.InvalidArguments");
 			});
 
+			it("refuses the space form --wait 30 instead of silently waiting 600", () => {
+				// LuCLI hands `--wait 30` over as a bare --wait plus a positional "30".
+				expect(() => mod.$parseJobsArgs({arg1: "drain", wait: "true", arg2: "30"})).toThrow("Wheels.InvalidArguments");
+			});
+
 			it("refuses a negative --expires", () => {
 				expect(() => mod.$parseJobsArgs({arg1: "drain", expires: "-5"})).toThrow("Wheels.InvalidArguments");
 			});
