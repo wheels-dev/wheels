@@ -130,7 +130,7 @@ A job can hook its own lifecycle, and the application can hear every failure in 
 ```cfm {test:compile} title="app/jobs/ChargeCardJob.cfc"
 component extends="wheels.Job" {
     public void function perform(struct data = {}) {
-        order = model("Order").findByKey(arguments.data.orderId);
+        var order = model("Order").findByKey(arguments.data.orderId);
         order.chargeCard();
     }
 
@@ -155,11 +155,22 @@ For centralized alerting, set an **application-wide failure hook** that hears ev
 set(jobsOnFailure = "app.jobs.FailureNotifier.report");
 ```
 
-It's called on every recorded failure with one struct — `{jobId, jobClass, queue, attempt, maxRetries, isFinal, error}`. It deliberately carries **no job `data`** (that can hold secrets), so it's safe to route to logs or an alerting service.
+It names `component.path.method`. The method is invoked with a single **named** argument, `event`, so it must declare that parameter:
+
+```cfm {test:compile} title="app/jobs/FailureNotifier.cfc"
+component {
+    public void function report(required struct event) {
+        // event = {jobId, jobClass, queue, attempt, maxRetries, isFinal, error}
+        if (arguments.event.isFinal) alert("Job #arguments.event.jobClass# gave up: #arguments.event.error.message#");
+    }
+}
+```
+
+The `event` struct deliberately carries **no job `data`** (that can hold secrets), so it's safe to route to logs or an alerting service.
 
 ### The stored result
 
-`perform()`'s return value is stored on the row, in a `wheels_jobs.result` column, and handed to `onSuccess(result)`. A simple value is stored as-is; a struct or array is stored as JSON. It's capped at 4000 characters (bound as `NVARCHAR` on SQL Server, UTF-8 bytes elsewhere), truncated on a character boundary with a visible marker if it's longer — so return a small summary, not a large payload. The `result` column is added by the same guarded auto-`ALTER` as the other 4.2 columns; without it, jobs run exactly as before and nothing is stored.
+`perform()`'s return value is stored on the row, in a `wheels_jobs.result` column, and handed to `onSuccess(result)`. A simple value is stored as-is; a struct or array is stored as JSON. It's capped — 4000 characters on SQL Server (`NVARCHAR`), 4000 **UTF-8 bytes** on the other databases (`VARCHAR` / Oracle `VARCHAR2`, which measure bytes) — truncated on a character boundary with a visible marker if it's longer, so return a small summary, not a large payload. The `result` column is added by the same guarded auto-`ALTER` as the other 4.2 columns; without it, jobs run exactly as before and nothing is stored.
 
 ## Cap how many jobs a server runs at once
 
