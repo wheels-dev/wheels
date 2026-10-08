@@ -41,6 +41,9 @@ component {
 	// at-least-once, so perform() must be idempotent. false: it is not re-run; the reaped
 	// attempt ends 'interrupted' (at-most-once).
 	this.idempotent = true;
+	// A job may set this.heartbeatGrace = n (seconds): once it heartbeats, it is reclaimed when
+	// its heartbeats stop for that long, even inside its timeout. Unset, the app's
+	// set(jobsHeartbeatGraceSeconds = n) applies (default 300); 0 turns it off. See heartbeat().
 	// true: never two runs of this job class at once, on any server (a lease in wheels_job_locks).
 	// A job can instead set this.concurrencyKey = "...", or define concurrencyKeyFor(struct data)
 	// (which wins), to share one lease among the jobs with the same key. See $jobLeaseName().
@@ -73,9 +76,13 @@ component {
 	}
 
 	/**
-	 * Tell the queue this job is still running. Call it from a long perform() more often than
-	 * the job's timeout: the stale-job reaper measures from the latest heartbeat, so a job that
-	 * heartbeats on time is never reaped and run a second time. Throws Wheels.Job.Fenced when
+	 * Tell the queue this job is still running. Once a job has heartbeated, a stop in its
+	 * heartbeats is how its worker's death is noticed: the job is reclaimed when it hasn't
+	 * heartbeated for its heartbeat grace (this.heartbeatGrace, or jobsHeartbeatGraceSeconds,
+	 * default 300 seconds), even before its timeout. Heartbeat at least every grace / 3. A stopped
+	 * heartbeat isn't proof the worker died: perform() stuck in a long call that can't heartbeat
+	 * is reclaimed too, so either heartbeat around such calls or raise the grace. heartbeat()
+	 * never extends the job's timeout, which stays the hard cap on one attempt. Throws Wheels.Job.Fenced when
 	 * the job's claim is gone (it was reaped and claimed again): stop working and return, since
 	 * another attempt now owns the job and this one's result will be discarded. Outside a
 	 * worker (perform() called directly) it does nothing. For an exclusive job (this.exclusive
@@ -127,6 +134,38 @@ component {
 	}
 
 	/**
+	 * The heartbeat grace for this job, in seconds: how long after its last heartbeat a running
+	 * job is taken for dead and reclaimed, even inside its timeout. this.heartbeatGrace when set,
+	 * else set(jobsHeartbeatGraceSeconds = n) (default 300). 0 = off. Values below 30 are raised
+	 * to 30, so an occasional slow heartbeat can't get a live job reclaimed.
+	 */
+	public numeric function $heartbeatGraceSeconds() {
+		local.grace = 300;
+		if (StructKeyExists(this, "heartbeatGrace") && IsNumeric(this.heartbeatGrace)) {
+			local.grace = Val(this.heartbeatGrace);
+		} else if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "jobsHeartbeatGraceSeconds") && IsNumeric(application.wheels.jobsHeartbeatGraceSeconds)) {
+			local.grace = Val(application.wheels.jobsHeartbeatGraceSeconds);
+		}
+		if (local.grace <= 0) {
+			return 0;
+		}
+		return Max(30, local.grace);
+	}
+
+	/**
+	 * Internal: how far a heartbeat extends the run's exclusive lease. With a heartbeat grace,
+	 * grace + Max(60, grace), so a job that stops heartbeating loses its lease on the same clock
+	 * it is reclaimed on; without one, the lease's original window.
+	 */
+	public numeric function $leaseRenewalSeconds() {
+		local.grace = $heartbeatGraceSeconds();
+		if (local.grace > 0) {
+			return local.grace + Max(60, local.grace);
+		}
+		return variables.$lease.windowSeconds;
+	}
+
+	/**
 	 * Internal: extends this run's exclusive lease by its window from now. A lease that is no
 	 * longer this run's (it expired and another run took it) is logged once and left alone; the
 	 * end of the run reports it as a lost lease.
@@ -141,7 +180,7 @@ component {
 			leaseState.renewed = local.leaseLock.renew(
 				name = variables.$lease.name,
 				owner = variables.$lease.owner,
-				expiresAt = local.leaseLock.nowMs() + variables.$lease.windowSeconds * 1000
+				expiresAt = local.leaseLock.nowMs() + $leaseRenewalSeconds() * 1000
 			);
 		} catch (any e) {
 			writeLog(text = "Job lease '#variables.$lease.name#' could not be renewed: #e.message#", type = "error", file = "wheels_jobs");

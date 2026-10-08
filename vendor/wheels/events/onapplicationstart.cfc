@@ -351,6 +351,9 @@ component {
 		// Background-job tables: true creates and upgrades them automatically at runtime; false
 		// leaves them to the app's own migration (`wheels jobs install`), for multi-server apps.
 		application.$wheels.jobsAutoCreateTables = true;
+		// A background job that has heartbeated is reclaimed once its heartbeats stop for this many
+		// seconds, even inside its timeout (0 = off; minimum 30). A job's this.heartbeatGrace wins.
+		application.$wheels.jobsHeartbeatGraceSeconds = 300;
 		application.$wheels.migrationLockTimeout = 300;
 		application.$wheels.migrationLockLease = 3600;
 		application.$wheels.createMigratorTable = true;
