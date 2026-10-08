@@ -77,7 +77,8 @@ component output="false" displayName="CLI Bridge" {
 			"jobsEnqueue" = "jobsEnqueue",
 			"jobsDrain" = "jobsDrain",
 			"jobsResume" = "jobsResume",
-			"jobsHostStatus" = "jobsHostStatus"
+			"jobsHostStatus" = "jobsHostStatus",
+			"jobsTick" = "jobsTick"
 		};
 		return this;
 	}
@@ -855,6 +856,23 @@ component output="false" displayName="CLI Bridge" {
 	 * (`expiresInSeconds`, default 3600; 0 = until resumed). Jobs already running finish.
 	 * Mutating: POST, loopback, reload password.
 	 */
+	/**
+	 * `wheels jobs tick`: one JobRunner.tick() on this server (record the host, reap, run jobs up to
+	 * the per-host cap). Mutating: it runs jobs.
+	 */
+	public struct function jobsTick(required struct context, required struct params) {
+		local.rv = {};
+		try {
+			local.rv.tick = new wheels.JobRunner().tick();
+			local.rv.success = true;
+			local.rv.message = "Tick done";
+		} catch (any e) {
+			local.rv.success = false;
+			local.rv.message = "Error running a tick: " & e.message;
+		}
+		return local.rv;
+	}
+
 	public struct function jobsDrain(required struct context, required struct params) {
 		local.rv = {};
 		try {

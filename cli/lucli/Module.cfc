@@ -586,7 +586,7 @@ component extends="modules.BaseModule" {
 
 	private any function jobsArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "action", default = "status", description = "work (long-lived worker loop), status (queue snapshot), enqueue (add a job), drain (stop this server starting new jobs) or resume. Defaults to status")
+			.positional(name = "action", default = "status", description = "work (long-lived worker loop), status (queue snapshot), enqueue (add a job), drain (stop this server starting new jobs), resume, or tick (run one tick: reap, then run jobs up to the per-host cap). Defaults to status")
 			.positional(name = "job", default = "", description = "enqueue only: the job class under app/jobs/, e.g. SendWelcomeEmailJob or billing.InvoiceJob")
 			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. enqueue: the queue to put the job on (default: the job's own). Empty = all queues")
 			.option(name = "data", default = "", description = "enqueue only: the job's data, a JSON object passed to perform()")
@@ -5876,7 +5876,7 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts and this server's running jobs, cap and drain (--format=json for machines), `enqueue <JobName>` adds a job now or after a delay, `drain [--wait]` stops this server starting new jobs (for deploys) and `resume` lifts it. retry/purge/monitor are tracked follow-ups (issue 3090).
+	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts and this server's running jobs, cap and drain (--format=json for machines), `enqueue <JobName>` adds a job now or after a delay, `drain [--wait]` stops this server starting new jobs (for deploys) and `resume` lifts it, `tick` runs one round (for cron/systemd timers). retry/purge/monitor are tracked follow-ups (issue 3090).
 	 */
 	public string function jobs() {
 		var opts = $parseJobsArgs(structuredArgs(arguments));
@@ -5892,6 +5892,8 @@ component extends="modules.BaseModule" {
 				return runJobsDrain(opts);
 			case "resume":
 				return runJobsResume(opts);
+			case "tick":
+				return runJobsTick(opts);
 			// The framework bridge (vendor/wheels/public/views/cli.cfm) already
 			// implements jobsRetry/jobsPurge/jobsMonitor — the CLI verbs are
 			// deliberate follow-ups tracked in ##3090. Fail loudly with the
@@ -5910,7 +5912,7 @@ component extends="modules.BaseModule" {
 				);
 			default:
 				out("Unknown jobs action: #opts.action#", "red");
-				out("Usage: wheels jobs [work|status|enqueue <JobName>|drain|resume] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--wait[=<seconds>]] [--expires=<seconds>] [--format=table|json]");
+				out("Usage: wheels jobs [work|status|enqueue <JobName>|drain|resume|tick] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--wait[=<seconds>]] [--expires=<seconds>] [--format=table|json]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
 		}
 	}
@@ -6216,6 +6218,32 @@ component extends="modules.BaseModule" {
 	/**
 	 * `wheels jobs resume`: this server starts jobs again.
 	 */
+	/**
+	 * `wheels jobs tick`: one JobRunner.tick() on this project's running server, for a cron job
+	 * or systemd timer that runs jobs without a long-lived worker. Mutating, so it goes through
+	 * the bridge's POST + reload-password gate like `work`.
+	 */
+	private string function runJobsTick(required struct opts) {
+		var serverPort = $requireOwnRunningServer([
+			"A tick needs this project's running server.",
+			"Start it with: wheels start"
+		]);
+		var httpResult = "";
+		try {
+			httpResult = makeBridgePost("#$serverUrlBase(serverPort)#/wheels/cli?command=jobsTick&format=json");
+		} catch (any httpErr) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Tick failed (connection error): #httpErr.message#");
+		}
+		var result = parseCliResponse(httpResult, "Jobs tick");
+		var tick = isStruct(result.tick ?: "") ? result.tick : {};
+		if (arguments.opts.format == "json") {
+			out(serializeJSON(tick));
+			return "";
+		}
+		out("Tick on #tick.host ?: '?'#: processed #tick.processed ?: 0#, failed #tick.failed ?: 0#, reaped #tick.reaped ?: 0#" & ((tick.draining ?: false) ? " (draining)" : "") & ((tick.capped ?: false) ? " (at the per-host cap)" : ""));
+		return "";
+	}
+
 	private string function runJobsResume(required struct opts) {
 		var serverPort = $requireOwnRunningServer([
 			"Resuming needs this project's running server.",
