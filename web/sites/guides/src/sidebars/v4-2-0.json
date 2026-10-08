@@ -88,6 +88,7 @@
       { "label": "Authorization & Filters", "link": "/v4-2-0/digging-deeper/authorization-and-filters/" },
       { "label": "Authorization Policies", "link": "/v4-2-0/digging-deeper/authorization-policies/" },
       { "label": "Background Jobs", "link": "/v4-2-0/digging-deeper/background-jobs/" },
+      { "label": "Running Jobs on Multiple Servers", "link": "/v4-2-0/digging-deeper/running-jobs-on-multiple-servers/" },
       { "label": "Caching", "link": "/v4-2-0/digging-deeper/caching/" },
       { "label": "Sending Email", "link": "/v4-2-0/digging-deeper/sending-email/" },
       { "label": "File Uploads & Downloads", "link": "/v4-2-0/digging-deeper/file-uploads-and-downloads/" },

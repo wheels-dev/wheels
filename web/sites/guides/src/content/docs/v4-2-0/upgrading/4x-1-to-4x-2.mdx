@@ -383,6 +383,22 @@ Every job claim now writes a fresh `claimToken` (and the claiming host, `claimed
 
 The `wheels_jobs` table gains a nullable `uniqueKey` column with a unique index, filtered to non-NULL keys on SQL Server. On an existing table, the first worker poll or `enqueue(uniqueKey=...)` after the upgrade adds the column, sets it to each row's `id`, and builds the index under the migration lock. It doesn't wait if another instance holds the lock. Servers still on 4.1 keep enqueuing during a rolling upgrade: their rows get a NULL key, which never collides. On a large table, or where the database user can't `ALTER`, apply the change yourself first; the statements are in [The jobs table](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table).
 
+### Long jobs can call `heartbeat()`, and `this.idempotent` gates retry after a reap
+
+A job can now call `heartbeat()` from inside `perform()` to tell the reaper it's still alive, so a job that legitimately runs past its `timeout` isn't reaped and run again ([#4477](https://github.com/wheels-dev/wheels/issues/4477)). It renews a new `wheels_jobs.heartbeatAt` column (added on first use, like `claimTimeout`; without it, `updatedAt` is renewed instead) for the current claim only, and throws `Wheels.Job.Fenced` if the claim was already reaped and reissued. Jobs also gain `this.idempotent`, **`true` by default**, which keeps today's at-least-once retry after a reap. A class that sets `this.idempotent = false` is **not** re-run after a reap: the reaped attempt ends in a new status, `interrupted`, counted in `queueStats()` and `getStats()`. Nothing changes unless you add `heartbeat()` or set `this.idempotent = false`. See [Running Jobs on Multiple Servers](/v4-2-0/digging-deeper/running-jobs-on-multiple-servers/#keep-a-long-job-alive-with-heartbeat).
+
+### A per-host concurrency cap, a host registry, and drain/resume for deploys
+
+Three additions let several servers share one queue under control ([#4480](https://github.com/wheels-dev/wheels/issues/4480)), all opt-in and defaulting to today's behaviour:
+
+- `set(jobsMaxConcurrentPerHost = n)` caps how many jobs one server runs at once (default `0`: no cap). The cap is per host — the name a worker records in `claimedBy`, which `set(jobsHostName = "...")` overrides when several app servers share a machine.
+- A `wheels_job_hosts` registry table (one row per host; auto-created on first use, never inside a transaction) tracks each server's running count, cap, drain state, and code version. Set a release tag or git SHA with `set(jobsCodeVersion = "...")` to see which build each server runs during a rollout.
+- `new wheels.JobRunner()` exposes `tick()` (register, reap, run a bounded batch), `drain(expiresInSeconds)` / `resume()`, and `status()`. A draining host starts nothing new while its running jobs finish.
+
+### `wheels jobs drain` and `wheels jobs resume` for rolling deploys
+
+`wheels jobs drain` marks this server draining so it starts no new jobs while its running jobs finish; `wheels jobs resume` lifts it ([#4480](https://github.com/wheels-dev/wheels/issues/4480)). `wheels jobs drain --wait` polls until the server has no running jobs and exits non-zero if any remain when the wait runs out, so a deploy script can stop the server safely. `--expires=<seconds>` (default 3600, `0` = until resumed) sets when the drain lifts itself if nothing resumes it. `wheels jobs status` now also reports this server's running count, cap, and drain state. See [Drain a server before a deploy](/v4-2-0/digging-deeper/running-jobs-on-multiple-servers/#drain-a-server-before-a-deploy).
+
 ### CSRF accepts the `X-CSRF-Token` header on any request
 
 A valid `X-CSRF-Token` header now passes CSRF protection on any non-GET request ([#3959](https://github.com/wheels-dev/wheels/issues/3959)). In 4.1 the header was read only when the request also sent `X-Requested-With: XMLHttpRequest`, which Turbo and `fetch()` don't send. Nothing breaks: clients that send both keep working, and a request passes when either the form field or the header holds a valid token. `startFormTag()` and `buttonTo()` gain `authenticityToken=false` to leave the hidden field out of markup that is cached and shared.

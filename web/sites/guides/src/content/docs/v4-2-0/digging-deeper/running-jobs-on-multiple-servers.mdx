@@ -1,0 +1,261 @@
+---
+title: Running Jobs on Multiple Servers
+description: Process one job queue safely from several app servers — fencing, heartbeats, idempotency, a per-host concurrency cap, draining a server for a deploy, and the shared schema the guarantees rest on.
+type: howto
+sidebar:
+  order: 4
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+[Background Jobs](/v4-2-0/digging-deeper/background-jobs/) shows you how to define, enqueue, and process jobs with one worker. This page is what changes when **several app servers share one `wheels_jobs` table** and all of them process it — the usual shape behind a load balancer. The queue is a database table, so adding servers needs no broker and no new infrastructure; what it needs is a clear idea of the guarantees you get, the two things your job code must do, and one schema change to make on the database before the servers go live.
+
+**You'll learn:**
+
+- What running across servers guarantees — and what it asks of your `perform()`
+- How a long-running job stays alive with `heartbeat()`, and what `Wheels.Job.Fenced` means
+- How `this.idempotent` chooses at-least-once or at-most-once recovery
+- How to cap how many jobs one server runs at once
+- How to run the queue: a CLI worker, a process supervisor, or a scheduled task
+- How to drain a server before a deploy so it finishes its work and stops cleanly
+- Which schema to apply yourself, rather than let a live server alter the table
+- Why every server must agree on the time
+
+<Aside type="note">
+  Read [Background Jobs](/v4-2-0/digging-deeper/background-jobs/) first. This page assumes you know how to define a job, enqueue it, and process the queue with `wheels jobs work` or `processQueue()`. It builds on those; it doesn't repeat them.
+</Aside>
+
+## The guarantees
+
+Several workers polling the same table is safe by design: each job is claimed with an atomic, guarded `UPDATE` (`WHERE id = :id AND status = 'pending'`), so two workers never start the same row. Beyond that, 4.2 makes the recovery path safe when a worker dies or stalls mid-job. The guarantees are worth stating exactly, because the two things they ask of your code follow directly from them.
+
+- **One job runs on one worker at a time.** The claim is atomic. A row in `processing` is owned by whichever worker claimed it.
+- **A crashed worker's job is recovered.** A worker killed mid-run leaves its row stranded in `processing`; the next poll on that queue reaps it (past a grace margin built from the claiming worker's own `timeout`) and requeues it for retry, or fails it once retries are exhausted. This is covered in full under [Crashed workers and the `timeout`](/v4-2-0/digging-deeper/background-jobs/#crashed-workers-and-the-timeout).
+- **One recorded *outcome* per attempt — not one execution.** A worker that was only stalled (a long GC pause, a hung remote call) can come back to life after its job was reaped and claimed again. Every claim writes a fresh `claimToken` to the row, and a worker may only complete, retry, or fail a job while the row still carries *its* token. The late attempt's result is discarded and logged as `Wheels.Job.Fenced`. Its `perform()` still ran to the point it stalled, though — so the work may have happened twice even though only one outcome was recorded.
+
+Two consequences for your code:
+
+1. **`perform()` must be idempotent.** Recovery is at-least-once: a reaped job runs again, and a fenced attempt already did part of its work. Write `perform()` so running it twice is the same as running it once — check-before-write, store an idempotency key, lean on a unique database constraint. This is the single most important rule for jobs on more than one server.
+2. **The guarantees hold only once every worker is on 4.2.** Fencing lives in the claim and the terminal updates. A worker still on 4.1 claims and completes a job *without* a token, so it can still overwrite a newer attempt. During a rolling upgrade, expect the old behaviour until the last 4.1 worker is gone. Jobs already `processing` when a worker upgrades have no token and are reaped the old way.
+
+<Aside type="caution" title="Enqueue once, across servers">
+When several servers (or several requests) might enqueue the *same* piece of work — a nightly report, a per-record follow-up — give the job a `uniqueKey` so only one row is written, whichever server gets there first. It's the natural companion to processing on many servers. See [Enqueue at most once with `uniqueKey`](/v4-2-0/digging-deeper/background-jobs/#enqueue-at-most-once-with-uniquekey).
+</Aside>
+
+## Keep a long job alive with `heartbeat()`
+
+The reaper decides a job is stale from how long its row has sat in `processing`. A job that legitimately runs longer than its `timeout` would be reaped and run a second time. To prevent that, call `heartbeat()` from inside `perform()` as the work proceeds:
+
+```cfm {test:compile} title="app/jobs/RebuildSearchIndexJob.cfc"
+component extends="wheels.Job" {
+    function config() {
+        super.config();
+        this.queue = "maintenance";
+        this.timeout = 120;   // a batch should take well under two minutes
+    }
+
+    public void function perform(struct data = {}) {
+        var job = this;
+        var onBatch = function(batch) {
+            reindex(batch);
+            job.heartbeat();   // "still alive" — resets the reap clock for this claim
+        };
+        model("Product").findInBatches(batchSize = 500, callback = onBatch);
+    }
+}
+```
+
+`heartbeat()` renews the reaper's clock for **this attempt's claim only** (it carries the same `claimToken` guard as a completion). The reaper measures staleness from the latest heartbeat, so a job that heartbeats on time is never reaped out from under itself. Call it between units of work — after each batch, each file, each page — not in a tight inner loop.
+
+If the claim is gone — the job was already reaped and handed to another worker while this one stalled — `heartbeat()` throws `Wheels.Job.Fenced`. That's your signal to **stop and return from `perform()`**: another attempt owns the job now, and anything more this attempt does will be discarded. Let the exception propagate; don't catch it to keep working.
+
+<Aside type="note" title="Restricted database users">
+`heartbeat()` renews a `wheels_jobs.heartbeatAt` column. On a table whose database user can't `ALTER` it, the column is absent and `heartbeat()` renews `updatedAt` instead — still correct, just coarser. See [The shared schema](#the-shared-schema) to add the column once by hand.
+</Aside>
+
+## Idempotency and `this.idempotent`
+
+Some work genuinely must not run twice, and can't be made idempotent — a job that posts to a ledger, say, where a replay is a real double-post. For those, `this.idempotent` changes what happens when a reaped job's worker is presumed dead:
+
+```cfm {test:compile} title="app/jobs/PostLedgerEntryJob.cfc"
+component extends="wheels.Job" {
+    function config() {
+        super.config();
+        this.queue = "ledger";
+        this.idempotent = false;   // do NOT re-run after a reap
+    }
+
+    public void function perform(struct data = {}) {
+        // A replay here would double-post. Better to stop than to risk it.
+        postEntry(arguments.data.entryId);
+    }
+}
+```
+
+- `this.idempotent = true` (the **default**) — recovery is **at-least-once**. A reaped job is retried, the attempt counts against `maxRetries`, and your idempotent `perform()` absorbs the replay. This is what every job does unless you say otherwise.
+- `this.idempotent = false` — recovery is **at-most-once**. A reaped attempt is **not** re-run: the row ends in the new status `interrupted`, and stops there. You've chosen "didn't finish" over "might run twice".
+
+`interrupted` rows are counted in `queueStats()` and `getStats()` alongside `pending` / `processing` / `completed` / `failed`, so you can alert on them:
+
+```cfm {test:compile} title="watch for interrupted work"
+component extends="Controller" {
+    function metrics() {
+        var jobs = new wheels.Job();
+        var stats = jobs.queueStats();
+        // {pending, processing, completed, failed, interrupted, total}
+        renderWith(data = stats);
+    }
+}
+```
+
+An `interrupted` row is a job that may not have finished and deliberately won't be retried, so treat a non-zero `interrupted` count as something to look at — decide per entry whether the work needs re-queuing by hand. Like `failed` rows, `interrupted` rows persist: `purgeCompleted()` only removes `completed` rows, so clear interrupted ones with your own SQL once you've dealt with them.
+
+## Cap how many jobs a server runs at once
+
+By default a server runs as many jobs as its workers claim. To bound the load one server puts on a shared database or an external API, set a per-host cap:
+
+```cfm {test:compile} title="config/settings.cfm"
+set(jobsMaxConcurrentPerHost = 4);   // this server runs at most 4 jobs at once; 0 (default) = no cap
+```
+
+The cap is enforced for **every** runner on the host — the CLI worker, `processQueue()`, and `JobRunner.tick()` below all honour it. A server at its cap claims nothing new until a running job finishes; other servers keep working to their own caps. The count is per *host*, so the cap governs all the workers and pollers on one server together, not each process on its own.
+
+<Aside type="note" title="What counts as a host">
+A host is the name a worker records in `wheels_jobs.claimedBy` — the machine's host name by default. When several app servers (JVMs) run on one machine, or you want several processes to share one cap and one drain flag, name each explicitly with `set(jobsHostName = "web-1")`. Two processes with the same host name share a cap; two with different names don't.
+</Aside>
+
+## Running the queue on each server
+
+[Background Jobs](/v4-2-0/digging-deeper/background-jobs/#process-the-queue) covers the two ways to process the queue. Across servers, run one of them on **each** server; they coordinate through the shared table.
+
+- **The CLI worker** — `wheels jobs work` under a process supervisor (systemd, Docker's restart policy, a Kamal accessory). When it loses its app server it exits non-zero and the supervisor restarts it. Run one (or several) per app server. This is the simplest option and the one to reach for first.
+- **A scheduled `processQueue()`** — call `processQueue()` from a CFML scheduled task or a cron-invoked script on each server, at whatever cadence your latency allows. No long-lived process to supervise.
+- **`JobRunner.tick()`** — one call that registers the server in the host registry, reaps stale jobs, and runs a bounded batch, all honouring the per-host cap and drain flag. It's the right building block for a scheduled task, because it keeps the host registry (and so `wheels jobs status` and drain-aware deploys) current:
+
+```cfm {test:compile} title="a scheduled task on each server"
+// Run every minute from a CFML scheduled task or a cron-invoked script.
+new wheels.JobRunner().tick(
+    queues = "default,mailers",   // empty = all queues
+    maxConcurrent = 2,            // -1 (default) uses set(jobsMaxConcurrentPerHost); 0 = no cap
+    timeout = 300,               // seconds a single job may run
+    maxJobs = 5                  // most jobs to run in this tick
+);
+```
+
+`tick()` runs its jobs synchronously, one after another, and does nothing beyond the cap or while the host is draining. Run it as often as your latency target wants; each call does a bounded amount of work and returns.
+
+<Aside type="note" title="Planned: a token-gated HTTP tick">
+An engine scheduled task that can only make an HTTP request — rather than run CFML directly — will be able to drive `tick()` through a token-gated `/wheels/jobs/tick` route, so you can schedule the queue from the engine's own task scheduler. That route is **not built yet** ([#4482](https://github.com/wheels-dev/wheels/issues/4482)); until it lands, drive `tick()` from a scheduled task that runs CFML, as above.
+</Aside>
+
+## Drain a server before a deploy
+
+The problem a rolling deploy creates: you need to stop a server, but it may be running jobs. Killing it mid-job strands that work (it's reaped and retried elsewhere, but only after its timeout). `wheels jobs work --stop-when-empty` stops one worker loop, not the server, and not any other worker on it. **Draining** is the clean answer: mark the server so it starts nothing new, let its running jobs finish, then stop it.
+
+<Steps>
+
+1. **Drain the server, and wait for it to go quiet:**
+
+   ```bash title="on the server you're about to deploy"
+   wheels jobs drain --wait
+   ```
+
+   `drain` marks this server draining in the host registry: it starts no new jobs, while jobs already running finish and stale-job reaping continues. `--wait` then polls until the server has no running jobs and exits `0` — at which point it's safe to stop. If jobs are still running when the wait runs out (`--wait` alone allows 600 seconds; `--wait=120` sets your own limit), it exits non-zero so your deploy script can wait longer or investigate rather than stop mid-job.
+
+2. **Deploy** — stop the server, roll out the new build, start it.
+
+3. **Resume**, so the server takes jobs again:
+
+   ```bash title="after the new build is up"
+   wheels jobs resume
+   ```
+
+</Steps>
+
+A drain lifts itself after `--expires=<seconds>` (default 3600) even if nothing resumes it, so a deploy that dies between `drain` and `resume` doesn't leave the server idle forever. Pass `--expires=0` to drain until an explicit `resume`. The same actions are available in CFML for a scripted deploy — `new wheels.JobRunner().drain(expiresInSeconds = 600)` and `.resume()` — and `status()` (or `wheels jobs status`) reports a server's running count, cap, and drain state from its registry row.
+
+<Aside type="note" title="The host registry">
+Drain state lives in a `wheels_job_hosts` table — one row per host, carrying its last-seen time, running count, configured cap, drain flag and expiry, and a code version. It's auto-created on first use (never inside a transaction). The code version defaults to the Wheels version; set your own (a release tag or git SHA) with `set(jobsCodeVersion = "...")` so `wheels jobs status` shows which build each server is running during a rollout.
+</Aside>
+
+## The shared schema
+
+The jobs table [auto-creates on first use](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table), and the multi-server columns are added to an existing table the same way — a guarded `ALTER`, run once, outside any transaction. That's convenient on a single server. **On several servers sharing a production database, apply the schema yourself before the servers go live**, for two reasons:
+
+- An auto-`ALTER` runs when the first upgraded server happens to poll, against a live, in-use table. On PostgreSQL and CockroachDB especially, you want that DDL to run on *your* schedule, in a maintenance window, not at an arbitrary moment under load.
+- If the application's database user lacks `ALTER` privilege — a common production hardening — the auto-upgrade can't run at all, and the features that need the columns quietly fall back (unfenced claims, `updatedAt` heartbeats). Applying the schema with a privileged user once removes that gap.
+
+The columns the multi-server guarantees use, on the `wheels_jobs` table:
+
+| Column | Type | Used for |
+|---|---|---|
+| `claimTimeout` | `INT` | Reaping a stale job on the *claiming* worker's timeout, so workers with different timeouts can share a queue |
+| `claimToken` | `VARCHAR(36)` | Fencing — a terminal update only lands while the row still carries the attempt's token |
+| `claimedBy` | `VARCHAR(128)` | The host that owns a claim (and the per-host cap and drain) |
+| `heartbeatAt` | `DATETIME` | `heartbeat()` renewing a long job's reap clock |
+| `uniqueKey` | `VARCHAR(255)` | Enqueue-once dedupe (nullable, with a unique index) |
+
+To add them by hand (adjust types per database — SQL Server omits `COLUMN`; Oracle uses `VARCHAR2` and `ADD (col TYPE)`):
+
+```sql
+ALTER TABLE wheels_jobs ADD COLUMN claimTimeout INT;
+ALTER TABLE wheels_jobs ADD COLUMN claimToken VARCHAR(36);
+ALTER TABLE wheels_jobs ADD COLUMN claimedBy VARCHAR(128);
+ALTER TABLE wheels_jobs ADD COLUMN heartbeatAt DATETIME;
+ALTER TABLE wheels_jobs ADD COLUMN uniqueKey VARCHAR(255);
+UPDATE wheels_jobs SET uniqueKey = id;
+CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey);
+```
+
+On SQL Server, make the unique index filtered — `CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) WHERE uniqueKey IS NOT NULL` — because SQL Server allows only one NULL in a plain unique index. On a large, busy table, do the `uniqueKey` backfill and index build in a maintenance window: it touches every row. See [The jobs table](/v4-2-0/digging-deeper/background-jobs/#the-jobs-table) for the full column list and the per-database notes. The `wheels_job_hosts` registry has no backfill and is cheap to auto-create; you can leave it to the framework.
+
+<Aside type="note" title="Planned: a schema command">
+A `wheels jobs install` command and a `jobsAutoCreateTables` setting — so you can apply the schema from the CLI and turn the auto-`ALTER` off entirely on production — are **planned, not built yet** ([#4499](https://github.com/wheels-dev/wheels/issues/4499)). Until then, apply the DDL above by hand.
+</Aside>
+
+## Clocks and skew
+
+Every guarantee here is timed against the **database's** clock where it can be — but reap windows, heartbeats, and `runAt` comparisons are currently written with each server's application clock. If two servers disagree about the time, a job can look stale to one and fresh to another. Keep every app server's clock in sync (NTP, or your platform's time service); a few seconds of skew is harmless, minutes are not.
+
+<Aside type="note" title="Planned: a single database clock">
+Writing and comparing all job timestamps on one UTC database clock — removing app-server skew from the reaper entirely — is **planned, not built yet** ([#4486](https://github.com/wheels-dev/wheels/issues/4486)). Until it lands, NTP on every app server is what keeps the reaper honest.
+</Aside>
+
+## Coming in 4.2
+
+More of the multi-server story is landing through 4.2. These are **not available yet**; each links its tracking issue, and this page gains a full section as it merges.
+
+- **Recurring schedules** — cron-style and interval schedules declared in `config/schedules.cfm`, with time zones, catch-up policy, and one job per slot across the fleet ([#4493](https://github.com/wheels-dev/wheels/issues/4493)). This is the piece that turns "run this once, later" into "run this every night", with the schedule-runner wiring to drive it.
+- **Exclusive jobs and concurrency keys** — `this.exclusive` and a `concurrencyKeyFor(data)` on a shared lease lock, so at most one job of a kind (or per key) runs across all servers ([#4496](https://github.com/wheels-dev/wheels/issues/4496)).
+- **Lifecycle hooks and a stored result** — per-job lifecycle hooks, an app-wide `jobsOnFailure` hook, and a stored job result ([#4498](https://github.com/wheels-dev/wheels/issues/4498)).
+- **`processQueue()` through the worker** — routing `processQueue()` and the CLI worker through one code path so both honour the same cap, reap, and fencing logic identically ([#4495](https://github.com/wheels-dev/wheels/issues/4495)).
+- **Old SQL Server index levels** — a clearer error when the `uniqueKey` filtered index can't be built on an old SQL Server compatibility level ([#4494](https://github.com/wheels-dev/wheels/issues/4494)).
+
+## Upgrading from 4.1
+
+All of this is additive: existing jobs keep working, the new settings default to today's behaviour, and the schema is added for you unless you turn it off. The one rule that matters during a rolling upgrade is that **fencing only holds once every worker is on 4.2** — so expect the old recovery behaviour until the last 4.1 worker is gone. The job-related entries on the [4.1 → 4.2 upgrade guide](/v4-2-0/upgrading/4x-1-to-4x-2/) cover each change, the columns added, and what fails safe if skipped.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Background Jobs"
+    description="Start here: define a job, enqueue it, process the queue, retries, priorities, and the jobs table."
+    href="/v4-2-0/digging-deeper/background-jobs/"
+  />
+  <LinkCard
+    title="Upgrading from 4.1 to 4.2"
+    description="Every job-related behaviour change, the columns added to wheels_jobs, and what fails safe if skipped."
+    href="/v4-2-0/upgrading/4x-1-to-4x-2/"
+  />
+  <LinkCard
+    title="Multi-Tenancy"
+    description="Jobs and tenant datasources: where the job store lives and how a tenant's work finds its database."
+    href="/v4-2-0/digging-deeper/multi-tenancy/"
+  />
+  <LinkCard
+    title="Deployment"
+    description="Rolling deploys, process supervision, and where draining fits in your release pipeline."
+    href="/v4-2-0/deployment/"
+  />
+</CardGrid>

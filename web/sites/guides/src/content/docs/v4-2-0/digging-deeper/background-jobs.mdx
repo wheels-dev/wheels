@@ -221,6 +221,10 @@ wheels jobs work --quiet                       # suppress per-job output; failur
 
 In production, run the worker under a process supervisor (systemd, Docker's restart policy, Kamal accessory containers): when it loses the server it exits non-zero and the supervisor restarts it. Run several workers for parallelism — the framework uses optimistic row locking, so two workers never run the same job twice. `--queue` accepts a comma-delimited list (`--queue=critical,default`); jobs across the listed queues run in `priority DESC, runAt ASC` order.
 
+<Aside type="tip" title="Running on more than one server">
+  When several app servers process the same `wheels_jobs` table, there's more to know — how a crashed or stalled worker's job is recovered safely, keeping a long job alive with `heartbeat()`, capping how many jobs a server runs at once, and draining a server before a deploy. See [Running Jobs on Multiple Servers](/v4-2-0/digging-deeper/running-jobs-on-multiple-servers/).
+</Aside>
+
 Check queue health without tailing logs:
 
 ```bash title="your shell"
@@ -444,6 +448,11 @@ Run the purge from a cron or scheduled task. A weekly purge of completed rows ol
 ## Related guides
 
 <CardGrid>
+  <LinkCard
+    title="Running Jobs on Multiple Servers"
+    description="Process one queue from several servers — fencing, heartbeats, idempotency, per-host caps, and draining for deploys."
+    href="/v4-2-0/digging-deeper/running-jobs-on-multiple-servers/"
+  />
   <LinkCard
     title="Models and the ORM"
     description="Jobs persist as rows. Read this first if `model().findByKey()` and callbacks aren't second nature yet."
