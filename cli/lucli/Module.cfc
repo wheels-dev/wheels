@@ -597,6 +597,7 @@ component extends="modules.BaseModule" {
 			.option(name = "max-jobs", default = 0, type = "numeric", description = "work only: stop after this many jobs (successes + failures count). 0 = run until stopped")
 			.flag(name = "stop-when-empty", default = false, description = "work only: exit when a poll finds no job ready to run, instead of waiting for more. For one-shot batches from cron or CI; combines with --max-jobs")
 			.flag(name = "quiet", default = false, description = "work only: suppress per-job completion output, only print failures")
+			.option(name = "job-timeout", default = 0, type = "numeric", description = "work only: cap, in seconds, on each job's run time. 0 = each job runs with its own timeout (this.timeout, default 300). Not --timeout: that is the runtime's own option and stops the whole worker")
 			.option(name = "format", default = "table", description = "status, enqueue, drain and resume: output format, table or json")
 			.option(name = "wait", default = "", type = "any", description = "drain only: after draining, wait until this server has no running jobs (--wait = up to 600 seconds, --wait=<seconds> for another limit). Exits with an error if jobs are still running at the limit")
 			.option(name = "expires", default = 3600, type = "numeric", description = "drain only: seconds until the drain lifts itself if nothing resumes it. 0 = until wheels jobs resume");
@@ -5828,6 +5829,7 @@ component extends="modules.BaseModule" {
 			maxJobs = parsed["max-jobs"],
 			stopWhenEmpty = parsed["stop-when-empty"],
 			quiet = parsed.quiet,
+			jobTimeout = parsed["job-timeout"],
 			format = lCase(trim(parsed.format)),
 			job = trim(parsed.job),
 			data = trim(parsed.data),
@@ -5858,6 +5860,12 @@ component extends="modules.BaseModule" {
 			throw(
 				type = "Wheels.InvalidArguments",
 				message = "wheels jobs #opts.action# takes no value '#opts.job#'. For a wait limit write --wait=<seconds>, with an equals sign."
+			);
+		}
+		if (opts.jobTimeout < 0) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "--job-timeout must be zero (each job's own timeout) or a positive number of seconds."
 			);
 		}
 		if (opts.expires < 0) {
@@ -5912,7 +5920,7 @@ component extends="modules.BaseModule" {
 				);
 			default:
 				out("Unknown jobs action: #opts.action#", "red");
-				out("Usage: wheels jobs [work|status|enqueue <JobName>|drain|resume|tick] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--wait[=<seconds>]] [--expires=<seconds>] [--format=table|json]");
+				out("Usage: wheels jobs [work|status|enqueue <JobName>|drain|resume|tick] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--job-timeout=<seconds>] [--wait[=<seconds>]] [--expires=<seconds>] [--format=table|json]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
 		}
 	}
@@ -5934,10 +5942,15 @@ component extends="modules.BaseModule" {
 		if (len(arguments.opts.queue)) {
 			workUrl &= "&queues=" & urlEncodedFormat(arguments.opts.queue);
 		}
+		// Without --job-timeout the server runs each job with its own class's timeout.
+		if (arguments.opts.jobTimeout > 0) {
+			workUrl &= "&timeout=" & arguments.opts.jobTimeout;
+		}
 
 		out("Wheels Job Worker", "cyan");
 		out("Queues: " & (len(arguments.opts.queue) ? arguments.opts.queue : "all"));
 		out("Poll interval: #arguments.opts.interval#s");
+		out("Job timeout: " & (arguments.opts.jobTimeout > 0 ? "each job's own, capped at #arguments.opts.jobTimeout#s" : "each job's own timeout"));
 		if (arguments.opts.maxJobs > 0) {
 			out("Max jobs: #arguments.opts.maxJobs#");
 		}

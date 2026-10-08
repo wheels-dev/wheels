@@ -38,6 +38,7 @@ Run jobs with the worker. It needs this app's server running, started with `whee
 wheels jobs work --queue=mailers --interval=3   # long-lived worker loop; --quiet for less output
 wheels jobs work --max-jobs=10                  # stops after 10 processed jobs (it keeps polling until then)
 wheels jobs work --stop-when-empty              # exits once no job is ready to run: one-shot batches from cron/CI
+wheels jobs work --job-timeout=600              # caps each job at 600s (not --timeout: that stops the worker); without it each job runs with its own this.timeout
 wheels jobs status [--queue=mailers] [--format=json]
 wheels jobs enqueue SendWelcomeEmailJob --data='{"userId":42}'   # enqueue from the CLI (class under app/jobs/)
 wheels jobs enqueue SendWelcomeEmailJob --in=300                 # or --at=2026-10-06T09:00:00Z; a delayed run, not cron

@@ -353,6 +353,9 @@ component {
 		// (a token in a URL ends up in access logs).
 		application.$wheels.jobsRunnerToken = "";
 		application.$wheels.jobsRunnerTokenInQuery = false;
+		// A background job that has heartbeated is reclaimed once its heartbeats stop for this many
+		// seconds, even inside its timeout (0 = off; minimum 30). A job's this.heartbeatGrace wins.
+		application.$wheels.jobsHeartbeatGraceSeconds = 300;
 		application.$wheels.migrationLockTimeout = 300;
 		application.$wheels.migrationLockLease = 3600;
 		application.$wheels.createMigratorTable = true;
