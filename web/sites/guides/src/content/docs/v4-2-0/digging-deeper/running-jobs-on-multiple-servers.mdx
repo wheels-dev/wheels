@@ -15,6 +15,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 - What running across servers guarantees — and what it asks of your `perform()`
 - How a job records liveness with `heartbeat()`, why `timeout` is a hard cap, and what `Wheels.Job.Fenced` means
 - How `this.idempotent` chooses at-least-once or at-most-once recovery
+- How lifecycle hooks and an app-wide failure hook let you observe jobs running on other servers
 - How to cap how many jobs one server runs at once
 - How to make a job exclusive, or one-per-key, across the whole fleet
 - How to run the queue: a CLI worker, a process supervisor, or a scheduled task
@@ -121,6 +122,44 @@ new wheels.JobWorker().purge(status = "interrupted", days = 30);   // interrupte
 ```
 
 `purge(status, days, queue)` accepts `"completed"`, `"failed"`, or `"interrupted"`, so it's also how you prune failed rows once you've extracted what you need from `lastError`.
+
+## Lifecycle hooks and failure handling
+
+A job can hook its own lifecycle, and the application can hear every failure in one place — which matters across servers, where a job you enqueued runs on a machine you aren't watching.
+
+```cfm {test:compile} title="app/jobs/ChargeCardJob.cfc"
+component extends="wheels.Job" {
+    public void function perform(struct data = {}) {
+        order = model("Order").findByKey(arguments.data.orderId);
+        order.chargeCard();
+    }
+
+    // Best-effort, after the outcome is recorded:
+    public void function onSuccess(any result) { /* ... */ }
+    public void function onFailure(any error, numeric attempt, boolean isFinal) {
+        if (arguments.isFinal) notifyBilling(arguments.error);   // gave up for good
+    }
+}
+```
+
+Per-job hooks, all optional:
+
+- **`beforePerform(data)`** and **`afterPerform(data, result)`** run *as part of the work* — inside `perform()`'s timeout, on the same attempt. A throw from either **fails the attempt**, like a throw from `perform()`. Use them for setup and teardown that must succeed for the job to count.
+- **`onSuccess(result)`** runs once the completion is recorded, and **`onFailure(error, attempt, isFinal)`** after each recorded failure. Both are **best-effort**: a throw is logged, not propagated, and never changes the recorded outcome.
+
+`isFinal` is `true` when the job won't be tried again — the last retry failed, **or** a reaper gave up on it: a reaped last attempt, and a non-idempotent job the reaper ends as `interrupted` (see [Idempotency](#idempotency-and-thisidempotent)), both fire `onFailure(..., isFinal = true)`. So `onFailure` with `isFinal` is a reliable "this job is done trying" signal even when the giving-up happened on another server's reaper, not in `perform()`.
+
+For centralized alerting, set an **application-wide failure hook** that hears every job's failures:
+
+```cfm {test:compile} title="config/settings.cfm"
+set(jobsOnFailure = "app.jobs.FailureNotifier.report");
+```
+
+It's called on every recorded failure with one struct — `{jobId, jobClass, queue, attempt, maxRetries, isFinal, error}`. It deliberately carries **no job `data`** (that can hold secrets), so it's safe to route to logs or an alerting service.
+
+### The stored result
+
+`perform()`'s return value is stored on the row, in a `wheels_jobs.result` column, and handed to `onSuccess(result)`. A simple value is stored as-is; a struct or array is stored as JSON. It's capped at 4000 characters (bound as `NVARCHAR` on SQL Server, UTF-8 bytes elsewhere), truncated on a character boundary with a visible marker if it's longer — so return a small summary, not a large payload. The `result` column is added by the same guarded auto-`ALTER` as the other 4.2 columns; without it, jobs run exactly as before and nothing is stored.
 
 ## Cap how many jobs a server runs at once
 
@@ -299,6 +338,7 @@ The columns the multi-server guarantees use, on the `wheels_jobs` table:
 | `claimedBy` | `VARCHAR(128)` | The host that owns a claim (and the per-host cap and drain) |
 | `heartbeatAt` | `DATETIME` / `TIMESTAMP` | `heartbeat()` stamping a long job's liveness |
 | `uniqueKey` | `VARCHAR(255)` | Enqueue-once dedupe (nullable, with a unique index) |
+| `result` | `VARCHAR(4000)` | `perform()`'s stored return value (`NVARCHAR(4000)` on SQL Server) |
 
 Adjust types per database. `heartbeatAt` is a timestamp column, so it's `DATETIME` on MySQL, SQL Server, and SQLite but **`TIMESTAMP` on PostgreSQL, CockroachDB, Oracle, and H2** (PostgreSQL and CockroachDB have no `DATETIME` type). SQL Server omits `COLUMN`; Oracle uses `VARCHAR2` for the string columns and the `ADD (col TYPE)` form. For MySQL (and SQLite, which ignores the exact spelling):
 
@@ -308,6 +348,7 @@ ALTER TABLE wheels_jobs ADD COLUMN claimToken VARCHAR(36);
 ALTER TABLE wheels_jobs ADD COLUMN claimedBy VARCHAR(128);
 ALTER TABLE wheels_jobs ADD COLUMN heartbeatAt DATETIME;      -- TIMESTAMP on PostgreSQL / CockroachDB / Oracle / H2
 ALTER TABLE wheels_jobs ADD COLUMN uniqueKey VARCHAR(255);
+ALTER TABLE wheels_jobs ADD COLUMN result VARCHAR(4000);       -- NVARCHAR(4000) on SQL Server
 UPDATE wheels_jobs SET uniqueKey = id;
 CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey);
 ```
@@ -325,12 +366,6 @@ All job timestamps — reap windows, heartbeats, `runAt` comparisons — are cur
 <Aside type="note" title="Planned: a single database clock">
 Writing and comparing all job timestamps on one UTC database clock — removing app-server skew from the reaper entirely — is **planned, not built yet** ([#4486](https://github.com/wheels-dev/wheels/issues/4486)). Until it lands, NTP on every app server is what keeps the reaper honest.
 </Aside>
-
-## Coming in 4.2
-
-More of the multi-server story is landing through 4.2. These are **not available yet**; each links its tracking issue, and this page gains a full section as it merges.
-
-- **Lifecycle hooks and a stored result** — per-job lifecycle hooks, an app-wide `jobsOnFailure` hook, and a stored job result ([#4498](https://github.com/wheels-dev/wheels/issues/4498)).
 
 ## Upgrading from 4.1
 
