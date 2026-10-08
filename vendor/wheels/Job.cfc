@@ -1079,8 +1079,7 @@ component {
 		}
 
 		if (!$jobSchema().autoCreateEnabled()) {
-			writeLog(text = $jobSchema().missingSchemaMessage("The wheels_jobs table"), type = "error", file = "wheels_jobs");
-			return false;
+			$throwJobSchemaMissing("The wheels_jobs table");
 		}
 
 		try {
@@ -1332,6 +1331,20 @@ component {
 			}
 		}
 		return variables.$claimTokenColumnsPresent;
+	}
+
+	/**
+	 * Throws Wheels.Job.SchemaMissing: a job table or column is missing while jobsAutoCreateTables
+	 * is false, so the framework won't create it. Logged once per application as well, because a
+	 * worker hits this on every poll until the migration runs.
+	 */
+	public void function $throwJobSchemaMissing(required string what) {
+		local.message = $jobSchema().missingSchemaMessage(arguments.what);
+		if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$jobsSchemaMissingLogged")) {
+			application.wheels.$jobsSchemaMissingLogged = true;
+			writeLog(text = local.message, type = "error", file = "wheels_jobs");
+		}
+		Throw(type = "Wheels.Job.SchemaMissing", message = local.message);
 	}
 
 	/**
@@ -1823,8 +1836,16 @@ component {
 	 * Public with $ prefix so JobWorker can pick database-appropriate SQL syntax.
 	 */
 	public string function $detectDatabaseType() {
+		return $databaseTypeOf(variables.$datasource);
+	}
+
+	/**
+	 * The database type behind a datasource, as $detectDatabaseType() reports it. Separate so
+	 * wheels.JobSchema can ask about the migrator's datasource, which may not be the app's.
+	 */
+	public string function $databaseTypeOf(required string datasourceName) {
 		try {
-			cfdbinfo(type = "version", datasource = "#variables.$datasource#", name = "local.info");
+			cfdbinfo(type = "version", datasource = "#arguments.datasourceName#", name = "local.info");
 			local.product = local.info.database_productname;
 			if (FindNoCase("oracle", local.product)) return "oracle";
 			if (FindNoCase("postgre", local.product)) return "postgresql";

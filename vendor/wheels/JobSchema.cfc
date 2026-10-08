@@ -13,10 +13,14 @@
 component {
 
 	/**
-	 * @datasource The datasource the catalog checks run against. Defaults to the app's.
+	 * @datasource The datasource the catalog checks run against. Defaults to the app's. A
+	 * migration passes the migrator's ($migratorDataSource()), which a TenantMigrator points at
+	 * each tenant's database.
+	 * @credentials Optional {username, password} for that datasource, as the migrator uses them.
 	 */
-	public any function init(string datasource = "") {
+	public any function init(string datasource = "", struct credentials = {}) {
 		variables.datasource = arguments.datasource;
+		variables.credentials = arguments.credentials;
 		if (!Len(variables.datasource) && StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "dataSourceName")) {
 			variables.datasource = application.wheels.dataSourceName;
 		}
@@ -98,7 +102,9 @@ component {
 
 	/**
 	 * A column's SQL type on a database: VARCHAR2/CLOB/TIMESTAMP on Oracle, CLOB/TIMESTAMP on H2,
-	 * TIMESTAMP on PostgreSQL, and VARCHAR/TEXT/DATETIME elsewhere.
+	 * TIMESTAMP on PostgreSQL, and VARCHAR/TEXT/DATETIME elsewhere. Integers are INT everywhere,
+	 * which Oracle stores as NUMBER(38); the claimTimeout column added to an older table on Oracle
+	 * used to be NUMBER(10), and both hold any timeout.
 	 */
 	public string function columnType(required struct column, required string dbType) {
 		local.varcharType = arguments.dbType == "oracle" ? "VARCHAR2" : "VARCHAR";
@@ -196,7 +202,7 @@ component {
 	public string function databaseType() {
 		if (!StructKeyExists(variables, "dbTypeCached")) {
 			local.job = new wheels.Job();
-			variables.dbTypeCached = local.job.$detectDatabaseType();
+			variables.dbTypeCached = local.job.$databaseTypeOf(variables.datasource);
 		}
 		return variables.dbTypeCached;
 	}
@@ -292,7 +298,7 @@ component {
 			default:
 				local.sql = "SELECT COLUMN_NAME AS colname, IS_NULLABLE AS nullable FROM INFORMATION_SCHEMA.COLUMNS WHERE LOWER(TABLE_NAME) = :name";
 		}
-		local.rows = QueryExecute(local.sql, local.params, {datasource = variables.datasource});
+		local.rows = QueryExecute(local.sql, local.params, $queryOptions());
 		local.rv = {};
 		for (local.i = 1; local.i <= local.rows.recordCount; local.i++) {
 			local.rv[LCase(local.rows.colname[local.i])] = CompareNoCase(Trim(local.rows.nullable[local.i]), "YES") == 0;
@@ -314,11 +320,14 @@ component {
 		ArrayAppend(local.lines, " * Creates each job table, or adds what an existing one is missing: tables that Wheels created");
 		ArrayAppend(local.lines, " * automatically are adopted, and running it again changes nothing. With this migration applied,");
 		ArrayAppend(local.lines, " * set(jobsAutoCreateTables = false) so servers never change the job tables at startup.");
+		ArrayAppend(local.lines, " *");
+		ArrayAppend(local.lines, " * down() drops the job tables, including ones this migration adopted rather than created, and");
+		ArrayAppend(local.lines, " * every job in them.");
 		ArrayAppend(local.lines, " */");
 		ArrayAppend(local.lines, "component extends=""wheels.migrator.Migration"" {");
 		ArrayAppend(local.lines, "");
 		ArrayAppend(local.lines, "	function up() {");
-		ArrayAppend(local.lines, "		var schema = new wheels.JobSchema();");
+		ArrayAppend(local.lines, "		var schema = new wheels.JobSchema(datasource = $migratorDataSource(), credentials = $migratorDataSourceCredentials());");
 		for (local.t in tables()) {
 			ArrayAppend(local.lines, "");
 			ArrayAppend(local.lines, "		if (!schema.hasTable(""#local.t.name#"")) {");
@@ -357,7 +366,7 @@ component {
 		ArrayAppend(local.lines, "	}");
 		ArrayAppend(local.lines, "");
 		ArrayAppend(local.lines, "	function down() {");
-		ArrayAppend(local.lines, "		var schema = new wheels.JobSchema();");
+		ArrayAppend(local.lines, "		var schema = new wheels.JobSchema(datasource = $migratorDataSource(), credentials = $migratorDataSourceCredentials());");
 		local.reversed = tables();
 		for (local.n = ArrayLen(local.reversed); local.n >= 1; local.n--) {
 			ArrayAppend(local.lines, "		if (schema.hasTable(""#local.reversed[local.n].name#"")) {");
@@ -414,6 +423,97 @@ component {
 	}
 
 	/**
+	 * A table's columns by type family as the catalog reports them: lower-cased column name ->
+	 * string, text, integer or datetime. Families, not exact types: a migration's column helpers
+	 * and auto-create may pick different members of a family (NUMBER(10) and NUMBER(38), TEXT and
+	 * NVARCHAR(MAX)). SQLite stores both string and text as TEXT, so it reports them as text.
+	 */
+	public struct function catalogColumnFamilies(required string tableName) {
+		local.name = LCase(arguments.tableName);
+		local.params = {name = {value = local.name, cfsqltype = "cf_sql_varchar"}};
+		local.dbType = databaseType();
+		switch (local.dbType) {
+			case "sqlite":
+				local.sql = "SELECT name AS colname, type AS coltype, 0 AS collength FROM pragma_table_info('#$safeName(arguments.tableName)#')";
+				local.params = {};
+				break;
+			case "oracle":
+				local.sql = "SELECT column_name AS colname, data_type AS coltype, char_length AS collength FROM user_tab_columns WHERE LOWER(table_name) = :name";
+				break;
+			case "sqlserver":
+				local.sql = "SELECT COLUMN_NAME AS colname, DATA_TYPE AS coltype, CHARACTER_MAXIMUM_LENGTH AS collength FROM INFORMATION_SCHEMA.COLUMNS WHERE LOWER(TABLE_NAME) = :name AND TABLE_SCHEMA = SCHEMA_NAME()";
+				break;
+			case "mysql":
+				local.sql = "SELECT column_name AS colname, data_type AS coltype, character_maximum_length AS collength FROM information_schema.columns WHERE table_schema = DATABASE() AND LOWER(table_name) = :name";
+				break;
+			case "postgresql":
+				local.sql = "SELECT column_name AS colname, data_type AS coltype, character_maximum_length AS collength FROM information_schema.columns WHERE table_schema = current_schema() AND LOWER(table_name) = :name";
+				break;
+			default:
+				// H2 2.x names the type in DATA_TYPE; H2 1.4 has a JDBC type code there and the
+				// name in TYPE_NAME.
+				local.sql = "SELECT COLUMN_NAME AS colname, DATA_TYPE AS coltype, CHARACTER_MAXIMUM_LENGTH AS collength FROM INFORMATION_SCHEMA.COLUMNS WHERE LOWER(TABLE_NAME) = :name";
+				try {
+					local.rows = QueryExecute(
+						"SELECT COLUMN_NAME AS colname, TYPE_NAME AS coltype, CHARACTER_MAXIMUM_LENGTH AS collength FROM INFORMATION_SCHEMA.COLUMNS WHERE LOWER(TABLE_NAME) = :name",
+						local.params,
+						$queryOptions()
+					);
+				} catch (any e) {
+					// H2 2.x: no TYPE_NAME column.
+				}
+		}
+		if (!StructKeyExists(local, "rows")) {
+			local.rows = QueryExecute(local.sql, local.params, $queryOptions());
+		}
+		local.rv = {};
+		for (local.i = 1; local.i <= local.rows.recordCount; local.i++) {
+			local.length = IsNumeric(local.rows.collength[local.i]) ? Val(local.rows.collength[local.i]) : 0;
+			local.family = $typeFamily(type = local.rows.coltype[local.i], length = local.length);
+			if (local.dbType == "sqlite" && local.family == "string") {
+				local.family = "text";
+			}
+			local.rv[LCase(local.rows.colname[local.i])] = local.family;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal: a catalog type name's family (string, text, integer, datetime), or the lower-cased
+	 * name itself when it belongs to none. A character type with no length limit (-1) is text.
+	 */
+	public string function $typeFamily(required string type, numeric length = 0) {
+		local.t = LCase(Trim(arguments.type));
+		if (FindNoCase("lob", local.t) || FindNoCase("large object", local.t) || FindNoCase("text", local.t)) {
+			return "text";
+		}
+		if (FindNoCase("char", local.t)) {
+			return arguments.length == -1 ? "text" : "string";
+		}
+		if (FindNoCase("time", local.t) || FindNoCase("date", local.t)) {
+			return "datetime";
+		}
+		if (FindNoCase("int", local.t) || FindNoCase("number", local.t) || FindNoCase("numeric", local.t) || FindNoCase("decimal", local.t)) {
+			return "integer";
+		}
+		return local.t;
+	}
+
+	/**
+	 * Internal: query options for this schema's datasource, with its credentials when given.
+	 */
+	public struct function $queryOptions() {
+		local.options = {datasource = variables.datasource};
+		if (StructKeyExists(variables.credentials, "username") && Len(variables.credentials.username)) {
+			local.options.username = variables.credentials.username;
+		}
+		if (StructKeyExists(variables.credentials, "password") && Len(variables.credentials.password)) {
+			local.options.password = variables.credentials.password;
+		}
+		return local.options;
+	}
+
+	/**
 	 * Internal: true when a catalog query returns a row.
 	 */
 	public boolean function $catalogHasRow(required string sql, required struct values) {
@@ -421,7 +521,7 @@ component {
 		for (local.key in arguments.values) {
 			local.params[local.key] = {value = arguments.values[local.key], cfsqltype = "cf_sql_varchar"};
 		}
-		return QueryExecute(arguments.sql, local.params, {datasource = variables.datasource}).recordCount > 0;
+		return QueryExecute(arguments.sql, local.params, $queryOptions()).recordCount > 0;
 	}
 
 	/**

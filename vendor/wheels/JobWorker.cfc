@@ -941,6 +941,11 @@ component {
 			}
 			return false;
 		} catch (any e) {
+			// The table is missing and may not be created (jobsAutoCreateTables = false): say so,
+			// with the way to create it, instead of skipping every poll as if the queue were empty.
+			if (e.type == "Wheels.Job.SchemaMissing") {
+				rethrow;
+			}
 			return false;
 		}
 	}

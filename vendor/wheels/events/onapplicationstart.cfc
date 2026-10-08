@@ -348,6 +348,9 @@ component {
 		// one at a time. A waiting instance gives up after migrationLockTimeout seconds; a holder
 		// that died frees the lock once its lease (renewed before each step) runs out.
 		application.$wheels.migratorLockTableName = "wheels_migrator_locks";
+		// Background-job tables: true creates and upgrades them automatically at runtime; false
+		// leaves them to the app's own migration (`wheels jobs install`), for multi-server apps.
+		application.$wheels.jobsAutoCreateTables = true;
 		application.$wheels.migrationLockTimeout = 300;
 		application.$wheels.migrationLockLease = 3600;
 		application.$wheels.createMigratorTable = true;

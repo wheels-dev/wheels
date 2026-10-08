@@ -9,6 +9,14 @@ component extends="wheels.WheelsTest" {
 
 	function afterAll() {
 		$removeGeneratedMigration();
+		try {
+			queryExecute(
+				"DELETE FROM #application.wheels.migratorTableName# WHERE version = :version",
+				{version = {value = $installVersion(), cfsqltype = "cf_sql_varchar"}},
+				{datasource = application.wheels.dataSourceName}
+			);
+		} catch (any e) {
+		}
 	}
 
 	function run() {
@@ -16,7 +24,8 @@ component extends="wheels.WheelsTest" {
 		describe("wheels.JobSchema", function() {
 
 			afterEach(function() {
-				StructDelete(application.wheels, "jobsAutoCreateTables");
+				application.wheels.jobsAutoCreateTables = true;
+				StructDelete(application.wheels, "$jobsSchemaMissingLogged");
 				$rebuildAutoCreated();
 			});
 
@@ -80,14 +89,67 @@ component extends="wheels.WheelsTest" {
 				expect(schema.hasColumn("wheels_jobs", "uniqueKey")).toBeTrue();
 			});
 
-			it("creates and alters nothing with jobsAutoCreateTables = false", function() {
+			it("runs up, down and up again through the migrator, building auto-create's column types", function() {
+				$rebuildAutoCreated();
+				var schema = new wheels.JobSchema();
+				var autoFamilies = schema.catalogColumnFamilies("wheels_jobs");
+				var autoColumns = schema.catalogColumns("wheels_jobs");
+				expect(autoFamilies.id).toBe(schema.databaseType() == "sqlite" ? "text" : "string");
+				expect(autoFamilies.priority).toBe("integer");
+				expect(autoFamilies.runat).toBe("datetime");
+
+				$dropJobTable();
+				var migrator = $installMigrator();
+				var output = migrator.migrateTo($installVersion());
+				expect(schema.hasTable("wheels_jobs")).toBeTrue(output);
+				expect(schema.catalogColumnFamilies("wheels_jobs")).toBe(autoFamilies, "same type family for every column");
+				expect(schema.catalogColumns("wheels_jobs")).toBe(autoColumns, "same nullability");
+
+				output = migrator.migrateTo("0");
+				expect(schema.hasTable("wheels_jobs")).toBeFalse("down() drops the table: " & output);
+
+				output = migrator.migrateTo($installVersion());
+				expect(schema.hasTable("wheels_jobs")).toBeTrue(output);
+				expect(schema.catalogColumnFamilies("wheels_jobs")).toBe(autoFamilies);
+				for (var index in schema.tableDef("wheels_jobs").indexes) {
+					expect(schema.hasIndex("wheels_jobs", index.name)).toBeTrue(index.name);
+				}
+				migrator.migrateTo("0");
+			});
+
+			it("with jobsAutoCreateTables = false, creates nothing and says how to install the schema", function() {
 				$dropJobTable();
 				application.wheels.jobsAutoCreateTables = false;
-				var job = new wheels.Job();
-				expect(job.$ensureJobTable()).toBeFalse();
+				var ensured = {type = "", message = ""};
+				try {
+					new wheels.Job().$ensureJobTable();
+				} catch (any e) {
+					ensured.type = e.type;
+					ensured.message = e.message;
+				}
+				expect(ensured.type).toBe("Wheels.Job.SchemaMissing");
+				expect(ensured.message).toInclude("wheels jobs install");
 				expect(new wheels.JobSchema().hasTable("wheels_jobs")).toBeFalse();
 
-				StructDelete(application.wheels, "jobsAutoCreateTables");
+				var enqueued = {type = ""};
+				try {
+					new wheels.tests._assets.jobs.ProcessOrdersJob().enqueue(queue = "test_schema_off");
+				} catch (any e) {
+					enqueued.type = e.type;
+				}
+				expect(enqueued.type).toBe("Wheels.Job.SchemaMissing", "enqueue reports the missing schema, not a generic failure");
+
+				var polled = {type = ""};
+				try {
+					new wheels.JobWorker().processNext(queues = "test_schema_off");
+				} catch (any e) {
+					polled.type = e.type;
+				}
+				expect(polled.type).toBe("Wheels.Job.SchemaMissing", "a worker poll doesn't pass for an empty queue");
+				expect(new wheels.JobSchema().hasTable("wheels_jobs")).toBeFalse();
+			});
+
+			it("with jobsAutoCreateTables = false, doesn't alter an existing table", function() {
 				$createLegacyJobTable();
 				application.wheels.jobsAutoCreateTables = false;
 				expect(new wheels.Job().$ensureJobTable()).toBeTrue();
@@ -126,6 +188,31 @@ component extends="wheels.WheelsTest" {
 		}
 		FileWrite(dir & "/CreateWheelsJobTablesProbe.cfc", new wheels.JobSchema().migrationSource());
 		return CreateObject("component", "wheels.tests._assets.jobs_install.CreateWheelsJobTablesProbe").init();
+	}
+
+	/**
+	 * A Migrator over a directory holding just the install migration, under a version later than
+	 * any other spec's, so migrateTo() runs it through the migrator's own transaction and lock.
+	 */
+	private any function $installMigrator() {
+		// One level at a time: Adobe's DirectoryCreate() takes only the path.
+		var parent = ExpandPath("/wheels/tests/_assets/jobs_install");
+		if (!DirectoryExists(parent)) {
+			DirectoryCreate(parent);
+		}
+		var dir = parent & "/migrations";
+		if (!DirectoryExists(dir)) {
+			DirectoryCreate(dir);
+		}
+		FileWrite(dir & "/#$installVersion()#_CreateWheelsJobTables.cfc", new wheels.JobSchema().migrationSource());
+		return CreateObject("component", "wheels.Migrator").init(
+			migratePath = "/wheels/tests/_assets/jobs_install/migrations/",
+			sqlPath = "/wheels/tests/_assets/jobs_install/sql/"
+		);
+	}
+
+	private string function $installVersion() {
+		return "20991231000200";
 	}
 
 	private void function $removeGeneratedMigration() {
