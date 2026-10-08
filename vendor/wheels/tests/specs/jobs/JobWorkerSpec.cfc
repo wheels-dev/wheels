@@ -937,6 +937,13 @@ component extends="wheels.WheelsTest" {
 					state.rejected = true;
 				}
 				expect(state.rejected).toBeTrue("the index must reject a second row with the same key");
+
+				// After an application restart nothing remembers the index was verified: a keyed
+				// enqueue must find the existing index rather than refuse with UniqueKeyUnavailable.
+				$clearUniqueKeyMemos();
+				var afterRestart = new wheels.tests._assets.jobs.ProcessOrdersJob();
+				var third = afterRestart.enqueue(queue = "test_unique_legacy", uniqueKey = "upgraded:2");
+				expect(third.enqueued).toBeTrue("an upgraded table's index must be recognised after a restart");
 			});
 
 			it("restores the CREATE TABLE layout for the next run", function() {

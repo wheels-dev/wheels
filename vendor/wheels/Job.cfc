@@ -1517,10 +1517,21 @@ component {
 	}
 
 	/**
-	 * True when wheels_jobs has the uniqueKey unique index, read from the index metadata. Oracle
-	 * and H2 report unquoted table names upper-cased, so an empty answer is asked again that way.
+	 * True when wheels_jobs has the uniqueKey unique index. Asked of the database's own catalog,
+	 * because driver index metadata isn't reliable everywhere: BoxLang's cfdbinfo reports no
+	 * indexes for this table on Oracle, SQL Server and CockroachDB. Falls back to cfdbinfo for an
+	 * unknown database or a catalog query that fails. Oracle and H2 report unquoted names
+	 * upper-cased, so names are compared case-insensitively.
 	 */
 	public boolean function $jobTableHasUniqueKeyIndex() {
+		local.catalogSql = $uniqueKeyIndexCatalogSql();
+		if (Len(local.catalogSql)) {
+			try {
+				return queryExecute(local.catalogSql, {}, {datasource = variables.$datasource}).recordCount > 0;
+			} catch (any e) {
+				// Fall back to the driver metadata below.
+			}
+		}
 		local.indexes = $jobTableIndexes("wheels_jobs");
 		if (!local.indexes.recordCount) {
 			local.indexes = $jobTableIndexes("WHEELS_JOBS");
@@ -1531,6 +1542,32 @@ component {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * The catalog query that finds the uniqueKey index on this database ("" for an unknown one).
+	 */
+	public string function $uniqueKeyIndexCatalogSql() {
+		local.dbType = $detectDatabaseType();
+		if (local.dbType == "postgresql") {
+			return "SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND LOWER(tablename) = 'wheels_jobs' AND LOWER(indexname) = 'idx_wjobs_unique_key'";
+		}
+		if (local.dbType == "mysql") {
+			return "SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND LOWER(table_name) = 'wheels_jobs' AND LOWER(index_name) = 'idx_wjobs_unique_key'";
+		}
+		if (local.dbType == "sqlserver") {
+			return "SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('wheels_jobs') AND LOWER(name) = 'idx_wjobs_unique_key'";
+		}
+		if (local.dbType == "oracle") {
+			return "SELECT 1 FROM user_indexes WHERE UPPER(table_name) = 'WHEELS_JOBS' AND UPPER(index_name) = 'IDX_WJOBS_UNIQUE_KEY'";
+		}
+		if (local.dbType == "h2") {
+			return "SELECT 1 FROM INFORMATION_SCHEMA.INDEXES WHERE UPPER(TABLE_NAME) = 'WHEELS_JOBS' AND UPPER(INDEX_NAME) = 'IDX_WJOBS_UNIQUE_KEY'";
+		}
+		if (local.dbType == "sqlite") {
+			return "SELECT 1 FROM sqlite_master WHERE type = 'index' AND LOWER(tbl_name) = 'wheels_jobs' AND LOWER(name) = 'idx_wjobs_unique_key'";
+		}
+		return "";
 	}
 
 	/**
