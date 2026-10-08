@@ -128,11 +128,7 @@ By default a server runs as many jobs as its workers claim. To bound the load on
 set(jobsMaxConcurrentPerHost = 4);   // this server runs at most 4 jobs at once; 0 (default) = no cap
 ```
 
-The cap is enforced by the CLI worker (`wheels jobs work`) and by `JobRunner.tick()`. A server at its cap claims nothing new until a running job finishes; other servers keep working to their own caps. The count is per *host*, so the cap governs all the workers and `tick()` callers on one server together, not each process on its own.
-
-<Aside type="note" title="processQueue() and the cap">
-A bare `processQueue()` does **not** yet honour the per-host cap or the drain flag, and doesn't reap stale jobs — it just claims and runs ready jobs. If you process the queue with `processQueue()` and want the cap, the drain flag, and reaping, drive it through `JobRunner.tick()` (below), which wraps all three. Routing `processQueue()` itself through the worker so it honours them directly is landing in [#4495](https://github.com/wheels-dev/wheels/issues/4495).
-</Aside>
+The cap is enforced by every runner that goes through the worker — the CLI worker (`wheels jobs work`), `JobRunner.tick()`, and `processQueue()` (which runs through the worker as of [#4495](https://github.com/wheels-dev/wheels/issues/4495)). A server at its cap claims nothing new until a running job finishes; other servers keep working to their own caps. The count is per *host*, so the cap governs all the workers and pollers on one server together, not each process on its own.
 
 <Aside type="note" title="What counts as a host">
 A host is the name a worker records in `wheels_jobs.claimedBy` — the machine's host name by default. When several app servers (JVMs) run on one machine, or you want several processes to share one cap and one drain flag, name each explicitly with `set(jobsHostName = "web-1")`. Two processes with the same host name share a cap; two with different names don't.
@@ -143,8 +139,8 @@ A host is the name a worker records in `wheels_jobs.claimedBy` — the machine's
 [Background Jobs](/v4-2-0/digging-deeper/background-jobs/#process-the-queue) covers the two ways to process the queue. Across servers, run one of them on **each** server; they coordinate through the shared table.
 
 - **The CLI worker** — `wheels jobs work` under a process supervisor (systemd, Docker's restart policy, a Kamal accessory). When it loses its app server it exits non-zero and the supervisor restarts it. Run one (or several) per app server. This is the simplest option and the one to reach for first.
-- **A scheduled `processQueue()`** — call `processQueue()` from a CFML scheduled task or a cron-invoked script on each server, at whatever cadence your latency allows. No long-lived process to supervise. Note that a bare `processQueue()` ignores the per-host cap and drain flag and doesn't reap (see above); for those, use `JobRunner.tick()` instead.
-- **`JobRunner.tick()`** — one call that registers the server in the host registry, reaps stale jobs, and runs a bounded batch, all honouring the per-host cap and drain flag. It's the right building block for a scheduled task, because it keeps the host registry (and so `wheels jobs status` and drain-aware deploys) current, and it's the cap/drain/reap-aware way to drive the queue from a scheduler:
+- **A scheduled `processQueue()`** — call `processQueue()` from a CFML scheduled task or a cron-invoked script on each server, at whatever cadence your latency allows. No long-lived process to supervise. As of [#4495](https://github.com/wheels-dev/wheels/issues/4495) it runs through the worker, so it reaps stale jobs first, honours the per-host cap, and stops starting new jobs on a draining host — the same safety as the CLI worker. (It doesn't refresh the server's `lastSeenAt` / code version in the host registry the way `tick()` does, but its running count and drain state are read live, so `wheels jobs status` and `wheels jobs drain --wait` still see its in-flight jobs.)
+- **`JobRunner.tick()`** — one call that registers the server in the host registry, reaps stale jobs, and runs a bounded batch, all honouring the per-host cap and drain flag. It's the right building block for a scheduled task, because it keeps the host registry (and so `wheels jobs status` and drain-aware deploys) current:
 
 ```cfm {test:compile} title="a scheduled task on each server"
 // Run every minute from a CFML scheduled task or a cron-invoked script.
@@ -242,7 +238,6 @@ More of the multi-server story is landing through 4.2. These are **not available
 - **Recurring schedules** — cron-style and interval schedules declared in `config/schedules.cfm`, with time zones, catch-up policy, and one job per slot across the fleet ([#4493](https://github.com/wheels-dev/wheels/issues/4493)). This is the piece that turns "run this once, later" into "run this every night", with the schedule-runner wiring to drive it.
 - **Exclusive jobs and concurrency keys** — `this.exclusive` and a `concurrencyKeyFor(data)` on a shared lease lock, so at most one job of a kind (or per key) runs across all servers ([#4496](https://github.com/wheels-dev/wheels/issues/4496)).
 - **Lifecycle hooks and a stored result** — per-job lifecycle hooks, an app-wide `jobsOnFailure` hook, and a stored job result ([#4498](https://github.com/wheels-dev/wheels/issues/4498)).
-- **`processQueue()` through the worker** — routing `processQueue()` and the CLI worker through one code path so both honour the same cap, reap, and fencing logic identically ([#4495](https://github.com/wheels-dev/wheels/issues/4495)).
 - **Old SQL Server index levels** — a clearer error when the `uniqueKey` filtered index can't be built on an old SQL Server compatibility level ([#4494](https://github.com/wheels-dev/wheels/issues/4494)).
 
 ## Upgrading from 4.1
