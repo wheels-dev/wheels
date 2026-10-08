@@ -244,7 +244,7 @@ component extends="Controller" {
     function drain() {
         worker = new wheels.Job();
         result = worker.processQueue(queue="mailers", limit=10);
-        // result = {processed: n, failed: n, skipped: n, errors: [...]}
+        // result = {processed: n, failed: n, skipped: n, fenced: n, errors: [...]}
         renderWith(data=result);
     }
 }
@@ -254,7 +254,7 @@ component extends="Controller" {
 - `processQueue(queue="mailers")` — only drain the `mailers` queue.
 - `processQueue(limit=100)` — bigger batch for one-shot catch-ups.
 
-In production, schedule the call at whatever cadence matches your latency tolerance — every minute is plenty for emails. Run it from multiple schedulers for parallelism: the base class uses optimistic row locking, so two pollers won't process the same job twice (a row claimed between the SELECT and the claim shows up in the `skipped` count).
+In production, schedule the call at whatever cadence matches your latency tolerance — every minute is plenty for emails. Run it from multiple schedulers for parallelism: the base class uses optimistic row locking, so two pollers won't process the same job twice — the atomic claim means the poller that loses the race simply doesn't get that row and moves on. The `fenced` count reports attempts whose result was discarded because the job had been reaped and reclaimed (see [one recorded outcome per attempt](/v4-2-0/digging-deeper/running-jobs-on-multiple-servers/#the-guarantees)).
 
 Check queue health without tailing logs — `queueStats()` returns per-status counts:
 
