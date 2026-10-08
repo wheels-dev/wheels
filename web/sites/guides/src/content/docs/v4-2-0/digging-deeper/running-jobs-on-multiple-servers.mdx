@@ -70,7 +70,7 @@ component extends="wheels.Job" {
 If the claim is gone — the job was already reaped and handed to another worker while this one stalled — `heartbeat()` throws `Wheels.Job.Fenced`. That's your signal to **stop and return from `perform()`**: another attempt owns the job now, and anything more this attempt does will be discarded. Let the exception propagate; don't catch it to keep working.
 
 <Aside type="note" title="What liveness does today, and what's coming">
-Because `timeout` already caps each attempt, recording liveness has a limited effect on today's reaper. It's the foundation for two changes landing in 4.2: renewing the job's lease so an exclusive or concurrency-keyed job keeps its slot while it runs ([#4496](https://github.com/wheels-dev/wheels/issues/4496)), and making a heartbeating long job detectable as dead sooner when its worker actually dies ([#4502](https://github.com/wheels-dev/wheels/issues/4502)). Call `heartbeat()` in long jobs now, and it gains teeth as those land. It never extends the per-attempt `timeout`.
+Because `timeout` already caps each attempt, recording liveness has a limited effect on today's reaper. It's the foundation for two changes landing in 4.2: once [#4496](https://github.com/wheels-dev/wheels/issues/4496) lands, `heartbeat()` also renews an exclusive or concurrency-keyed job's lease, so a long run keeps its slot while it works; and [#4502](https://github.com/wheels-dev/wheels/issues/4502) will make a heartbeating long job detectable as dead sooner when its worker actually dies. Call `heartbeat()` in long jobs now, and it gains teeth as those land. It never extends the per-attempt `timeout`.
 </Aside>
 
 <Aside type="note" title="Restricted database users">
