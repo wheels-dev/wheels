@@ -1147,12 +1147,17 @@ component {
 			local.params,
 			{datasource = variables.$datasource, result = "local.updateResult"}
 		);
-		writeLog(
-			text = "Job '#arguments.jobClass#' [#arguments.jobId#] was interrupted: its worker stopped responding and the job is not idempotent, so it was not retried",
-			type = "warning",
-			file = "wheels_jobs"
-		);
-		return StructKeyExists(local, "updateResult") ? Val(local.updateResult.recordCount) : 0;
+		local.changed = StructKeyExists(local, "updateResult") ? Val(local.updateResult.recordCount) : 0;
+		// Only the reaper that won the row logs it: a concurrent one (or a row that came back to
+		// life) changed nothing.
+		if (local.changed > 0) {
+			writeLog(
+				text = "Job '#arguments.jobClass#' [#arguments.jobId#] was interrupted: its worker stopped responding and the job is not idempotent, so it was not retried",
+				type = "warning",
+				file = "wheels_jobs"
+			);
+		}
+		return local.changed;
 	}
 
 	/**
