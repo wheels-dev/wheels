@@ -47,21 +47,21 @@ When several servers (or several requests) might enqueue the *same* piece of wor
 
 ## Record liveness with `heartbeat()`
 
-A job's `timeout` is a **hard cap on a single attempt**: `perform()` runs in a bounded thread and is stopped when the timeout elapses, however much work is left (the attempt is then retried or failed like any timeout). `heartbeat()` does **not** extend that cap — a job can't run past its `timeout`. What it does is record that this attempt is *alive*: call it from inside `perform()` as the work proceeds, and it stamps the row's liveness for the reaper to read.
+A job's `timeout` is a **hard cap on a single attempt**: `perform()` runs in a bounded thread and is stopped when the timeout elapses, however much work is left (the attempt is then retried or failed like any timeout). `heartbeat()` does **not** extend that cap — a job can't run past its `timeout`. What it does is let a **long** job's worker-death be noticed quickly. Call it from inside `perform()` as the work proceeds, and it stamps the row's liveness; a job that has heartbeated is reclaimed once its beats stop for the **heartbeat grace** — even inside its `timeout`, so its recovery no longer waits out a long timeout.
 
 ```cfm {test:compile} title="app/jobs/RebuildSearchIndexJob.cfc"
 component extends="wheels.Job" {
     function config() {
         super.config();
         this.queue = "maintenance";
-        this.timeout = 120;   // a batch should take well under two minutes
+        this.timeout = 3600;   // a full rebuild may legitimately run up to an hour
     }
 
     public void function perform(struct data = {}) {
         var job = this;
         var onBatch = function(batch) {
             reindex(batch);
-            job.heartbeat();   // "still alive" — stamps liveness for the reaper (doesn't extend the timeout)
+            job.heartbeat();   // "still alive" — a dead worker is now caught within the grace, not an hour
         };
         model("Product").findInBatches(batchSize = 500, callback = onBatch);
     }
@@ -70,10 +70,12 @@ component extends="wheels.Job" {
 
 `heartbeat()` stamps liveness on **this attempt's claim only** (it carries the same `claimToken` guard as a completion). Call it between units of work — after each batch, each file, each page — not in a tight inner loop.
 
+The grace is `jobsHeartbeatGraceSeconds` (default `300`, floor `30`, `0` turns it off), set app-wide with `set(jobsHeartbeatGraceSeconds = n)` or per class with `this.heartbeatGrace`. With it, a heartbeating job whose worker dies is reclaimed about that many seconds after its last beat, instead of waiting for the full claim window (`timeout` plus the reap grace). A job that **never** heartbeats keeps that full claim window — heartbeating is what opts a long job into faster recovery.
+
 If the claim is gone — the job was already reaped and handed to another worker while this one stalled — `heartbeat()` throws `Wheels.Job.Fenced`. That's your signal to **stop and return from `perform()`**: another attempt owns the job now, and anything more this attempt does will be discarded. Let the exception propagate; don't catch it to keep working.
 
-<Aside type="note" title="What liveness does today, and what's coming">
-`heartbeat()` also renews an [exclusive or concurrency-keyed job's](#exclusive-jobs-and-concurrency-keys) lease, extending it with each beat. Like its effect on the reaper, this is mostly groundwork today: because `timeout` hard-caps each attempt and the lease is sized to outlast that, the lease can't expire mid-run as things stand, and [#4502](https://github.com/wheels-dev/wheels/issues/4502) will make a heartbeating long job detectable as dead sooner when its worker actually dies. Either way, `heartbeat()` never extends the per-attempt `timeout`.
+<Aside type="note" title="Heartbeats and the exclusive lease">
+For an [exclusive or concurrency-keyed job](#exclusive-jobs-and-concurrency-keys), each `heartbeat()` also renews the run's lease by the grace window, so the lease frees on the same clock the job is reclaimed on: stop beating, and both the claim and the lease lapse together after the grace. `heartbeat()` never extends the per-attempt `timeout`.
 </Aside>
 
 <Aside type="note" title="Restricted database users">
@@ -217,7 +219,7 @@ component extends="wheels.Job" {
 }
 ```
 
-The lease lives in a `wheels_job_locks` table (auto-created on first use, never inside a transaction), owned by the running attempt's claim token, and lasts as long as the attempt's reap window — the timeout it was claimed with plus the reap grace — so it covers the run. A long run can [`heartbeat()`](#record-liveness-with-heartbeat) to extend the lease as it goes. If a run does lose its lease before it finishes — taken over after expiry — that's logged and counted (as `leasesLost` in a `processQueue()` result), and the run is **not** failed for it; make the work idempotent so a rare overlap is harmless.
+The lease lives in a `wheels_job_locks` table (auto-created on first use, never inside a transaction), owned by the running attempt's claim token, and lasts as long as the attempt's reap window — the timeout it was claimed with plus the reap grace — so it covers the run. A long run that [`heartbeat()`](#record-liveness-with-heartbeat)s renews the lease by the heartbeat grace on each beat, so a job that stops beating loses its lease on the very clock it is reclaimed on. If a run does lose its lease before it finishes — taken over after expiry — that's logged and counted (as `leasesLost` in a `processQueue()` result), and the run is **not** failed for it; make the work idempotent so a rare overlap is harmless.
 
 <Aside type="caution">
 A busy lease is retried, not dropped, so an exclusive job that always finds its lease held (a run that never ends, a key that's too coarse) will keep being put back to `pending` and never make progress. Scope `concurrencyKeyFor()` as narrowly as correctness allows, and make sure exclusive jobs actually finish.
