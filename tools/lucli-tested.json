@@ -1,0 +1,6 @@
+{
+  "_about": "LuCLI runtimes tested with each released line, beyond the one the release was built with (tools/lucli.json at its tag). distribution-install-smoke accepts a channel's LuCLI if it is the tag's pin or listed here for the release's major.minor line. Add a version only after the line's core and CLI suites pass on it; a line with no entry accepts the tag's pin only.",
+  "lines": {
+    "4.1": ["0.6.2.1", "0.6.2.2"]
+  }
+}
