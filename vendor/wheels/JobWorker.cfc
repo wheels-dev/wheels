@@ -62,6 +62,9 @@ component {
 		// nothing is stuck.
 		this.checkTimeouts(timeout = arguments.timeout, queues = arguments.queues);
 
+		// Keep schedules running from the same poll (throttled to jobsScheduleCheckSeconds).
+		$jobBridge().$enqueueDueSchedules();
+
 		// A draining host starts nothing new (in-flight jobs finish; the reap above still runs).
 		local.host = $jobBridge().$jobHostName();
 		if ($jobBridge().$hostDraining(local.host)) {
@@ -1189,6 +1192,11 @@ component {
 			}
 			return false;
 		} catch (any e) {
+			// The table is missing and may not be created (jobsAutoCreateTables = false): say so,
+			// with the way to create it, instead of skipping every poll as if the queue were empty.
+			if (e.type == "Wheels.Job.SchemaMissing") {
+				rethrow;
+			}
 			return false;
 		}
 	}

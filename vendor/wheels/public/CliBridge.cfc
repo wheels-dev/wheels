@@ -78,7 +78,8 @@ component output="false" displayName="CLI Bridge" {
 			"jobsDrain" = "jobsDrain",
 			"jobsResume" = "jobsResume",
 			"jobsHostStatus" = "jobsHostStatus",
-			"jobsTick" = "jobsTick"
+			"jobsTick" = "jobsTick",
+			"jobsInstallSource" = "jobsInstallSource"
 		};
 		return this;
 	}
@@ -830,6 +831,24 @@ component output="false" displayName="CLI Bridge" {
 		} catch (any e) {
 			local.rv.success = false;
 			local.rv.message = "Error processing job: " & e.message;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * `wheels jobs install`: the source of the migration that creates the job tables, built from
+	 * wheels.JobSchema. Read-only: the CLI writes the file, and nothing touches the database.
+	 */
+	public struct function jobsInstallSource(required struct context, required struct params) {
+		local.rv = {};
+		try {
+			local.rv.success = true;
+			local.rv.migrationName = "CreateWheelsJobTables";
+			local.rv.source = new wheels.JobSchema().migrationSource();
+			local.rv.message = "Jobs migration source generated";
+		} catch (any e) {
+			local.rv.success = false;
+			local.rv.message = "Error generating the jobs migration: " & e.message;
 		}
 		return local.rv;
 	}

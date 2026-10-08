@@ -497,7 +497,7 @@ component {
 		Throw(
 			type = "Wheels.Job.UniqueKeyUnavailable",
 			message = "Job '#arguments.jobClass#' was enqueued with a uniqueKey, but wheels_jobs can't enforce one yet, so it was not enqueued.",
-			extendedInfo = "wheels_jobs needs a uniqueKey column (VARCHAR(255), nullable) with a unique index. The framework adds them on a worker poll or an enqueue(uniqueKey=...) made outside a transaction, unless the database user can't ALTER the table or another instance is upgrading it right now. " & $uniqueKeyLastProblem() & $uniqueKeyManualFix()
+			extendedInfo = ($jobSchema().autoCreateEnabled() ? "" : $jobSchema().missingSchemaMessage("The wheels_jobs uniqueKey column or index") & " ") & "wheels_jobs needs a uniqueKey column (VARCHAR(255), nullable) with a unique index. The framework adds them on a worker poll or an enqueue(uniqueKey=...) made outside a transaction, unless the database user can't ALTER the table or another instance is upgrading it right now. " & $uniqueKeyLastProblem() & $uniqueKeyManualFix()
 		);
 	}
 
@@ -1249,6 +1249,11 @@ component {
 		try {
 			// Check if table already exists by querying it
 			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			// With auto-create off the schema is the app's (its `wheels jobs install` migration):
+			// no column upgrades run here.
+			if (!$jobSchema().autoCreateEnabled()) {
+				return true;
+			}
 			// Table exists — make sure the claimTimeout column exists too (#3989). Probed on
 			// every call and never cached: a shared or rebuilt dev DB can lose it (see #2780).
 			$ensureClaimTimeoutColumn();
@@ -1261,72 +1266,40 @@ component {
 			// Table doesn't exist — create it
 		}
 
+		if (!$jobSchema().autoCreateEnabled()) {
+			// The probe can fail for reasons other than a missing table (a lost connection, a
+			// permission). Only the catalog's answer makes it a missing schema; otherwise run the
+			// probe again here, so its own error is what the caller sees.
+			if (!$jobSchema().hasTable("wheels_jobs")) {
+				$throwJobSchemaMissing("The wheels_jobs table");
+			}
+			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			return true;
+		}
+
 		try {
 			// Detect actual database type from the datasource via JDBC metadata.
 			// We query the datasource directly rather than using application.wheels.adapterName
 			// because the adapter may have been detected from a different datasource.
 			local.dbType = $detectDatabaseType();
+			local.schema = $jobSchema();
+			queryExecute(local.schema.createTableSql(tableName = "wheels_jobs", dbType = local.dbType), {}, {datasource = variables.$datasource});
 
-			// Use database-appropriate types
-			if (local.dbType == "oracle") {
-				local.varcharType = "VARCHAR2";
-				local.textType = "CLOB";
-				local.datetimeType = "TIMESTAMP";
-			} else if (local.dbType == "postgresql") {
-				local.varcharType = "VARCHAR";
-				local.textType = "TEXT";
-				local.datetimeType = "TIMESTAMP";
-			} else if (local.dbType == "h2") {
-				local.varcharType = "VARCHAR";
-				local.textType = "CLOB";
-				local.datetimeType = "TIMESTAMP";
-			} else {
-				local.varcharType = "VARCHAR";
-				local.textType = "TEXT";
-				local.datetimeType = "DATETIME";
-			}
-
-			queryExecute("
-				CREATE TABLE wheels_jobs (
-					id #local.varcharType#(36) NOT NULL PRIMARY KEY,
-					jobClass #local.varcharType#(255) NOT NULL,
-					queue #local.varcharType#(100) DEFAULT 'default' NOT NULL,
-					data #local.textType#,
-					priority INT DEFAULT 0 NOT NULL,
-					status #local.varcharType#(20) DEFAULT 'pending' NOT NULL,
-					attempts INT DEFAULT 0 NOT NULL,
-					maxRetries INT DEFAULT 3 NOT NULL,
-					claimTimeout INT,
-					claimToken #local.varcharType#(36),
-					claimedBy #local.varcharType#(128),
-					uniqueKey #local.varcharType#(255),
-					heartbeatAt #local.datetimeType#,
-					result #$resultColumnType(local.dbType)#,
-					lastError #local.textType#,
-					runAt #local.datetimeType#,
-					completedAt #local.datetimeType#,
-					failedAt #local.datetimeType#,
-					createdAt #local.datetimeType#,
-					updatedAt #local.datetimeType#
-				)
-			", {}, {datasource = variables.$datasource});
-
-			// Add indexes for efficient queue processing
-			try {
-				queryExecute("CREATE INDEX idx_wjobs_processing ON wheels_jobs (status, runAt, priority)", {}, {datasource = variables.$datasource});
-				queryExecute("CREATE INDEX idx_wjobs_queue ON wheels_jobs (queue, status)", {}, {datasource = variables.$datasource});
-				queryExecute("CREATE INDEX idx_wjobs_cleanup ON wheels_jobs (status, completedAt)", {}, {datasource = variables.$datasource});
-			} catch (any indexError) {
-				// Indexes are optional — don't fail if they can't be created
-			}
-			// The uniqueKey index is not optional: it is what de-duplicates enqueue(uniqueKey=).
-			// If it can't be built now, the next $ensureJobTable() retries it (the column is there,
-			// the index isn't), and enqueue(uniqueKey=) refuses to run without it.
-			try {
-				queryExecute($uniqueKeyIndexSql(), {}, {datasource = variables.$datasource});
-				$recordUniqueKeyIndexVerified();
-			} catch (any uniqueIndexError) {
-				writeLog(text = $uniqueKeyUpgradeFailureText(reason = uniqueIndexError.message, step = "index"), type = "error", file = "wheels_jobs");
+			// Indexes for efficient queue processing are optional: don't fail if one can't be
+			// created. The uniqueKey index is not optional: it is what de-duplicates
+			// enqueue(uniqueKey=). If it can't be built now, the next $ensureJobTable() retries it
+			// (the column is there, the index isn't), and enqueue(uniqueKey=) refuses to run without it.
+			for (local.index in local.schema.tableDef("wheels_jobs").indexes) {
+				try {
+					queryExecute(local.schema.indexSql(tableName = "wheels_jobs", indexName = local.index.name, dbType = local.dbType), {}, {datasource = variables.$datasource});
+					if (local.index.name == "idx_wjobs_unique_key") {
+						$recordUniqueKeyIndexVerified();
+					}
+				} catch (any indexError) {
+					if (!local.index.optional) {
+						writeLog(text = "Could not create the wheels_jobs index #local.index.name#: #indexError.message#", type = "error", file = "wheels_jobs");
+					}
+				}
 			}
 
 			writeLog(text = "Auto-created wheels_jobs table", type = "information", file = "wheels_jobs");
@@ -1347,6 +1320,9 @@ component {
 		// DDL inside an open transaction makes MySQL and Oracle commit the caller's work, so the
 		// column is never added there (an INSERT failure's table-ensure runs inside the caller's
 		// transaction). A worker poll or a call outside a transaction adds it.
+		if (!$jobSchema().autoCreateEnabled()) {
+			return;
+		}
 		if (Len($outermostWheelsTransaction())) {
 			return;
 		}
@@ -1432,14 +1408,7 @@ component {
 	 * Oracle takes a parenthesised column list; everything else accepts ADD COLUMN.
 	 */
 	public string function $claimTimeoutAlterSql() {
-		local.dbType = $detectDatabaseType();
-		if (local.dbType == "oracle") {
-			return "ALTER TABLE wheels_jobs ADD (claimTimeout NUMBER(10))";
-		}
-		if (local.dbType == "sqlserver") {
-			return "ALTER TABLE wheels_jobs ADD claimTimeout INT";
-		}
-		return "ALTER TABLE wheels_jobs ADD COLUMN claimTimeout INT";
+		return $jobSchema().addColumnSql(tableName = "wheels_jobs", columnName = "claimTimeout", dbType = $detectDatabaseType());
 	}
 
 	/**
@@ -1471,6 +1440,9 @@ component {
 		// DDL inside an open transaction makes MySQL and Oracle commit the caller's work, so the
 		// columns are never added there (an INSERT failure's table-ensure runs inside the caller's
 		// transaction). A worker poll or a call outside a transaction adds them.
+		if (!$jobSchema().autoCreateEnabled()) {
+			return;
+		}
 		if (Len($outermostWheelsTransaction())) {
 			return;
 		}
@@ -1519,14 +1491,7 @@ component {
 	 * The per-database "ADD <column> VARCHAR(n)" DDL for a claim-fencing column.
 	 */
 	public string function $claimTokenAlterSql(required string columnName, required numeric size) {
-		local.dbType = $detectDatabaseType();
-		if (local.dbType == "oracle") {
-			return "ALTER TABLE wheels_jobs ADD (#arguments.columnName# VARCHAR2(#arguments.size#))";
-		}
-		if (local.dbType == "sqlserver") {
-			return "ALTER TABLE wheels_jobs ADD #arguments.columnName# VARCHAR(#arguments.size#)";
-		}
-		return "ALTER TABLE wheels_jobs ADD COLUMN #arguments.columnName# VARCHAR(#arguments.size#)";
+		return $jobSchema().addColumnSql(tableName = "wheels_jobs", columnName = arguments.columnName, dbType = $detectDatabaseType());
 	}
 
 	/**
@@ -1569,6 +1534,9 @@ component {
 	 * a failed ALTER backs off and logs once, and jobs then run without storing their result.
 	 */
 	public void function $ensureResultColumn() {
+		if (!$jobSchema().autoCreateEnabled()) {
+			return;
+		}
 		if (Len($outermostWheelsTransaction())) {
 			return;
 		}
@@ -1617,25 +1585,14 @@ component {
 	 * non-ASCII text, and VARCHAR(4000) (VARCHAR2 on Oracle) elsewhere.
 	 */
 	public string function $resultColumnType(required string dbType) {
-		if (arguments.dbType == "sqlserver") {
-			return "NVARCHAR(4000)";
-		}
-		return (arguments.dbType == "oracle" ? "VARCHAR2" : "VARCHAR") & "(4000)";
+		return $jobSchema().columnType(column = $jobSchema().columnDef("wheels_jobs", "result"), dbType = arguments.dbType);
 	}
 
 	/**
 	 * The per-database "ADD result" DDL.
 	 */
 	public string function $resultAlterSql() {
-		local.dbType = $detectDatabaseType();
-		local.definition = "result #$resultColumnType(local.dbType)#";
-		if (local.dbType == "oracle") {
-			return "ALTER TABLE wheels_jobs ADD (#local.definition#)";
-		}
-		if (local.dbType == "sqlserver") {
-			return "ALTER TABLE wheels_jobs ADD #local.definition#";
-		}
-		return "ALTER TABLE wheels_jobs ADD COLUMN #local.definition#";
+		return $jobSchema().addColumnSql(tableName = "wheels_jobs", columnName = "result", dbType = $detectDatabaseType());
 	}
 
 	/**
@@ -1783,6 +1740,84 @@ component {
 	}
 
 	/**
+	 * Internal: the JobScheduler $enqueueDueSchedules() runs, a seam for specs.
+	 */
+	public any function $newScheduler() {
+		return new wheels.JobScheduler();
+	}
+
+	/**
+	 * Enqueues due schedules (JobScheduler.enqueueDue()) at most once every
+	 * jobsScheduleCheckSeconds (default 15; 0 = never) per application, so every worker poll,
+	 * processQueue() and JobRunner.tick() keeps schedules running without a separate process.
+	 * Any number of servers may do it: each slot is enqueued once (its uniqueKey). Only when the
+	 * schedules table exists, so an app without schedules never gets one. Never throws: a failed
+	 * check is logged and the poll carries on. Returns {checked, enqueued} (both 0 when skipped).
+	 */
+	public struct function $enqueueDueSchedules() {
+		var rv = {checked = 0, enqueued = 0};
+		if (!StructKeyExists(application, "wheels")) {
+			return rv;
+		}
+		local.interval = StructKeyExists(application.wheels, "jobsScheduleCheckSeconds") && IsNumeric(application.wheels.jobsScheduleCheckSeconds) ? Val(application.wheels.jobsScheduleCheckSeconds) : 15;
+		if (local.interval <= 0 || Len($outermostWheelsTransaction())) {
+			return rv;
+		}
+		local.now = GetTickCount();
+		if (StructKeyExists(application.wheels, "$jobsScheduleCheckedAt") && local.now - application.wheels["$jobsScheduleCheckedAt"] < local.interval * 1000) {
+			return rv;
+		}
+		// One check at a time per application; a poll that finds one running skips.
+		var gate = {due = false};
+		lock name="wheels.jobs.scheduleCheck" type="exclusive" timeout="1" throwOnTimeout="false" {
+			gate.due = !StructKeyExists(application.wheels, "$jobsScheduleCheckedAt") || GetTickCount() - application.wheels["$jobsScheduleCheckedAt"] >= local.interval * 1000;
+			if (gate.due) {
+				application.wheels["$jobsScheduleCheckedAt"] = GetTickCount();
+			}
+		}
+		if (gate.due) {
+			try {
+				local.scheduler = $newScheduler();
+				if (local.scheduler.$schedulesTableExists()) {
+					local.outcome = local.scheduler.enqueueDue();
+					rv.checked = local.outcome.checked;
+					rv.enqueued = local.outcome.enqueued;
+					for (local.error in local.outcome.errors) {
+						writeLog(text = "Schedule check: #local.error#", type = "error", file = "wheels_jobs");
+					}
+				}
+			} catch (any e) {
+				writeLog(text = "Could not check job schedules: #e.message#", type = "error", file = "wheels_jobs");
+			}
+		}
+		return rv;
+	}
+
+	/**
+	 * Throws Wheels.Job.SchemaMissing: a job table or column is missing while jobsAutoCreateTables
+	 * is false, so the framework won't create it. Logged once per application as well, because a
+	 * worker hits this on every poll until the migration runs.
+	 */
+	public void function $throwJobSchemaMissing(required string what) {
+		local.message = $jobSchema().missingSchemaMessage(arguments.what);
+		if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$jobsSchemaMissingLogged")) {
+			application.wheels.$jobsSchemaMissingLogged = true;
+			writeLog(text = local.message, type = "error", file = "wheels_jobs");
+		}
+		Throw(type = "Wheels.Job.SchemaMissing", message = local.message);
+	}
+
+	/**
+	 * The job schema (wheels.JobSchema) for this instance's datasource, memoised per instance.
+	 */
+	public any function $jobSchema() {
+		if (!StructKeyExists(variables, "$jobSchemaInstance")) {
+			variables.$jobSchemaInstance = new wheels.JobSchema(datasource = variables.$datasource);
+		}
+		return variables.$jobSchemaInstance;
+	}
+
+	/**
 	 * A fresh, unique token for one claim of one job.
 	 */
 	public string function $newClaimToken() {
@@ -1856,6 +1891,9 @@ component {
 		// DDL inside an open transaction makes MySQL and Oracle commit the caller's work, so the
 		// upgrade never runs there, whoever calls this (a keyed enqueue, or the table-ensure an
 		// INSERT failure triggers). A worker poll or an enqueue outside a transaction does it.
+		if (!$jobSchema().autoCreateEnabled()) {
+			return;
+		}
 		if (Len($outermostWheelsTransaction())) {
 			return;
 		}
@@ -2044,14 +2082,7 @@ component {
 	 * The per-database "ADD uniqueKey" DDL (nullable).
 	 */
 	public string function $uniqueKeyAlterSql() {
-		local.dbType = $detectDatabaseType();
-		if (local.dbType == "oracle") {
-			return "ALTER TABLE wheels_jobs ADD (uniqueKey VARCHAR2(255))";
-		}
-		if (local.dbType == "sqlserver") {
-			return "ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255)";
-		}
-		return "ALTER TABLE wheels_jobs ADD COLUMN uniqueKey VARCHAR(255)";
+		return $jobSchema().addColumnSql(tableName = "wheels_jobs", columnName = "uniqueKey", dbType = $detectDatabaseType());
 	}
 
 	/**
@@ -2059,11 +2090,7 @@ component {
 	 * single NULL, so it is filtered to the non-NULL keys there.
 	 */
 	public string function $uniqueKeyIndexSql() {
-		local.sql = "CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey)";
-		if ($detectDatabaseType() == "sqlserver") {
-			local.sql &= " WHERE uniqueKey IS NOT NULL";
-		}
-		return local.sql;
+		return $jobSchema().indexSql(tableName = "wheels_jobs", indexName = "idx_wjobs_unique_key", dbType = $detectDatabaseType());
 	}
 
 	/**
@@ -2231,25 +2258,15 @@ component {
 		if ($hostsTableExists()) {
 			return true;
 		}
+		if (!$jobSchema().autoCreateEnabled()) {
+			$warnAuxTableMissingOnce("wheels_job_hosts", "this server's drain/resume and its host record in jobs status are unavailable (the per-host cap still works)");
+			return false;
+		}
 		if (Len($outermostWheelsTransaction())) {
 			return false;
 		}
-		local.dbType = $detectDatabaseType();
-		local.varcharType = local.dbType == "oracle" ? "VARCHAR2" : "VARCHAR";
-		local.datetimeType = ListFindNoCase("oracle,postgresql,h2", local.dbType) ? "TIMESTAMP" : "DATETIME";
 		try {
-			queryExecute("
-				CREATE TABLE wheels_job_hosts (
-					host #local.varcharType#(128) NOT NULL PRIMARY KEY,
-					lastSeenAt #local.datetimeType#,
-					startedAt #local.datetimeType#,
-					running INT DEFAULT 0 NOT NULL,
-					maxConcurrent INT DEFAULT 0 NOT NULL,
-					draining INT DEFAULT 0 NOT NULL,
-					drainExpiresAt #local.datetimeType#,
-					codeVersion #local.varcharType#(64)
-				)
-			", {}, {datasource = variables.$datasource});
+			queryExecute($jobSchema().createTableSql(tableName = "wheels_job_hosts", dbType = $detectDatabaseType()), {}, {datasource = variables.$datasource});
 			writeLog(text = "Auto-created wheels_job_hosts table", type = "information", file = "wheels_jobs");
 		} catch (any e) {
 			// Another instance may have created it at the same moment; only a still-missing
@@ -2260,6 +2277,22 @@ component {
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Internal: logs once per application that a job table is missing and, with
+	 * jobsAutoCreateTables = false, won't be created, naming what doesn't work without it.
+	 */
+	public void function $warnAuxTableMissingOnce(required string tableName, required string effect) {
+		if (!StructKeyExists(application, "wheels")) {
+			return;
+		}
+		local.key = "$jobsAuxMissingLogged_" & arguments.tableName;
+		if (StructKeyExists(application.wheels, local.key)) {
+			return;
+		}
+		application.wheels[local.key] = true;
+		writeLog(text = $jobSchema().missingSchemaMessage("The #arguments.tableName# table") & " Until it exists, #arguments.effect#.", type = "error", file = "wheels_jobs");
 	}
 
 	public boolean function $hostsTableExists() {
@@ -2364,6 +2397,9 @@ component {
 	 * Without it, heartbeat() renews updatedAt instead, so jobs still stay alive.
 	 */
 	public void function $ensureHeartbeatColumn() {
+		if (!$jobSchema().autoCreateEnabled()) {
+			return;
+		}
 		if (Len($outermostWheelsTransaction())) {
 			return;
 		}
@@ -2387,17 +2423,7 @@ component {
 	 * The per-database "ADD heartbeatAt" DDL, typed like the table's other timestamps.
 	 */
 	public string function $heartbeatAlterSql() {
-		local.dbType = $detectDatabaseType();
-		if (local.dbType == "oracle") {
-			return "ALTER TABLE wheels_jobs ADD (heartbeatAt TIMESTAMP)";
-		}
-		if (local.dbType == "sqlserver") {
-			return "ALTER TABLE wheels_jobs ADD heartbeatAt DATETIME";
-		}
-		if (local.dbType == "postgresql" || local.dbType == "h2") {
-			return "ALTER TABLE wheels_jobs ADD COLUMN heartbeatAt TIMESTAMP";
-		}
-		return "ALTER TABLE wheels_jobs ADD COLUMN heartbeatAt DATETIME";
+		return $jobSchema().addColumnSql(tableName = "wheels_jobs", columnName = "heartbeatAt", dbType = $detectDatabaseType());
 	}
 
 	/**
@@ -2770,14 +2796,17 @@ component {
 		if ($jobLockTableExists()) {
 			return;
 		}
+		if (!$jobSchema().autoCreateEnabled()) {
+			$throwJobSchemaMissing("The wheels_job_locks table (needed by exclusive jobs)");
+		}
 		if (Len($outermostWheelsTransaction())) {
 			Throw(
 				type = "Wheels.JobLockTableMissing",
-				message = "wheels_job_locks doesn't exist yet, and it can't be created inside a transaction. Run the job outside a transaction once, or create the table: #arguments.leaseLock.createTableSql()#"
+				message = "wheels_job_locks doesn't exist yet, and it can't be created inside a transaction. Run the job outside a transaction once, or create it with `wheels jobs install`."
 			);
 		}
 		try {
-			queryExecute(arguments.leaseLock.createTableSql(), {}, {datasource = variables.$datasource});
+			queryExecute($jobSchema().createTableSql(tableName = "wheels_job_locks", dbType = $detectDatabaseType()), {}, {datasource = variables.$datasource});
 		} catch (any e) {
 			// Tolerate "already exists" from another server creating it at the same time.
 			if (!$jobLockTableExists()) {
@@ -2866,8 +2895,16 @@ component {
 	 * Public with $ prefix so JobWorker can pick database-appropriate SQL syntax.
 	 */
 	public string function $detectDatabaseType() {
+		return $databaseTypeOf(variables.$datasource);
+	}
+
+	/**
+	 * The database type behind a datasource, as $detectDatabaseType() reports it. Separate so
+	 * wheels.JobSchema can ask about the migrator's datasource, which may not be the app's.
+	 */
+	public string function $databaseTypeOf(required string datasourceName) {
 		try {
-			cfdbinfo(type = "version", datasource = "#variables.$datasource#", name = "local.info");
+			cfdbinfo(type = "version", datasource = "#arguments.datasourceName#", name = "local.info");
 			local.product = local.info.database_productname;
 			if (FindNoCase("oracle", local.product)) return "oracle";
 			if (FindNoCase("postgre", local.product)) return "postgresql";
