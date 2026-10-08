@@ -25,6 +25,13 @@ component extends="wheels.WheelsTest" {
 				expect($row(staleId).status).toBe("pending", "a job stranded by a dead worker must be requeued");
 			});
 
+			it("doesn't reap a row with no claimTimeout inside the job timeout when the cap is small", function() {
+				// Idle 5 minutes, no claimTimeout recorded: a 60s cap alone would reap it at 120s.
+				var id = $insertJob(queue = "test_pq_legacy", status = "processing", attempts = 1, idleSeconds = 300);
+				new wheels.Job().processQueue(queue = "test_pq_legacy", timeout = 60);
+				expect($row(id).status).toBe("processing", "an older job may still be running under its own timeout");
+			});
+
 			it("records the job class's own timeout as claimTimeout", function() {
 				var id = $insertJob(queue = "test_pq_own", jobClass = "wheels.tests._assets.jobs.LongTimeoutJob");
 				var result = new wheels.Job().processQueue(queue = "test_pq_own");
@@ -70,10 +77,14 @@ component extends="wheels.WheelsTest" {
 		string jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
 		string status = "pending",
 		numeric attempts = 0,
-		boolean stale = false
+		boolean stale = false,
+		numeric idleSeconds = 0
 	) {
 		var id = CreateUUID();
 		var stamp = arguments.stale ? DateAdd("h", -2, Now()) : DateAdd("s", -5, Now());
+		if (arguments.idleSeconds > 0) {
+			stamp = DateAdd("s", -arguments.idleSeconds, Now());
+		}
 		queryExecute(
 			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 			VALUES (:id, :jobClass, :queue, '{}', 0, :status, :attempts, 3, :runAt, :createdAt, :updatedAt)",

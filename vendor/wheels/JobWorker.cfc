@@ -20,6 +20,10 @@ component {
 		// own job class's timeout (capped by timeoutCap when that is > 0) instead of this poll's.
 		this.perJobTimeout = false;
 		this.timeoutCap = 0;
+		// Reap window floor for rows that recorded no claimTimeout (claimed before the column
+		// existed): such a row is reaped at Max(this poll's timeout, legacyReapTimeout), so a
+		// small processQueue timeout cap can't reap a still-running older job early.
+		this.legacyReapTimeout = 0;
 		variables.$datasource = "";
 		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "dataSourceName")) {
 			variables.$datasource = application.wheels.dataSourceName;
@@ -244,7 +248,7 @@ component {
 			// to this poller's timeout when the row has none. rowCutoff is the "idle past its own
 			// grace" boundary; the staleness test itself runs SQL-side inside the requeue UPDATE
 			// (AND updatedAt < :staleCutoff), so we never diff a query timestamp in CFML (#3989).
-			local.rowTimeout = local.timeout;
+			local.rowTimeout = Max(local.timeout, Val(this.legacyReapTimeout));
 			if (StructKeyExists(local.row, "claimTimeout") && IsNumeric(local.row.claimTimeout) && Val(local.row.claimTimeout) > 0) {
 				local.rowTimeout = Val(local.row.claimTimeout);
 			}

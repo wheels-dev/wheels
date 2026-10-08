@@ -606,6 +606,9 @@ component {
 		// The poll's own timeout: the reap window for rows that recorded none, and the timeout
 		// for a job whose class can't be loaded.
 		local.pollTimeout = local.worker.timeoutCap > 0 ? local.worker.timeoutCap : this.timeout;
+		// A row that recorded no claimTimeout may still be running under its own (longer)
+		// timeout, so it is never reaped inside this job's timeout, whatever the cap.
+		local.worker.legacyReapTimeout = Max(local.worker.timeoutCap, this.timeout);
 		local.max = Val(arguments.limit) > 0 ? Int(Val(arguments.limit)) : 0;
 		local.lastJobId = "";
 		while (local.max == 0 || local.result.processed + local.result.failed + local.result.fenced < local.max) {
