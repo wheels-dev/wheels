@@ -365,7 +365,7 @@ component {
 		Throw(
 			type = "Wheels.Job.UniqueKeyUnavailable",
 			message = "Job '#arguments.jobClass#' was enqueued with a uniqueKey, but wheels_jobs can't enforce one yet, so it was not enqueued.",
-			extendedInfo = "wheels_jobs needs a uniqueKey column (VARCHAR(255), nullable) with a unique index. The framework adds them on a worker poll or an enqueue(uniqueKey=...) made outside a transaction, unless the database user can't ALTER the table or another instance is upgrading it right now. Add them manually: ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255); UPDATE wheels_jobs SET uniqueKey = id; CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) (on SQL Server add WHERE uniqueKey IS NOT NULL)."
+			extendedInfo = ($jobSchema().autoCreateEnabled() ? "" : $jobSchema().missingSchemaMessage("The wheels_jobs uniqueKey column or index") & " ") & "wheels_jobs needs a uniqueKey column (VARCHAR(255), nullable) with a unique index. The framework adds them on a worker poll or an enqueue(uniqueKey=...) made outside a transaction, unless the database user can't ALTER the table or another instance is upgrading it right now. Add them manually: ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255); UPDATE wheels_jobs SET uniqueKey = id; CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey) (on SQL Server add WHERE uniqueKey IS NOT NULL)."
 		);
 	}
 
@@ -1063,6 +1063,11 @@ component {
 		try {
 			// Check if table already exists by querying it
 			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			// With auto-create off the schema is the app's (its `wheels jobs install` migration):
+			// no column upgrades run here.
+			if (!$jobSchema().autoCreateEnabled()) {
+				return true;
+			}
 			// Table exists — make sure the claimTimeout column exists too (#3989). Probed on
 			// every call and never cached: a shared or rebuilt dev DB can lose it (see #2780).
 			$ensureClaimTimeoutColumn();
@@ -1073,70 +1078,34 @@ component {
 			// Table doesn't exist — create it
 		}
 
+		if (!$jobSchema().autoCreateEnabled()) {
+			writeLog(text = $jobSchema().missingSchemaMessage("The wheels_jobs table"), type = "error", file = "wheels_jobs");
+			return false;
+		}
+
 		try {
 			// Detect actual database type from the datasource via JDBC metadata.
 			// We query the datasource directly rather than using application.wheels.adapterName
 			// because the adapter may have been detected from a different datasource.
 			local.dbType = $detectDatabaseType();
+			local.schema = $jobSchema();
+			queryExecute(local.schema.createTableSql(tableName = "wheels_jobs", dbType = local.dbType), {}, {datasource = variables.$datasource});
 
-			// Use database-appropriate types
-			if (local.dbType == "oracle") {
-				local.varcharType = "VARCHAR2";
-				local.textType = "CLOB";
-				local.datetimeType = "TIMESTAMP";
-			} else if (local.dbType == "postgresql") {
-				local.varcharType = "VARCHAR";
-				local.textType = "TEXT";
-				local.datetimeType = "TIMESTAMP";
-			} else if (local.dbType == "h2") {
-				local.varcharType = "VARCHAR";
-				local.textType = "CLOB";
-				local.datetimeType = "TIMESTAMP";
-			} else {
-				local.varcharType = "VARCHAR";
-				local.textType = "TEXT";
-				local.datetimeType = "DATETIME";
-			}
-
-			queryExecute("
-				CREATE TABLE wheels_jobs (
-					id #local.varcharType#(36) NOT NULL PRIMARY KEY,
-					jobClass #local.varcharType#(255) NOT NULL,
-					queue #local.varcharType#(100) DEFAULT 'default' NOT NULL,
-					data #local.textType#,
-					priority INT DEFAULT 0 NOT NULL,
-					status #local.varcharType#(20) DEFAULT 'pending' NOT NULL,
-					attempts INT DEFAULT 0 NOT NULL,
-					maxRetries INT DEFAULT 3 NOT NULL,
-					claimTimeout INT,
-					claimToken #local.varcharType#(36),
-					claimedBy #local.varcharType#(128),
-					uniqueKey #local.varcharType#(255),
-					lastError #local.textType#,
-					runAt #local.datetimeType#,
-					completedAt #local.datetimeType#,
-					failedAt #local.datetimeType#,
-					createdAt #local.datetimeType#,
-					updatedAt #local.datetimeType#
-				)
-			", {}, {datasource = variables.$datasource});
-
-			// Add indexes for efficient queue processing
-			try {
-				queryExecute("CREATE INDEX idx_wjobs_processing ON wheels_jobs (status, runAt, priority)", {}, {datasource = variables.$datasource});
-				queryExecute("CREATE INDEX idx_wjobs_queue ON wheels_jobs (queue, status)", {}, {datasource = variables.$datasource});
-				queryExecute("CREATE INDEX idx_wjobs_cleanup ON wheels_jobs (status, completedAt)", {}, {datasource = variables.$datasource});
-			} catch (any indexError) {
-				// Indexes are optional — don't fail if they can't be created
-			}
-			// The uniqueKey index is not optional: it is what de-duplicates enqueue(uniqueKey=).
-			// If it can't be built now, the next $ensureJobTable() retries it (the column is there,
-			// the index isn't), and enqueue(uniqueKey=) refuses to run without it.
-			try {
-				queryExecute($uniqueKeyIndexSql(), {}, {datasource = variables.$datasource});
-				$recordUniqueKeyIndexVerified();
-			} catch (any uniqueIndexError) {
-				writeLog(text = "Could not create the wheels_jobs uniqueKey index: #uniqueIndexError.message#", type = "error", file = "wheels_jobs");
+			// Indexes for efficient queue processing are optional: don't fail if one can't be
+			// created. The uniqueKey index is not optional: it is what de-duplicates
+			// enqueue(uniqueKey=). If it can't be built now, the next $ensureJobTable() retries it
+			// (the column is there, the index isn't), and enqueue(uniqueKey=) refuses to run without it.
+			for (local.index in local.schema.tableDef("wheels_jobs").indexes) {
+				try {
+					queryExecute(local.schema.indexSql(tableName = "wheels_jobs", indexName = local.index.name, dbType = local.dbType), {}, {datasource = variables.$datasource});
+					if (local.index.name == "idx_wjobs_unique_key") {
+						$recordUniqueKeyIndexVerified();
+					}
+				} catch (any indexError) {
+					if (!local.index.optional) {
+						writeLog(text = "Could not create the wheels_jobs index #local.index.name#: #indexError.message#", type = "error", file = "wheels_jobs");
+					}
+				}
 			}
 
 			writeLog(text = "Auto-created wheels_jobs table", type = "information", file = "wheels_jobs");
@@ -1157,6 +1126,9 @@ component {
 		// DDL inside an open transaction makes MySQL and Oracle commit the caller's work, so the
 		// column is never added there (an INSERT failure's table-ensure runs inside the caller's
 		// transaction). A worker poll or a call outside a transaction adds it.
+		if (!$jobSchema().autoCreateEnabled()) {
+			return;
+		}
 		if (Len($outermostWheelsTransaction())) {
 			return;
 		}
@@ -1242,14 +1214,7 @@ component {
 	 * Oracle takes a parenthesised column list; everything else accepts ADD COLUMN.
 	 */
 	public string function $claimTimeoutAlterSql() {
-		local.dbType = $detectDatabaseType();
-		if (local.dbType == "oracle") {
-			return "ALTER TABLE wheels_jobs ADD (claimTimeout NUMBER(10))";
-		}
-		if (local.dbType == "sqlserver") {
-			return "ALTER TABLE wheels_jobs ADD claimTimeout INT";
-		}
-		return "ALTER TABLE wheels_jobs ADD COLUMN claimTimeout INT";
+		return $jobSchema().addColumnSql(tableName = "wheels_jobs", columnName = "claimTimeout", dbType = $detectDatabaseType());
 	}
 
 	/**
@@ -1281,6 +1246,9 @@ component {
 		// DDL inside an open transaction makes MySQL and Oracle commit the caller's work, so the
 		// columns are never added there (an INSERT failure's table-ensure runs inside the caller's
 		// transaction). A worker poll or a call outside a transaction adds them.
+		if (!$jobSchema().autoCreateEnabled()) {
+			return;
+		}
 		if (Len($outermostWheelsTransaction())) {
 			return;
 		}
@@ -1329,14 +1297,7 @@ component {
 	 * The per-database "ADD <column> VARCHAR(n)" DDL for a claim-fencing column.
 	 */
 	public string function $claimTokenAlterSql(required string columnName, required numeric size) {
-		local.dbType = $detectDatabaseType();
-		if (local.dbType == "oracle") {
-			return "ALTER TABLE wheels_jobs ADD (#arguments.columnName# VARCHAR2(#arguments.size#))";
-		}
-		if (local.dbType == "sqlserver") {
-			return "ALTER TABLE wheels_jobs ADD #arguments.columnName# VARCHAR(#arguments.size#)";
-		}
-		return "ALTER TABLE wheels_jobs ADD COLUMN #arguments.columnName# VARCHAR(#arguments.size#)";
+		return $jobSchema().addColumnSql(tableName = "wheels_jobs", columnName = arguments.columnName, dbType = $detectDatabaseType());
 	}
 
 	/**
@@ -1371,6 +1332,16 @@ component {
 			}
 		}
 		return variables.$claimTokenColumnsPresent;
+	}
+
+	/**
+	 * The job schema (wheels.JobSchema) for this instance's datasource, memoised per instance.
+	 */
+	public any function $jobSchema() {
+		if (!StructKeyExists(variables, "$jobSchemaInstance")) {
+			variables.$jobSchemaInstance = new wheels.JobSchema(datasource = variables.$datasource);
+		}
+		return variables.$jobSchemaInstance;
 	}
 
 	/**
@@ -1442,6 +1413,9 @@ component {
 		// DDL inside an open transaction makes MySQL and Oracle commit the caller's work, so the
 		// upgrade never runs there, whoever calls this (a keyed enqueue, or the table-ensure an
 		// INSERT failure triggers). A worker poll or an enqueue outside a transaction does it.
+		if (!$jobSchema().autoCreateEnabled()) {
+			return;
+		}
 		if (Len($outermostWheelsTransaction())) {
 			return;
 		}
@@ -1622,14 +1596,7 @@ component {
 	 * The per-database "ADD uniqueKey" DDL (nullable).
 	 */
 	public string function $uniqueKeyAlterSql() {
-		local.dbType = $detectDatabaseType();
-		if (local.dbType == "oracle") {
-			return "ALTER TABLE wheels_jobs ADD (uniqueKey VARCHAR2(255))";
-		}
-		if (local.dbType == "sqlserver") {
-			return "ALTER TABLE wheels_jobs ADD uniqueKey VARCHAR(255)";
-		}
-		return "ALTER TABLE wheels_jobs ADD COLUMN uniqueKey VARCHAR(255)";
+		return $jobSchema().addColumnSql(tableName = "wheels_jobs", columnName = "uniqueKey", dbType = $detectDatabaseType());
 	}
 
 	/**
@@ -1637,11 +1604,7 @@ component {
 	 * single NULL, so it is filtered to the non-NULL keys there.
 	 */
 	public string function $uniqueKeyIndexSql() {
-		local.sql = "CREATE UNIQUE INDEX idx_wjobs_unique_key ON wheels_jobs (uniqueKey)";
-		if ($detectDatabaseType() == "sqlserver") {
-			local.sql &= " WHERE uniqueKey IS NOT NULL";
-		}
-		return local.sql;
+		return $jobSchema().indexSql(tableName = "wheels_jobs", indexName = "idx_wjobs_unique_key", dbType = $detectDatabaseType());
 	}
 
 	/**
