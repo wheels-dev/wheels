@@ -34,11 +34,13 @@ component {
 		variables.$job.$ensureHostsTable();
 		local.host = variables.$job.$jobHostName();
 		local.cap = arguments.maxConcurrent >= 0 ? Int(arguments.maxConcurrent) : variables.$job.$jobsMaxConcurrentPerHost();
-		local.rv = {host = local.host, processed = 0, failed = 0, fenced = 0, reaped = 0, capped = false, draining = false};
+		local.rv = {host = local.host, processed = 0, failed = 0, fenced = 0, reaped = 0, scheduled = 0, capped = false, draining = false};
 
 		local.worker = new wheels.JobWorker();
 		local.worker.maxConcurrentPerHost = local.cap;
 		local.rv.reaped = local.worker.checkTimeouts(timeout = arguments.timeout, queues = arguments.queues);
+		// Due schedules first, so a slot that is due now can run in this same tick.
+		local.rv.scheduled = variables.$job.$enqueueDueSchedules().enqueued;
 
 		local.limit = Max(1, Int(Val(arguments.maxJobs)));
 		for (local.i = 1; local.i <= local.limit; local.i++) {

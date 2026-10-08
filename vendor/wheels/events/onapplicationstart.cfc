@@ -348,6 +348,9 @@ component {
 		// one at a time. A waiting instance gives up after migrationLockTimeout seconds; a holder
 		// that died frees the lock once its lease (renewed before each step) runs out.
 		application.$wheels.migratorLockTableName = "wheels_migrator_locks";
+		// Job schedules (config/schedules.cfm) are checked and their due slots enqueued at most
+		// this often, from every worker poll, processQueue() and JobRunner.tick(). 0 = never.
+		application.$wheels.jobsScheduleCheckSeconds = 15;
 		application.$wheels.migrationLockTimeout = 300;
 		application.$wheels.migrationLockLease = 3600;
 		application.$wheels.createMigratorTable = true;
