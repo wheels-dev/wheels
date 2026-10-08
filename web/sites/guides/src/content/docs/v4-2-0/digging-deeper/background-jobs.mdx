@@ -217,7 +217,10 @@ wheels jobs work --queue=mailers --interval=3  # poll every 3 seconds when idle 
 wheels jobs work --stop-when-empty              # exit once no job is ready to run — one-shot batches from cron or CI
 wheels jobs work --max-jobs=100                # stop after 100 jobs (combine with --stop-when-empty to cap a batch)
 wheels jobs work --quiet                       # suppress per-job output; failures still print
+wheels jobs work --timeout=600                 # cap each job's run time at 600 seconds (default: each job's own timeout)
 ```
+
+Each job runs with its own `timeout` (set in `config()`, default `300` seconds), so a job with `this.timeout = 900` gets its full 15 minutes. `--timeout=<seconds>` caps that: a job with a longer `timeout` is cut off at the cap, and one with a shorter `timeout` keeps its own. Before 4.2 the worker stopped every job at 300 seconds, whatever its `timeout`.
 
 In production, run the worker under a process supervisor (systemd, Docker's restart policy, Kamal accessory containers): when it loses the server it exits non-zero and the supervisor restarts it. Run several workers for parallelism — the framework uses optimistic row locking, so two workers never run the same job twice. `--queue` accepts a comma-delimited list (`--queue=critical,default`); jobs across the listed queues run in `priority DESC, runAt ASC` order.
 

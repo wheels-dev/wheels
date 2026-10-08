@@ -206,6 +206,36 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("work --timeout", () => {
+
+			it("defaults to 0, each job's own timeout", () => {
+				expect(mod.$parseJobsArgs({arg1 = "work"}).timeout).toBe(0);
+			});
+
+			it("parses --timeout=<seconds>", () => {
+				expect(mod.$parseJobsArgs({arg1 = "work", timeout = "1800"}).timeout).toBe(1800);
+			});
+
+			it("refuses a negative --timeout", () => {
+				expect(() => mod.$parseJobsArgs({arg1 = "work", timeout = "-1"})).toThrow(type = "Wheels.InvalidArguments");
+			});
+
+			it("doesn't send a timeout without --timeout, so each job runs with its own", () => {
+				var m = workerModule([idlePoll()]);
+				m.jobs(arg1 = "work", "stop-when-empty" = "true");
+				expect(m.$callLog().makeBridgePost[1][1]).notToInclude("timeout=");
+				expect(printed(m)).toInclude("each job's own timeout");
+			});
+
+			it("sends --timeout to the server as the cap", () => {
+				var m = workerModule([idlePoll()]);
+				m.jobs(arg1 = "work", "stop-when-empty" = "true", timeout = "1800");
+				expect(m.$callLog().makeBridgePost[1][1]).toInclude("&timeout=1800");
+				expect(printed(m)).toInclude("1800s");
+			});
+
+		});
+
 		describe("$formatJobsStatusTable — status rendering", () => {
 
 			it("reports no jobs for an empty stats struct", () => {
