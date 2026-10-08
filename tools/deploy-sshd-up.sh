@@ -7,6 +7,19 @@ set -euo pipefail
 
 FIX_DIR="$(cd "$(dirname "$0")/.." && pwd)/cli/lucli/tests/_fixtures/deploy/sshd"
 
+# The fixture is one Compose project shared by every checkout on the machine.
+# When both containers are already up and answering, use them as they are:
+# another checkout may be mid-run on them, and `up -d` from a different
+# checkout could recreate them underneath it.
+banner_ok() {
+  bash -c "exec 3<>/dev/tcp/localhost/$1; read -t 2 line <&3; exec 3<&-; [[ \$line == SSH-* ]]" 2>/dev/null
+}
+running="$(docker compose -f "$FIX_DIR/docker-compose.yml" ps --status running --quiet 2>/dev/null | wc -l | tr -d ' ')"
+if [[ "$running" == "2" ]] && banner_ok 22022 && banner_ok 22023; then
+  echo "sshd fixture already running on 22022/22023; reusing it."
+  exit 0
+fi
+
 docker compose -f "$FIX_DIR/docker-compose.yml" up -d
 
 # linuxserver/openssh-server runs cont-init.d before sshd binds the port.
