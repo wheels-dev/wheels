@@ -20,6 +20,10 @@ component extends="wheels.WheelsTest" {
 			afterEach(function() {
 				application.wheels.jobsRunnerToken = "";
 				application.wheels.jobsRunnerTokenInQuery = false;
+				application.wheels.jobsRunnerTickMaxJobs = 1;
+				application.wheels.jobsRunnerTickTimeout = 300;
+				application.wheels.jobsRunnerTickQueues = "";
+				queryExecute("DELETE FROM wheels_jobs WHERE queue = 'test_tick_batch'", {}, {datasource = application.wheels.dataSourceName});
 			});
 
 			it("recognises the route, with or without a trailing slash", function() {
@@ -111,6 +115,52 @@ component extends="wheels.WheelsTest" {
 				expect(body.host).toBe(new wheels.Job().$jobHostName());
 				expect(StructKeyExists(body, "processed")).toBeTrue();
 				expect(StructKeyExists(body, "durationMs")).toBeTrue();
+			});
+
+			it("runs each tick with the configured batch size, timeout and queues", function() {
+				application.wheels.jobsRunnerTickMaxJobs = 25;
+				application.wheels.jobsRunnerTickTimeout = 900;
+				application.wheels.jobsRunnerTickQueues = "mail, reports";
+				var endpoint = new wheels.JobTickEndpoint();
+				prepareMock(endpoint);
+				var runner = createStub();
+				runner.$("tick", {processed = 0});
+				endpoint.$("$newRunner", runner);
+				endpoint.$runTick();
+				var passed = runner.$callLog().tick[1];
+				expect(passed.maxJobs).toBe(25);
+				expect(passed.timeout).toBe(900);
+				expect(passed.queues).toBe("mail, reports");
+			});
+
+			it("keeps one job, 300 seconds and every queue when nothing is set, or a setting is invalid", function() {
+				StructDelete(application.wheels, "jobsRunnerTickMaxJobs");
+				StructDelete(application.wheels, "jobsRunnerTickTimeout");
+				StructDelete(application.wheels, "jobsRunnerTickQueues");
+				var endpoint = new wheels.JobTickEndpoint();
+				expect(endpoint.$tickArguments()).toBe({maxJobs = 1, timeout = 300, queues = ""});
+				application.wheels.jobsRunnerTickMaxJobs = 0;
+				application.wheels.jobsRunnerTickTimeout = "soon";
+				application.wheels.jobsRunnerTickQueues = ["mail"];
+				expect(endpoint.$tickArguments()).toBe({maxJobs = 1, timeout = 300, queues = ""});
+			});
+
+			it("drains several jobs in one call when jobsRunnerTickMaxJobs is above 1", function() {
+				var job = new wheels.tests._assets.jobs.ProcessOrdersJob();
+				for (var i = 1; i <= 3; i++) {
+					job.enqueue(queue = "test_tick_batch");
+				}
+				application.wheels.jobsRunnerTickMaxJobs = 3;
+				application.wheels.jobsRunnerTickQueues = "test_tick_batch";
+				var response = new wheels.JobTickEndpoint().handle(method = "POST", headers = {"X-Wheels-Jobs-Token" = "spec-tick-token"});
+				expect(response.status).toBe(200);
+				expect(DeserializeJSON(response.body).processed).toBe(3);
+				var done = queryExecute(
+					"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE queue = 'test_tick_batch' AND status = 'completed'",
+					{},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(done.cnt).toBe(3);
 			});
 
 			it("compares tokens in full, whatever their length", function() {
