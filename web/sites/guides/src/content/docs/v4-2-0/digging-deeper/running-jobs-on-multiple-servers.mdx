@@ -249,9 +249,27 @@ new wheels.JobRunner().tick(
 
 `tick()` runs its jobs synchronously, one after another, and does nothing beyond the cap or while the host is draining. Run it as often as your latency target wants; each call does a bounded amount of work and returns.
 
-<Aside type="note" title="Planned: a token-gated HTTP tick">
-An engine scheduled task that can only make an HTTP request — rather than run CFML directly — will be able to drive `tick()` through a token-gated `/wheels/jobs/tick` route, so you can schedule the queue from the engine's own task scheduler. That route is **not built yet** ([#4482](https://github.com/wheels-dev/wheels/issues/4482)); until it lands, drive `tick()` from a scheduled task that runs CFML, as above.
-</Aside>
+### Drive it over HTTP: the tick route
+
+When your scheduler can only make an HTTP request — an engine scheduled task, a cron `curl`, a systemd timer — point it at `/wheels/jobs/tick`. Each call runs one `JobRunner.tick()` on that server and returns a JSON summary. Turn it on by setting a token:
+
+```cfm {test:compile} title="config/settings.cfm"
+set(jobsRunnerToken = "a-long-random-secret");   // the route is 404 until this is set
+```
+
+Then hit it with the token in a header, once a minute, from each server:
+
+```bash title="a cron entry / systemd timer"
+curl -fsS -X POST http://127.0.0.1:8080/wheels/jobs/tick -H "X-Wheels-Jobs-Token: a-long-random-secret"
+```
+
+The **token is the boundary**, not the caller's address:
+
+- The route returns **404** unless `jobsRunnerToken` is set, and **403** without the right token (compared in constant time). The token goes in the `X-Wheels-Jobs-Token` header; `?token=` is accepted only with `set(jobsRunnerTokenInQuery = true)`, for a scheduler that can't set headers.
+- A request carrying **any forwarding header** (`X-Forwarded-*`, `Forwarded`, `X-Real-IP`, `CF-Connecting-IP`, …) is refused — call it on the server itself (localhost), not through your proxy, so a public request can't reach it.
+- It's answered before routing and the public-component gate, so it doesn't depend on your routes or middleware. An overlapping tick on the same server is skipped.
+
+`wheels jobs tick` runs one tick from the CLI, for a cron job that has the `wheels` binary instead of an HTTP client.
 
 ## Recurring schedules
 
