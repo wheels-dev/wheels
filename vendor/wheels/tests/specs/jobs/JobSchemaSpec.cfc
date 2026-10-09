@@ -166,6 +166,22 @@ component extends="wheels.WheelsTest" {
 				expect(new wheels.JobSchema().hasTable("wheels_jobs")).toBeFalse();
 			});
 
+			it("with jobsAutoCreateTables = false, says the schema is missing from inside a transaction too", function() {
+				$dropJobTable();
+				application.wheels.jobsAutoCreateTables = false;
+				var ensured = {type = "", message = ""};
+				transaction {
+					try {
+						new wheels.Job().$ensureJobTable();
+					} catch (any e) {
+						ensured.type = e.type;
+						ensured.message = e.message;
+					}
+					transaction action="rollback";
+				}
+				expect(ensured.type).toBe("Wheels.Job.SchemaMissing", "not a database error from an aborted transaction: " & ensured.message);
+			});
+
 			it("with jobsAutoCreateTables = false, reports a probe failure as itself when the table exists", function() {
 				// The catalog says the table is there but the probe fails (here: a datasource that
 				// doesn't exist, as for a lost connection): that error surfaces, not a misleading

@@ -176,7 +176,7 @@ The `event` struct deliberately carries **no job `data`** (that can hold secrets
 
 ### The stored result
 
-`perform()`'s return value is stored on the row, in a `wheels_jobs.result` column, and handed to `onSuccess(result)`. A simple value is stored as-is; a struct or array is stored as JSON. It's capped — 4000 characters on SQL Server (`NVARCHAR`), 4000 **UTF-8 bytes** on the other databases (a safe bound; Oracle's `VARCHAR2` counts bytes) — truncated on a character boundary with a visible marker if it's longer, so return a small summary, not a large payload. The `result` column is added by the same guarded auto-`ALTER` as the other 4.2 columns; without it, jobs run exactly as before and nothing is stored.
+`perform()`'s return value is stored on the row, in a `wheels_jobs.result` column, and handed to `onSuccess(result)`. A simple value is stored as-is; a struct or array is stored as JSON. Returning nothing stores `NULL`, and so does returning an empty string (Oracle can't tell the two apart, so no database does). It's capped — 4000 characters on SQL Server (`NVARCHAR`), 4000 **UTF-8 bytes** on the other databases (a safe bound; Oracle's `VARCHAR2` counts bytes) — truncated on a character boundary with a visible marker if it's longer, so return a small summary, not a large payload. The `result` column is added by the same guarded auto-`ALTER` as the other 4.2 columns; without it, jobs run exactly as before and nothing is stored.
 
 ## Cap how many jobs a server runs at once
 
