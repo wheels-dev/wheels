@@ -108,6 +108,10 @@ jobs:
         wheels_env: [production, testing]
     env:
       WHEELS_CI: "true"
+      # Re-bind adobe2023's .engine home to the host (compose.ci.yml), reversing
+      # the named volume in compose.yml, so CI's host-side engine-home access
+      # keeps working. Job-level so every `docker compose` call layers it.
+      COMPOSE_FILE: compose.yml:compose.ci.yml
     steps:
       - uses: actions/checkout@v5
 

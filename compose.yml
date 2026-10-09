@@ -165,6 +165,9 @@ services:
     stdin_open: true
     volumes:
       - ./:/wheels-test-suite
+      # Engine runtime home (WEB-INF/cfclasses, etc.) on a named volume, off the
+      # bind-mounted source tree, so Docker's VM doesn't leak those file handles.
+      - engine_adobe2018:/wheels-test-suite/.engine/adobe2018
       - type: bind
         source: ./tools/docker/adobe2018/server.json
         target: /wheels-test-suite/server.json
@@ -200,6 +203,7 @@ services:
     stdin_open: true
     volumes:
       - ./:/wheels-test-suite
+      - engine_adobe2021:/wheels-test-suite/.engine/adobe2021
       - ./tools/docker/adobe2021:/wheels-test-suite/tools/docker/adobe2021
       - type: bind
         source: ./tools/docker/adobe2021/server.json
@@ -241,6 +245,7 @@ services:
     stdin_open: true
     volumes:
       - ./:/wheels-test-suite
+      - engine_adobe2023:/wheels-test-suite/.engine/adobe2023
       - ./tools/docker/adobe2023:/wheels-test-suite/tools/docker/adobe2023
       - type: bind
         source: ./tools/docker/adobe2023/server.json
@@ -294,6 +299,7 @@ services:
     stdin_open: true
     volumes:
       - ./:/wheels-test-suite
+      - engine_adobe2025:/wheels-test-suite/.engine/adobe2025
       - ./tools/docker/adobe2025:/wheels-test-suite/tools/docker/adobe2025
       - type: bind
         source: ./tools/docker/adobe2025/server.json
@@ -342,6 +348,7 @@ services:
     stdin_open: true
     volumes:
       - ./:/wheels-test-suite
+      - engine_boxlang:/wheels-test-suite/.engine/boxlang
       - type: bind
         source: ./tools/docker/boxlang/server.json
         target: /wheels-test-suite/server.json
@@ -490,3 +497,21 @@ volumes:
   postgres_data:
   sqlserver_data:
   cockroachdb_data:
+  # Per-engine server homes (.engine/<engine>), kept off the bind-mounted source
+  # tree. The name is keyed per checkout (WHEELS_ENGINE_KEY, set by
+  # tools/test-matrix.sh to a hash of the repo root) because COMPOSE_PROJECT_NAME
+  # is forced to "wheels": without the key, every worktree/clone would share one
+  # engine home and Adobe could serve another checkout's compiled classes. Plain
+  # `docker compose` (no script) gets "default". A fresh engine home:
+  # `docker volume rm wheels_engine_<key>_<engine>` (list: `docker volume ls
+  # --filter name=wheels_engine`).
+  engine_adobe2018:
+    name: wheels_engine_${WHEELS_ENGINE_KEY:-default}_adobe2018
+  engine_adobe2021:
+    name: wheels_engine_${WHEELS_ENGINE_KEY:-default}_adobe2021
+  engine_adobe2023:
+    name: wheels_engine_${WHEELS_ENGINE_KEY:-default}_adobe2023
+  engine_adobe2025:
+    name: wheels_engine_${WHEELS_ENGINE_KEY:-default}_adobe2025
+  engine_boxlang:
+    name: wheels_engine_${WHEELS_ENGINE_KEY:-default}_boxlang
