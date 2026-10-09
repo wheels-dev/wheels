@@ -69,19 +69,19 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("delays the run by delaySeconds", () => {
-				var before = Now();
+				var before = jobsNow();
 				var rv = enqueue({job = "wheels.tests._assets.jobs.ProbeJob", queue = variables.queue, delaySeconds = "120"});
 				expect(rv.success).toBeTrue();
 				expect(rv.job.delaySeconds).toBe(120);
 				// Compared in the database against typed timestamps (as JobHardenerSpec
 				// does): JDBC hands runAt back as a different type per engine and
 				// database (an Oracle TIMESTAMP, epoch milliseconds on BoxLang SQLite).
-				var stored = QueryExecute(
+				var stored = jobsQuery(
 					"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE id = :id AND status = 'pending' AND runAt > :earliest AND runAt < :latest",
 					{
 						id = {value = rv.job.id, cfsqltype = "cf_sql_varchar"},
-						earliest = {value = DateAdd("s", 110, before), cfsqltype = "cf_sql_timestamp"},
-						latest = {value = DateAdd("s", 180, before), cfsqltype = "cf_sql_timestamp"}
+						earliest = {value = before + 110, cfsqltype = "wheels_epoch"},
+						latest = {value = before + 180, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = variables.ds}
 				);
@@ -214,6 +214,21 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC epoch seconds from the database's clock, which
+	 * job rows are stamped with.
+	 */
+	private numeric function jobsNow() {
+		return new wheels.Job().$jobClock().nowEpoch();
+	}
+
+	/**
+	 * queryExecute() with wheels_epoch timestamp parameters, as the jobs code binds them.
+	 */
+	private any function jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return new wheels.Job().$jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 }

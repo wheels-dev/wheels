@@ -15,14 +15,14 @@ component extends="wheels.WheelsTest" {
 				var bootstrapJob = new wheels.Job();
 				bootstrapJob.$ensureJobTable();
 				try {
-					queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_fence_%'", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("DELETE FROM wheels_jobs WHERE queue LIKE 'test_fence_%'", {}, {datasource = application.wheels.dataSourceName});
 				} catch (any e) {
 				}
 			});
 
 			afterEach(function() {
 				try {
-					queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_fence_%'", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("DELETE FROM wheels_jobs WHERE queue LIKE 'test_fence_%'", {}, {datasource = application.wheels.dataSourceName});
 				} catch (any e) {
 				}
 			});
@@ -84,10 +84,10 @@ component extends="wheels.WheelsTest" {
 				expect(Len(first.claimedBy)).toBeGT(0, "a claim must record the claiming host");
 
 				// Reap it, then claim again: the second attempt must get a different token.
-				queryExecute(
+				jobsQuery(
 					"UPDATE wheels_jobs SET updatedAt = :stale WHERE id = :id",
 					{
-						stale = {value = DateAdd("h", -2, Now()), cfsqltype = "cf_sql_timestamp"},
+						stale = {value = jobsNow() - 7200, cfsqltype = "wheels_epoch"},
 						id = {value = id, cfsqltype = "cf_sql_varchar"}
 					},
 					{datasource = application.wheels.dataSourceName}
@@ -136,8 +136,8 @@ component extends="wheels.WheelsTest" {
 		string jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
 		string data = "{}"
 	) {
-		var stamp = DateAdd("s", -5, Now());
-		queryExecute(
+		var stamp = jobsNow() - 5;
+		jobsQuery(
 			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 			VALUES (:id, :jobClass, :queue, :data, 0, 'pending', 0, 3, :runAt, :createdAt, :updatedAt)",
 			{
@@ -145,9 +145,9 @@ component extends="wheels.WheelsTest" {
 				jobClass = {value = arguments.jobClass, cfsqltype = "cf_sql_varchar"},
 				queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
 				data = {value = arguments.data, cfsqltype = "cf_sql_longvarchar"},
-				runAt = {value = stamp, cfsqltype = "cf_sql_timestamp"},
-				createdAt = {value = stamp, cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = stamp, cfsqltype = "cf_sql_timestamp"}
+				runAt = {value = stamp, cfsqltype = "wheels_epoch"},
+				createdAt = {value = stamp, cfsqltype = "wheels_epoch"},
+				updatedAt = {value = stamp, cfsqltype = "wheels_epoch"}
 			},
 			{datasource = application.wheels.dataSourceName}
 		);
@@ -158,7 +158,7 @@ component extends="wheels.WheelsTest" {
 	 * struct (a query column is an epoch number on BoxLang, so read scalars out explicitly).
 	 */
 	private struct function $jobRow(required string id) {
-		var q = queryExecute(
+		var q = jobsQuery(
 			"SELECT * FROM wheels_jobs WHERE id = :id",
 			{id = {value = arguments.id, cfsqltype = "cf_sql_varchar"}},
 			{datasource = application.wheels.dataSourceName}
@@ -176,6 +176,21 @@ component extends="wheels.WheelsTest" {
 			rv.claimedBy = IsNull(q.claimedBy[1]) ? "" : ToString(q.claimedBy[1]);
 		}
 		return rv;
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC epoch seconds from the database's clock, which
+	 * job rows are stamped with.
+	 */
+	private numeric function jobsNow() {
+		return new wheels.Job().$jobClock().nowEpoch();
+	}
+
+	/**
+	 * queryExecute() with wheels_epoch timestamp parameters, as the jobs code binds them.
+	 */
+	private any function jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return new wheels.Job().$jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 }

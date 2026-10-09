@@ -186,11 +186,11 @@ component extends="wheels.WheelsTest" {
 
 	private void function $cleanup() {
 		try {
-			queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_lease_%'", {}, {datasource = application.wheels.dataSourceName});
+			jobsQuery("DELETE FROM wheels_jobs WHERE queue LIKE 'test_lease_%'", {}, {datasource = application.wheels.dataSourceName});
 		} catch (any e) {
 		}
 		try {
-			queryExecute(
+			jobsQuery(
 				"DELETE FROM wheels_job_locks WHERE lockname LIKE 'spec:%' OR lockname LIKE 'job:wheels.tests.%' OR lockname = 'key:nightly-report'",
 				{},
 				{datasource = application.wheels.dataSourceName}
@@ -213,8 +213,8 @@ component extends="wheels.WheelsTest" {
 
 	private string function $insertJob(required string queue, required string jobClass, numeric maxRetries = 3) {
 		var id = CreateUUID();
-		var stamp = DateAdd("s", -5, Now());
-		queryExecute(
+		var stamp = jobsNow() - 5;
+		jobsQuery(
 			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 			VALUES (:id, :jobClass, :queue, '{}', 0, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt)",
 			{
@@ -222,9 +222,9 @@ component extends="wheels.WheelsTest" {
 				jobClass = {value = arguments.jobClass, cfsqltype = "cf_sql_varchar"},
 				queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
 				maxRetries = {value = arguments.maxRetries, cfsqltype = "cf_sql_integer"},
-				runAt = {value = stamp, cfsqltype = "cf_sql_timestamp"},
-				createdAt = {value = stamp, cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = stamp, cfsqltype = "cf_sql_timestamp"}
+				runAt = {value = stamp, cfsqltype = "wheels_epoch"},
+				createdAt = {value = stamp, cfsqltype = "wheels_epoch"},
+				updatedAt = {value = stamp, cfsqltype = "wheels_epoch"}
 			},
 			{datasource = application.wheels.dataSourceName}
 		);
@@ -232,10 +232,10 @@ component extends="wheels.WheelsTest" {
 	}
 
 	private void function $makeDue(required string id) {
-		queryExecute(
+		jobsQuery(
 			"UPDATE wheels_jobs SET runAt = :runAt WHERE id = :id",
 			{
-				runAt = {value = DateAdd("s", -5, Now()), cfsqltype = "cf_sql_timestamp"},
+				runAt = {value = jobsNow() - 5, cfsqltype = "wheels_epoch"},
 				id = {value = arguments.id, cfsqltype = "cf_sql_varchar"}
 			},
 			{datasource = application.wheels.dataSourceName}
@@ -243,20 +243,35 @@ component extends="wheels.WheelsTest" {
 	}
 
 	private struct function $row(required string id) {
-		var q = queryExecute(
+		var q = jobsQuery(
 			"SELECT status, attempts FROM wheels_jobs WHERE id = :id",
 			{id = {value = arguments.id, cfsqltype = "cf_sql_varchar"}},
 			{datasource = application.wheels.dataSourceName}
 		);
-		var due = queryExecute(
+		var due = jobsQuery(
 			"SELECT id FROM wheels_jobs WHERE id = :id AND runAt <= :now",
 			{
 				id = {value = arguments.id, cfsqltype = "cf_sql_varchar"},
-				now = {value = Now(), cfsqltype = "cf_sql_timestamp"}
+				now = {value = jobsNow(), cfsqltype = "wheels_epoch"}
 			},
 			{datasource = application.wheels.dataSourceName}
 		);
 		return {status = q.recordCount ? q.status : "", attempts = q.recordCount ? q.attempts : 0, due = due.recordCount > 0};
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC epoch seconds from the database's clock, which
+	 * job rows are stamped with.
+	 */
+	private numeric function jobsNow() {
+		return new wheels.Job().$jobClock().nowEpoch();
+	}
+
+	/**
+	 * queryExecute() with wheels_epoch timestamp parameters, as the jobs code binds them.
+	 */
+	private any function jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return new wheels.Job().$jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 }

@@ -49,34 +49,25 @@ component extends="wheels.WheelsTest" {
 
 			it("stores and reads back UTC times local time can't represent, on this database", function() {
 				var clock = new wheels.Job().$jobClock();
-				// The spring-forward gap in America/New_York and Europe/London, both instants of the
-				// November fold in America/New_York, and a time past 2038.
-				var cases = [
-					{epoch = 1772937000, wall = "2026-03-08 02:30:00"},
-					{epoch = 1774747800, wall = "2026-03-29 01:30:00"},
-					{epoch = 1793511000, wall = "2026-11-01 05:30:00"},
-					{epoch = 1793514600, wall = "2026-11-01 06:30:00"},
-					{epoch = 2208992523, wall = "2040-01-01 01:02:03"}
-				];
-				for (var c in cases) {
-					var id = CreateUUID();
-					clock.query(
-						"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
-						VALUES (:id, 'wheels.Job', 'test_job_clock', '{}', 0, 'completed', 0, 3, :t, :t, :t)",
-						{id = {value = id, cfsqltype = "cf_sql_varchar"}, t = {value = c.epoch, cfsqltype = "wheels_epoch"}}
-					);
+				for (var c in $dstCases()) {
+					var id = $insertAt(clock, c.epoch);
 					var row = queryExecute(
 						"SELECT " & clock.epochSql("runAt") & " AS e FROM wheels_jobs WHERE id = :id",
 						{id = {value = id, cfsqltype = "cf_sql_varchar"}},
 						{datasource = application.wheels.dataSourceName}
 					);
 					expect(row.e[1]).toBe(c.epoch, c.wall);
-					// H2 1.4 does timestamp arithmetic in the JVM's local time zone, so outside UTC a time
-					// in the skipped hour is stored an hour later (H2 is single-host: run it on UTC).
-					if (clock.$dbType() == "h2" && GetTimeZoneInfo().utcTotalOffset != 0) {
-						continue;
-					}
-					// Independently of the clock: the stored value equals the UTC wall time as a literal.
+				}
+			});
+
+			it("stores those times as their UTC wall time, checked with the database's own literal", function() {
+				var clock = new wheels.Job().$jobClock();
+				if (clock.$dbType() == "h2" && GetTimeZoneInfo().utcTotalOffset != 0) {
+					skip("H2 1.4 does timestamp arithmetic in the JVM's time zone, so it requires the JVM to run on UTC.");
+				}
+				for (var c in $dstCases()) {
+					var id = $insertAt(clock, c.epoch);
+					// Independently of the clock's helpers: the stored value equals the UTC wall time.
 					var match = queryExecute(
 						"SELECT id FROM wheels_jobs WHERE id = :id AND runAt = " & $literalSql(c.wall, c.epoch, clock.$dbType()),
 						{id = {value = id, cfsqltype = "cf_sql_varchar"}},
@@ -147,6 +138,33 @@ component extends="wheels.WheelsTest" {
 			});
 
 		});
+	}
+
+	/**
+	 * The spring-forward gap in America/New_York and Europe/London, both instants of the November
+	 * fold in America/New_York, and a time past 2038, as epoch seconds and UTC wall time.
+	 */
+	private array function $dstCases() {
+		return [
+			{epoch = 1772937000, wall = "2026-03-08 02:30:00"},
+			{epoch = 1774747800, wall = "2026-03-29 01:30:00"},
+			{epoch = 1793511000, wall = "2026-11-01 05:30:00"},
+			{epoch = 1793514600, wall = "2026-11-01 06:30:00"},
+			{epoch = 2208992523, wall = "2040-01-01 01:02:03"}
+		];
+	}
+
+	/**
+	 * A completed job row whose timestamps are the given epoch, written as the jobs code writes them.
+	 */
+	private string function $insertAt(required any clock, required numeric epoch) {
+		var id = CreateUUID();
+		arguments.clock.query(
+			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+			VALUES (:id, 'wheels.Job', 'test_job_clock', '{}', 0, 'completed', 0, 3, :t, :t, :t)",
+			{id = {value = id, cfsqltype = "cf_sql_varchar"}, t = {value = arguments.epoch, cfsqltype = "wheels_epoch"}}
+		);
+		return id;
 	}
 
 	/**

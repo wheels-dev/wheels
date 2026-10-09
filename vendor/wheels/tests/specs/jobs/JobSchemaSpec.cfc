@@ -284,7 +284,7 @@ component extends="wheels.WheelsTest" {
 				var id = $insertShiftRow(clock, 1772359200);
 				schema.rowId = id;
 				if (schema.databaseType() == "sqlite") {
-					return;
+					skip("SQLite is never converted: its columns hold epoch milliseconds.");
 				}
 				expect(function() {
 					schema.convertLocalTimestamps(offsetMinutes = -300);
