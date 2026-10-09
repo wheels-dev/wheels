@@ -21,6 +21,10 @@ excerpt: >-
   production conditions from the 4.1.1 CHANGELOG, and explains what Wheels 4.2
   changes.
 coverImage: null
+announcement:
+  title: "From 2.x to 4.x, part 5: validation conditions now fail closed"
+  body: |
+    New post: **[Validation conditions now fail closed: migrating your 2.x condition strings](https://blog.wheels.dev/posts/from-2x-to-41-validation-conditions/)** — 2.x ran `condition=` and `unless=` strings through Evaluate(); 4.1 parses a small grammar and throws for what it can't parse. The grammar, and how to migrate your strings.
 ---
 
 CFWheels 2.x handed every `condition=` and `unless=` string to CFML's `Evaluate()`. Any expression the engine could run was accepted. Wheels 4.1 and later don't do that. It parses a small, fixed grammar, and since 4.1.0 a string it can't parse throws `Wheels.InvalidValidationCondition` instead of skipping the rule. This post covers what 4.1.2 accepts, what it does with the rest, and how we rewrote real 2.x condition strings and tested them on the example app.
