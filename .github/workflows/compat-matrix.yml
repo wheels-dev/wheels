@@ -34,7 +34,7 @@ on:
         type: boolean
         default: false
       engines:
-        description: 'Comma list of engines to run (blank = all: lucee6,lucee7,adobe2023,adobe2025,boxlang; add rustcfml to include that lane in a narrowed run)'
+        description: 'Comma list of engines to run (blank = all: lucee6,lucee7,adobe2023,adobe2025,boxlang; add rustcfml to include that lane in a narrowed run, tz to include the America/New_York lanes)'
         type: string
         default: ''
       databases:
@@ -86,6 +86,11 @@ jobs:
           ENGINES = ["lucee6", "lucee7", "adobe2023", "adobe2025", "boxlang"]
           DATABASES = ["mysql", "postgres", "sqlserver", "h2", "cockroachdb", "oracle", "sqlite"]
           LUCEE_ONLY = {"h2"}
+          # Every other leg runs the engine's JVM in UTC, where converting between local time
+          # and UTC changes nothing, so a local/UTC mix-up can't show. These legs run the core
+          # suite on SQLite with the JVM in a zone that has a UTC offset and daylight saving.
+          TZ_ENGINES = ["lucee7", "adobe2025", "boxlang"]
+          TZ_ZONE = "America/New_York"
 
           def pick(raw, allowed, extra=()):
               items = [x.strip().lower() for x in (raw or "").split(",") if x.strip()]
@@ -97,21 +102,28 @@ jobs:
                   sys.exit(1)
               return items, False
 
-          engines, all_engines = pick(os.environ.get("ENGINES_INPUT"), ENGINES, extra=("rustcfml",))
+          engines, all_engines = pick(os.environ.get("ENGINES_INPUT"), ENGINES, extra=("rustcfml", "tz"))
           databases, all_databases = pick(os.environ.get("DATABASES_INPUT"), DATABASES)
           run_rustcfml = (all_engines and all_databases) or "rustcfml" in engines
-          engines = [e for e in engines if e != "rustcfml"]
+          run_tz = (all_engines and all_databases) or "tz" in engines
+          engines = [e for e in engines if e not in ("rustcfml", "tz")]
 
+          # tz/suffix are set on every leg so the job can read them unconditionally.
           include = [
-              {"cfengine": e, "database": d}
+              {"cfengine": e, "database": d, "tz": "", "suffix": ""}
               for e in ENGINES if e in engines
               for d in DATABASES if d in databases
               if not (d in LUCEE_ONLY and not e.startswith("lucee"))
           ]
+          if run_tz:
+              include += [
+                  {"cfengine": e, "database": "sqlite", "tz": TZ_ZONE, "suffix": "-tz-ny"}
+                  for e in TZ_ENGINES
+              ]
           if not include and not run_rustcfml:
               print("::error::The engines/databases inputs select no legs")
               sys.exit(1)
-          print(f"{len(include)} leg(s): " + ", ".join(f"{l['cfengine']}+{l['database']}" for l in include))
+          print(f"{len(include)} leg(s): " + ", ".join(f"{l['cfengine']}+{l['database']}{l['suffix']}" for l in include))
           print(f"rustcfml lane: {run_rustcfml}")
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               # An empty include list is not a valid matrix; the tests job
@@ -122,7 +134,7 @@ jobs:
           PY
 
   tests:
-    name: "${{ matrix.cfengine }} + ${{ matrix.database }}"
+    name: "${{ matrix.cfengine }} + ${{ matrix.database }}${{ matrix.tz != '' && format(' (TZ {0})', matrix.tz) || '' }}"
     needs: plan
     if: needs.plan.outputs.has_legs == 'true'
     runs-on: ubuntu-24.04
@@ -130,6 +142,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
+      # The engine container's time zone (compose.yml reads these). Empty for every leg but
+      # the TZ lanes; job-level so a crash-recovery `docker compose up` keeps them too.
+      ENGINE_TZ: ${{ matrix.tz }}
+      ENGINE_JAVA_TOOL_OPTIONS: ${{ matrix.tz != '' && format('-Duser.timezone={0}', matrix.tz) || '' }}
       PORT_lucee6: 60006
       PORT_lucee7: 60007
       PORT_adobe2023: 62023
@@ -485,7 +501,7 @@ jobs:
           # request which would re-run the entire test suite — runner.cfm
           # does not cache results between requests)
           if [ -f "$RESULT_FILE" ]; then
-            python3 tools/ci/testbox_junit.py "$RESULT_FILE" "$JUNIT_FILE" "${{ matrix.cfengine }}/${DB}" \
+            python3 tools/ci/testbox_junit.py "$RESULT_FILE" "$JUNIT_FILE" "${{ matrix.cfengine }}/${DB}${{ matrix.suffix }}" \
               || { echo "JUnit conversion failed for ${DB} (non-fatal)"; rm -f "$JUNIT_FILE"; }
           fi
 
@@ -627,14 +643,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: test-results-${{ matrix.cfengine }}-${{ matrix.database }}
+          name: test-results-${{ matrix.cfengine }}-${{ matrix.database }}${{ matrix.suffix }}
           path: /tmp/test-results/
 
       - name: Upload JUnit XML artifacts
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: junit-${{ matrix.cfengine }}-${{ matrix.database }}
+          name: junit-${{ matrix.cfengine }}-${{ matrix.database }}${{ matrix.suffix }}
           path: /tmp/junit-results/
 
   #############################################
@@ -748,16 +764,17 @@ jobs:
 
           # SOFT_FAIL_DBS and MIN_SPECS come from the workflow-level env.
 
-          for engine in lucee6 lucee7 adobe2023 adobe2025 boxlang; do
-            ROW="| **${engine}** |"
-            for db in mysql postgres sqlserver h2 cockroachdb oracle sqlite; do
-              FILE="results/test-results-${engine}-${db}/${engine}-${db}-result.txt"
-              IS_SOFT_FAIL=false
-              if echo ",${SOFT_FAIL_DBS}," | grep -q ",${db},"; then
-                IS_SOFT_FAIL=true
-              fi
-              if [ -f "$FILE" ]; then
-                STATS=$(python3 -c "
+          # One grid cell for a leg's result file.
+          cell() {
+            local FILE="$1" db="$2" IS_SOFT_FAIL=false STATS FAIL SPECS
+            if echo ",${SOFT_FAIL_DBS}," | grep -q ",${db},"; then
+              IS_SOFT_FAIL=true
+            fi
+            if [ ! -f "$FILE" ]; then
+              echo " -- |"
+              return
+            fi
+            STATS=$(python3 -c "
           import json, sys
           try:
             d = json.load(open('$FILE'))
@@ -765,25 +782,36 @@ jobs:
           except:
             print(-1, -1)
           " 2>/dev/null || echo "-1 -1")
-                FAIL="${STATS% *}"
-                SPECS="${STATS#* }"
-                if [ "$FAIL" = "-1" ]; then
-                  ROW="${ROW} :x: no result |"
-                elif [ "$SPECS" -lt "$MIN_SPECS" ]; then
-                  ROW="${ROW} :x: ${SPECS} tests |"
-                elif [ "$FAIL" = "0" ]; then
-                  ROW="${ROW} :white_check_mark: |"
-                elif [ "$IS_SOFT_FAIL" = true ]; then
-                  ROW="${ROW} :warning: ${FAIL} |"
-                else
-                  ROW="${ROW} :x: ${FAIL} |"
-                fi
-              else
-                ROW="${ROW} -- |"
-              fi
+            FAIL="${STATS% *}"
+            SPECS="${STATS#* }"
+            if [ "$FAIL" = "-1" ]; then
+              echo " :x: no result |"
+            elif [ "$SPECS" -lt "$MIN_SPECS" ]; then
+              echo " :x: ${SPECS} tests |"
+            elif [ "$FAIL" = "0" ]; then
+              echo " :white_check_mark: |"
+            elif [ "$IS_SOFT_FAIL" = true ]; then
+              echo " :warning: ${FAIL} |"
+            else
+              echo " :x: ${FAIL} |"
+            fi
+          }
+
+          for engine in lucee6 lucee7 adobe2023 adobe2025 boxlang; do
+            ROW="| **${engine}** |"
+            for db in mysql postgres sqlserver h2 cockroachdb oracle sqlite; do
+              ROW="${ROW}$(cell "results/test-results-${engine}-${db}/${engine}-${db}-result.txt" "$db")"
             done
             MATRIX_MD="${MATRIX_MD}
           ${ROW}"
+          done
+
+          # The America/New_York lanes (SQLite only), one row each when they ran.
+          for engine in lucee7 adobe2025 boxlang; do
+            DIR="results/test-results-${engine}-sqlite-tz-ny"
+            [ -d "$DIR" ] || continue
+            MATRIX_MD="${MATRIX_MD}
+          | **${engine}** (TZ America/New_York) | | | | | | |$(cell "${DIR}/${engine}-sqlite-result.txt" sqlite)"
           done
 
           SOFT_FAIL_NOTE=""
