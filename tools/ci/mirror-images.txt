@@ -1,0 +1,35 @@
+# Docker Hub images that CI and the local test setup pull, copied unchanged to
+# ghcr.io/wheels-dev/mirror/<name> by .github/workflows/mirror-images.yml so
+# runs don't depend on Docker Hub's anonymous pull limit.
+#
+# One reference per line, written exactly as the repo used it before the
+# repoint. A name:tag copies to mirror/<name>:<tag> and is refreshed on every
+# run. A name:tag@sha256:... copies that exact digest (tagged sha256-<hex> so it
+# stays listed); pull it as ghcr.io/wheels-dev/mirror/<name>:<tag>@sha256:...
+#
+# Add the image here first and let the mirror run before pointing anything at
+# it. Images from other registries (mcr.microsoft.com, ghcr.io) stay as they are.
+
+# Engine images (tools/docker/*/Dockerfile) and the CommandBox install smoke
+ortussolutions/commandbox:latest
+ortussolutions/commandbox:latest@sha256:1f180edf899d1db7fc906835e20c12ed18a93db2c2c1053ac5cace2f28626da0
+ortussolutions/commandbox:jdk21@sha256:d65126caeb6c80c115d4cc93f9b9db88697c4fe2aa4ca83ea9a36dadc62c02c1
+
+# Databases (compose.yml)
+mysql:9.7.0
+postgres:18.4
+cockroachdb/cockroach:v24.3.32
+gvenzl/oracle-free:23.26.1-slim
+
+# Linux packages: rpm rebuild/check (rpm-rewrap.sh) and the install smoke
+rockylinux/rockylinux:9
+rockylinux/rockylinux:10
+rockylinux:9
+fedora:44
+
+# CLI deploy specs: sshd fixtures and the E2E app image
+linuxserver/openssh-server:latest
+nginx:alpine
+
+# AJP regression check (tools/ci/ajp)
+httpd:2.4
