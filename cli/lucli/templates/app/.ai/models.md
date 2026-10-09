@@ -62,7 +62,7 @@ component extends="Model" {
 Finders: `model("User").findAll()`, `findOne(where="...")`, `findByKey(params.key)`.
 
 `where=` is parsed, not passed through: every `column <op> literal` is bound as a parameter, and the column must be the model's or an `include`d model's.
-- `1 = 0` / `1 = 1` (two numbers) pass through unbound.
+- A condition with no column (`where="1 = 0"`, `"1 = 1"`) isn't supported; it throws `Wheels.ColumnNotFound`. To match nothing use `whereIn("id", [])` (no rows); to match everything leave the condition out.
 - A literal inside a subquery (`id IN (SELECT ... WHERE user_id = 1)`) throws `Wheels.UnbindableWhereValue`. A subquery comparing columns only works. Otherwise run the subquery first and pass its values with `whereIn("id", ValueArray(q, "bookId"))`.
 Create: `model("User").new(params.user).save()`, or `model("User").create(params.user)`.
 Include associations: `findAll(include="role,orders")`. Pagination: `findAll(page=params.page, perPage=25)`.

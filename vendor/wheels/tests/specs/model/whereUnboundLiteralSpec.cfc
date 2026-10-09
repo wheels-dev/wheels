@@ -4,39 +4,27 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo
 
-		// `where` binds every `column <operator> value`. A comparison between two numbers
-		// (1 = 0, 1 = 1) has no column and goes into the SQL unbound; a value that has no column
-		// of the model or an included model to bind against, such as one inside a subquery,
-		// throws an error that names the condition.
+		// `where` binds every `column <operator> value`, and the column must belong to the model or
+		// an included model. A condition with no column (1 = 0) isn't supported, and a value with no
+		// column to bind against, such as one inside a subquery, throws an error naming the condition.
 
-		describe("where with a comparison between two numbers", () => {
+		describe("where with a condition that has no column", () => {
 
-			it("matches nothing with 1 = 0 and everything with 1 = 1", () => {
-				var all = g.model("post").count(reload = true);
-				expect(g.model("post").findAll(where = "1 = 0", returnAs = "query", reload = true).recordCount).toBe(0);
-				expect(g.model("post").findAll(where = "1 = 1", returnAs = "query", reload = true).recordCount).toBe(all);
-				expect(g.model("post").findAll(where = "1=0", returnAs = "query", reload = true).recordCount).toBe(0);
+			it("says 1 = 0 isn't supported, and what to use instead", () => {
+				var state = {type = "", detail = ""};
+				try {
+					g.model("post").findAll(where = "1 = 0", returnAs = "query", reload = true);
+				} catch (any e) {
+					state.type = e.type;
+					state.detail = e.extendedInfo;
+				}
+				expect(state.type).toBe("Wheels.ColumnNotFound");
+				expect(state.detail).toInclude("isn't supported");
+				expect(state.detail).toInclude("whereIn() with an empty array");
 			})
 
-			it("keeps the bound values of the other conditions in line", () => {
-				var first = $firstPost();
-				expect(g.model("post").findAll(where = "id = #first.id# AND 1 = 1", returnAs = "query", reload = true).id).toBe(first.id);
-				expect(g.model("post").findAll(where = "1 = 1 AND id = #first.id#", returnAs = "query", reload = true).id).toBe(first.id);
-				expect(g.model("post").findAll(where = "1 = 0 OR id = #first.id#", returnAs = "query", reload = true).id).toBe(first.id);
-				expect(g.model("post").findAll(where = "id = #first.id# AND 1 = 0", returnAs = "query", reload = true).recordCount).toBe(0);
-				var byTitle = g.model("post").findAll(where = "1 = 1 AND title = '#first.title#' AND 2 > 1", returnAs = "query", reload = true);
-				expect(byTitle.recordCount).toBe(1);
-				expect(byTitle.id).toBe(first.id);
-			})
-
-			it("leaves a comparison inside a quoted value as text", () => {
-				expect(g.model("post").findAll(where = "title = '1 = 0'", returnAs = "query", reload = true).recordCount).toBe(0);
-			})
-
-			it("works in count(), updateAll() and deleteAll() too", () => {
-				expect(g.model("post").count(where = "1 = 0", reload = true)).toBe(0);
-				expect(g.model("post").updateAll(where = "1 = 0", views = 999)).toBe(0);
-				expect(g.model("post").deleteAll(where = "1 = 0")).toBe(0);
+			it("returns no rows for whereIn() with an empty array, the suggested alternative", () => {
+				expect(g.model("post").whereIn("id", []).count()).toBe(0);
 			})
 
 		});
@@ -54,6 +42,28 @@ component extends="wheels.WheelsTest" {
 				expect(state.type).toBe("Wheels.UnbindableWhereValue");
 				// The parser drops the spaces around an operator it masks.
 				expect(state.message).toInclude("WHERE views=?");
+			})
+
+			it("shows no value in the error, including a quoted literal elsewhere in the subquery", () => {
+				var state = {type = "", message = ""};
+				try {
+					g.model("author").findAll(
+						where = "id IN (SELECT COALESCE(authorid, LENGTH('private_marker_x')) FROM c_o_r_e_posts WHERE views = 5 AND title = 'private_title_y')",
+						returnAs = "query",
+						reload = true
+					);
+				} catch (any e) {
+					state.type = e.type;
+					state.message = e.message & " " & e.extendedInfo;
+				}
+				expect(state.type).toBe("Wheels.UnbindableWhereValue");
+				expect(state.message).toInclude("'...'");
+				for (var secret in ["private_marker_x", "private_title_y"]) {
+					expect(state.message).notToInclude(secret);
+					expect(state.message).notToInclude(LCase(BinaryEncode(CharsetDecode(secret, "utf-8"), "hex")));
+				}
+				expect(state.message).notToInclude("wmask");
+				expect(Find(Chr(2), state.message)).toBe(0);
 			})
 
 			it("still runs a subquery that compares columns only", () => {
@@ -83,11 +93,6 @@ component extends="wheels.WheelsTest" {
 			})
 
 		});
-	}
-
-	private struct function $firstPost() {
-		var posts = g.model("post").findAll(order = "id", maxRows = 1, returnAs = "query", reload = true);
-		return {id = posts.id, title = posts.title};
 	}
 
 }

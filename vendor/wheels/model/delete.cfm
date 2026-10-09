@@ -38,8 +38,6 @@
 		}
 		arguments.include = $listClean(arguments.include);
 		arguments.where = $cleanInList(arguments.where);
-		// A comparison between two numbers (1 = 0, 1 = 1) goes into the SQL unbound.
-		arguments.where = $passThroughLiteralPredicates(arguments.where);
 		if (arguments.instantiate) {
 			local.rv = 0;
 			local.objects = findAll(

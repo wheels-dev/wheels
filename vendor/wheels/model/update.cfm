@@ -37,8 +37,6 @@
 		$args(name = "updateAll", args = arguments);
 		arguments.include = $listClean(arguments.include);
 		arguments.where = $cleanInList(arguments.where);
-		// A comparison between two numbers (1 = 0, 1 = 1) goes into the SQL unbound.
-		arguments.where = $passThroughLiteralPredicates(arguments.where);
 		arguments.properties = $setProperties(
 			argumentCollection = arguments,
 			filterList = "where,include,properties,reload,parameterize,instantiate,useIndex,validate,transaction,callbacks,includeSoftDeletes",

@@ -59,8 +59,6 @@
 		$setDebugName(name = "findAll", args = arguments);
 		arguments.include = $listClean(arguments.include);
 		arguments.where = $cleanInList(arguments.where);
-		// A comparison between two numbers (1 = 0, 1 = 1) goes into the SQL unbound.
-		arguments.where = $passThroughLiteralPredicates(arguments.where);
 
 		// we only allow direct associations to be loaded when returning objects
 		if (
