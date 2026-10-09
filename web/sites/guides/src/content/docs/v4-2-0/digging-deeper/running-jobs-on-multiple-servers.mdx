@@ -300,7 +300,7 @@ schedule("health-check")
 ```
 
 - **`.job(class)`** — the job class under `app/jobs/`, as for `enqueue`.
-- **`.cron(expression)`** — a standard 5-field cron expression (`minute hour day-of-month month day-of-week`), read in the schedule's time zone. Lists, ranges, steps (`*/5`), and names (`MON`, `JAN`) work, as do the `@hourly` … `@yearly` aliases. Seconds and Quartz extensions are refused.
+- **`.cron(expression)`** — a standard 5-field cron expression (`minute hour day-of-month month day-of-week`), read in the schedule's time zone. Lists, ranges, steps (`*/5`), and names (`MON`, `JAN`) work, as do the `@hourly` … `@yearly` aliases. A step on a single value runs to the end of the field, as in Vixie cron and cronie: `5/15` in the minute field is `5,20,35,50`, `5/1` is `5-59`, and in day-of-week (`0`-`7`, both Sunday) `1/2` is Monday, Wednesday, Friday and Sunday. Seconds and Quartz extensions are refused.
 - **`.every(count, "minutes" | "hours")`** — a fixed interval, aligned to the epoch. For a daily or longer cadence, use `.cron()` instead.
 - **`.timezone(zone)`** — the IANA zone `.cron()` is read in (default `UTC`), e.g. `Europe/London`.
 - **`.catchUp(mode)`**, **`.catchUpWindow(seconds)`**, **`.queue()`**, **`.priority()`**, **`.data(struct)`**, **`.enabled(boolean)`** — tune catch-up (below), and set the same options you'd pass to `enqueue`.

@@ -184,7 +184,8 @@ component {
 			$invalid("'#arguments.part#' in the #arguments.label# field uses a Quartz extension (L, W, ## or ?), which isn't supported.");
 		}
 		local.step = 1;
-		if (Find("/", local.text)) {
+		local.stepped = Find("/", local.text) > 0;
+		if (local.stepped) {
 			local.stepText = ListLast(local.text, "/");
 			local.text = ListFirst(local.text, "/");
 			if (!REFind("^[0-9]+$", local.stepText) || Val(local.stepText) < 1) {
@@ -201,9 +202,11 @@ component {
 		}
 		local.first = $value(local.bounds[1], arguments.low, arguments.high, arguments.label, arguments.names);
 		local.last = ArrayLen(local.bounds) == 2 ? $value(local.bounds[2], arguments.low, arguments.high, arguments.label, arguments.names) : local.first;
-		if (ArrayLen(local.bounds) == 1 && local.step > 1) {
-			// "5/15" means from 5 to the end of the range, every 15.
-			local.last = arguments.high == 7 ? 6 : arguments.high;
+		if (ArrayLen(local.bounds) == 1 && local.stepped) {
+			// Vixie cron / cronie: "N/S" runs from N to the field's maximum, every S, so "5/15" is
+			// 5,20,35,50 and "5/1" is 5-59. Day-of-week runs to 7 (Sunday again): "7/2" is Sunday,
+			// and "1/2" is Monday, Wednesday, Friday and Sunday.
+			local.last = arguments.high;
 		}
 		if (local.last < local.first) {
 			$invalid("'#arguments.part#' is a reversed range in the #arguments.label# field.");

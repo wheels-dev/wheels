@@ -20,6 +20,32 @@ component extends="wheels.WheelsTest" {
 				expect(c.isoUtc(c.nextCron(cron, c.msFromIsoUtc("2026-10-17T10:00Z")))).toBe("2026-10-19T09:00:00Z");
 			});
 
+			it("runs N/S from N to the end of the field, as Vixie cron and cronie do", function() {
+				var c = new wheels.JobCron();
+				expect($matching(c.parse("5/15 * * * *").minutes, 0)).toBe("5,20,35,50");
+				expect($matching(c.parse("5/1 * * * *").minutes, 0)).toBe(ArrayToList($sequence(5, 59)));
+				expect($matching(c.parse("0 22/1 * * *").hours, 0)).toBe("22,23");
+				expect($matching(c.parse("0 0 30/1 * *").days, 1)).toBe("30,31");
+				expect($matching(c.parse("0 0 1 11/1 *").months, 1)).toBe("11,12");
+				// Unchanged: a bare value, a range with a step, and */S.
+				expect($matching(c.parse("5 * * * *").minutes, 0)).toBe("5");
+				expect($matching(c.parse("5-20/5 * * * *").minutes, 0)).toBe("5,10,15,20");
+				expect($matching(c.parse("*/15 * * * *").minutes, 0)).toBe("0,15,30,45");
+				// The next slot follows: from 10:21, "5/15" next fires at 10:35.
+				expect(c.isoUtc(c.nextCron(c.parse("5/15 * * * *"), c.msFromIsoUtc("2026-10-12T10:21Z")))).toBe("2026-10-12T10:35:00Z");
+			});
+
+			it("runs a day-of-week N/S through 7, which is Sunday again", function() {
+				var c = new wheels.JobCron();
+				// The weekday table is Sunday (0) to Saturday (6).
+				expect($matching(c.parse("0 9 * * 7/2").weekdays, 0)).toBe("0");
+				expect($matching(c.parse("0 9 * * 1/2").weekdays, 0)).toBe("0,1,3,5");
+				expect($matching(c.parse("0 9 * * MON/2").weekdays, 0)).toBe("0,1,3,5");
+				expect($matching(c.parse("0 9 * * */2").weekdays, 0)).toBe("0,2,4,6");
+				// 2026-10-12 is a Monday: "7/2" next fires on Sunday the 18th.
+				expect(c.isoUtc(c.nextCron(c.parse("0 9 * * 7/2"), c.msFromIsoUtc("2026-10-12T00:00Z")))).toBe("2026-10-18T09:00:00Z");
+			});
+
 			it("matches day-of-month OR day-of-week when both are restricted", function() {
 				var c = new wheels.JobCron();
 				// The 13th, or any Friday: from Sunday 2026-02-01 the first match is Friday the 6th.
@@ -394,6 +420,28 @@ component extends="wheels.WheelsTest" {
 		rv.lastEnqueuedFor = IsNull(q.lastEnqueuedFor[1]) ? 0 : q.lastEnqueuedFor[1];
 		rv.lastError = IsNull(q.lastError[1]) ? "" : q.lastError[1];
 		return rv;
+	}
+
+	/**
+	 * The values a JobCron match table allows, as a list. `low` is the field's first value: 0 for
+	 * minutes, hours and weekdays, 1 for days and months.
+	 */
+	private string function $matching(required array table, required numeric low) {
+		var values = [];
+		for (var i = 1; i <= ArrayLen(arguments.table); i++) {
+			if (arguments.table[i]) {
+				ArrayAppend(values, i - 1 + arguments.low);
+			}
+		}
+		return ArrayToList(values);
+	}
+
+	private array function $sequence(required numeric first, required numeric last) {
+		var values = [];
+		for (var i = arguments.first; i <= arguments.last; i++) {
+			ArrayAppend(values, i);
+		}
+		return values;
 	}
 
 	private numeric function $jobCount(required string queue) {
