@@ -1,0 +1,1 @@
+- Global helpers (`app/views/helpers.cfm`) are now available to a controller once Wheels initializes it, rather than as soon as the object exists. A controller built directly with `new` or `CreateObject()`, or code in a controller's own pseudo-constructor (outside its functions), no longer sees them. Call global helpers from `config()` or an action instead.
