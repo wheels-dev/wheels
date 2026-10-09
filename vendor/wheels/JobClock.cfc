@@ -183,10 +183,22 @@ component {
 
 	/**
 	 * Internal: a UTC date/time (a plain value holding UTC's wall time) as local time, as a plain
-	 * date/time in whole seconds.
+	 * date/time in whole seconds. Built from local2utc alone: BoxLang's DateConvert("utc2local")
+	 * leaves a plain value's wall time unchanged. The local time L is the one whose UTC is the
+	 * given value, L = U - offset(L); the offset is taken at U first and then at that first guess,
+	 * so a daylight-saving change between the two still lands on the right hour.
 	 */
 	public date function $utcToLocal(required date utcDateTime) {
-		return $wholeSeconds(DateConvert("utc2local", arguments.utcDateTime));
+		local.u = $wholeSeconds(arguments.utcDateTime);
+		local.guess = DateAdd("s", -$utcOffsetSeconds(local.u), local.u);
+		return DateAdd("s", -$utcOffsetSeconds(local.guess), local.u);
+	}
+
+	/**
+	 * Internal: seconds UTC is ahead of local time at a local date/time.
+	 */
+	public numeric function $utcOffsetSeconds(required date localDateTime) {
+		return DateDiff("s", $wholeSeconds(arguments.localDateTime), $appUtc(arguments.localDateTime));
 	}
 
 	public date function $wholeSeconds(required date value) {
