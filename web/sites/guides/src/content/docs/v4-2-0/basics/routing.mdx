@@ -145,6 +145,10 @@ mapper()
 
 With the constraint, `/posts/2026/04` matches and fills `params.year="2026"`, `params.month="04"`. `/posts/foo/bar` does not match — the router moves on to the next route. Without the constraint, `/posts/foo/bar` would match and `params.year="foo"`.
 
+<Aside type="caution" title="Write the pattern with a single backslash">
+A constraint value is a plain CFML string, and the router drops it into the route's regex verbatim. CFML strings have **no backslash escapes**, so a backslash in a constraint reaches the regex as-is: write a digit class as `"\d{4}"`, not `"\\d{4}"`. A doubled backslash is a *literal* backslash to the regex engine (`\\d` means "a backslash, then `d`"), so `"\\d{4}"` never matches a year and the route silently falls through. The same holds for `\w`, `\s`, `\.` and any other escape.
+</Aside>
+
 ## Route helpers
 
 Every route with a `name` is reachable by name from anywhere in your app. The helpers take the name, resolve it to a URL, and fill in placeholders from named arguments.
