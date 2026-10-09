@@ -101,17 +101,34 @@ component {
 	 * Internal: the arguments each tick runs with, from settings so that a caller holding the token
 	 * can't widen the work one request does: jobsRunnerTickMaxJobs (most jobs per call, default 1),
 	 * jobsRunnerTickTimeout (seconds per job, default 300) and jobsRunnerTickQueues (comma list,
-	 * default every queue). A missing or invalid value falls back to its default.
+	 * default every queue). maxJobs must be a whole number from 1 to 1000 and timeout one from 1 to
+	 * 86400 (a day); a missing, fractional or out-of-range value falls back to its default.
 	 */
 	public struct function $tickArguments() {
-		local.maxJobs = $setting("jobsRunnerTickMaxJobs", 1);
-		local.timeout = $setting("jobsRunnerTickTimeout", 300);
 		local.queues = $setting("jobsRunnerTickQueues", "");
 		return {
-			maxJobs = IsNumeric(local.maxJobs) && local.maxJobs >= 1 ? Int(local.maxJobs) : 1,
-			timeout = IsNumeric(local.timeout) && local.timeout > 0 ? Int(local.timeout) : 300,
+			maxJobs = $wholeSetting(name = "jobsRunnerTickMaxJobs", fallback = 1, maximum = 1000),
+			timeout = $wholeSetting(name = "jobsRunnerTickTimeout", fallback = 300, maximum = 86400),
 			queues = IsSimpleValue(local.queues) ? Trim(local.queues) : ""
 		};
+	}
+
+	/**
+	 * Internal: a setting that must be a whole number from 1 to `maximum` (well inside the INTEGER
+	 * columns it can end up in, such as a claimed job's claimTimeout). Anything else (missing, not
+	 * a number, a fraction, zero or less, or above the maximum) is the fallback. Never through
+	 * Int(), which Lucee truncates to 32 bits.
+	 */
+	public numeric function $wholeSetting(required string name, required numeric fallback, required numeric maximum) {
+		local.value = $setting(arguments.name, arguments.fallback);
+		if (!IsSimpleValue(local.value) || !IsNumeric(local.value)) {
+			return arguments.fallback;
+		}
+		local.value = Val(local.value);
+		if (local.value < 1 || local.value > arguments.maximum || local.value != Round(local.value)) {
+			return arguments.fallback;
+		}
+		return local.value;
 	}
 
 	/**

@@ -353,9 +353,9 @@ component {
 		// (a token in a URL ends up in access logs).
 		application.$wheels.jobsRunnerToken = "";
 		application.$wheels.jobsRunnerTokenInQuery = false;
-		// What each call to the tick route runs (JobRunner.tick()): at most this many jobs, each
-		// capped at this many seconds, from these queues ("" = every queue). Settings, not request
-		// parameters, so a caller holding the token can't widen the work one request does.
+		// What each call to the tick route runs (JobRunner.tick()): at most this many jobs (1-1000),
+		// each capped at this many seconds (1-86400), from these queues ("" = every queue). Settings,
+		// not request parameters, so a caller holding the token can't widen the work one request does.
 		application.$wheels.jobsRunnerTickMaxJobs = 1;
 		application.$wheels.jobsRunnerTickTimeout = 300;
 		application.$wheels.jobsRunnerTickQueues = "";

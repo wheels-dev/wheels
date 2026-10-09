@@ -133,16 +133,34 @@ component extends="wheels.WheelsTest" {
 				expect(passed.queues).toBe("mail, reports");
 			});
 
-			it("keeps one job, 300 seconds and every queue when nothing is set, or a setting is invalid", function() {
+			it("keeps one job, 300 seconds and every queue when nothing is set", function() {
 				StructDelete(application.wheels, "jobsRunnerTickMaxJobs");
 				StructDelete(application.wheels, "jobsRunnerTickTimeout");
 				StructDelete(application.wheels, "jobsRunnerTickQueues");
+				expect(new wheels.JobTickEndpoint().$tickArguments()).toBe({maxJobs = 1, timeout = 300, queues = ""});
+			});
+
+			it("takes maxJobs from 1 to 1000 and a timeout from 1 to 86400, whole numbers only", function() {
 				var endpoint = new wheels.JobTickEndpoint();
-				expect(endpoint.$tickArguments()).toBe({maxJobs = 1, timeout = 300, queues = ""});
-				application.wheels.jobsRunnerTickMaxJobs = 0;
-				application.wheels.jobsRunnerTickTimeout = "soon";
+				// Each setting on its own, with the other at its default.
+				var cases = [
+					{name = "jobsRunnerTickMaxJobs", key = "maxJobs", fallback = 1, invalid = [0, -1, 0.5, 1.5, 1001, 2147483648, "soon", "", "2 jobs", [5], {n = 5}], valid = [{value = 1, expected = 1}, {value = "10", expected = 10}, {value = 1000, expected = 1000}]},
+					{name = "jobsRunnerTickTimeout", key = "timeout", fallback = 300, invalid = [0, -300, 0.5, 300.25, 86401, 2147483648, "soon", "", "1 hour", [5], {n = 5}], valid = [{value = 1, expected = 1}, {value = "600", expected = 600}, {value = 86400, expected = 86400}]}
+				];
+				for (var c in cases) {
+					for (var value in c.invalid) {
+						application.wheels[c.name] = value;
+						var label = IsSimpleValue(value) ? "[" & value & "]" : "a complex value";
+						expect(endpoint.$tickArguments()[c.key]).toBe(c.fallback, c.name & " " & label);
+					}
+					for (var v in c.valid) {
+						application.wheels[c.name] = v.value;
+						expect(endpoint.$tickArguments()[c.key]).toBe(v.expected, c.name & " [" & v.value & "]");
+					}
+					application.wheels[c.name] = c.fallback;
+				}
 				application.wheels.jobsRunnerTickQueues = ["mail"];
-				expect(endpoint.$tickArguments()).toBe({maxJobs = 1, timeout = 300, queues = ""});
+				expect(endpoint.$tickArguments().queues).toBe("");
 			});
 
 			it("drains several jobs in one call when jobsRunnerTickMaxJobs is above 1", function() {

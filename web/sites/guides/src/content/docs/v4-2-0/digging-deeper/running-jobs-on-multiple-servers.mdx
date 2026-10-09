@@ -257,12 +257,15 @@ When your scheduler can only make an HTTP request — an engine scheduled task, 
 set(jobsRunnerToken = "a-long-random-secret");   // the route is 404 until this is set
 
 // Optional: what each call runs (the defaults are 1, 300 and every queue).
-set(jobsRunnerTickMaxJobs = 10);        // at most this many jobs per call, one after another
-set(jobsRunnerTickTimeout = 600);       // seconds each job may run
+set(jobsRunnerTickMaxJobs = 10);        // at most this many jobs per call, one after another (1-1000)
+set(jobsRunnerTickTimeout = 600);       // seconds each job may run (1-86400)
 set(jobsRunnerTickQueues = "default");  // comma list of queues; "" = every queue
 ```
 
-Pick `jobsRunnerTickMaxJobs` × the time a job takes to fit inside your scheduler's interval: the jobs in one call run one after another, and an overlapping call on the same server is skipped rather than stacked.
+A fractional or out-of-range value falls back to the default. When sizing a batch:
+
+- **It has to fit inside one HTTP request.** The jobs in a call run one after another, inside that request, so `jobsRunnerTickMaxJobs` × the time a job takes, plus a little overhead, must fit within **your engine's request timeout**. `jobsRunnerTickTimeout` caps each job; it doesn't extend the request's timeout. It should also fit inside your scheduler's interval, because an overlapping call on the same server is skipped rather than stacked. For long or many jobs, run `wheels jobs work` (a continuous worker) instead.
+- **A request the engine kills mid-job leaves that job claimed.** The reaper recovers it like any job whose worker died: once its claim or heartbeat goes stale it is retried, or, for a job with `this.idempotent = false`, marked `interrupted` (see [Idempotency and `this.idempotent`](#idempotency-and-thisidempotent)). Keep your jobs idempotent.
 
 Then hit it with the token in a header, once a minute, from each server:
 
