@@ -125,6 +125,9 @@ services:
       # Runs through this file are framework-repository runs: specs that skip outside
       # the repository must not skip here (RequireRepoPathSpec fails instead).
       - "WHEELS_EXPECT_REPO=true"
+      # The engine's time zone: UTC unless ENGINE_TZ is set (the compat matrix TZ lanes, or
+      # ENGINE_TZ=... locally). The JVM follows TZ on Linux; EngineTimeZoneSpec checks it did.
+      - "TZ=${ENGINE_TZ:-UTC}"
     volumes:
       - ./:/wheels-test-suite
       - type: bind
@@ -284,6 +287,9 @@ services:
       # Runs through this file are framework-repository runs: specs that skip outside
       # the repository must not skip here (RequireRepoPathSpec fails instead).
       - "WHEELS_EXPECT_REPO=true"
+      # The engine's time zone: UTC unless ENGINE_TZ is set (the compat matrix TZ lanes, or
+      # ENGINE_TZ=... locally). The JVM follows TZ on Linux; EngineTimeZoneSpec checks it did.
+      - "TZ=${ENGINE_TZ:-UTC}"
     tty: true
     stdin_open: true
     volumes:
@@ -329,6 +335,9 @@ services:
       # Runs through this file are framework-repository runs: specs that skip outside
       # the repository must not skip here (RequireRepoPathSpec fails instead).
       - "WHEELS_EXPECT_REPO=true"
+      # The engine's time zone: UTC unless ENGINE_TZ is set (the compat matrix TZ lanes, or
+      # ENGINE_TZ=... locally). The JVM follows TZ on Linux; EngineTimeZoneSpec checks it did.
+      - "TZ=${ENGINE_TZ:-UTC}"
     tty: true
     stdin_open: true
     volumes:
