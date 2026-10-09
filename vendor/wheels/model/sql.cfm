@@ -1575,7 +1575,7 @@
 							Throw(
 								type = "Wheels.ColumnNotFound",
 								message = "Wheels looked for the column mapped to the `#local.param.property#` property but couldn't find it in the database table.",
-								extendedInfo = "Verify the `where` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
+								extendedInfo = $columnNotFoundWhereHint(property = local.param.property, where = arguments.where)
 							);
 						} else {
 							writeLog(
@@ -1608,6 +1608,10 @@
 					if (!StructIsEmpty(local.leftExpression)) {
 						local.where = Replace(local.where, local.element, Replace(local.element, local.leftExpression.dataPart, "?", "one"));
 						ArrayAppend(local.params, local.leftExpression.param);
+					} else if (Find("?", local.element)) {
+						// A value compared with something that isn't this model's (or an included
+						// model's) column, typically inside a subquery: there is no column to bind it to.
+						$throwUnbindableWhereValue(element = local.element);
 					} else if (ArrayLen(local.classes) > 1) {
 						local.where = $qualifyUnboundConditionColumn(where = local.where, element = local.element, classes = local.classes, useTableAlias = local.useTableAlias);
 					}
@@ -1677,6 +1681,39 @@
 			}
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. The detail for Wheels.ColumnNotFound raised by a `where` condition: what
+	 * to check, and, for a number in the column's place (`1 = 0`) or a clause with a subquery,
+	 * what `where` accepts instead.
+	 */
+	public string function $columnNotFoundWhereHint(required string property, required string where) {
+		local.rv = "Verify the `where` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct.";
+		if (ReFind("^[+-]?[0-9.]+$", arguments.property)) {
+			local.rv &= " `where` accepts this model's and included models' columns compared with values; a condition with no column, such as `1 = 0` or `1 = 1`, isn't supported. For no rows, use whereIn() with an empty array; for every row, leave the condition out.";
+		} else if (FindNoCase("SELECT", arguments.where)) {
+			local.rv &= " If `#arguments.property#` is a column inside a subquery: `where` binds every `column <operator> value` and accepts only this model's and included models' columns, so a value compared with a subquery's column can't be bound. Use whereIn() with a value array, or run the subquery as its own query first.";
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. Throws Wheels.UnbindableWhereValue for a `where` condition whose value
+	 * has no column of this model (or an included model) to be bound against. The condition is
+	 * echoed with its quoted values hidden: a bound one is already `?`, and any other quoted
+	 * literal (still in its masked, reversible form) is shown as '...'. Unquoted numbers in the
+	 * developer's own where text are shown as written.
+	 */
+	public void function $throwUnbindableWhereValue(required string element) {
+		local.condition = Trim(ReReplaceNoCase(Trim(arguments.element), "^(AND|OR)([^a-zA-Z0-9_$])", "\2"));
+		local.condition = ReReplace(local.condition, "'" & $whereLiteralSentinel() & "[^']*'", "'...'", "all");
+		local.condition = Replace(local.condition, Chr(2), "", "all");
+		Throw(
+			type = "Wheels.UnbindableWhereValue",
+			message = "Wheels can't bind the value in the `where` condition `#local.condition#` (bound values are shown as ? and quoted values as '...'): it isn't compared with a column of this model or an included model, such as a value inside a subquery.",
+			extendedInfo = "`where` binds every `column <operator> value` as a query parameter, and the column must belong to the model or an `include`d model. Compare subquery columns with each other only, pass the values with whereIn() (a value array), or run the subquery as its own query first and pass its results."
+		);
 	}
 
 	/**

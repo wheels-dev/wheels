@@ -127,6 +127,16 @@ A literal anywhere else stays in the SQL text, escaped for your database:
 
 Escaped is not the same as bound. Don't build those positions from request input: compare with an operator instead, or use the builder.
 
+**`where` accepts model columns compared with values.** A `where` string is parsed, not passed through. Each `column <operator> literal` is bound, and the column has to belong to the model you're querying or to one you `include`. Two shapes follow from that.
+
+- A condition with no column, such as `where="1 = 0"` or `where="1 = 1"`, isn't supported. It throws `Wheels.ColumnNotFound`. For a query that should match nothing, use `whereIn()` with an empty array: `model("Post").whereIn("id", []).get()` returns no rows. For one that should match everything, leave the condition out, or skip the call.
+- A literal compared with another table's column inside a subquery can't be bound: `id IN (SELECT book_id FROM accesses WHERE user_id = 1)` throws `Wheels.UnbindableWhereValue`, naming the condition. A subquery that compares columns only works: `id IN (SELECT book_id FROM accesses WHERE accesses.book_id = books.id)`. For a subquery that needs a value, run it as its own query first and pass its results with `whereIn()`, which binds each value:
+
+  ```cfm
+  bookIds = model("Access").findAll(where = "userId = #userId#", select = "bookId", returnAs = "query");
+  books = model("Book").whereIn("id", ValueArray(bookIds, "bookId")).get();
+  ```
+
 <Aside type="note" title="Backslashes on MySQL and MariaDB">
   A backslash in a `where` value is an ordinary character, whether the value is bound or written into the SQL text. `'C:\temp'` matches `C:\temp`, and `'C:\\temp'` matches two backslashes, on MySQL just as on every other database. Before 4.2, values written into the SQL text (every value with `parameterize=false`, and function arguments) went through MySQL's own backslash escapes. If you wrote `\\` there to mean one backslash, write `\` now.
 
