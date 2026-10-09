@@ -934,18 +934,28 @@ component output="false" extends="wheels.Global"{
 				inTransaction = false
 			);
 		}
-		transaction action="begin" {
-			local.result = $executeMigrationStep(
-				migration = arguments.migration,
-				direction = arguments.direction,
-				errorLabel = arguments.errorLabel,
-				divider = local.divider,
-				inTransaction = true
-			);
-			if (local.result.success) {
-				transaction action="commit";
-			} else {
-				transaction action="rollback";
+		// CockroachDB refuses a schema change after any other statement in a transaction at a
+		// weak isolation level, and Lucee leaves a pooled connection at read committed once a
+		// transaction on it has ended. So a step that reads (or writes) before its DDL fails there
+		// unless its transaction asks for serializable, CockroachDB's own default. Other databases
+		// keep the engine's default isolation.
+		if (arguments.migration.cfc.$getDBType() == "CockroachDB") {
+			transaction action="begin" isolation="serializable" {
+				local.result = $executeMigrationStep(migration = arguments.migration, direction = arguments.direction, errorLabel = arguments.errorLabel, divider = local.divider, inTransaction = true);
+				if (local.result.success) {
+					transaction action="commit";
+				} else {
+					transaction action="rollback";
+				}
+			}
+		} else {
+			transaction action="begin" {
+				local.result = $executeMigrationStep(migration = arguments.migration, direction = arguments.direction, errorLabel = arguments.errorLabel, divider = local.divider, inTransaction = true);
+				if (local.result.success) {
+					transaction action="commit";
+				} else {
+					transaction action="rollback";
+				}
 			}
 		}
 		return local.result;
