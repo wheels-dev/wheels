@@ -10,7 +10,9 @@
  * - a request carrying any forwarding header (see $forwardingHeaders()), even an empty one,
  *   came through a proxy, so it is refused (403) whatever its token;
  * - a request whose method or headers can't be read is refused (500) without running a tick,
- *   rather than being judged on missing information.
+ *   rather than being judged on missing information;
+ * - each tick runs with the jobsRunnerTickMaxJobs / jobsRunnerTickTimeout / jobsRunnerTickQueues
+ *   settings, never with values from the request.
  *
  * handle() takes the request's parts and returns {status, contentType, body}, so the rules are
  * testable without HTTP. Dispatch calls it before routing and before the public-component gate.
@@ -63,17 +65,19 @@ component {
 
 	/**
 	 * Internal: one tick under a per-host lock taken try-once, so a call that overlaps a running
-	 * tick on this server returns at once instead of stacking.
+	 * tick on this server returns at once instead of stacking. Its batch size, timeout and queues
+	 * come from the app's settings ($tickArguments()), never from the request.
 	 */
 	public struct function $runTick() {
 		local.started = GetTickCount();
 		local.job = new wheels.Job();
 		local.host = local.job.$jobHostName();
+		local.tickArgs = $tickArguments();
 		var outcome = {ran = false, summary = {}, error = ""};
 		lock name="wheels.jobs.tick.#local.host#" type="exclusive" timeout="1" throwOnTimeout="false" {
 			outcome.ran = true;
 			try {
-				outcome.summary = $newRunner().tick();
+				outcome.summary = $newRunner().tick(argumentCollection = local.tickArgs);
 			} catch (any e) {
 				outcome.error = e.message;
 			}
@@ -91,6 +95,46 @@ component {
 		local.rv.ok = true;
 		local.rv.durationMs = GetTickCount() - local.started;
 		return local.rv;
+	}
+
+	/**
+	 * Internal: the arguments each tick runs with, from settings so that a caller holding the token
+	 * can't widen the work one request does: jobsRunnerTickMaxJobs (most jobs per call, default 1),
+	 * jobsRunnerTickTimeout (seconds per job, default 300) and jobsRunnerTickQueues (comma list,
+	 * default every queue). maxJobs must be a whole number from 1 to 1000 and timeout one from 1 to
+	 * 86400 (a day); a missing, fractional or out-of-range value falls back to its default.
+	 */
+	public struct function $tickArguments() {
+		local.queues = $setting("jobsRunnerTickQueues", "");
+		return {
+			maxJobs = $wholeSetting(name = "jobsRunnerTickMaxJobs", fallback = 1, maximum = 1000),
+			timeout = $wholeSetting(name = "jobsRunnerTickTimeout", fallback = 300, maximum = 86400),
+			queues = IsSimpleValue(local.queues) ? Trim(local.queues) : ""
+		};
+	}
+
+	/**
+	 * Internal: a setting that must be a whole number from 1 to `maximum` (well inside the INTEGER
+	 * columns it can end up in, such as a claimed job's claimTimeout), written as plain digits.
+	 * Anything else (missing, a fraction, zero, a sign, exponent notation such as "1e3", or above
+	 * the maximum) is the fallback: a value that isn't plainly a whole number is never coerced
+	 * into one. Never through Int(), which Lucee truncates to 32 bits.
+	 */
+	public numeric function $wholeSetting(required string name, required numeric fallback, required numeric maximum) {
+		local.value = $setting(arguments.name, arguments.fallback);
+		if (!IsSimpleValue(local.value)) {
+			return arguments.fallback;
+		}
+		// A whole number reads as digits, possibly with a ".0" tail (an engine's double).
+		local.text = Trim(ToString(local.value));
+		if (!ReFind("^[0-9]+(\.0+)?$", local.text)) {
+			return arguments.fallback;
+		}
+		local.number = Val(ListFirst(local.text, "."));
+		if (local.number < 1 || local.number > arguments.maximum) {
+			return arguments.fallback;
+		}
+		return local.number;
 	}
 
 	/**
