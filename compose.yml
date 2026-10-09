@@ -498,10 +498,20 @@ volumes:
   sqlserver_data:
   cockroachdb_data:
   # Per-engine server homes (.engine/<engine>), kept off the bind-mounted source
-  # tree. Compose prefixes these with the project name, so they're per-project.
-  # A fresh engine: `docker volume rm <project>_engine_<engine>`.
+  # tree. The name is keyed per checkout (WHEELS_ENGINE_KEY, set by
+  # tools/test-matrix.sh to a hash of the repo root) because COMPOSE_PROJECT_NAME
+  # is forced to "wheels": without the key, every worktree/clone would share one
+  # engine home and Adobe could serve another checkout's compiled classes. Plain
+  # `docker compose` (no script) gets "default". A fresh engine home:
+  # `docker volume rm wheels_engine_<key>_<engine>` (list: `docker volume ls
+  # --filter name=wheels_engine`).
   engine_adobe2018:
+    name: wheels_engine_${WHEELS_ENGINE_KEY:-default}_adobe2018
   engine_adobe2021:
+    name: wheels_engine_${WHEELS_ENGINE_KEY:-default}_adobe2021
   engine_adobe2023:
+    name: wheels_engine_${WHEELS_ENGINE_KEY:-default}_adobe2023
   engine_adobe2025:
+    name: wheels_engine_${WHEELS_ENGINE_KEY:-default}_adobe2025
   engine_boxlang:
+    name: wheels_engine_${WHEELS_ENGINE_KEY:-default}_boxlang
