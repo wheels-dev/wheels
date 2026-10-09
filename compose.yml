@@ -360,7 +360,7 @@ services:
       - wheels-network
 
   mysql:
-    image: mysql:9.7.0
+    image: ghcr.io/wheels-dev/mirror/mysql:9.7.0
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: wheelstestdb
@@ -381,7 +381,7 @@ services:
       - wheels-network
 
   postgres:
-    image: postgres:18.4
+    image: ghcr.io/wheels-dev/mirror/postgres:18.4
     restart: always
     environment:
       POSTGRES_USER: wheelstestdb
