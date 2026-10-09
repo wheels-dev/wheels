@@ -52,6 +52,10 @@ jobs:
           - cfengine: lucee7
             database: h2
     env:
+      # Re-bind each engine's .engine/<engine> home to the host (compose.ci.yml),
+      # reversing the named volume in compose.yml, so CI's host-side engine-home
+      # access keeps working. Harmless for engines not in the override.
+      COMPOSE_FILE: compose.yml:compose.ci.yml
       PORT_boxlang: 60001
       PORT_adobe2023: 62023
       PORT_lucee7: 60007

@@ -16,6 +16,12 @@
 #   tools/test-matrix.sh --down                # Tear down all containers
 #   tools/test-matrix.sh --keep lucee7 sqlite  # Default — leave containers up
 #
+# --rebuild rebuilds the engine IMAGE; it does not reset the engine's server
+# home. Adobe and BoxLang keep that home (.engine/<engine>) on a per-engine
+# named volume, which survives --down. For a truly fresh engine home, remove
+# the volume: docker volume rm <project>_engine_<engine>
+# (e.g. docker volume rm wheels_engine_adobe2025).
+#
 # Time zone (mirrors the compat-matrix TZ lanes; lucee7, adobe2025, boxlang):
 #   ENGINE_TZ=America/New_York tools/test-matrix.sh lucee7 sqlite
 #   compose.yml passes it to the engine container as TZ, so its JVM runs in that zone instead
