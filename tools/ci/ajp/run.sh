@@ -21,7 +21,7 @@ PROJECT="${1:-wheels-ajp}"
 PORT="${AJP_HTTPD_PORT:-9590}"
 OUT="${AJP_RESULT_JSON:-$(mktemp)}"
 # compose.ajp.yml runs the same image the stock config is read from.
-export AJP_HTTPD_IMAGE="${AJP_HTTPD_IMAGE:-httpd:2.4}"
+export AJP_HTTPD_IMAGE="${AJP_HTTPD_IMAGE:-ghcr.io/wheels-dev/mirror/httpd:2.4}"
 GEN="$(mktemp -d "${TMPDIR:-/tmp}/wheels-ajp.XXXXXX")"
 export AJP_SERVER_JSON="$GEN/server-ajp.json"
 export AJP_HTTPD_CONF="$GEN/httpd.conf"

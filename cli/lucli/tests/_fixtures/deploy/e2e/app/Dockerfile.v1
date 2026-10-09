@@ -11,5 +11,5 @@
 #   2. A follow-up task can build + `docker save` this into a tarball, load
 #      it into a dind service, and flip the test from "command-dispatch
 #      assertions" to "real HTTP v1 serves".
-FROM nginx:alpine
+FROM ghcr.io/wheels-dev/mirror/nginx:alpine
 RUN printf '%s\n' 'v1' > /usr/share/nginx/html/index.html
