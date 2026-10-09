@@ -2,10 +2,13 @@ name: Mirror Docker Hub images to GHCR
 
 # Copies the Docker Hub images CI pulls (tools/ci/mirror-images.txt) to
 # ghcr.io/wheels-dev/mirror/<name>, unchanged, so CI doesn't hit Docker Hub's
-# anonymous pull limit on shared GitHub runners. Weekly, on dispatch, and when
-# the image list changes (a same-repo PR mirrors a new image before anything
-# points at it). Each image copies in its own job, so the Docker Hub pulls
-# spread across runners, and an image already up to date costs no pull.
+# anonymous pull limit on shared GitHub runners. Copies run weekly, on
+# dispatch, and on a push to develop that changes the image list, so only
+# reviewed code writes the tags CI pulls. A PR that changes the list gets a dry
+# check instead (each source resolves; nothing is written): mirror a new image
+# by merging it to the list, then repoint to it in a later PR. Each image
+# copies in its own job, so the Docker Hub pulls spread across runners, and an
+# image already up to date costs no pull.
 on:
   workflow_dispatch:
   schedule:
@@ -31,8 +34,6 @@ concurrency:
 
 jobs:
   list:
-    # A fork PR's token can't write packages; the run after merge mirrors it.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -51,7 +52,46 @@ jobs:
           echo "$images"
           echo "images=${images}" >> "$GITHUB_OUTPUT"
 
+  check:
+    # PRs, forks included: resolve each reference on Docker Hub (a HEAD, which
+    # doesn't count toward the pull limit) and compare it with the mirror,
+    # with a read-only token. Nothing is written.
+    if: github.event_name == 'pull_request'
+    needs: list
+    name: "check ${{ matrix.image }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.list.outputs.images) }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install crane
+        uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
+
+      - name: Log in to GHCR (read-only)
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | crane auth login ghcr.io -u "$GHCR_USER" --password-stdin
+
+      - name: Check the image
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: bash tools/ci/mirror-images.sh check "$IMAGE"
+
   mirror:
+    # Only develop's reviewed script writes the live tags: a dispatch with
+    # --ref <unmerged branch> gets no write job.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
     needs: list
     name: "mirror ${{ matrix.image }}"
     runs-on: ubuntu-24.04

@@ -4,6 +4,7 @@
 #
 #   bash tools/ci/mirror-images.sh list            # print the config's references as JSON
 #   bash tools/ci/mirror-images.sh map  <ref>      # print the mirror reference for <ref>
+#   bash tools/ci/mirror-images.sh check <ref>     # resolve <ref> and compare with the mirror; writes nothing
 #   bash tools/ci/mirror-images.sh copy <ref>      # copy <ref> with crane (must be logged in to ghcr.io)
 #
 # MIRROR_CONFIG overrides tools/ci/mirror-images.txt; MIRROR_PREFIX overrides
@@ -81,6 +82,36 @@ retry() {
   done
 }
 
+# A PR's dry run: resolve the source's digest with a HEAD and compare it with
+# the mirror's, reporting what the copy after merge would do. Fails only when
+# the source doesn't resolve (a digest pin must still exist upstream, since
+# the copy fetches exactly that digest). An unreadable mirror (a fork's token)
+# is reported, not fatal.
+check() {
+  parse "$1"
+  local src="docker.io/${NAME}" dst="${PREFIX}/${NAME}" want have
+  if [[ -n "$DIGEST" ]]; then
+    src+="@${DIGEST}" dst+=":${DIGEST/:/-}"
+  else
+    src+=":${TAG}" dst+=":${TAG}"
+  fi
+  want="$(retry crane digest "$src")"
+  if [[ -n "$DIGEST" && "$want" != "$DIGEST" ]]; then
+    echo "::error::${src} resolved to ${want}" >&2; return 1
+  fi
+  if ! have="$(crane digest "$dst" 2>/dev/null)"; then
+    if crane ls "${PREFIX}/${NAME}" >/dev/null 2>&1; then
+      echo "would copy: ${src} (${want}) -> ${dst} (tag not in the mirror yet)"
+    else
+      echo "would copy: ${src} (${want}) -> ${dst} (new image, or the mirror isn't readable here)"
+    fi
+  elif [[ "$have" == "$want" ]]; then
+    echo "up to date: ${dst} (${want})"
+  else
+    echo "would copy: ${src} (${want}) -> ${dst} (mirror has ${have})"
+  fi
+}
+
 copy() {
   parse "$1"
   local src="docker.io/${NAME}" dst="${PREFIX}/${NAME}" want have
@@ -111,6 +142,7 @@ copy() {
 case "${1:-}" in
   list) list ;;
   map)  map "${2:?usage: map <ref>}" ;;
+  check) check "${2:?usage: check <ref>}" ;;
   copy) copy "${2:?usage: copy <ref>}" ;;
-  *) sed -n '2,12p' "$0" >&2; exit 2 ;;
+  *) sed -n '2,13p' "$0" >&2; exit 2 ;;
 esac
