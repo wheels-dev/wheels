@@ -53,6 +53,14 @@ component extends="wheels.WheelsTest" {
 				expect(ListLast(application["$hookSpecLog"], "|")).toBe("success:none");
 			});
 
+			it("stores NULL when perform() returns an empty string, as for nothing", function() {
+				var id = $insertJob(queue = "test_hooks_empty", data = {mode = "empty"});
+				new wheels.JobWorker().processNext(queues = "test_hooks_empty", timeout = 300);
+				var row = $row(id);
+				expect(row.status).toBe("completed");
+				expect(row.resultIsNull).toBeTrue("Oracle can't tell an empty string from NULL, so every database stores NULL");
+			});
+
 			it("cuts a long result short with a visible marker", function() {
 				var id = $insertJob(queue = "test_hooks_long", data = {mode = "long"});
 				new wheels.JobWorker().processNext(queues = "test_hooks_long", timeout = 300);

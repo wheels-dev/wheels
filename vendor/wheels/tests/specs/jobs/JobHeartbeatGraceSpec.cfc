@@ -62,6 +62,14 @@ component extends="wheels.WheelsTest" {
 				expect($status(id)).toBe("processing", "15 seconds is inside the 30-second minimum");
 			});
 
+			it("reclaims a job idle past the 30-second minimum when the setting is below it", function() {
+				application.wheels.jobsHeartbeatGraceSeconds = 5;
+				var id = $insertRunning(queue = "test_grace_floor_past", heartbeatSecondsAgo = 45);
+				var reaped = new wheels.JobWorker().checkTimeouts(timeout = 300, queues = "test_grace_floor_past");
+				expect(reaped).toBe(1);
+				expect($status(id)).toBe("pending", "45 seconds is past the 30-second minimum, so the job is retried");
+			});
+
 			it("renews an exclusive job's lease by the heartbeat grace window", function() {
 				application.wheels.jobsHeartbeatGraceSeconds = 100;
 				var job = new wheels.Job();

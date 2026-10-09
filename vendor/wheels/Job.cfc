@@ -1232,6 +1232,12 @@ component {
 	 * Public with $ prefix so JobWorker can bootstrap the table on a fresh database.
 	 */
 	public boolean function $ensureJobTable() {
+		// PostgreSQL and CockroachDB abort a transaction on a failed statement, so inside one the
+		// probe below would turn a missing table into "current transaction is aborted" for the
+		// catalog check after it. With auto-create off, ask the catalog first there.
+		if (!$jobSchema().autoCreateEnabled() && $jobSchema().databaseType() == "postgresql" && !$jobSchema().hasTable("wheels_jobs")) {
+			$throwJobSchemaMissing("The wheels_jobs table");
+		}
 		try {
 			// Check if table already exists by querying it
 			$jobsQuery("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});

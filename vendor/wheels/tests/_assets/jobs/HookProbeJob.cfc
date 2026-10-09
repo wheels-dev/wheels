@@ -1,7 +1,8 @@
 /**
  * A job with every lifecycle hook (core-suite fixture). Each hook appends to a list in the
  * application scope so the hook specs can check what ran, in what order, with what.
- * data.mode picks what perform() does: "text" (default), "struct", "void", "long" or "fail".
+ * data.mode picks what perform() does: "text" (default), "struct", "void", "empty" (returns ""),
+ * "long", "unicode", "unicodeLong" or "fail".
  */
 component extends="wheels.Job" {
 
@@ -37,6 +38,9 @@ component extends="wheels.Job" {
 		}
 		if (local.mode == "void") {
 			return;
+		}
+		if (local.mode == "empty") {
+			return "";
 		}
 		return "done";
 	}

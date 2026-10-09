@@ -1,0 +1,1 @@
+- With `jobsAutoCreateTables = false` on PostgreSQL or CockroachDB, a job call made inside a database transaction while the job tables are missing now reports `Wheels.Job.SchemaMissing`, pointing at `wheels jobs install`. Before, the failed table probe aborted the transaction, and the caller saw "current transaction is aborted" instead.
