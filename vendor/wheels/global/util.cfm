@@ -581,8 +581,10 @@
 			try {
 				return $javaCalendarToDate($epochMillisCalendar(JavaCast("long", arguments.value)));
 			} catch (any e) {
-				// JVM-free engine (RustCFML) — plain epoch arithmetic instead.
-				return DateAdd("s", Int(arguments.value / 1000), CreateDate(1970, 1, 1));
+				// JVM-free engine (RustCFML) — plain epoch arithmetic instead,
+				// counted from the epoch instant in local time. CreateDate(1970, 1, 1)
+				// is local midnight, which is off by the host's 1970 UTC offset (#4525).
+				return DateAdd("s", Int(arguments.value / 1000), DateConvert("utc2local", CreateDateTime(1970, 1, 1, 0, 0, 0)));
 			}
 		}
 		// Datetime strings, including the fractional-second form
