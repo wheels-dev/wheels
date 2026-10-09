@@ -75,7 +75,7 @@ component {
 
 		// Find the next candidate job
 		local.params = {
-			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
+			runAt = {value = $now(), cfsqltype = "wheels_epoch"}
 		};
 
 		// The candidate SELECT deliberately excludes the data column: at backlog scale
@@ -110,11 +110,11 @@ component {
 		local.sql &= $candidateLimitClause(dbType = local.dbType, candidateLimit = local.candidateLimit);
 
 		try {
-			local.candidates = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			local.candidates = $jobsQuery(local.sql, local.params, {datasource = variables.$datasource});
 		} catch (any e) {
 			$ensureJobTable();
 			try {
-				local.candidates = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+				local.candidates = $jobsQuery(local.sql, local.params, {datasource = variables.$datasource});
 			} catch (any e2) {
 				local.result.skipped = true;
 				local.result.error = e2.message;
@@ -288,9 +288,9 @@ component {
 		// or an ALTER-blocked table) fall back to this poller's own timeout.
 		// The floor is 30s, not 60s: a heartbeating row can be reapable from its heartbeat grace,
 		// whose minimum is 30s.
-		local.floorCutoff = DateAdd("s", -30, $now());
+		local.floorCutoff = $now() - 30;
 
-		local.params = {cutoff = {value = local.floorCutoff, cfsqltype = "cf_sql_timestamp"}};
+		local.params = {cutoff = {value = local.floorCutoff, cfsqltype = "wheels_epoch"}};
 
 		// Scope the reap to the queues this poll serves. A blank "queues" reaps across all
 		// queues (the standalone jobsMonitor path); processNext passes its own queue set so
@@ -339,7 +339,7 @@ component {
 					local.grace = Min(local.grace, local.beatGrace);
 				}
 			}
-			local.rowCutoff = DateAdd("s", -local.grace, local.now);
+			local.rowCutoff = local.now - local.grace;
 
 			local.currentAttempts = Val(local.row.attempts);
 			local.maxRetries = Val(local.row.maxRetries);
@@ -396,7 +396,7 @@ component {
 				// hasBeat: whether the job has heartbeated (#4502), as a flag so no timestamp is
 				// read in CFML.
 				local.beatColumn = $heartbeatColumnAvailable() ? ", CASE WHEN heartbeatAt IS NULL THEN 0 ELSE 1 END AS hasBeat" : "";
-				return queryExecute(
+				return $jobsQuery(
 					"SELECT id, jobClass, queue, attempts, maxRetries, updatedAt, claimTimeout" & local.beatColumn & "
 					FROM wheels_jobs " & arguments.whereClause,
 					arguments.params,
@@ -406,7 +406,7 @@ component {
 				variables.$claimTimeoutColumnPresent = false;
 			}
 		}
-		return queryExecute(
+		return $jobsQuery(
 			"SELECT id, jobClass, queue, attempts, maxRetries, updatedAt
 			FROM wheels_jobs " & arguments.whereClause,
 			arguments.params,
@@ -434,7 +434,7 @@ component {
 			}
 
 			local.sql &= " GROUP BY queue, status ORDER BY queue, status";
-			local.rows = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			local.rows = $jobsQuery(local.sql, local.params, {datasource = variables.$datasource});
 		} catch (any e) {
 			$ensureJobTable();
 			return local.result;
@@ -472,8 +472,8 @@ component {
 			worker = {id = this.workerId, startedAt = this.startedAt, processed = this.jobsProcessed, failed = this.jobsFailed}
 		};
 
-		local.lookback = DateAdd("n", -arguments.minutes, $now());
-		local.params = {lookback = {value = local.lookback, cfsqltype = "cf_sql_timestamp"}};
+		local.lookback = $now() - arguments.minutes * 60;
+		local.params = {lookback = {value = local.lookback, cfsqltype = "wheels_epoch"}};
 
 		// Throughput — completed and failed in the window
 		try {
@@ -484,7 +484,7 @@ component {
 				local.params.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 			}
 			local.sql &= " GROUP BY status";
-			local.throughputRows = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			local.throughputRows = $jobsQuery(local.sql, local.params, {datasource = variables.$datasource});
 
 			for (local.row in local.throughputRows) {
 				if (local.row.status == "completed") local.result.throughput.completed = local.row.cnt;
@@ -501,7 +501,8 @@ component {
 
 		// Recent jobs
 		try {
-			local.recentSql = "SELECT id, jobClass, queue, status, attempts, lastError, updatedAt
+			// updatedAt is read as epoch seconds and reported in the app's local time.
+			local.recentSql = "SELECT id, jobClass, queue, status, attempts, lastError, " & $jobClock().epochSql("updatedAt") & " AS updatedAt
 				FROM wheels_jobs";
 			local.recentParams = {};
 			if (Len(arguments.queue)) {
@@ -515,7 +516,7 @@ component {
 			// the query throws and the catch below returned an empty
 			// recentJobs. The CFML break is a belt-and-braces backstop.
 			local.recentSql &= $candidateLimitClause(dbType = $dbType(), candidateLimit = 10);
-			local.recentRows = queryExecute(local.recentSql, local.recentParams, {datasource = variables.$datasource});
+			local.recentRows = $jobsQuery(local.recentSql, local.recentParams, {datasource = variables.$datasource});
 
 			for (local.row in local.recentRows) {
 				if (ArrayLen(local.result.recentJobs) >= 10) {
@@ -537,7 +538,7 @@ component {
 
 		// Oldest pending job
 		try {
-			local.oldestSql = "SELECT createdAt FROM wheels_jobs WHERE status = 'pending'";
+			local.oldestSql = "SELECT " & $jobClock().epochSql("createdAt") & " AS createdAtEpoch FROM wheels_jobs WHERE status = 'pending'";
 			local.oldestParams = {};
 			if (Len(arguments.queue)) {
 				local.oldestSql &= " AND queue = :queue";
@@ -547,28 +548,10 @@ component {
 			// Bound in SQL text (see the recentJobs note on driver maxrows) —
 			// the ORDER BY puts the oldest pending row first.
 			local.oldestSql &= $candidateLimitClause(dbType = $dbType(), candidateLimit = 1);
-			local.oldestRow = queryExecute(local.oldestSql, local.oldestParams, {datasource = variables.$datasource});
+			local.oldestRow = $jobsQuery(local.oldestSql, local.oldestParams, {datasource = variables.$datasource});
 			if (local.oldestRow.recordCount) {
-				// This reads through a raw queryExecute, so the Wheels adapter's
-				// date canonicalization never runs. The shapes the drivers hand
-				// back vary: epoch-millis longs (Adobe + sqlite-jdbc), real date
-				// objects, fractional-second strings, and Oracle's
-				// oracle.sql.TIMESTAMP (which is not a java.util.Date, #3649).
-				// This component is standalone (no Global mixin), so reach the
-				// shared normalizer through the application object and keep the
-				// old epoch-milliseconds conversion as the fallback.
-				local.normalized = "";
-				try {
-					local.normalized = application.wo.$normalizeDbTimestamp(local.oldestRow.createdAt);
-				} catch (any e) {
-					local.normalized = IsNumeric(local.oldestRow.createdAt)
-						? DateAdd("s", Int(local.oldestRow.createdAt / 1000), CreateDate(1970, 1, 1))
-						: local.oldestRow.createdAt;
-				}
-				// Stored as UTC on the jobs clock; reported in the app's local time.
-				local.result.oldestPending = IsDate(local.normalized)
-					? $jobClock().toLocal(local.normalized)
-					: local.oldestRow.createdAt;
+				// Read as epoch seconds on the jobs clock; reported in the app's local time.
+				local.result.oldestPending = $jobClock().toLocal(local.oldestRow.createdAtEpoch);
 			}
 		} catch (any e) {
 			// Ignore
@@ -598,15 +581,15 @@ component {
 				// Bound in SQL text (BoxLang + PostgreSQL throws on the driver
 				// maxrows option — setLargeMaxRows is not implemented).
 				local.selectSql &= $candidateLimitClause(dbType = $dbType(), candidateLimit = arguments.limit);
-				local.failedJobs = queryExecute(local.selectSql, local.selectParams, {datasource = variables.$datasource});
+				local.failedJobs = $jobsQuery(local.selectSql, local.selectParams, {datasource = variables.$datasource});
 
 				if (!local.failedJobs.recordCount) return 0;
 
 				local.ids = ValueList(local.failedJobs.id);
 				local.idConditions = [];
 				local.updateParams = {
-					runAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
-					updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}
+					runAt = {value = local.now, cfsqltype = "wheels_epoch"},
+					updatedAt = {value = local.now, cfsqltype = "wheels_epoch"}
 				};
 				local.i = 0;
 				for (local.id in ListToArray(local.ids)) {
@@ -621,7 +604,7 @@ component {
 						runAt = :runAt, updatedAt = :updatedAt
 					WHERE id IN (#ArrayToList(local.idConditions)#)";
 
-				queryExecute(local.updateSql, local.updateParams, {datasource = variables.$datasource});
+				$jobsQuery(local.updateSql, local.updateParams, {datasource = variables.$datasource});
 				return local.failedJobs.recordCount;
 			} catch (any e) {
 				$ensureJobTable();
@@ -635,8 +618,8 @@ component {
 				runAt = :runAt, updatedAt = :updatedAt
 			WHERE status = 'failed'";
 		local.params = {
-			runAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
-			updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}
+			runAt = {value = local.now, cfsqltype = "wheels_epoch"},
+			updatedAt = {value = local.now, cfsqltype = "wheels_epoch"}
 		};
 
 		if (Len(arguments.queue)) {
@@ -654,9 +637,9 @@ component {
 				local.countSql &= " AND queue = :queue";
 				local.countParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 			}
-			local.countResult = queryExecute(local.countSql, local.countParams, {datasource = variables.$datasource});
+			local.countResult = $jobsQuery(local.countSql, local.countParams, {datasource = variables.$datasource});
 
-			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			$jobsQuery(local.sql, local.params, {datasource = variables.$datasource});
 			return local.countResult.cnt ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
@@ -675,13 +658,13 @@ component {
 			throw(type = "Wheels.InvalidArgument", message = "Purge status must be 'completed', 'failed' or 'interrupted'.");
 		}
 
-		local.cutoff = DateAdd("d", -arguments.days, $now());
+		local.cutoff = $now() - arguments.days * 86400;
 		local.dateColumn = (arguments.status == "completed") ? "completedAt" : "failedAt";
 
 		local.sql = "DELETE FROM wheels_jobs WHERE status = :status AND #local.dateColumn# < :cutoff";
 		local.params = {
 			status = {value = arguments.status, cfsqltype = "cf_sql_varchar"},
-			cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}
+			cutoff = {value = local.cutoff, cfsqltype = "wheels_epoch"}
 		};
 
 		if (Len(arguments.queue)) {
@@ -693,18 +676,18 @@ component {
 			local.countSql = "SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = :status AND #local.dateColumn# < :cutoff";
 			local.countParams = {
 				status = {value = arguments.status, cfsqltype = "cf_sql_varchar"},
-				cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}
+				cutoff = {value = local.cutoff, cfsqltype = "wheels_epoch"}
 			};
 			if (Len(arguments.queue)) {
 				local.countSql &= " AND queue = :queue";
 				local.countParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 			}
-			local.countResult = queryExecute(local.countSql, local.countParams, {datasource = variables.$datasource});
+			local.countResult = $jobsQuery(local.countSql, local.countParams, {datasource = variables.$datasource});
 			local.cnt = local.countResult.cnt ?: 0;
 			if (local.cnt <= 0) {
 				return 0;
 			}
-			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			$jobsQuery(local.sql, local.params, {datasource = variables.$datasource});
 			return local.cnt;
 		} catch (any e) {
 			$ensureJobTable();
@@ -777,7 +760,7 @@ component {
 			local.setClaim &= ", heartbeatAt = NULL";
 		}
 		local.params = {
-			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			updatedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 			id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
 		};
 		if (arguments.withClaimTimeout) {
@@ -790,13 +773,10 @@ component {
 			local.params.claimToken = {value = local.claimToken, cfsqltype = "cf_sql_varchar"};
 			local.params.claimedBy = {value = $jobBridge().$jobHostName(), cfsqltype = "cf_sql_varchar"};
 		}
-		queryExecute(
-			"UPDATE wheels_jobs
+		local.$prepared = $jobClock().prepare("UPDATE wheels_jobs
 			SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt" & local.setClaim & "
-			WHERE id = :id AND status = 'pending'",
-			local.params,
-			{datasource = variables.$datasource, result = "local.updateResult"}
-		);
+			WHERE id = :id AND status = 'pending'", local.params);
+		queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.updateResult"});
 		local.won = (local.updateResult.recordCount ?: 0) > 0;
 		if (local.won && Len(local.claimToken)) {
 			if (!StructKeyExists(variables, "$claimTokens")) {
@@ -890,19 +870,16 @@ component {
 			// token guard, an attempt that was reaped and re-claimed while it ran would match
 			// the NEW attempt's 'processing' row here and complete it out from under it.
 			local.doneParams = {
-				completedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+				completedAt = {value = $now(), cfsqltype = "wheels_epoch"},
+				updatedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 				id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 			};
 			local.doneGuard = $jobBridge().$claimTokenGuard(claimToken = local.claimToken, params = local.doneParams);
 			local.resultSet = $jobBridge().$resultAssignment(performOutcome = local.performOutcome, params = local.doneParams);
-			queryExecute(
-				"UPDATE wheels_jobs
+			local.$prepared = $jobClock().prepare("UPDATE wheels_jobs
 				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt" & local.resultSet & "
-				WHERE id = :id AND status = 'processing'" & local.doneGuard,
-				local.doneParams,
-				{datasource = variables.$datasource, result = "local.doneResult"}
-			);
+				WHERE id = :id AND status = 'processing'" & local.doneGuard, local.doneParams);
+			queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.doneResult"});
 
 			if (Len(local.claimToken) && Val(local.doneResult.recordCount ?: 0) == 0) {
 				$jobBridge().$logFencedAttempt(jobId = arguments.jobRow.id, jobClass = arguments.jobRow.jobClass, outcome = "completed");
@@ -1061,12 +1038,12 @@ component {
 			maxDelay = local.maxDelay,
 			retryBackoff = local.retryBackoff
 		);
-		local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
+		local.nextRunAt = $now() + local.backoffSeconds;
 
 		local.params = {
 			lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
-			runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
-			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			runAt = {value = local.nextRunAt, cfsqltype = "wheels_epoch"},
+			updatedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 			id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
 		};
 		// Optimistic version token: when the reaper passes the attempts it read,
@@ -1082,25 +1059,22 @@ component {
 		// comparison SQL-side (a query's updatedAt is an epoch number on BoxLang / mishandled
 		// on Adobe when diffed in CFML). A row still inside its own window matches 0 rows.
 		local.staleGuard = "";
-		if (IsDate(arguments.staleCutoff)) {
+		if (IsNumeric(arguments.staleCutoff)) {
 			local.staleGuard = " AND " & $lastSeenSql() & " < :staleCutoff";
-			local.params.staleCutoff = {value = arguments.staleCutoff, cfsqltype = "cf_sql_timestamp"};
+			local.params.staleCutoff = {value = arguments.staleCutoff, cfsqltype = "wheels_epoch"};
 		}
 		// Fence (the owning attempt's own retry): only while the row is still its claim.
 		local.tokenGuard = $jobBridge().$claimTokenGuard(claimToken = arguments.claimToken, params = local.params);
 		// A requeued row is nobody's claim, so its token goes with it — the reaper path clears
 		// the reaped attempt's token here too.
 		local.clearToken = $claimTokenColumnAvailable() ? ", claimToken = NULL" : "";
-		queryExecute(
-			"UPDATE wheels_jobs
+		local.$prepared = $jobClock().prepare("UPDATE wheels_jobs
 			SET status = 'pending',
 				lastError = :lastError,
 				runAt = :runAt,
 				updatedAt = :updatedAt" & local.clearToken & "
-			WHERE id = :id AND status = 'processing'" & local.attemptsGuard & local.staleGuard & local.tokenGuard,
-			local.params,
-			{datasource = variables.$datasource, result = "local.updateResult"}
-		);
+			WHERE id = :id AND status = 'processing'" & local.attemptsGuard & local.staleGuard & local.tokenGuard, local.params);
+		queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.updateResult"});
 
 		writeLog(
 			text = "Job '#arguments.jobClass#' [#arguments.jobId#] failed (attempt #arguments.currentAttempts#/#arguments.maxRetries#), retrying in #local.backoffSeconds#s",
@@ -1123,9 +1097,9 @@ component {
 		string claimToken = ""
 	) {
 		local.params = {
-			failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			failedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 			lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
-			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			updatedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 			id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
 		};
 		// Same optimistic version token as $scheduleRetry: only this attempts-value wins (#3888).
@@ -1136,21 +1110,18 @@ component {
 		}
 		// Per-row staleness guard built from the row's own claimTimeout, compared SQL-side (#3989).
 		local.staleGuard = "";
-		if (IsDate(arguments.staleCutoff)) {
+		if (IsNumeric(arguments.staleCutoff)) {
 			local.staleGuard = " AND " & $lastSeenSql() & " < :staleCutoff";
-			local.params.staleCutoff = {value = arguments.staleCutoff, cfsqltype = "cf_sql_timestamp"};
+			local.params.staleCutoff = {value = arguments.staleCutoff, cfsqltype = "wheels_epoch"};
 		}
 		local.tokenGuard = $jobBridge().$claimTokenGuard(claimToken = arguments.claimToken, params = local.params);
-		queryExecute(
-			"UPDATE wheels_jobs
+		local.$prepared = $jobClock().prepare("UPDATE wheels_jobs
 			SET status = 'failed',
 				failedAt = :failedAt,
 				lastError = :lastError,
 				updatedAt = :updatedAt
-			WHERE id = :id AND status = 'processing'" & local.attemptsGuard & local.staleGuard & local.tokenGuard,
-			local.params,
-			{datasource = variables.$datasource, result = "local.updateResult"}
-		);
+			WHERE id = :id AND status = 'processing'" & local.attemptsGuard & local.staleGuard & local.tokenGuard, local.params);
+		queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.updateResult"});
 
 		writeLog(
 			text = "Job '#arguments.jobClass#' [#arguments.jobId#] permanently failed after #arguments.maxRetries# attempts",
@@ -1161,11 +1132,18 @@ component {
 	}
 
 	/**
-	 * The current time on the jobs clock (wheels.JobClock): UTC, from the database's clock, in
-	 * whole seconds.
+	 * The current time on the jobs clock (wheels.JobClock): UTC epoch seconds, from the database's
+	 * clock.
 	 */
-	private date function $now() {
-		return $jobClock().utcNow();
+	private numeric function $now() {
+		return $jobClock().nowEpoch();
+	}
+
+	/**
+	 * Internal: queryExecute() with wheels_epoch timestamp parameters (see wheels.JobClock).
+	 */
+	private any function $jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return $jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 	/**
@@ -1361,23 +1339,20 @@ component {
 		required any staleCutoff
 	) {
 		local.params = {
-			failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			failedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 			lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
-			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			updatedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 			id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"},
 			expectedAttempts = {value = arguments.expectedAttempts, cfsqltype = "cf_sql_integer"},
-			staleCutoff = {value = arguments.staleCutoff, cfsqltype = "cf_sql_timestamp"}
+			staleCutoff = {value = arguments.staleCutoff, cfsqltype = "wheels_epoch"}
 		};
-		queryExecute(
-			"UPDATE wheels_jobs
+		local.$prepared = $jobClock().prepare("UPDATE wheels_jobs
 			SET status = 'interrupted',
 				failedAt = :failedAt,
 				lastError = :lastError,
 				updatedAt = :updatedAt
-			WHERE id = :id AND status = 'processing' AND attempts = :expectedAttempts AND " & $lastSeenSql() & " < :staleCutoff",
-			local.params,
-			{datasource = variables.$datasource, result = "local.updateResult"}
-		);
+			WHERE id = :id AND status = 'processing' AND attempts = :expectedAttempts AND " & $lastSeenSql() & " < :staleCutoff", local.params);
+		queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.updateResult"});
 		local.changed = StructKeyExists(local, "updateResult") ? Val(local.updateResult.recordCount) : 0;
 		// Only the reaper that won the row logs it: a concurrent one (or a row that came back to
 		// life) changed nothing.
@@ -1396,7 +1371,7 @@ component {
 	 * actually claimed, so the candidate scan doesn't transfer every pending payload.
 	 */
 	private string function $fetchJobData(required string jobId) {
-		local.dataRow = queryExecute(
+		local.dataRow = $jobsQuery(
 			"SELECT data FROM wheels_jobs WHERE id = :id",
 			{id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}},
 			{datasource = variables.$datasource}

@@ -94,17 +94,14 @@ component {
 			return;
 		}
 		local.params = {
-			beatAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			beatAt = {value = $now(), cfsqltype = "wheels_epoch"},
 			id = {value = variables.$claim.jobId, cfsqltype = "cf_sql_varchar"}
 		};
 		local.guard = $claimTokenGuard(claimToken = variables.$claim.claimToken, params = local.params);
 		// Without the heartbeatAt column (an ALTER-blocked table), updatedAt keeps it alive instead.
 		local.column = $heartbeatColumnAvailable() ? "heartbeatAt" : "updatedAt";
-		queryExecute(
-			"UPDATE wheels_jobs SET #local.column# = :beatAt WHERE id = :id AND status = 'processing'" & local.guard,
-			local.params,
-			{datasource = variables.$datasource, result = "local.beat"}
-		);
+		local.$prepared = $jobClock().prepare("UPDATE wheels_jobs SET #local.column# = :beatAt WHERE id = :id AND status = 'processing'" & local.guard, local.params);
+		queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.beat"});
 		if (Val(local.beat.recordCount ?: 0) == 0) {
 			$logFencedAttempt(jobId = variables.$claim.jobId, jobClass = GetMetadata(this).name, outcome = "heartbeat");
 			Throw(
@@ -253,7 +250,7 @@ component {
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
-			runAt = DateAdd("s", arguments.seconds, $now()),
+			runAt = $now() + arguments.seconds,
 			transactional = $resolveTransactional(arguments.transactional),
 			uniqueKey = arguments.uniqueKey
 		);
@@ -282,7 +279,7 @@ component {
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
-			runAt = $jobClock().toUtc(arguments.runAt),
+			runAt = $jobClock().fromLocal(arguments.runAt),
 			transactional = $resolveTransactional(arguments.transactional),
 			uniqueKey = arguments.uniqueKey
 		);
@@ -454,7 +451,7 @@ component {
 	 * Internal: reads which job holds `uniqueKey` ("" when none does).
 	 */
 	public string function $selectJobIdByUniqueKey(required string uniqueKey) {
-		local.rows = queryExecute(
+		local.rows = $jobsQuery(
 			"SELECT id FROM wheels_jobs WHERE uniqueKey = :uniqueKey",
 			{uniqueKey = {value = arguments.uniqueKey, cfsqltype = "cf_sql_varchar"}},
 			{datasource = variables.$datasource}
@@ -576,7 +573,7 @@ component {
 		required struct data,
 		required string queue,
 		required numeric priority,
-		required date runAt,
+		required numeric runAt,
 		boolean transactional = true,
 		string uniqueKey = ""
 	) {
@@ -693,8 +690,8 @@ component {
 		required string queue,
 		required string serializedData,
 		required numeric priority,
-		required date runAt,
-		required date enqueuedAt,
+		required numeric runAt,
+		required numeric enqueuedAt,
 		string uniqueKey = "",
 		boolean withUniqueKey = false
 	) {
@@ -707,14 +704,14 @@ component {
 			data = {value = arguments.serializedData, cfsqltype = "cf_sql_longvarchar"},
 			priority = {value = arguments.priority, cfsqltype = "cf_sql_integer"},
 			maxRetries = {value = this.maxRetries, cfsqltype = "cf_sql_integer"},
-			runAt = {value = arguments.runAt, cfsqltype = "cf_sql_timestamp"},
-			createdAt = {value = arguments.enqueuedAt, cfsqltype = "cf_sql_timestamp"},
-			updatedAt = {value = arguments.enqueuedAt, cfsqltype = "cf_sql_timestamp"}
+			runAt = {value = arguments.runAt, cfsqltype = "wheels_epoch"},
+			createdAt = {value = arguments.enqueuedAt, cfsqltype = "wheels_epoch"},
+			updatedAt = {value = arguments.enqueuedAt, cfsqltype = "wheels_epoch"}
 		};
 		if (arguments.withUniqueKey) {
 			local.params.uniqueKey = {value = Len(arguments.uniqueKey) ? arguments.uniqueKey : arguments.id, cfsqltype = "cf_sql_varchar"};
 		}
-		queryExecute(
+		$jobsQuery(
 			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt" & local.keyColumn & ")
 			VALUES (:id, :jobClass, :queue, :data, :priority, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt" & local.keyValue & ")",
 			local.params,
@@ -850,7 +847,7 @@ component {
 		// connection pool hands out a different connection that cannot see the
 		// uncommitted UPDATE.
 		local.claimParams = {
-			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			updatedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 			id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 		};
 		// A new claim starts with no heartbeat, so an earlier attempt's can't make it look stale.
@@ -861,13 +858,10 @@ component {
 			local.claimParams.claimedBy = {value = $jobHostName(), cfsqltype = "cf_sql_varchar"};
 		}
 		try {
-			queryExecute(
-				"UPDATE wheels_jobs
+			local.$prepared = $jobClock().prepare("UPDATE wheels_jobs
 				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt" & local.setClaim & "
-				WHERE id = :id AND status = 'pending'",
-				local.claimParams,
-				{datasource = variables.$datasource, result = "local.updateResult"}
-			);
+				WHERE id = :id AND status = 'pending'", local.claimParams);
+			queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.updateResult"});
 			if ((local.updateResult.recordCount ?: 0) == 0) {
 				// Another worker already claimed this job — skip without executing
 				local.result.skipped = true;
@@ -927,19 +921,16 @@ component {
 
 			// Mark as completed — only while the row is still this attempt's claim
 			local.doneParams = {
-				completedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+				completedAt = {value = $now(), cfsqltype = "wheels_epoch"},
+				updatedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 				id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 			};
 			local.doneGuard = $claimTokenGuard(claimToken = local.claimToken, params = local.doneParams);
 			local.resultSet = $resultAssignment(performOutcome = local.performOutcome, params = local.doneParams);
-			queryExecute(
-				"UPDATE wheels_jobs
+			local.$prepared = $jobClock().prepare("UPDATE wheels_jobs
 				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt" & local.resultSet & "
-				WHERE id = :id AND status = 'processing'" & local.doneGuard,
-				local.doneParams,
-				{datasource = variables.$datasource, result = "local.doneResult"}
-			);
+				WHERE id = :id AND status = 'processing'" & local.doneGuard, local.doneParams);
+			queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.doneResult"});
 
 			if (Len(local.claimToken) && Val(local.doneResult.recordCount ?: 0) == 0) {
 				$logFencedAttempt(jobId = arguments.jobRow.id, jobClass = arguments.jobRow.jobClass, outcome = "completed");
@@ -980,27 +971,24 @@ component {
 					maxDelay = local.backoff.maxDelay,
 					retryBackoff = local.backoff.retryBackoff
 				);
-				local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
+				local.nextRunAt = $now() + local.backoffSeconds;
 
 				local.retryParams = {
 					lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
-					runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
-					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+					runAt = {value = local.nextRunAt, cfsqltype = "wheels_epoch"},
+					updatedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 				};
 				local.retryGuard = $claimTokenGuard(claimToken = local.claimToken, params = local.retryParams);
 				// A requeued row is nobody's claim: drop the token with it.
 				local.clearToken = Len(local.claimToken) ? ", claimToken = NULL" : "";
-				queryExecute(
-					"UPDATE wheels_jobs
+				local.$prepared = $jobClock().prepare("UPDATE wheels_jobs
 					SET status = 'pending',
 						lastError = :lastError,
 						runAt = :runAt,
 						updatedAt = :updatedAt" & local.clearToken & "
-					WHERE id = :id AND status = 'processing'" & local.retryGuard,
-					local.retryParams,
-					{datasource = variables.$datasource, result = "local.retryResult"}
-				);
+					WHERE id = :id AND status = 'processing'" & local.retryGuard, local.retryParams);
+				queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.retryResult"});
 				if (Len(local.claimToken) && Val(local.retryResult.recordCount ?: 0) == 0) {
 					fence.lost = true;
 					$logFencedAttempt(jobId = arguments.jobRow.id, jobClass = arguments.jobRow.jobClass, outcome = "failed, retry");
@@ -1016,22 +1004,19 @@ component {
 			} else {
 				// Max retries exceeded — mark as failed (dead letter)
 				local.failParams = {
-					failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+					failedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 					lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
-					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+					updatedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 				};
 				local.failGuard = $claimTokenGuard(claimToken = local.claimToken, params = local.failParams);
-				queryExecute(
-					"UPDATE wheels_jobs
+				local.$prepared = $jobClock().prepare("UPDATE wheels_jobs
 					SET status = 'failed',
 						failedAt = :failedAt,
 						lastError = :lastError,
 						updatedAt = :updatedAt
-					WHERE id = :id AND status = 'processing'" & local.failGuard,
-					local.failParams,
-					{datasource = variables.$datasource, result = "local.failResult"}
-				);
+					WHERE id = :id AND status = 'processing'" & local.failGuard, local.failParams);
+				queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.failResult"});
 				if (Len(local.claimToken) && Val(local.failResult.recordCount ?: 0) == 0) {
 					fence.lost = true;
 					$logFencedAttempt(jobId = arguments.jobRow.id, jobClass = arguments.jobRow.jobClass, outcome = "failed");
@@ -1156,7 +1141,7 @@ component {
 			}
 
 			local.sql &= " GROUP BY status";
-			local.result = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			local.result = $jobsQuery(local.sql, local.params, {datasource = variables.$datasource});
 
 			for (local.row in local.result) {
 				if (StructKeyExists(local.stats, local.row.status)) {
@@ -1182,8 +1167,8 @@ component {
 				runAt = :runAt, updatedAt = :updatedAt
 			WHERE status = 'failed'";
 		local.params = {
-			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
+			runAt = {value = $now(), cfsqltype = "wheels_epoch"},
+			updatedAt = {value = $now(), cfsqltype = "wheels_epoch"}
 		};
 
 		if (Len(arguments.queue)) {
@@ -1198,8 +1183,8 @@ component {
 				local.countSql &= " AND queue = :queue";
 				local.countParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 			}
-			local.countResult = queryExecute(local.countSql, local.countParams, {datasource = variables.$datasource});
-			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			local.countResult = $jobsQuery(local.countSql, local.countParams, {datasource = variables.$datasource});
+			$jobsQuery(local.sql, local.params, {datasource = variables.$datasource});
 			return local.countResult.cnt ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
@@ -1213,10 +1198,10 @@ component {
 	 * @queue Optional queue name to filter by.
 	 */
 	public numeric function purgeCompleted(numeric days = 7, string queue = "") {
-		local.cutoff = DateAdd("d", -arguments.days, $now());
+		local.cutoff = $now() - arguments.days * 86400;
 		local.sql = "DELETE FROM wheels_jobs WHERE status = 'completed' AND completedAt < :cutoff";
 		local.params = {
-			cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}
+			cutoff = {value = local.cutoff, cfsqltype = "wheels_epoch"}
 		};
 
 		if (Len(arguments.queue)) {
@@ -1226,13 +1211,13 @@ component {
 
 		try {
 			local.countSql = "SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = 'completed' AND completedAt < :cutoff";
-			local.countParams = {cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}};
+			local.countParams = {cutoff = {value = local.cutoff, cfsqltype = "wheels_epoch"}};
 			if (Len(arguments.queue)) {
 				local.countSql &= " AND queue = :queue";
 				local.countParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 			}
-			local.countResult = queryExecute(local.countSql, local.countParams, {datasource = variables.$datasource});
-			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			local.countResult = $jobsQuery(local.countSql, local.countParams, {datasource = variables.$datasource});
+			$jobsQuery(local.sql, local.params, {datasource = variables.$datasource});
 			return local.countResult.cnt ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
@@ -1249,7 +1234,7 @@ component {
 	public boolean function $ensureJobTable() {
 		try {
 			// Check if table already exists by querying it
-			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			$jobsQuery("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
 			// With auto-create off the schema is the app's (its `wheels jobs install` migration):
 			// no column upgrades run here.
 			if (!$jobSchema().autoCreateEnabled()) {
@@ -1274,7 +1259,7 @@ component {
 			if (!$jobSchema().hasTable("wheels_jobs")) {
 				$throwJobSchemaMissing("The wheels_jobs table");
 			}
-			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			$jobsQuery("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
 			return true;
 		}
 
@@ -1284,7 +1269,7 @@ component {
 			// because the adapter may have been detected from a different datasource.
 			local.dbType = $detectDatabaseType();
 			local.schema = $jobSchema();
-			queryExecute(local.schema.createTableSql(tableName = "wheels_jobs", dbType = local.dbType), {}, {datasource = variables.$datasource});
+			$jobsQuery(local.schema.createTableSql(tableName = "wheels_jobs", dbType = local.dbType), {}, {datasource = variables.$datasource});
 
 			// Indexes for efficient queue processing are optional: don't fail if one can't be
 			// created. The uniqueKey index is not optional: it is what de-duplicates
@@ -1292,7 +1277,7 @@ component {
 			// (the column is there, the index isn't), and enqueue(uniqueKey=) refuses to run without it.
 			for (local.index in local.schema.tableDef("wheels_jobs").indexes) {
 				try {
-					queryExecute(local.schema.indexSql(tableName = "wheels_jobs", indexName = local.index.name, dbType = local.dbType), {}, {datasource = variables.$datasource});
+					$jobsQuery(local.schema.indexSql(tableName = "wheels_jobs", indexName = local.index.name, dbType = local.dbType), {}, {datasource = variables.$datasource});
 					if (local.index.name == "idx_wjobs_unique_key") {
 						$recordUniqueKeyIndexVerified();
 					}
@@ -1342,7 +1327,7 @@ component {
 			return;
 		}
 		try {
-			queryExecute($claimTimeoutAlterSql(), {}, {datasource = variables.$datasource});
+			$jobsQuery($claimTimeoutAlterSql(), {}, {datasource = variables.$datasource});
 			$clearClaimTimeoutAlterMemo();
 		} catch (any e) {
 			$recordClaimTimeoutAlterFailure();
@@ -1367,7 +1352,7 @@ component {
 		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, arguments.memoKey)) {
 			return false;
 		}
-		return DateDiff("s", application.wheels[arguments.memoKey], $now()) < $claimTimeoutAlterBackoffWindow();
+		return IsNumeric(application.wheels[arguments.memoKey]) && $now() - application.wheels[arguments.memoKey] < $claimTimeoutAlterBackoffWindow();
 	}
 
 	/**
@@ -1397,7 +1382,7 @@ component {
 	 */
 	public boolean function $jobTableHasClaimTimeout() {
 		try {
-			queryExecute("SELECT claimTimeout FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			$jobsQuery("SELECT claimTimeout FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
 			return true;
 		} catch (any e) {
 			return false;
@@ -1456,10 +1441,10 @@ component {
 		}
 		try {
 			if (!$jobTableHasColumn("claimToken")) {
-				queryExecute($claimTokenAlterSql(columnName = "claimToken", size = 36), {}, {datasource = variables.$datasource});
+				$jobsQuery($claimTokenAlterSql(columnName = "claimToken", size = 36), {}, {datasource = variables.$datasource});
 			}
 			if (!$jobTableHasColumn("claimedBy")) {
-				queryExecute($claimTokenAlterSql(columnName = "claimedBy", size = 128), {}, {datasource = variables.$datasource});
+				$jobsQuery($claimTokenAlterSql(columnName = "claimedBy", size = 128), {}, {datasource = variables.$datasource});
 			}
 			$clearClaimTimeoutAlterMemo(memoKey = "$claimTokenAlterFailedAt");
 		} catch (any e) {
@@ -1481,7 +1466,7 @@ component {
 	 */
 	public boolean function $jobTableHasColumn(required string columnName) {
 		try {
-			queryExecute("SELECT #arguments.columnName# FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			$jobsQuery("SELECT #arguments.columnName# FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
 			return true;
 		} catch (any e) {
 			return false;
@@ -1549,7 +1534,7 @@ component {
 			return;
 		}
 		try {
-			queryExecute($resultAlterSql(), {}, {datasource = variables.$datasource});
+			$jobsQuery($resultAlterSql(), {}, {datasource = variables.$datasource});
 			$clearClaimTimeoutAlterMemo(memoKey = "$resultAlterFailedAt");
 		} catch (any e) {
 			$recordClaimTimeoutAlterFailure(memoKey = "$resultAlterFailedAt");
@@ -1943,7 +1928,7 @@ component {
 		arguments.progress.step = "column";
 		if (!$jobTableHasUniqueKey()) {
 			try {
-				queryExecute($uniqueKeyAlterSql(), {}, {datasource = variables.$datasource});
+				$jobsQuery($uniqueKeyAlterSql(), {}, {datasource = variables.$datasource});
 			} catch (any e) {
 				if (!$jobTableHasUniqueKey()) {
 					rethrow;
@@ -1951,11 +1936,11 @@ component {
 			}
 		}
 		arguments.progress.step = "backfill";
-		queryExecute("UPDATE wheels_jobs SET uniqueKey = id WHERE uniqueKey IS NULL", {}, {datasource = variables.$datasource});
+		$jobsQuery("UPDATE wheels_jobs SET uniqueKey = id WHERE uniqueKey IS NULL", {}, {datasource = variables.$datasource});
 		arguments.progress.step = "index";
 		if (!$jobTableHasUniqueKeyIndex()) {
 			try {
-				queryExecute($uniqueKeyIndexSql(), {}, {datasource = variables.$datasource});
+				$jobsQuery($uniqueKeyIndexSql(), {}, {datasource = variables.$datasource});
 			} catch (any e) {
 				if (!$jobTableHasUniqueKeyIndex()) {
 					rethrow;
@@ -1970,7 +1955,7 @@ component {
 	 */
 	public boolean function $jobTableHasUniqueKey() {
 		try {
-			queryExecute("SELECT uniqueKey FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			$jobsQuery("SELECT uniqueKey FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
 			return true;
 		} catch (any e) {
 			return false;
@@ -1988,7 +1973,7 @@ component {
 		local.catalogSql = $uniqueKeyIndexCatalogSql();
 		if (Len(local.catalogSql)) {
 			try {
-				return queryExecute(local.catalogSql, {}, {datasource = variables.$datasource}).recordCount > 0;
+				return $jobsQuery(local.catalogSql, {}, {datasource = variables.$datasource}).recordCount > 0;
 			} catch (any e) {
 				// Fall back to the driver metadata below.
 			}
@@ -2189,7 +2174,7 @@ component {
 	 */
 	public numeric function $sqlServerCompatibilityLevel() {
 		try {
-			local.rows = queryExecute(
+			local.rows = $jobsQuery(
 				"SELECT compatibility_level AS lvl FROM sys.databases WHERE name = DB_NAME()",
 				{},
 				{datasource = variables.$datasource}
@@ -2267,7 +2252,7 @@ component {
 			return false;
 		}
 		try {
-			queryExecute($jobSchema().createTableSql(tableName = "wheels_job_hosts", dbType = $detectDatabaseType()), {}, {datasource = variables.$datasource});
+			$jobsQuery($jobSchema().createTableSql(tableName = "wheels_job_hosts", dbType = $detectDatabaseType()), {}, {datasource = variables.$datasource});
 			writeLog(text = "Auto-created wheels_job_hosts table", type = "information", file = "wheels_jobs");
 		} catch (any e) {
 			// Another instance may have created it at the same moment; only a still-missing
@@ -2298,7 +2283,7 @@ component {
 
 	public boolean function $hostsTableExists() {
 		try {
-			queryExecute("SELECT host FROM wheels_job_hosts WHERE 1=0", {}, {datasource = variables.$datasource});
+			$jobsQuery("SELECT host FROM wheels_job_hosts WHERE 1=0", {}, {datasource = variables.$datasource});
 			return true;
 		} catch (any e) {
 			return false;
@@ -2313,12 +2298,12 @@ component {
 	 */
 	public boolean function $hostDraining(required string host) {
 		try {
-			local.rows = queryExecute(
+			local.rows = $jobsQuery(
 				"SELECT COUNT(*) AS cnt FROM wheels_job_hosts
 				WHERE host = :host AND draining = 1 AND (drainExpiresAt IS NULL OR drainExpiresAt > :now)",
 				{
 					host = {value = arguments.host, cfsqltype = "cf_sql_varchar"},
-					now = {value = $now(), cfsqltype = "cf_sql_timestamp"}
+					now = {value = $now(), cfsqltype = "wheels_epoch"}
 				},
 				{datasource = variables.$datasource}
 			);
@@ -2339,7 +2324,7 @@ component {
 	 */
 	public numeric function $runningOnHost(required string host) {
 		try {
-			local.rows = queryExecute(
+			local.rows = $jobsQuery(
 				"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = 'processing' AND claimedBy = :host",
 				{host = {value = arguments.host, cfsqltype = "cf_sql_varchar"}},
 				{datasource = variables.$datasource}
@@ -2371,23 +2356,24 @@ component {
 			local.params[local.column] = arguments.fields[local.column];
 		}
 		local.updateSql = "UPDATE wheels_job_hosts SET #ArrayToList(local.sets, ", ")# WHERE host = :host";
-		queryExecute(local.updateSql, local.params, {datasource = variables.$datasource, result = "local.updated"});
+		local.$prepared = $jobClock().prepare(local.updateSql, local.params);
+		queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.updated"});
 		if (Val(local.updated.recordCount ?: 0) > 0) {
 			return;
 		}
 		local.columns = "host, startedAt";
 		local.values = ":host, :startedAt";
 		local.insertParams = Duplicate(local.params);
-		local.insertParams.startedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"};
+		local.insertParams.startedAt = {value = $now(), cfsqltype = "wheels_epoch"};
 		for (local.column in arguments.fields) {
 			local.columns &= ", #local.column#";
 			local.values &= ", :#local.column#";
 		}
 		try {
-			queryExecute("INSERT INTO wheels_job_hosts (#local.columns#) VALUES (#local.values#)", local.insertParams, {datasource = variables.$datasource});
+			$jobsQuery("INSERT INTO wheels_job_hosts (#local.columns#) VALUES (#local.values#)", local.insertParams, {datasource = variables.$datasource});
 		} catch (any e) {
 			// Lost the race to insert it: the row exists now, so update it.
-			queryExecute(local.updateSql, local.params, {datasource = variables.$datasource});
+			$jobsQuery(local.updateSql, local.params, {datasource = variables.$datasource});
 		}
 	}
 
@@ -2412,7 +2398,7 @@ component {
 			return;
 		}
 		try {
-			queryExecute($heartbeatAlterSql(), {}, {datasource = variables.$datasource});
+			$jobsQuery($heartbeatAlterSql(), {}, {datasource = variables.$datasource});
 			$clearClaimTimeoutAlterMemo(memoKey = "$heartbeatAlterFailedAt");
 		} catch (any e) {
 			$recordClaimTimeoutAlterFailure(memoKey = "$heartbeatAlterFailedAt");
@@ -2755,19 +2741,16 @@ component {
 		required string leaseName
 	) {
 		local.params = {
-			runAt = {value = DateAdd("s", arguments.delaySeconds, $now()), cfsqltype = "cf_sql_timestamp"},
-			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			runAt = {value = $now() + arguments.delaySeconds, cfsqltype = "wheels_epoch"},
+			updatedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 			id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
 		};
 		local.guard = $claimTokenGuard(claimToken = arguments.claimToken, params = local.params);
 		local.clearToken = Len(arguments.claimToken) ? ", claimToken = NULL" : "";
-		queryExecute(
-			"UPDATE wheels_jobs
+		local.$prepared = $jobClock().prepare("UPDATE wheels_jobs
 			SET status = 'pending', attempts = attempts - 1, runAt = :runAt, updatedAt = :updatedAt" & local.clearToken & "
-			WHERE id = :id AND status = 'processing' AND attempts > 0" & local.guard,
-			local.params,
-			{datasource = variables.$datasource, result = "local.deferResult"}
-		);
+			WHERE id = :id AND status = 'processing' AND attempts > 0" & local.guard, local.params);
+		queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.deferResult"});
 		WriteLog(
 			type = "information",
 			file = "wheels_jobs",
@@ -2807,7 +2790,7 @@ component {
 			);
 		}
 		try {
-			queryExecute($jobSchema().createTableSql(tableName = "wheels_job_locks", dbType = $detectDatabaseType()), {}, {datasource = variables.$datasource});
+			$jobsQuery($jobSchema().createTableSql(tableName = "wheels_job_locks", dbType = $detectDatabaseType()), {}, {datasource = variables.$datasource});
 		} catch (any e) {
 			// Tolerate "already exists" from another server creating it at the same time.
 			if (!$jobLockTableExists()) {
@@ -2825,7 +2808,7 @@ component {
 		local.catalogSql = $jobLockTableCatalogSql();
 		if (Len(local.catalogSql)) {
 			try {
-				return queryExecute(local.catalogSql, {}, {datasource = variables.$datasource}).recordCount > 0;
+				return $jobsQuery(local.catalogSql, {}, {datasource = variables.$datasource}).recordCount > 0;
 			} catch (any e) {
 				// Fall back to the probe below.
 			}
@@ -2834,7 +2817,7 @@ component {
 			return false;
 		}
 		try {
-			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_job_locks WHERE 1=0", {}, {datasource = variables.$datasource});
+			$jobsQuery("SELECT COUNT(*) AS cnt FROM wheels_job_locks WHERE 1=0", {}, {datasource = variables.$datasource});
 			return true;
 		} catch (any e) {
 			return false;
@@ -2881,11 +2864,18 @@ component {
 	}
 
 	/**
-	 * The current time on the jobs clock (wheels.JobClock): UTC, from the database's clock, in
-	 * whole seconds. Every timestamp the jobs code writes or compares against comes from here.
+	 * The current time on the jobs clock (wheels.JobClock): UTC epoch seconds, from the database's
+	 * clock. Every timestamp the jobs code writes or compares against comes from here.
 	 */
-	private date function $now() {
-		return $jobClock().utcNow();
+	private numeric function $now() {
+		return $jobClock().nowEpoch();
+	}
+
+	/**
+	 * Internal: queryExecute() with wheels_epoch timestamp parameters (see wheels.JobClock).
+	 */
+	private any function $jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return $jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 	/**

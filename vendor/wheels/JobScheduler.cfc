@@ -39,7 +39,7 @@ component {
 		if (!$ensureSchedulesTable()) {
 			return rv;
 		}
-		local.rows = queryExecute(
+		local.rows = $jobsQuery(
 			"SELECT name, jobClass, data, queue, priority, kind, spec, timezone, catchUp, catchUpWindowSeconds, lastEnqueuedFor, lastError
 			FROM wheels_job_schedules
 			WHERE enabled = 1 AND (nextRunAt IS NULL OR nextRunAt <= :now)",
@@ -212,22 +212,19 @@ component {
 	 */
 	private void function $advance(required string name, required numeric lastEnqueuedFor, required numeric nextRunAt, required numeric now) {
 		local.next = arguments.nextRunAt > 0 ? $ms(arguments.nextRunAt) : $ms(arguments.now + 86400000);
-		queryExecute(
-			"UPDATE wheels_job_schedules
+		local.$prepared = variables.$job.$jobClock().prepare("UPDATE wheels_job_schedules
 			SET lastEnqueuedFor = :lastEnqueuedFor, nextRunAt = :nextRunAt, lastError = NULL, updatedAt = :updatedAt
-			WHERE name = :name AND (lastEnqueuedFor IS NULL OR lastEnqueuedFor < :lastEnqueuedForGuard)",
-			{
+			WHERE name = :name AND (lastEnqueuedFor IS NULL OR lastEnqueuedFor < :lastEnqueuedForGuard)", {
 				lastEnqueuedFor = $ms(arguments.lastEnqueuedFor),
 				lastEnqueuedForGuard = $ms(arguments.lastEnqueuedFor),
 				nextRunAt = local.next,
-				updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+				updatedAt = {value = $now(), cfsqltype = "wheels_epoch"},
 				name = {value = arguments.name, cfsqltype = "cf_sql_varchar"}
-			},
-			{datasource = variables.$datasource, result = "local.moved"}
-		);
+			});
+		queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.moved"});
 		if (Val(local.moved.recordCount ?: 0) == 0) {
 			// Another server is ahead: only keep the check time current.
-			queryExecute(
+			$jobsQuery(
 				"UPDATE wheels_job_schedules SET nextRunAt = :nextRunAt WHERE name = :name AND (nextRunAt IS NULL OR nextRunAt < :nextRunAtGuard)",
 				{nextRunAt = local.next, nextRunAtGuard = local.next, name = {value = arguments.name, cfsqltype = "cf_sql_varchar"}},
 				{datasource = variables.$datasource}
@@ -241,7 +238,7 @@ component {
 	 */
 	private void function $recordScheduleError(required string name, required string message, required numeric now, string previous = "") {
 		try {
-			queryExecute(
+			$jobsQuery(
 				"UPDATE wheels_job_schedules SET lastError = :lastError, nextRunAt = :nextRunAt WHERE name = :name",
 				{
 					lastError = {value = Left(arguments.message, 1000), cfsqltype = "cf_sql_varchar"},
@@ -264,7 +261,7 @@ component {
 	 * Insert or update one code-defined schedule. False when a db row holds the name.
 	 */
 	private boolean function $upsertCodeSchedule(required struct def, required numeric now) {
-		local.existing = queryExecute(
+		local.existing = $jobsQuery(
 			"SELECT source FROM wheels_job_schedules WHERE name = :name",
 			{name = {value = arguments.def.name, cfsqltype = "cf_sql_varchar"}},
 			{datasource = variables.$datasource}
@@ -276,7 +273,7 @@ component {
 		local.params = $definitionParams(arguments.def);
 		if (local.existing.recordCount) {
 			// nextRunAt NULL: check it on the next enqueueDue(), as its timing may have changed.
-			queryExecute(
+			$jobsQuery(
 				"UPDATE wheels_job_schedules
 				SET jobClass = :jobClass, data = :data, queue = :queue, priority = :priority, kind = :kind, spec = :spec,
 					timezone = :timezone, catchUp = :catchUp, catchUpWindowSeconds = :catchUpWindowSeconds, enabled = :enabled,
@@ -289,7 +286,7 @@ component {
 		}
 		local.params.lastEnqueuedFor = $ms(arguments.now);
 		try {
-			queryExecute(
+			$jobsQuery(
 				"INSERT INTO wheels_job_schedules
 				(name, jobClass, data, queue, priority, kind, spec, timezone, catchUp, catchUpWindowSeconds, enabled, source, lastEnqueuedFor, updatedAt)
 				VALUES (:name, :jobClass, :data, :queue, :priority, :kind, :spec, :timezone, :catchUp, :catchUpWindowSeconds, :enabled, 'code', :lastEnqueuedFor, :updatedAt)",
@@ -318,7 +315,7 @@ component {
 			catchUp = {value = arguments.def.catchUp, cfsqltype = "cf_sql_varchar"},
 			catchUpWindowSeconds = {value = arguments.def.catchUpWindowSeconds, cfsqltype = "cf_sql_integer"},
 			enabled = {value = arguments.def.enabled ? 1 : 0, cfsqltype = "cf_sql_integer"},
-			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
+			updatedAt = {value = $now(), cfsqltype = "wheels_epoch"}
 		};
 	}
 
@@ -327,7 +324,7 @@ component {
 	 */
 	private numeric function $disableRemovedCodeSchedules(required array names) {
 		local.sql = "UPDATE wheels_job_schedules SET enabled = 0, updatedAt = :updatedAt WHERE source = 'code' AND enabled = 1";
-		local.params = {updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}};
+		local.params = {updatedAt = {value = $now(), cfsqltype = "wheels_epoch"}};
 		if (ArrayLen(arguments.names)) {
 			local.placeholders = [];
 			for (local.i = 1; local.i <= ArrayLen(arguments.names); local.i++) {
@@ -336,7 +333,8 @@ component {
 			}
 			local.sql &= " AND name NOT IN (#ArrayToList(local.placeholders)#)";
 		}
-		queryExecute(local.sql, local.params, {datasource = variables.$datasource, result = "local.disabled"});
+		local.$prepared = variables.$job.$jobClock().prepare(local.sql, local.params);
+		queryExecute(local.$prepared.sql, local.$prepared.params, {datasource = variables.$datasource, result = "local.disabled"});
 		return Val(local.disabled.recordCount ?: 0);
 	}
 
@@ -384,7 +382,7 @@ component {
 			return false;
 		}
 		try {
-			queryExecute(
+			$jobsQuery(
 				variables.$job.$jobSchema().createTableSql(tableName = "wheels_job_schedules", dbType = variables.$job.$detectDatabaseType()),
 				{},
 				{datasource = variables.$datasource}
@@ -401,7 +399,7 @@ component {
 
 	public boolean function $schedulesTableExists() {
 		try {
-			queryExecute("SELECT name FROM wheels_job_schedules WHERE 1=0", {}, {datasource = variables.$datasource});
+			$jobsQuery("SELECT name FROM wheels_job_schedules WHERE 1=0", {}, {datasource = variables.$datasource});
 			return true;
 		} catch (any e) {
 			return false;
@@ -409,7 +407,7 @@ component {
 	}
 
 	private boolean function $scheduleExists(required string name) {
-		return queryExecute(
+		return $jobsQuery(
 			"SELECT name FROM wheels_job_schedules WHERE name = :name",
 			{name = {value = arguments.name, cfsqltype = "cf_sql_varchar"}},
 			{datasource = variables.$datasource}
@@ -435,9 +433,16 @@ component {
 		}
 	}
 
-	/** The current time on the jobs clock (wheels.JobClock): UTC, from the database's clock. */
-	private date function $now() {
-		return variables.$job.$jobClock().utcNow();
+	/** The current time on the jobs clock (wheels.JobClock): UTC epoch seconds, from the database's clock. */
+	private numeric function $now() {
+		return variables.$job.$jobClock().nowEpoch();
+	}
+
+	/**
+	 * Internal: queryExecute() with wheels_epoch timestamp parameters (see wheels.JobClock).
+	 */
+	private any function $jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return variables.$job.$jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 }

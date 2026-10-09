@@ -77,9 +77,9 @@ component {
 	 */
 	public struct function drain(numeric expiresInSeconds = 3600) {
 		$requireHostsTable();
-		local.expiresAt = {value = "", cfsqltype = "cf_sql_timestamp", null = true};
+		local.expiresAt = {value = "", cfsqltype = "wheels_epoch", null = true};
 		if (arguments.expiresInSeconds > 0) {
-			local.expiresAt = {value = DateAdd("s", Int(arguments.expiresInSeconds), $now()), cfsqltype = "cf_sql_timestamp"};
+			local.expiresAt = {value = $now() + Int(arguments.expiresInSeconds), cfsqltype = "wheels_epoch"};
 		}
 		local.host = variables.$job.$jobHostName();
 		variables.$job.$writeHostRow(
@@ -87,7 +87,7 @@ component {
 			fields = {
 				draining = {value = 1, cfsqltype = "cf_sql_integer"},
 				drainExpiresAt = local.expiresAt,
-				lastSeenAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
+				lastSeenAt = {value = $now(), cfsqltype = "wheels_epoch"}
 			}
 		);
 		writeLog(text = "Jobs host '#local.host#' is draining: no new jobs will start here until it is resumed or the drain expires", type = "information", file = "wheels_jobs");
@@ -104,8 +104,8 @@ component {
 			host = local.host,
 			fields = {
 				draining = {value = 0, cfsqltype = "cf_sql_integer"},
-				drainExpiresAt = {value = "", cfsqltype = "cf_sql_timestamp", null = true},
-				lastSeenAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
+				drainExpiresAt = {value = "", cfsqltype = "wheels_epoch", null = true},
+				lastSeenAt = {value = $now(), cfsqltype = "wheels_epoch"}
 			}
 		);
 		writeLog(text = "Jobs host '#local.host#' resumed", type = "information", file = "wheels_jobs");
@@ -129,13 +129,13 @@ component {
 			codeVersion = ""
 		};
 		if (variables.$job.$hostsTableExists()) {
-			local.row = queryExecute(
-				"SELECT drainExpiresAt, lastSeenAt, codeVersion FROM wheels_job_hosts WHERE host = :host",
+			local.row = $jobsQuery(
+				"SELECT " & variables.$job.$jobClock().epochSql("drainExpiresAt") & " AS drainExpiresAt, " & variables.$job.$jobClock().epochSql("lastSeenAt") & " AS lastSeenAt, codeVersion FROM wheels_job_hosts WHERE host = :host",
 				{host = {value = local.host, cfsqltype = "cf_sql_varchar"}},
 				{datasource = $datasource()}
 			);
 			if (local.row.recordCount) {
-				// Stored as UTC on the jobs clock; reported in the app's local time.
+				// Read as epoch seconds on the jobs clock; reported in the app's local time.
 				local.clock = variables.$job.$jobClock();
 				local.rv.drainExpiresAt = IsNull(local.row.drainExpiresAt[1]) ? "" : local.clock.toLocal(local.row.drainExpiresAt[1]);
 				local.rv.lastSeenAt = IsNull(local.row.lastSeenAt[1]) ? "" : local.clock.toLocal(local.row.lastSeenAt[1]);
@@ -156,7 +156,7 @@ component {
 		variables.$job.$writeHostRow(
 			host = arguments.host,
 			fields = {
-				lastSeenAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+				lastSeenAt = {value = $now(), cfsqltype = "wheels_epoch"},
 				running = {value = variables.$job.$runningOnHost(arguments.host), cfsqltype = "cf_sql_integer"},
 				maxConcurrent = {value = arguments.maxConcurrent, cfsqltype = "cf_sql_integer"},
 				codeVersion = {value = variables.$job.$jobsCodeVersion(), cfsqltype = "cf_sql_varchar"}
@@ -179,11 +179,18 @@ component {
 	}
 
 	/**
-	 * The current time on the jobs clock (wheels.JobClock): UTC, from the database's clock, in
-	 * whole seconds.
+	 * The current time on the jobs clock (wheels.JobClock): UTC epoch seconds, from the database's
+	 * clock.
 	 */
-	private date function $now() {
-		return variables.$job.$jobClock().utcNow();
+	private numeric function $now() {
+		return variables.$job.$jobClock().nowEpoch();
+	}
+
+	/**
+	 * Internal: queryExecute() with wheels_epoch timestamp parameters (see wheels.JobClock).
+	 */
+	private any function $jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return variables.$job.$jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 	private string function $datasource() {

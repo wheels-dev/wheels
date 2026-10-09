@@ -219,6 +219,19 @@ component extends="wheels.WheelsTest" {
 
 		describe("converting rows written before job timestamps were UTC", function() {
 
+			beforeEach(function() {
+				new wheels.Job().$jobLeaseLock();
+			});
+
+			afterEach(function() {
+				queryExecute(
+					"DELETE FROM wheels_job_locks WHERE lockname = :name",
+					{name = {value = new wheels.JobSchema().conversionMarker(), cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				queryExecute("DELETE FROM wheels_jobs WHERE queue = 'test_schema_shift'", {}, {datasource = application.wheels.dataSourceName});
+			});
+
 			it("updates every date/time column of each job table, and none of the lock table", function() {
 				var statements = new wheels.JobSchema().shiftTimestampsSql(minutes = 300, dbType = "mysql");
 				var joined = ArrayToList(statements, Chr(10));
@@ -234,34 +247,83 @@ component extends="wheels.WheelsTest" {
 			it("moves a stored timestamp by the given minutes on this database", function() {
 				var job = new wheels.Job();
 				job.$ensureJobTable();
+				var clock = job.$jobClock();
 				var schema = new wheels.JobSchema();
-				var id = CreateUUID();
-				var stamp = CreateDateTime(2026, 3, 1, 10, 0, 0);
-				queryExecute(
-					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
-					VALUES (:id, 'wheels.Job', 'test_schema_shift', '{}', 0, 'completed', 1, 3, :stamp, :stamp, :stamp)",
-					{id = {value = id, cfsqltype = "cf_sql_varchar"}, stamp = {value = stamp, cfsqltype = "cf_sql_timestamp"}},
-					{datasource = application.wheels.dataSourceName}
-				);
+				var id = $insertShiftRow(clock, 1772359200);
 				var statement = schema.shiftTimestampsSql(minutes = 300, dbType = schema.databaseType())[1];
 				queryExecute(statement & " WHERE id = :id", {id = {value = id, cfsqltype = "cf_sql_varchar"}}, {datasource = application.wheels.dataSourceName});
-				var row = queryExecute(
-					"SELECT runAt, completedAt FROM wheels_jobs WHERE id = :id",
+				expect($storedEpoch(clock, id)).toBe(1772359200 + 300 * 60);
+				var nulls = queryExecute(
+					"SELECT completedAt FROM wheels_jobs WHERE id = :id AND completedAt IS NULL",
 					{id = {value = id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
 				);
-				queryExecute("DELETE FROM wheels_jobs WHERE id = :id", {id = {value = id, cfsqltype = "cf_sql_varchar"}}, {datasource = application.wheels.dataSourceName});
-				expect(DateDiff("n", stamp, application.wo.$normalizeDbTimestamp(row.runAt[1]))).toBe(300);
-				expect(IsDate(application.wo.$normalizeDbTimestamp(row.completedAt[1]))).toBeFalse("NULL stays NULL");
+				expect(nulls.recordCount).toBe(1, "NULL stays NULL");
+			});
+
+			it("converts once: a second run changes nothing", function() {
+				var schema = new wheels.tests._assets.jobs.ScopedConversionSchema();
+				var clock = new wheels.Job().$jobClock();
+				var id = $insertShiftRow(clock, 1772359200);
+				schema.rowId = id;
+				if (schema.databaseType() == "sqlite") {
+					expect(schema.convertLocalTimestamps(offsetMinutes = -300)).toBeFalse("SQLite stores epoch ms, never local time");
+					expect($storedEpoch(clock, id)).toBe(1772359200);
+					return;
+				}
+				expect(schema.convertLocalTimestamps(offsetMinutes = -300)).toBeTrue();
+				expect($storedEpoch(clock, id)).toBe(1772359200 + 300 * 60, "UTC = local + 5h for UTC-5");
+				expect(schema.convertLocalTimestamps(offsetMinutes = -300)).toBeFalse();
+				expect($storedEpoch(clock, id)).toBe(1772359200 + 300 * 60, "not shifted twice");
+			});
+
+			it("rolls every table back when a statement fails, so a rerun converts once", function() {
+				var schema = new wheels.tests._assets.jobs.ScopedConversionSchema();
+				schema.failOnStatement = 2;
+				var clock = new wheels.Job().$jobClock();
+				var id = $insertShiftRow(clock, 1772359200);
+				schema.rowId = id;
+				if (schema.databaseType() == "sqlite") {
+					return;
+				}
+				expect(function() {
+					schema.convertLocalTimestamps(offsetMinutes = -300);
+				}).toThrow("Spec.ConversionFailed");
+				expect($storedEpoch(clock, id)).toBe(1772359200, "the first table's update was rolled back");
+				expect(schema.$conversionDone()).toBeFalse("no marker after a failure");
+				schema.failOnStatement = 0;
+				expect(schema.convertLocalTimestamps(offsetMinutes = -300)).toBeTrue();
+				expect($storedEpoch(clock, id)).toBe(1772359200 + 300 * 60);
 			});
 
 			it("writes the conversion into the install migration, off by default", function() {
 				var source = new wheels.JobSchema().migrationSource();
 				expect(source).toInclude("this.convertLocalOffsetMinutes = 0;");
-				expect(source).toInclude("schema.shiftTimestampsSql(minutes = -Val(this.convertLocalOffsetMinutes), dbType = schema.databaseType())");
+				expect(source).toInclude("schema.convertLocalTimestamps(offsetMinutes = Val(this.convertLocalOffsetMinutes));");
 			});
 
 		});
+	}
+
+	/**
+	 * A completed job row stamped with an epoch on the jobs clock (completedAt left NULL).
+	 */
+	private string function $insertShiftRow(required any clock, required numeric epoch) {
+		var id = CreateUUID();
+		arguments.clock.query(
+			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+			VALUES (:id, 'wheels.Job', 'test_schema_shift', '{}', 0, 'completed', 1, 3, :stamp, :stamp, :stamp)",
+			{id = {value = id, cfsqltype = "cf_sql_varchar"}, stamp = {value = arguments.epoch, cfsqltype = "wheels_epoch"}}
+		);
+		return id;
+	}
+
+	private numeric function $storedEpoch(required any clock, required string id) {
+		return queryExecute(
+			"SELECT " & arguments.clock.epochSql("runAt") & " AS e FROM wheels_jobs WHERE id = :id",
+			{id = {value = arguments.id, cfsqltype = "cf_sql_varchar"}},
+			{datasource = application.wheels.dataSourceName}
+		).e[1];
 	}
 
 	/**
