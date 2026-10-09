@@ -368,6 +368,22 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("tick", () => {
+
+			it("runs one tick through the bridge and prints its summary", () => {
+				var m = new cli.lucli.Module(cwd = variables.tempRoot);
+				prepareMock(m);
+				m.$("out");
+				m.$(method = "$requireOwnRunningServer", returns = 61999);
+				m.$("makeBridgePost", serializeJSON({success: true, tick: {host: "web-1", processed: 2, failed: 0, reaped: 1, capped: false, draining: false}}));
+				expect(m.jobs(arg1 = "tick")).toBe("");
+				expect(m.$count("makeBridgePost")).toBe(1);
+				expect(m.$callLog().makeBridgePost[1][1]).toInclude("command=jobsTick");
+				expect(printed(m)).toInclude("Tick on web-1: processed 2, failed 0, reaped 1");
+			});
+
+		});
+
 		describe("install", () => {
 
 			it("parses install and --force", () => {

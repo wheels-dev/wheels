@@ -348,6 +348,14 @@ component {
 		// one at a time. A waiting instance gives up after migrationLockTimeout seconds; a holder
 		// that died frees the lock once its lease (renewed before each step) runs out.
 		application.$wheels.migratorLockTableName = "wheels_migrator_locks";
+		// The jobs tick route (/wheels/jobs/tick) is off unless a token is set. The token goes in the
+		// X-Wheels-Jobs-Token header; ?token= is accepted only with jobsRunnerTokenInQuery = true
+		// (a token in a URL ends up in access logs).
+		application.$wheels.jobsRunnerToken = "";
+		application.$wheels.jobsRunnerTokenInQuery = false;
+		// Job schedules (config/schedules.cfm) are checked and their due slots enqueued at most
+		// this often, from every worker poll, processQueue() and JobRunner.tick(). 0 = never.
+		application.$wheels.jobsScheduleCheckSeconds = 15;
 		// Background-job tables: true creates and upgrades them automatically at runtime; false
 		// leaves them to the app's own migration (`wheels jobs install`), for multi-server apps.
 		application.$wheels.jobsAutoCreateTables = true;

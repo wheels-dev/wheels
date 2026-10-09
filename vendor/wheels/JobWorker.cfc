@@ -62,6 +62,9 @@ component {
 		// nothing is stuck.
 		this.checkTimeouts(timeout = arguments.timeout, queues = arguments.queues);
 
+		// Keep schedules running from the same poll (throttled to jobsScheduleCheckSeconds).
+		$jobBridge().$enqueueDueSchedules();
+
 		// A draining host starts nothing new (in-flight jobs finish; the reap above still runs).
 		local.host = $jobBridge().$jobHostName();
 		if ($jobBridge().$hostDraining(local.host)) {

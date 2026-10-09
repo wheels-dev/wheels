@@ -592,6 +592,17 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. Answers a `/wheels/jobs/tick` request through JobTickEndpoint: sets the
+	 * status and content type, and returns the body.
+	 */
+	public string function $respondToJobsTick(required any endpoint, required struct urlScope) {
+		local.response = arguments.endpoint.respond(urlScope = arguments.urlScope);
+		cfheader(statuscode = local.response.status);
+		cfcontent(type = local.response.contentType);
+		return local.response.body;
+	}
+
+	/**
 	 * Parse incoming params, create controller object, call an action on it and return the response.
 	 * Called from index.cfm in the root so what we return here is the final result of the request processing.
 	 * This currently needs to be public as it's called from elsewhere
@@ -606,6 +617,16 @@ component output="false" extends="wheels.Global"{
 		// This is used for maintenance mode content.
 		if (StructKeyExists(request, "$wheelsAbortContent")) {
 			return request.$wheelsAbortContent;
+		}
+
+		// The jobs tick route (`/wheels/jobs/tick`, #4482): token-gated, answered before routing and
+		// before the public-component gate, so it works with enablePublicComponent = false and
+		// doesn't depend on the app's routes or middleware. 404 unless jobsRunnerToken is set.
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "jobsRunnerToken") && Len(application.wheels.jobsRunnerToken)) {
+			local.tickEndpoint = new wheels.JobTickEndpoint();
+			if (local.tickEndpoint.isTickPath(arguments.pathInfo)) {
+				return $respondToJobsTick(local.tickEndpoint, arguments.urlScope);
+			}
 		}
 
 		if ($get("showDebugInformation")) {
