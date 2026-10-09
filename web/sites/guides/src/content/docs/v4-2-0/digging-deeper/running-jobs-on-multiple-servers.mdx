@@ -396,10 +396,15 @@ The hand-written DDL above is the fallback — for a DBA applying it directly, o
 
 ## Clocks and skew
 
-All job timestamps — reap windows, heartbeats, `runAt` comparisons — are currently written and compared with **each server's own application clock** (`Now()`), not the database's. If two servers disagree about the time, a job can look stale to one and fresh to another. Keep every app server's clock in sync (NTP, or your platform's time service); a few seconds of skew is harmless, minutes are not.
+Job timestamps — reap windows, heartbeats, `runAt` comparisons — are kept on **one UTC clock: the database's** ([#4486](https://github.com/wheels-dev/wheels/issues/4486)). `wheels.JobClock` reads the database's UTC time (`SYSUTCDATETIME`, `UTC_TIMESTAMP`, `clock_timestamp()`, `SYS_EXTRACT_UTC(…)`) at most once a minute per application and tracks the skew against the server's own UTC; every timestamp the jobs code writes or compares is corrected by that skew, and the comparisons still run in SQL. So two servers with clocks minutes apart no longer disagree about whether a job is stale or due — which removes the main reason app-server clock skew used to matter. (A clock roughly right is still worth keeping; a failed clock read just reuses the last good skew, logging once.)
 
-<Aside type="note" title="Planned: a single database clock">
-Writing and comparing all job timestamps on one UTC database clock — removing app-server skew from the reaper entirely — is **planned, not built yet** ([#4486](https://github.com/wheels-dev/wheels/issues/4486)). Until it lands, NTP on every app server is what keeps the reaper honest.
+Two things to know:
+
+- **H2 and SQLite use the server's own UTC**, not a database clock — they're single-host databases, so there's nothing to reconcile. On **H2**, timestamp arithmetic runs in the JVM's time zone, so **run its JVM in UTC** (`-Duser.timezone=UTC`); a non-UTC JVM shifts stored job times. SQLite is unaffected.
+- **The CFML API stays in local time.** `enqueueAt(runAt = …)` takes a local time and converts it to UTC for storage, and `JobRunner.status()` and the queue stats convert back, so your code and dashboards read local time as before. Only the stored column values are UTC.
+
+<Aside type="note" title="Converting a database upgraded from before 4.2">
+Rows written before 4.2 hold local-time values. The [install migration](#the-shared-schema) can shift them once: set `this.convertLocalOffsetMinutes` (your old server's offset from UTC, in minutes) in the generated migration before running it. The conversion runs in one transaction with a marker in `wheels_job_locks`, so a failed run converts nothing and running it again changes nothing. SQLite is skipped — its timestamps were never stored in local time.
 </Aside>
 
 ## Upgrading from 4.1
