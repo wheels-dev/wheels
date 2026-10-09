@@ -115,20 +115,26 @@ component {
 
 	/**
 	 * Internal: a setting that must be a whole number from 1 to `maximum` (well inside the INTEGER
-	 * columns it can end up in, such as a claimed job's claimTimeout). Anything else (missing, not
-	 * a number, a fraction, zero or less, or above the maximum) is the fallback. Never through
-	 * Int(), which Lucee truncates to 32 bits.
+	 * columns it can end up in, such as a claimed job's claimTimeout), written as plain digits.
+	 * Anything else (missing, a fraction, zero, a sign, exponent notation such as "1e3", or above
+	 * the maximum) is the fallback: a value that isn't plainly a whole number is never coerced
+	 * into one. Never through Int(), which Lucee truncates to 32 bits.
 	 */
 	public numeric function $wholeSetting(required string name, required numeric fallback, required numeric maximum) {
 		local.value = $setting(arguments.name, arguments.fallback);
-		if (!IsSimpleValue(local.value) || !IsNumeric(local.value)) {
+		if (!IsSimpleValue(local.value)) {
 			return arguments.fallback;
 		}
-		local.value = Val(local.value);
-		if (local.value < 1 || local.value > arguments.maximum || local.value != Round(local.value)) {
+		// A whole number reads as digits, possibly with a ".0" tail (an engine's double).
+		local.text = Trim(ToString(local.value));
+		if (!ReFind("^[0-9]+(\.0+)?$", local.text)) {
 			return arguments.fallback;
 		}
-		return local.value;
+		local.number = Val(ListFirst(local.text, "."));
+		if (local.number < 1 || local.number > arguments.maximum) {
+			return arguments.fallback;
+		}
+		return local.number;
 	}
 
 	/**

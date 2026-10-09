@@ -144,8 +144,8 @@ component extends="wheels.WheelsTest" {
 				var endpoint = new wheels.JobTickEndpoint();
 				// Each setting on its own, with the other at its default.
 				var cases = [
-					{name = "jobsRunnerTickMaxJobs", key = "maxJobs", fallback = 1, invalid = [0, -1, 0.5, 1.5, 1001, 2147483648, "soon", "", "2 jobs", [5], {n = 5}], valid = [{value = 1, expected = 1}, {value = "10", expected = 10}, {value = 1000, expected = 1000}]},
-					{name = "jobsRunnerTickTimeout", key = "timeout", fallback = 300, invalid = [0, -300, 0.5, 300.25, 86401, 2147483648, "soon", "", "1 hour", [5], {n = 5}], valid = [{value = 1, expected = 1}, {value = "600", expected = 600}, {value = 86400, expected = 86400}]}
+					{name = "jobsRunnerTickMaxJobs", key = "maxJobs", fallback = 1, invalid = [0, -1, 0.5, 1.5, 1001, 2147483648, "1e3", "1e99", "+5", "0x10", "soon", "", "2 jobs", [5], {n = 5}], valid = [{value = 1, expected = 1}, {value = "10", expected = 10}, {value = " 10 ", expected = 10}, {value = 1000, expected = 1000}]},
+					{name = "jobsRunnerTickTimeout", key = "timeout", fallback = 300, invalid = [0, -300, 0.5, 300.25, 86401, 2147483648, "1e3", "1e99", "+600", "soon", "", "1 hour", [5], {n = 5}], valid = [{value = 1, expected = 1}, {value = "600", expected = 600}, {value = 86400, expected = 86400}]}
 				];
 				for (var c in cases) {
 					for (var value in c.invalid) {
