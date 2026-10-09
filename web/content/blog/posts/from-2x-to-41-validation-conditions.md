@@ -22,6 +22,7 @@ excerpt: >-
   changes.
 coverImage: null
 announcement:
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/4541'
   title: "From 2.x to 4.x, part 5: validation conditions now fail closed"
   body: |
     New post: **[Validation conditions now fail closed: migrating your 2.x condition strings](https://blog.wheels.dev/posts/from-2x-to-41-validation-conditions/)** — 2.x ran `condition=` and `unless=` strings through Evaluate(); 4.1 parses a small grammar and throws for what it can't parse. The grammar, and how to migrate your strings.
