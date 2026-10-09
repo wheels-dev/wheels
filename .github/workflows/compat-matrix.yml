@@ -142,10 +142,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
-      # The engine container's time zone (compose.yml reads these). Empty for every leg but
-      # the TZ lanes; job-level so a crash-recovery `docker compose up` keeps them too.
+      # The engine container's time zone (compose.yml reads it; UTC when empty, as on every leg
+      # but the TZ lanes). Job-level so a crash-recovery `docker compose up` keeps it too.
+      # EngineTimeZoneSpec fails the leg if the JVM or the engine didn't take it.
       ENGINE_TZ: ${{ matrix.tz }}
-      ENGINE_JAVA_TOOL_OPTIONS: ${{ matrix.tz != '' && format('-Duser.timezone={0}', matrix.tz) || '' }}
       PORT_lucee6: 60006
       PORT_lucee7: 60007
       PORT_adobe2023: 62023

@@ -125,10 +125,9 @@ services:
       # Runs through this file are framework-repository runs: specs that skip outside
       # the repository must not skip here (RequireRepoPathSpec fails instead).
       - "WHEELS_EXPECT_REPO=true"
-      # Empty unless set (the compat matrix TZ lanes, or ENGINE_TZ=... locally): the JVM
-      # then runs in that time zone instead of UTC.
-      - "TZ=${ENGINE_TZ:-}"
-      - "JAVA_TOOL_OPTIONS=${ENGINE_JAVA_TOOL_OPTIONS:-}"
+      # The engine's time zone: UTC unless ENGINE_TZ is set (the compat matrix TZ lanes, or
+      # ENGINE_TZ=... locally). The JVM follows TZ on Linux; EngineTimeZoneSpec checks it did.
+      - "TZ=${ENGINE_TZ:-UTC}"
     volumes:
       - ./:/wheels-test-suite
       - type: bind
@@ -288,10 +287,9 @@ services:
       # Runs through this file are framework-repository runs: specs that skip outside
       # the repository must not skip here (RequireRepoPathSpec fails instead).
       - "WHEELS_EXPECT_REPO=true"
-      # Empty unless set (the compat matrix TZ lanes, or ENGINE_TZ=... locally): the JVM
-      # then runs in that time zone instead of UTC.
-      - "TZ=${ENGINE_TZ:-}"
-      - "JAVA_TOOL_OPTIONS=${ENGINE_JAVA_TOOL_OPTIONS:-}"
+      # The engine's time zone: UTC unless ENGINE_TZ is set (the compat matrix TZ lanes, or
+      # ENGINE_TZ=... locally). The JVM follows TZ on Linux; EngineTimeZoneSpec checks it did.
+      - "TZ=${ENGINE_TZ:-UTC}"
     tty: true
     stdin_open: true
     volumes:
@@ -337,10 +335,9 @@ services:
       # Runs through this file are framework-repository runs: specs that skip outside
       # the repository must not skip here (RequireRepoPathSpec fails instead).
       - "WHEELS_EXPECT_REPO=true"
-      # Empty unless set (the compat matrix TZ lanes, or ENGINE_TZ=... locally): the JVM
-      # then runs in that time zone instead of UTC.
-      - "TZ=${ENGINE_TZ:-}"
-      - "JAVA_TOOL_OPTIONS=${ENGINE_JAVA_TOOL_OPTIONS:-}"
+      # The engine's time zone: UTC unless ENGINE_TZ is set (the compat matrix TZ lanes, or
+      # ENGINE_TZ=... locally). The JVM follows TZ on Linux; EngineTimeZoneSpec checks it did.
+      - "TZ=${ENGINE_TZ:-UTC}"
     tty: true
     stdin_open: true
     volumes:
