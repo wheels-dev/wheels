@@ -15,11 +15,10 @@ ortussolutions/commandbox:latest
 ortussolutions/commandbox:latest@sha256:1f180edf899d1db7fc906835e20c12ed18a93db2c2c1053ac5cace2f28626da0
 ortussolutions/commandbox:jdk21@sha256:d65126caeb6c80c115d4cc93f9b9db88697c4fe2aa4ca83ea9a36dadc62c02c1
 
-# Databases (compose.yml)
+# Databases (compose.yml). cockroachdb/cockroach and gvenzl/oracle-free are
+# deliberately not mirrored; compose.yml pulls them from Docker Hub.
 mysql:9.7.0
 postgres:18.4
-cockroachdb/cockroach:v24.3.32
-gvenzl/oracle-free:23.26.1-slim
 
 # Linux packages: rpm rebuild/check (rpm-rewrap.sh) and the install smoke
 rockylinux/rockylinux:9
