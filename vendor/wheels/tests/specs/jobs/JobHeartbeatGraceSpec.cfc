@@ -77,7 +77,7 @@ component extends="wheels.WheelsTest" {
 
 	private void function $cleanup() {
 		try {
-			queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_grace_%'", {}, {datasource = application.wheels.dataSourceName});
+			jobsQuery("DELETE FROM wheels_jobs WHERE queue LIKE 'test_grace_%'", {}, {datasource = application.wheels.dataSourceName});
 		} catch (any e) {
 		}
 	}
@@ -94,18 +94,18 @@ component extends="wheels.WheelsTest" {
 		string jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob"
 	) {
 		var id = CreateUUID();
-		var claimedAt = DateAdd("n", -Max(arguments.claimedMinutesAgo, arguments.heartbeatMinutesAgo + 1), Now());
+		var claimedAt = (jobsNow() - (Max(arguments.claimedMinutesAgo, arguments.heartbeatMinutesAgo + 1)) * 60);
 		var beatSeconds = arguments.heartbeatMinutesAgo * 60 + arguments.heartbeatSecondsAgo;
 		var params = {
 			id = {value = id, cfsqltype = "cf_sql_varchar"},
 			jobClass = {value = arguments.jobClass, cfsqltype = "cf_sql_varchar"},
 			queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
-			runAt = {value = claimedAt, cfsqltype = "cf_sql_timestamp"},
-			createdAt = {value = claimedAt, cfsqltype = "cf_sql_timestamp"},
-			updatedAt = {value = claimedAt, cfsqltype = "cf_sql_timestamp"},
-			heartbeatAt = {value = DateAdd("s", -beatSeconds, Now()), cfsqltype = "cf_sql_timestamp", null = beatSeconds == 0}
+			runAt = {value = claimedAt, cfsqltype = "wheels_epoch"},
+			createdAt = {value = claimedAt, cfsqltype = "wheels_epoch"},
+			updatedAt = {value = claimedAt, cfsqltype = "wheels_epoch"},
+			heartbeatAt = {value = jobsNow() - beatSeconds, cfsqltype = "wheels_epoch", null = beatSeconds == 0}
 		};
-		queryExecute(
+		jobsQuery(
 			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt, claimTimeout, heartbeatAt)
 			VALUES (:id, :jobClass, :queue, '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt, 3600, :heartbeatAt)",
 			params,
@@ -115,12 +115,28 @@ component extends="wheels.WheelsTest" {
 	}
 
 	private string function $status(required string id) {
-		var q = queryExecute(
+		var q = jobsQuery(
 			"SELECT status FROM wheels_jobs WHERE id = :id",
 			{id = {value = arguments.id, cfsqltype = "cf_sql_varchar"}},
 			{datasource = application.wheels.dataSourceName}
 		);
 		return q.recordCount ? q.status : "";
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC epoch seconds from the database's clock, which
+	 * job rows and memos are stamped with. A row stamped with the app's local Now() is hours out
+	 * on a server that isn't on UTC.
+	 */
+	private numeric function jobsNow() {
+		return new wheels.Job().$jobClock().nowEpoch();
+	}
+
+	/**
+	 * jobsQuery() with wheels_epoch timestamp parameters, as the jobs code binds them.
+	 */
+	private any function jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return new wheels.Job().$jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 }

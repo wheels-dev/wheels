@@ -389,6 +389,13 @@ component {
 		ArrayAppend(local.lines, "	// (CockroachDB under read-committed isolation; MySQL and Oracle commit each statement).");
 		ArrayAppend(local.lines, "	this.useTransaction = false;");
 		ArrayAppend(local.lines, "");
+		ArrayAppend(local.lines, "	// Job timestamps are UTC (read from the database's clock) since Wheels 4.2; rows written");
+		ArrayAppend(local.lines, "	// before that hold the server's local time. Drain every server before upgrading and leave");
+		ArrayAppend(local.lines, "	// this at 0, or set your old servers' offset from UTC in minutes (-300 for UTC-5, 60 for");
+		ArrayAppend(local.lines, "	// UTC+1) before running the migration to convert existing rows once. SQLite needs neither:");
+		ArrayAppend(local.lines, "	// it stores epoch milliseconds, which were never in local time.");
+		ArrayAppend(local.lines, "	this.convertLocalOffsetMinutes = 0;");
+		ArrayAppend(local.lines, "");
 		ArrayAppend(local.lines, "	function up() {");
 		ArrayAppend(local.lines, "		var schema = new wheels.JobSchema(datasource = $migratorDataSource(), credentials = $migratorDataSourceCredentials());");
 		for (local.t in tables()) {
@@ -442,6 +449,10 @@ component {
 				ArrayAppend(local.lines, "		}");
 			}
 		}
+		ArrayAppend(local.lines, "");
+		ArrayAppend(local.lines, "		// One transaction with a marker row: a failed conversion leaves nothing converted, and");
+		ArrayAppend(local.lines, "		// running it again after a successful one changes nothing.");
+		ArrayAppend(local.lines, "		schema.convertLocalTimestamps(offsetMinutes = Val(this.convertLocalOffsetMinutes));");
 		ArrayAppend(local.lines, "	}");
 		ArrayAppend(local.lines, "");
 		ArrayAppend(local.lines, "	function down() {");
@@ -456,6 +467,119 @@ component {
 		ArrayAppend(local.lines, "");
 		ArrayAppend(local.lines, "}");
 		return ArrayToList(local.lines, local.nl) & local.nl;
+	}
+
+	/**
+	 * Converts the job tables' timestamps from the old servers' local time to UTC, once: rows
+	 * written before Wheels 4.2 hold the server's local time, and job timestamps are UTC since.
+	 * Every table is updated in one transaction, together with a marker row in wheels_job_locks
+	 * (conversionMarker()), so a failure leaves nothing converted and a run after a successful one
+	 * changes nothing. SQLite is skipped: its columns hold epoch milliseconds, which were never in
+	 * local time. Returns whether rows were converted.
+	 * @offsetMinutes The old servers' offset from UTC in minutes (-300 for UTC-5, 60 for UTC+1).
+	 */
+	public boolean function convertLocalTimestamps(required numeric offsetMinutes) {
+		local.dbType = databaseType();
+		if (arguments.offsetMinutes == 0 || local.dbType == "sqlite") {
+			return false;
+		}
+		var state = {converted = false};
+		transaction action="begin" {
+			try {
+				if (!$conversionDone()) {
+					for (local.sql in shiftTimestampsSql(minutes = -arguments.offsetMinutes, dbType = local.dbType)) {
+						$runConversionStatement(local.sql);
+					}
+					queryExecute(
+						"INSERT INTO wheels_job_locks (lockname, lockowner, lockhost, acquiredat, expiresat) VALUES (:name, :owner, '', 0, 999999999999999)",
+						{
+							name = {value = conversionMarker(), cfsqltype = "cf_sql_varchar"},
+							owner = {value = "offset #Int(arguments.offsetMinutes)# min", cfsqltype = "cf_sql_varchar"}
+						},
+						$queryOptions()
+					);
+					state.converted = true;
+				}
+				transaction action="commit";
+			} catch (any e) {
+				transaction action="rollback";
+				rethrow;
+			}
+		}
+		return state.converted;
+	}
+
+	/**
+	 * The wheels_job_locks row that records the one-time conversion to UTC. The table lives in
+	 * the job tables' datasource, so the marker is per datasource; the version suffix lets a
+	 * later, different conversion run once on its own.
+	 */
+	public string function conversionMarker() {
+		return "wheels.jobs.timestamps-utc.v1";
+	}
+
+	/**
+	 * Internal: whether the conversion to UTC has already run on this datasource.
+	 */
+	public boolean function $conversionDone() {
+		return queryExecute(
+			"SELECT lockname FROM wheels_job_locks WHERE lockname = :name",
+			{name = {value = conversionMarker(), cfsqltype = "cf_sql_varchar"}},
+			$queryOptions()
+		).recordCount > 0;
+	}
+
+	/**
+	 * Internal: runs one conversion statement (a seam for specs).
+	 */
+	public void function $runConversionStatement(required string sql) {
+		queryExecute(arguments.sql, {}, $queryOptions());
+	}
+
+	/**
+	 * UPDATE statements that move every date/time column of the job tables by a number of
+	 * minutes, one per table (convertLocalTimestamps() runs them). SQLite's columns hold epoch
+	 * milliseconds.
+	 * @minutes Minutes to add (negative to subtract).
+	 * @dbType The database type (databaseType()).
+	 */
+	public array function shiftTimestampsSql(required numeric minutes, required string dbType) {
+		local.rv = [];
+		local.n = Int(arguments.minutes);
+		for (local.t in tables()) {
+			local.sets = [];
+			for (local.c in local.t.columns) {
+				if (local.c.type == "datetime") {
+					ArrayAppend(local.sets, local.c.name & " = " & $shiftedColumnSql(local.c.name, local.n, arguments.dbType));
+				}
+			}
+			if (ArrayLen(local.sets)) {
+				ArrayAppend(local.rv, "UPDATE #local.t.name# SET " & ArrayToList(local.sets, ", "));
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal: a date/time column moved by a whole number of minutes, in the database's syntax.
+	 * NULL stays NULL everywhere.
+	 */
+	public string function $shiftedColumnSql(required string column, required numeric minutes, required string dbType) {
+		switch (arguments.dbType) {
+			case "sqlserver":
+				return "DATEADD(minute, #arguments.minutes#, #arguments.column#)";
+			case "mysql":
+				return "DATE_ADD(#arguments.column#, INTERVAL #arguments.minutes# MINUTE)";
+			case "postgresql":
+				return "#arguments.column# + (#arguments.minutes# * INTERVAL '1 minute')";
+			case "oracle":
+				return "#arguments.column# + NUMTODSINTERVAL(#arguments.minutes#, 'MINUTE')";
+			case "h2":
+				return "DATEADD('MINUTE', #arguments.minutes#, #arguments.column#)";
+			case "sqlite":
+				return "#arguments.column# + (#arguments.minutes# * 60000)";
+		}
+		Throw(type = "Wheels.Job.UnsupportedDatabase", message = "Can't convert job timestamps on database type '#arguments.dbType#'.");
 	}
 
 	/**

@@ -174,7 +174,7 @@ component extends="wheels.WheelsTest" {
 
 	private void function $cleanup() {
 		try {
-			queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_hooks_%'", {}, {datasource = application.wheels.dataSourceName});
+			jobsQuery("DELETE FROM wheels_jobs WHERE queue LIKE 'test_hooks_%'", {}, {datasource = application.wheels.dataSourceName});
 		} catch (any e) {
 		}
 	}
@@ -188,8 +188,8 @@ component extends="wheels.WheelsTest" {
 		string jobClass = "wheels.tests._assets.jobs.HookProbeJob"
 	) {
 		var id = CreateUUID();
-		var stamp = arguments.stale ? DateAdd("h", -2, Now()) : DateAdd("s", -5, Now());
-		queryExecute(
+		var stamp = arguments.stale ? jobsNow() - 7200 : jobsNow() - 5;
+		jobsQuery(
 			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 			VALUES (:id, :jobClass, :queue, :data, 0, :status, :attempts, 1, :runAt, :createdAt, :updatedAt)",
 			{
@@ -199,9 +199,9 @@ component extends="wheels.WheelsTest" {
 				data = {value = SerializeJSON(arguments.data), cfsqltype = "cf_sql_longvarchar"},
 				status = {value = arguments.status, cfsqltype = "cf_sql_varchar"},
 				attempts = {value = arguments.attempts, cfsqltype = "cf_sql_integer"},
-				runAt = {value = stamp, cfsqltype = "cf_sql_timestamp"},
-				createdAt = {value = stamp, cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = stamp, cfsqltype = "cf_sql_timestamp"}
+				runAt = {value = stamp, cfsqltype = "wheels_epoch"},
+				createdAt = {value = stamp, cfsqltype = "wheels_epoch"},
+				updatedAt = {value = stamp, cfsqltype = "wheels_epoch"}
 			},
 			{datasource = application.wheels.dataSourceName}
 		);
@@ -209,12 +209,12 @@ component extends="wheels.WheelsTest" {
 	}
 
 	private struct function $row(required string id) {
-		var q = queryExecute(
+		var q = jobsQuery(
 			"SELECT status, result FROM wheels_jobs WHERE id = :id",
 			{id = {value = arguments.id, cfsqltype = "cf_sql_varchar"}},
 			{datasource = application.wheels.dataSourceName}
 		);
-		var nulls = queryExecute(
+		var nulls = jobsQuery(
 			"SELECT id FROM wheels_jobs WHERE id = :id AND result IS NULL",
 			{id = {value = arguments.id, cfsqltype = "cf_sql_varchar"}},
 			{datasource = application.wheels.dataSourceName}
@@ -224,6 +224,21 @@ component extends="wheels.WheelsTest" {
 			result = q.recordCount && !IsNull(q.result[1]) ? q.result[1] : "",
 			resultIsNull = nulls.recordCount > 0
 		};
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC epoch seconds from the database's clock, which
+	 * job rows are stamped with.
+	 */
+	private numeric function jobsNow() {
+		return new wheels.Job().$jobClock().nowEpoch();
+	}
+
+	/**
+	 * queryExecute() with wheels_epoch timestamp parameters, as the jobs code binds them.
+	 */
+	private any function jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return new wheels.Job().$jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 }
