@@ -1027,6 +1027,57 @@
 	}
 
 	/**
+	 * Internal function. Leaves a comparison between two numbers, such as `1 = 0` or `1 = 1` (the
+	 * usual "match nothing" / "match everything" in a clause built up in code), out of parameter
+	 * binding. Its operator is wrapped in Chr(8), which no WHERE regex reads through, so neither the
+	 * clause builder nor the value binder treats it as `column <operator> value`; $whereClause()
+	 * removes the marks from the SQL. Text inside quoted literals is never touched.
+	 */
+	public string function $passThroughLiteralPredicates(required string where) {
+		if (!ReFind("[0-9]\s*(<>|!=|<=|>=|=|<|>)\s*[+-]?[0-9]", arguments.where)) {
+			return arguments.where;
+		}
+		// The odd-numbered pieces between single quotes are outside a literal (an escaped '' is
+		// an empty piece, so it keeps the alternation).
+		local.pieces = ListToArray(arguments.where, "'", true);
+		for (local.i = 1; local.i <= ArrayLen(local.pieces); local.i += 2) {
+			local.pieces[local.i] = $markLiteralPredicates(local.pieces[local.i]);
+		}
+		return ArrayToList(local.pieces, "'");
+	}
+
+	/**
+	 * Internal function. Wraps the operator of each `number <operator> number` in text with no
+	 * quoted literals in Chr(8). A number that is part of a longer token (a column name such as
+	 * `col1`, or an arithmetic term) is left alone: the comparison must start after a space, an
+	 * opening parenthesis or the start, and end before a space, a closing parenthesis or the end.
+	 */
+	public string function $markLiteralPredicates(required string text) {
+		local.pattern = "([+-]?[0-9]+(?:\.[0-9]+)?)\s*(<>|!=|<=|>=|=|<|>)\s*([+-]?[0-9]+(?:\.[0-9]+)?)";
+		local.rv = arguments.text;
+		local.start = 1;
+		while (local.start <= Len(local.rv)) {
+			local.m = ReFind(local.pattern, local.rv, local.start, true);
+			if (local.m.pos[1] == 0) {
+				break;
+			}
+			local.endPos = local.m.pos[1] + local.m.len[1];
+			local.before = local.m.pos[1] > 1 ? Mid(local.rv, local.m.pos[1] - 1, 1) : "";
+			local.after = local.endPos <= Len(local.rv) ? Mid(local.rv, local.endPos, 1) : "";
+			if ((!Len(local.before) || ReFind("[\s(]", local.before)) && (!Len(local.after) || ReFind("[\s)]", local.after))) {
+				local.opPos = local.m.pos[3];
+				local.opLen = local.m.len[3];
+				// opPos is at least 2 (a number comes first), so Left() never gets 0 (Lucee 7).
+				local.rv = Left(local.rv, local.opPos - 1) & Chr(8) & Mid(local.rv, local.opPos, local.opLen) & Chr(8) & Mid(local.rv, local.opPos + local.opLen, Len(local.rv));
+				local.start = local.endPos + 2;
+			} else {
+				local.start = local.m.pos[1] + 1;
+			}
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Replace every single-quoted string literal in a WHERE string with a
 	 * masked placeholder whose content is a sentinel prefix plus the literal's
 	 * hex-encoded, un-escaped value. Masked literals contain no quote, comma
@@ -1575,7 +1626,7 @@
 							Throw(
 								type = "Wheels.ColumnNotFound",
 								message = "Wheels looked for the column mapped to the `#local.param.property#` property but couldn't find it in the database table.",
-								extendedInfo = "Verify the `where` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
+								extendedInfo = "Verify the `where` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct." & (FindNoCase("SELECT", arguments.where) ? " If `#local.param.property#` is a column inside a subquery: `where` binds every `column <operator> value` and accepts only this model's and included models' columns, so a value compared with a subquery's column can't be bound. Use whereIn() with a value array, or run the subquery as its own query first." : "")
 							);
 						} else {
 							writeLog(
@@ -1608,12 +1659,18 @@
 					if (!StructIsEmpty(local.leftExpression)) {
 						local.where = Replace(local.where, local.element, Replace(local.element, local.leftExpression.dataPart, "?", "one"));
 						ArrayAppend(local.params, local.leftExpression.param);
+					} else if (Find("?", local.element)) {
+						// A value compared with something that isn't this model's (or an included
+						// model's) column, typically inside a subquery: there is no column to bind it to.
+						$throwUnbindableWhereValue(element = local.element);
 					} else if (ArrayLen(local.classes) > 1) {
 						local.where = $qualifyUnboundConditionColumn(where = local.where, element = local.element, classes = local.classes, useTableAlias = local.useTableAlias);
 					}
 				}
 			}
 			local.where = Replace(local.where, Chr(7), "", "all");
+			// literal-only comparisons ($passThroughLiteralPredicates) go into the SQL as written
+			local.where = Replace(local.where, Chr(8), "", "all");
 
 			// add to sql array
 			local.where = " " & local.where & " ";
@@ -1677,6 +1734,19 @@
 			}
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. Throws Wheels.UnbindableWhereValue for a `where` condition whose value
+	 * has no column of this model (or an included model) to be bound against.
+	 */
+	public void function $throwUnbindableWhereValue(required string element) {
+		local.condition = Trim(ReReplaceNoCase(Trim(arguments.element), "^(AND|OR)([^a-zA-Z0-9_$])", "\2"));
+		Throw(
+			type = "Wheels.UnbindableWhereValue",
+			message = "Wheels can't bind the value in the `where` condition `#local.condition#` (the value is shown as ?): it isn't compared with a column of this model or an included model, such as a value inside a subquery.",
+			extendedInfo = "`where` binds every `column <operator> value` as a query parameter, and the column must belong to the model or an `include`d model. Compare subquery columns with each other only, pass the values with whereIn() (a value array), or run the subquery as its own query first and pass its results."
+		);
 	}
 
 	/**
