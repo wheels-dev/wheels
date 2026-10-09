@@ -131,7 +131,7 @@ wheels jobs enqueue billing.InvoiceJob --queue=billing --priority=5
 | `--at` | Run it at this time, in ISO 8601: with `Z` or an offset (`2026-10-06T11:00:00+02:00`), or without one for this machine's local time (`2026-10-06 09:00`). A time in the past is refused. |
 | `--format=json` | Print the enqueued job as JSON. |
 
-"Scheduling" here means one delayed run (`--in` / `--at`, the same as `enqueueIn()` / `enqueueAt()`). Wheels has no recurring, cron-style schedule; for that, run `wheels jobs enqueue` or `processQueue()` from your system's scheduler.
+"Scheduling" here means one delayed run (`--in` / `--at`, the same as `enqueueIn()` / `enqueueAt()`). For a *recurring*, cron-style schedule, declare it in `config/schedules.cfm` — see [Recurring schedules](/v4-2-0/digging-deeper/running-jobs-on-multiple-servers/#recurring-schedules).
 
 The class must be a component under `app/jobs/` (or a `jobClassPrefixes` path, the same list the worker accepts) that extends `wheels.Job`. Anything else is refused before it's loaded, and an unknown name lists the job classes it found. Enqueueing writes a row, so like `wheels jobs work` it only talks to this project's own server and sends the reload password.
 
@@ -220,9 +220,13 @@ wheels jobs work --quiet                       # suppress per-job output; failur
 wheels jobs work --job-timeout=600             # cap each job's run time at 600 seconds (default: each job's own timeout)
 ```
 
-Each job runs with its own `timeout` (set in `config()`, default `300` seconds), so a job with `this.timeout = 900` gets its full 15 minutes. `--job-timeout=<seconds>` caps that: a job with a longer `timeout` is cut off at the cap, and one with a shorter `timeout` keeps its own. (Don't use `--timeout`: that is the CLI runtime's own option, which stops the whole worker after that many seconds.) Before 4.2 the worker stopped every job at 300 seconds, whatever its `timeout`.
+Each job runs with its own `timeout` (set in `config()`, default `300` seconds), so a job with `this.timeout = 900` gets its full 15 minutes. `--job-timeout=<seconds>` caps that: a job with a longer `timeout` is cut off at the cap, and one with a shorter `timeout` keeps its own. (Use `--job-timeout`, not `--timeout`: on some CLI runtimes `--timeout` is the runtime's own root option and would stop the whole worker after that many seconds.) Before 4.2 the worker stopped every job at 300 seconds, whatever its `timeout`.
 
 In production, run the worker under a process supervisor (systemd, Docker's restart policy, Kamal accessory containers): when it loses the server it exits non-zero and the supervisor restarts it. Run several workers for parallelism — the framework uses optimistic row locking, so two workers never run the same job twice. `--queue` accepts a comma-delimited list (`--queue=critical,default`); jobs across the listed queues run in `priority DESC, runAt ASC` order.
+
+<Aside type="tip" title="Running on more than one server">
+  When several app servers process the same `wheels_jobs` table, there's more to know — how a crashed or stalled worker's job is recovered safely, keeping a long job alive with `heartbeat()`, capping how many jobs a server runs at once, and draining a server before a deploy. See [Running Jobs on Multiple Servers](/v4-2-0/digging-deeper/running-jobs-on-multiple-servers/).
+</Aside>
 
 Check queue health without tailing logs:
 
@@ -243,7 +247,7 @@ component extends="Controller" {
     function drain() {
         worker = new wheels.Job();
         result = worker.processQueue(queue="mailers", limit=10);
-        // result = {processed: n, failed: n, skipped: n, errors: [...]}
+        // result = {processed: n, failed: n, skipped: n, fenced: n, leasesLost: n, errors: [...]}
         renderWith(data=result);
     }
 }
@@ -253,7 +257,7 @@ component extends="Controller" {
 - `processQueue(queue="mailers")` — only drain the `mailers` queue.
 - `processQueue(limit=100)` — bigger batch for one-shot catch-ups.
 
-In production, schedule the call at whatever cadence matches your latency tolerance — every minute is plenty for emails. Run it from multiple schedulers for parallelism: the base class uses optimistic row locking, so two pollers won't process the same job twice (a row claimed between the SELECT and the claim shows up in the `skipped` count).
+In production, schedule the call at whatever cadence matches your latency tolerance — every minute is plenty for emails. Run it from multiple schedulers for parallelism: the base class uses optimistic row locking, so two pollers won't process the same job twice — the atomic claim means the poller that loses the race simply doesn't get that row and moves on. The extra counts cover the multi-server cases: `fenced` is attempts whose result was discarded because the job had been reaped and reclaimed, `skipped` is [exclusive jobs](/v4-2-0/digging-deeper/running-jobs-on-multiple-servers/#exclusive-jobs-and-concurrency-keys) whose lease was held (put back to `pending`), and `leasesLost` is runs that finished but had lost their lease. See [the guarantees](/v4-2-0/digging-deeper/running-jobs-on-multiple-servers/#the-guarantees).
 
 Check queue health without tailing logs — `queueStats()` returns per-status counts:
 
@@ -447,6 +451,11 @@ Run the purge from a cron or scheduled task. A weekly purge of completed rows ol
 ## Related guides
 
 <CardGrid>
+  <LinkCard
+    title="Running Jobs on Multiple Servers"
+    description="Process one queue from several servers — fencing, heartbeats, idempotency, per-host caps, and draining for deploys."
+    href="/v4-2-0/digging-deeper/running-jobs-on-multiple-servers/"
+  />
   <LinkCard
     title="Models and the ORM"
     description="Jobs persist as rows. Read this first if `model().findByKey()` and callbacks aren't second nature yet."
