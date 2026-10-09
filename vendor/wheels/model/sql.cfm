@@ -1701,18 +1701,17 @@
 	/**
 	 * Internal function. Throws Wheels.UnbindableWhereValue for a `where` condition whose value
 	 * has no column of this model (or an included model) to be bound against. The condition is
-	 * echoed with its literal values hidden: a bound one is already `?`, any other quoted literal
-	 * (still in its masked, reversible form) is shown as '...', and a number that isn't part of
-	 * an identifier is shown as `...`.
+	 * echoed with its quoted values hidden: a bound one is already `?`, and any other quoted
+	 * literal (still in its masked, reversible form) is shown as '...'. Unquoted numbers in the
+	 * developer's own where text are shown as written.
 	 */
 	public void function $throwUnbindableWhereValue(required string element) {
 		local.condition = Trim(ReReplaceNoCase(Trim(arguments.element), "^(AND|OR)([^a-zA-Z0-9_$])", "\2"));
 		local.condition = ReReplace(local.condition, "'" & $whereLiteralSentinel() & "[^']*'", "'...'", "all");
 		local.condition = Replace(local.condition, Chr(2), "", "all");
-		local.condition = ReReplace(local.condition, "(^|[^a-zA-Z0-9_$.])[0-9]+(\.[0-9]+)?", "\1...", "all");
 		Throw(
 			type = "Wheels.UnbindableWhereValue",
-			message = "Wheels can't bind the value in the `where` condition `#local.condition#` (values are shown as ?, '...' or ...): it isn't compared with a column of this model or an included model, such as a value inside a subquery.",
+			message = "Wheels can't bind the value in the `where` condition `#local.condition#` (bound values are shown as ? and quoted values as '...'): it isn't compared with a column of this model or an included model, such as a value inside a subquery.",
 			extendedInfo = "`where` binds every `column <operator> value` as a query parameter, and the column must belong to the model or an `include`d model. Compare subquery columns with each other only, pass the values with whereIn() (a value array), or run the subquery as its own query first and pass its results."
 		);
 	}
