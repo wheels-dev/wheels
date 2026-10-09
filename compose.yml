@@ -431,7 +431,7 @@ services:
       - wheels-network
 
   cockroachdb:
-    image: ghcr.io/wheels-dev/mirror/cockroachdb/cockroach:v24.3.32
+    image: cockroachdb/cockroach:v24.3.32
     restart: always
     command: start-single-node --insecure --advertise-addr=cockroachdb
     ports:
@@ -449,7 +449,7 @@ services:
       - wheels-network
 
   cockroachdb-init:
-    image: ghcr.io/wheels-dev/mirror/cockroachdb/cockroach:v24.3.32
+    image: cockroachdb/cockroach:v24.3.32
     depends_on:
       cockroachdb:
         condition: service_healthy
@@ -459,7 +459,7 @@ services:
       - wheels-network
 
   oracle:
-    image: ghcr.io/wheels-dev/mirror/gvenzl/oracle-free:23.26.1-slim
+    image: gvenzl/oracle-free:23.26.1-slim
     restart: always
     environment:
       ORACLE_PASSWORD: wheelstestdb
