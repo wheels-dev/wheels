@@ -389,6 +389,12 @@ component {
 		ArrayAppend(local.lines, "	// (CockroachDB under read-committed isolation; MySQL and Oracle commit each statement).");
 		ArrayAppend(local.lines, "	this.useTransaction = false;");
 		ArrayAppend(local.lines, "");
+		ArrayAppend(local.lines, "	// Job timestamps are UTC (read from the database's clock) since Wheels 4.2; rows written");
+		ArrayAppend(local.lines, "	// before that hold the server's local time. Drain every server before upgrading and leave");
+		ArrayAppend(local.lines, "	// this at 0, or set your old servers' offset from UTC in minutes (-300 for UTC-5, 60 for");
+		ArrayAppend(local.lines, "	// UTC+1) before running the migration to convert existing rows once.");
+		ArrayAppend(local.lines, "	this.convertLocalOffsetMinutes = 0;");
+		ArrayAppend(local.lines, "");
 		ArrayAppend(local.lines, "	function up() {");
 		ArrayAppend(local.lines, "		var schema = new wheels.JobSchema(datasource = $migratorDataSource(), credentials = $migratorDataSourceCredentials());");
 		for (local.t in tables()) {
@@ -442,6 +448,12 @@ component {
 				ArrayAppend(local.lines, "		}");
 			}
 		}
+		ArrayAppend(local.lines, "");
+		ArrayAppend(local.lines, "		if (Val(this.convertLocalOffsetMinutes) != 0) {");
+		ArrayAppend(local.lines, "			for (var sql in schema.shiftTimestampsSql(minutes = -Val(this.convertLocalOffsetMinutes), dbType = schema.databaseType())) {");
+		ArrayAppend(local.lines, "				execute(sql);");
+		ArrayAppend(local.lines, "			}");
+		ArrayAppend(local.lines, "		}");
 		ArrayAppend(local.lines, "	}");
 		ArrayAppend(local.lines, "");
 		ArrayAppend(local.lines, "	function down() {");
@@ -456,6 +468,53 @@ component {
 		ArrayAppend(local.lines, "");
 		ArrayAppend(local.lines, "}");
 		return ArrayToList(local.lines, local.nl) & local.nl;
+	}
+
+	/**
+	 * UPDATE statements that move every date/time column of the job tables by a number of
+	 * minutes, one per table. The install migration runs them once when the operator sets
+	 * convertLocalOffsetMinutes: rows written before Wheels 4.2 hold the server's local time,
+	 * and job timestamps are UTC since. SQLite stores them as epoch milliseconds.
+	 * @minutes Minutes to add (negative to subtract).
+	 * @dbType The database type (databaseType()).
+	 */
+	public array function shiftTimestampsSql(required numeric minutes, required string dbType) {
+		local.rv = [];
+		local.n = Int(arguments.minutes);
+		for (local.t in tables()) {
+			local.sets = [];
+			for (local.c in local.t.columns) {
+				if (local.c.type == "datetime") {
+					ArrayAppend(local.sets, local.c.name & " = " & $shiftedColumnSql(local.c.name, local.n, arguments.dbType));
+				}
+			}
+			if (ArrayLen(local.sets)) {
+				ArrayAppend(local.rv, "UPDATE #local.t.name# SET " & ArrayToList(local.sets, ", "));
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal: a date/time column moved by a whole number of minutes, in the database's syntax.
+	 * NULL stays NULL everywhere.
+	 */
+	public string function $shiftedColumnSql(required string column, required numeric minutes, required string dbType) {
+		switch (arguments.dbType) {
+			case "sqlserver":
+				return "DATEADD(minute, #arguments.minutes#, #arguments.column#)";
+			case "mysql":
+				return "DATE_ADD(#arguments.column#, INTERVAL #arguments.minutes# MINUTE)";
+			case "postgresql":
+				return "#arguments.column# + (#arguments.minutes# * INTERVAL '1 minute')";
+			case "oracle":
+				return "#arguments.column# + NUMTODSINTERVAL(#arguments.minutes#, 'MINUTE')";
+			case "h2":
+				return "DATEADD('MINUTE', #arguments.minutes#, #arguments.column#)";
+			case "sqlite":
+				return "#arguments.column# + (#arguments.minutes# * 60000)";
+		}
+		Throw(type = "Wheels.Job.UnsupportedDatabase", message = "Can't convert job timestamps on database type '#arguments.dbType#'.");
 	}
 
 	/**

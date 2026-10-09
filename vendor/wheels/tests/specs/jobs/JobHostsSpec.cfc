@@ -87,7 +87,7 @@ component extends="wheels.WheelsTest" {
 				queryExecute(
 					"UPDATE wheels_job_hosts SET drainExpiresAt = :past WHERE host = :host",
 					{
-						past = {value = DateAdd("n", -1, Now()), cfsqltype = "cf_sql_timestamp"},
+						past = {value = DateAdd("n", -1, jobsNow()), cfsqltype = "cf_sql_timestamp"},
 						host = {value = request.$wheelsHostsSpec.host, cfsqltype = "cf_sql_varchar"}
 					},
 					{datasource = application.wheels.dataSourceName}
@@ -187,7 +187,7 @@ component extends="wheels.WheelsTest" {
 		numeric attempts = 0
 	) {
 		var id = CreateUUID();
-		var stamp = arguments.stale ? DateAdd("h", -2, Now()) : DateAdd("s", -5, Now());
+		var stamp = arguments.stale ? DateAdd("h", -2, jobsNow()) : DateAdd("s", -5, jobsNow());
 		var columns = "id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt";
 		var values = ":id, 'wheels.tests._assets.jobs.ProcessOrdersJob', :queue, '{}', 0, :status, :attempts, 3, :runAt, :createdAt, :updatedAt";
 		var params = {
@@ -223,6 +223,15 @@ component extends="wheels.WheelsTest" {
 			{host = {value = request.$wheelsHostsSpec.host, cfsqltype = "cf_sql_varchar"}},
 			{datasource = application.wheels.dataSourceName}
 		);
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC from the database's clock, which job rows and
+	 * memos are stamped with. A row stamped with the app's local Now() is hours out on a server
+	 * that isn't on UTC.
+	 */
+	private date function jobsNow() {
+		return new wheels.Job().$jobClock().utcNow();
 	}
 
 }

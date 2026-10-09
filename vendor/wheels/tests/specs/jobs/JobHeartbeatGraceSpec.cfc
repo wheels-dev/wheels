@@ -94,7 +94,7 @@ component extends="wheels.WheelsTest" {
 		string jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob"
 	) {
 		var id = CreateUUID();
-		var claimedAt = DateAdd("n", -Max(arguments.claimedMinutesAgo, arguments.heartbeatMinutesAgo + 1), Now());
+		var claimedAt = DateAdd("n", -Max(arguments.claimedMinutesAgo, arguments.heartbeatMinutesAgo + 1), jobsNow());
 		var beatSeconds = arguments.heartbeatMinutesAgo * 60 + arguments.heartbeatSecondsAgo;
 		var params = {
 			id = {value = id, cfsqltype = "cf_sql_varchar"},
@@ -103,7 +103,7 @@ component extends="wheels.WheelsTest" {
 			runAt = {value = claimedAt, cfsqltype = "cf_sql_timestamp"},
 			createdAt = {value = claimedAt, cfsqltype = "cf_sql_timestamp"},
 			updatedAt = {value = claimedAt, cfsqltype = "cf_sql_timestamp"},
-			heartbeatAt = {value = DateAdd("s", -beatSeconds, Now()), cfsqltype = "cf_sql_timestamp", null = beatSeconds == 0}
+			heartbeatAt = {value = DateAdd("s", -beatSeconds, jobsNow()), cfsqltype = "cf_sql_timestamp", null = beatSeconds == 0}
 		};
 		queryExecute(
 			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt, claimTimeout, heartbeatAt)
@@ -121,6 +121,15 @@ component extends="wheels.WheelsTest" {
 			{datasource = application.wheels.dataSourceName}
 		);
 		return q.recordCount ? q.status : "";
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC from the database's clock, which job rows and
+	 * memos are stamped with. A row stamped with the app's local Now() is hours out on a server
+	 * that isn't on UTC.
+	 */
+	private date function jobsNow() {
+		return new wheels.Job().$jobClock().utcNow();
 	}
 
 }

@@ -216,6 +216,52 @@ component extends="wheels.WheelsTest" {
 			});
 
 		});
+
+		describe("converting rows written before job timestamps were UTC", function() {
+
+			it("updates every date/time column of each job table, and none of the lock table", function() {
+				var statements = new wheels.JobSchema().shiftTimestampsSql(minutes = 300, dbType = "mysql");
+				var joined = ArrayToList(statements, Chr(10));
+				expect(ArrayLen(statements)).toBe(3);
+				expect(joined).toInclude("UPDATE wheels_jobs SET heartbeatAt = DATE_ADD(heartbeatAt, INTERVAL 300 MINUTE)");
+				expect(joined).toInclude("runAt = DATE_ADD(runAt, INTERVAL 300 MINUTE)");
+				expect(joined).toInclude("UPDATE wheels_job_hosts SET lastSeenAt = ");
+				expect(joined).toInclude("UPDATE wheels_job_schedules SET updatedAt = ");
+				expect(joined).notToInclude("wheels_job_locks");
+				expect(new wheels.JobSchema().$shiftedColumnSql("runAt", -60, "sqlite")).toBe("runAt + (-60 * 60000)");
+			});
+
+			it("moves a stored timestamp by the given minutes on this database", function() {
+				var job = new wheels.Job();
+				job.$ensureJobTable();
+				var schema = new wheels.JobSchema();
+				var id = CreateUUID();
+				var stamp = CreateDateTime(2026, 3, 1, 10, 0, 0);
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'test_schema_shift', '{}', 0, 'completed', 1, 3, :stamp, :stamp, :stamp)",
+					{id = {value = id, cfsqltype = "cf_sql_varchar"}, stamp = {value = stamp, cfsqltype = "cf_sql_timestamp"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				var statement = schema.shiftTimestampsSql(minutes = 300, dbType = schema.databaseType())[1];
+				queryExecute(statement & " WHERE id = :id", {id = {value = id, cfsqltype = "cf_sql_varchar"}}, {datasource = application.wheels.dataSourceName});
+				var row = queryExecute(
+					"SELECT runAt, completedAt FROM wheels_jobs WHERE id = :id",
+					{id = {value = id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				queryExecute("DELETE FROM wheels_jobs WHERE id = :id", {id = {value = id, cfsqltype = "cf_sql_varchar"}}, {datasource = application.wheels.dataSourceName});
+				expect(DateDiff("n", stamp, application.wo.$normalizeDbTimestamp(row.runAt[1]))).toBe(300);
+				expect(IsDate(application.wo.$normalizeDbTimestamp(row.completedAt[1]))).toBeFalse("NULL stays NULL");
+			});
+
+			it("writes the conversion into the install migration, off by default", function() {
+				var source = new wheels.JobSchema().migrationSource();
+				expect(source).toInclude("this.convertLocalOffsetMinutes = 0;");
+				expect(source).toInclude("schema.shiftTimestampsSql(minutes = -Val(this.convertLocalOffsetMinutes), dbType = schema.databaseType())");
+			});
+
+		});
 	}
 
 	/**

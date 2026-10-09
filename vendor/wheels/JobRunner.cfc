@@ -135,8 +135,10 @@ component {
 				{datasource = $datasource()}
 			);
 			if (local.row.recordCount) {
-				local.rv.drainExpiresAt = IsNull(local.row.drainExpiresAt[1]) ? "" : local.row.drainExpiresAt[1];
-				local.rv.lastSeenAt = IsNull(local.row.lastSeenAt[1]) ? "" : local.row.lastSeenAt[1];
+				// Stored as UTC on the jobs clock; reported in the app's local time.
+				local.clock = variables.$job.$jobClock();
+				local.rv.drainExpiresAt = IsNull(local.row.drainExpiresAt[1]) ? "" : local.clock.toLocal(local.row.drainExpiresAt[1]);
+				local.rv.lastSeenAt = IsNull(local.row.lastSeenAt[1]) ? "" : local.clock.toLocal(local.row.lastSeenAt[1]);
 				local.rv.codeVersion = IsNull(local.row.codeVersion[1]) ? "" : local.row.codeVersion[1];
 			}
 		}
@@ -177,12 +179,11 @@ component {
 	}
 
 	/**
-	 * Now() truncated to whole seconds, as the job tables are written everywhere else (MySQL/H2
-	 * DATETIME rounds fractional seconds >= 0.5 up).
+	 * The current time on the jobs clock (wheels.JobClock): UTC, from the database's clock, in
+	 * whole seconds.
 	 */
 	private date function $now() {
-		local.n = Now();
-		return CreateDateTime(Year(local.n), Month(local.n), Day(local.n), Hour(local.n), Minute(local.n), Second(local.n));
+		return variables.$job.$jobClock().utcNow();
 	}
 
 	private string function $datasource() {

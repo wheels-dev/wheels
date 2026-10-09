@@ -132,7 +132,7 @@ component extends="wheels.WheelsTest" {
 				local.bootstrap.$ensureJobTable();
 
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("s", -1800, Now());  // well past the grace window (timeout + max(60,timeout))
+				local.oldTime = DateAdd("s", -1800, jobsNow());  // well past the grace window (timeout + max(60,timeout))
 				queryExecute(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'test_timeout', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
@@ -162,7 +162,7 @@ component extends="wheels.WheelsTest" {
 				local.bootstrap.$ensureJobTable();
 
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("s", -1800, Now());  // well past the grace window (timeout + max(60,timeout))
+				local.oldTime = DateAdd("s", -1800, jobsNow());  // well past the grace window (timeout + max(60,timeout))
 				queryExecute(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'test_reaper_3888', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
@@ -197,7 +197,7 @@ component extends="wheels.WheelsTest" {
 				// blanket reap would catch it, a poll scoped to queue X must leave it alone —
 				// otherwise a short-timeout worker reaps another worker's live job (#3888).
 				local.idY = CreateUUID();
-				local.oldTime = DateAdd("s", -1800, Now());
+				local.oldTime = DateAdd("s", -1800, jobsNow());
 				queryExecute(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'reap_scope_Y_3888', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
@@ -235,7 +235,7 @@ component extends="wheels.WheelsTest" {
 				// (status='processing' AND attempts=1) lets exactly one win; the loser matches
 				// 0 rows, so attempts is bumped once, not twice, and the count stays honest.
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("s", -1800, Now());
+				local.oldTime = DateAdd("s", -1800, jobsNow());
 				queryExecute(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'reap_race_3888', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
@@ -281,7 +281,7 @@ component extends="wheels.WheelsTest" {
 				// requeue and the live claim is left untouched — this is why attempts (bumped
 				// on every claim) is a safer version token than a round-tripped timestamp.
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("s", -1800, Now());
+				local.oldTime = DateAdd("s", -1800, jobsNow());
 				queryExecute(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'reap_token_3888', '{}', 0, 'processing', 2, 3, :runAt, :createdAt, :updatedAt)",
@@ -323,7 +323,7 @@ component extends="wheels.WheelsTest" {
 				// window. A bridge call with timeout=0 must normalise to 300 (grace 600s),
 				// not collapse the grace window to 60s and reap this live job.
 				local.id = CreateUUID();
-				local.recentTime = DateAdd("s", -90, Now());
+				local.recentTime = DateAdd("s", -90, jobsNow());
 				queryExecute(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'reap_zero_3984', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
@@ -358,7 +358,7 @@ component extends="wheels.WheelsTest" {
 				local.bootstrap.$ensureJobTable();
 
 				local.id = CreateUUID();
-				local.t = Now();
+				local.t = jobsNow();
 				queryExecute(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'claimts_3989', '{}', 0, 'pending', 0, 3, :runAt, :createdAt, :updatedAt)",
@@ -396,7 +396,7 @@ component extends="wheels.WheelsTest" {
 				// A short poller (timeout 60 -> grace 120s) would reap it under the old #3888 rule,
 				// but must honour the OWNER's recorded timeout and leave it running.
 				local.id = CreateUUID();
-				local.idle = DateAdd("s", -300, Now());
+				local.idle = DateAdd("s", -300, jobsNow());
 				queryExecute(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, claimTimeout, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'claimlong_3989', '{}', 0, 'processing', 1, 3, 600, :runAt, :createdAt, :updatedAt)",
@@ -433,7 +433,7 @@ component extends="wheels.WheelsTest" {
 				// A pre-#3989 / column-less row (claimTimeout NULL), idle 1800s. The reaper must
 				// fall back to the poller's timeout (300 -> grace 600s) and recover it.
 				local.id = CreateUUID();
-				local.idle = DateAdd("s", -1800, Now());
+				local.idle = DateAdd("s", -1800, jobsNow());
 				queryExecute(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'claimnull_3989', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
@@ -520,7 +520,7 @@ component extends="wheels.WheelsTest" {
 						// Memoise a just-now ALTER failure; CliBridge builds a fresh JobWorker per poll,
 						// so without a back-off the DDL would re-run every poll. During the window the
 						// ALTER must be skipped, leaving the column absent even though the DB would allow it.
-						application.wheels.$claimTimeoutAlterFailedAt = Now();
+						application.wheels.$claimTimeoutAlterFailedAt = jobsNow();
 						local.job.$ensureClaimTimeoutColumn();
 						expect(local.job.$jobTableHasClaimTimeout()).toBeFalse("ALTER must be skipped during the back-off window");
 						// Clearing the memo lets the next ensure() re-attempt and add the column.
@@ -546,7 +546,7 @@ component extends="wheels.WheelsTest" {
 				if (local.dropped) {
 					try {
 						// A failure older than any reasonable window must not suppress a retry.
-						application.wheels.$claimTimeoutAlterFailedAt = DateAdd("s", -3600, Now());
+						application.wheels.$claimTimeoutAlterFailedAt = DateAdd("s", -3600, jobsNow());
 						local.job.$ensureClaimTimeoutColumn();
 						expect(local.job.$jobTableHasClaimTimeout()).toBeTrue("a stale failure memo must not block the retry");
 					} finally {
@@ -559,7 +559,7 @@ component extends="wheels.WheelsTest" {
 				local.job = new wheels.Job();
 				local.job.$ensureJobTable();
 				try {
-					application.wheels.$claimTimeoutAlterFailedAt = Now();
+					application.wheels.$claimTimeoutAlterFailedAt = jobsNow();
 					local.job.$ensureClaimTimeoutColumn();
 					expect(StructKeyExists(application.wheels, "$claimTimeoutAlterFailedAt")).toBeFalse("a present column must clear any stale failure memo");
 				} finally {
@@ -698,7 +698,7 @@ component extends="wheels.WheelsTest" {
 				local.bootstrap.$ensureJobTable();
 
 				local.id = CreateUUID();
-				local.now = Now();
+				local.now = jobsNow();
 				queryExecute(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, lastError, runAt, failedAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'test_retry', '{}', 0, 'failed', 3, 3, 'Test error', :now, :now, :now, :now)",
@@ -755,7 +755,7 @@ component extends="wheels.WheelsTest" {
 				local.bootstrap.$ensureJobTable();
 
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("d", -30, Now());
+				local.oldTime = DateAdd("d", -30, jobsNow());
 				queryExecute(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, completedAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'test_purge', '{}', 0, 'completed', 1, 3, :oldTime, :oldTime, :oldTime, :oldTime)",
@@ -835,7 +835,7 @@ component extends="wheels.WheelsTest" {
 				$createLegacyJobTable();
 				// A just-failed ALTER puts the upgrade in its back-off window, as when the database
 				// user can't ALTER the table.
-				application.wheels.$uniqueKeyAlterFailedAt = Now();
+				application.wheels.$uniqueKeyAlterFailedAt = jobsNow();
 				var job = new wheels.tests._assets.jobs.ProcessOrdersJob();
 				var plain = job.enqueue(queue = "test_unique_legacy");
 				expect(plain.enqueued).toBeTrue("a job without a key must still enqueue on a table without the column");
@@ -900,7 +900,7 @@ component extends="wheels.WheelsTest" {
 
 			it("keeps a heartbeating job alive through updatedAt when heartbeatAt can't be added", function() {
 				$createLegacyJobTable();
-				application.wheels.$heartbeatAlterFailedAt = Now();
+				application.wheels.$heartbeatAlterFailedAt = jobsNow();
 				try {
 					var id = CreateUUID();
 					queryExecute(
@@ -908,9 +908,9 @@ component extends="wheels.WheelsTest" {
 						VALUES (:id, 'wheels.tests._assets.jobs.ProcessOrdersJob', 'test_unique_legacy', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
 						{
 							id = {value = id, cfsqltype = "cf_sql_varchar"},
-							runAt = {value = DateAdd("h", -2, Now()), cfsqltype = "cf_sql_timestamp"},
-							createdAt = {value = DateAdd("h", -2, Now()), cfsqltype = "cf_sql_timestamp"},
-							updatedAt = {value = DateAdd("h", -2, Now()), cfsqltype = "cf_sql_timestamp"}
+							runAt = {value = DateAdd("h", -2, jobsNow()), cfsqltype = "cf_sql_timestamp"},
+							createdAt = {value = DateAdd("h", -2, jobsNow()), cfsqltype = "cf_sql_timestamp"},
+							updatedAt = {value = DateAdd("h", -2, jobsNow()), cfsqltype = "cf_sql_timestamp"}
 						},
 						{datasource = application.wheels.dataSourceName}
 					);
@@ -1035,9 +1035,9 @@ component extends="wheels.WheelsTest" {
 			VALUES (:id, 'wheels.tests._assets.jobs.ProcessOrdersJob', 'test_unique_legacy', '{}', 0, 'completed', 1, 3, :runAt, :createdAt, :updatedAt)",
 			{
 				id = {value = arguments.id, cfsqltype = "cf_sql_varchar"},
-				runAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
-				createdAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"}
+				runAt = {value = jobsNow(), cfsqltype = "cf_sql_timestamp"},
+				createdAt = {value = jobsNow(), cfsqltype = "cf_sql_timestamp"},
+				updatedAt = {value = jobsNow(), cfsqltype = "cf_sql_timestamp"}
 			},
 			{datasource = application.wheels.dataSourceName}
 		);
@@ -1047,6 +1047,15 @@ component extends="wheels.WheelsTest" {
 		StructDelete(application.wheels, "$jobsUniqueKeyIndexVerified");
 		StructDelete(application.wheels, "$uniqueKeyAlterFailedAt");
 		StructDelete(application.wheels, "$heartbeatAlterFailedAt");
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC from the database's clock, which job rows and
+	 * memos are stamped with. A row stamped with the app's local Now() is hours out on a server
+	 * that isn't on UTC.
+	 */
+	private date function jobsNow() {
+		return new wheels.Job().$jobClock().utcNow();
 	}
 
 }

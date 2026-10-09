@@ -261,7 +261,8 @@ component {
 
 	/**
 	 * Enqueue this job for processing at a specific time.
-	 * @runAt Date/time when the job should be processed.
+	 * @runAt Date/time when the job should be processed, in the app's local time (stored as UTC
+	 * on the jobs clock, see wheels.JobClock).
 	 * @data Job data to pass to perform().
 	 * @queue Override the default queue name.
 	 * @priority Override the default priority.
@@ -281,7 +282,7 @@ component {
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
-			runAt = arguments.runAt,
+			runAt = $jobClock().toUtc(arguments.runAt),
 			transactional = $resolveTransactional(arguments.transactional),
 			uniqueKey = arguments.uniqueKey
 		);
@@ -2880,13 +2881,24 @@ component {
 	}
 
 	/**
-	 * Returns Now() truncated to whole seconds.
-	 * Prevents MySQL/H2 DATETIME rounding: when fractional seconds >= 0.5,
-	 * these databases round UP to the next second, making runAt appear in the future.
+	 * The current time on the jobs clock (wheels.JobClock): UTC, from the database's clock, in
+	 * whole seconds. Every timestamp the jobs code writes or compares against comes from here.
 	 */
 	private date function $now() {
-		local.n = Now();
-		return CreateDateTime(Year(local.n), Month(local.n), Day(local.n), Hour(local.n), Minute(local.n), Second(local.n));
+		return $jobClock().utcNow();
+	}
+
+	/**
+	 * Internal: the jobs clock for this instance's datasource (it can change with tenant context).
+	 */
+	public any function $jobClock() {
+		if (!StructKeyExists(variables, "$jobClocks")) {
+			variables.$jobClocks = {};
+		}
+		if (!StructKeyExists(variables.$jobClocks, variables.$datasource)) {
+			variables.$jobClocks[variables.$datasource] = new wheels.JobClock(datasource = variables.$datasource, job = this);
+		}
+		return variables.$jobClocks[variables.$datasource];
 	}
 
 	/**

@@ -528,7 +528,7 @@ component {
 					status = local.row.status,
 					attempts = local.row.attempts,
 					lastError = local.row.lastError ?: "",
-					updatedAt = local.row.updatedAt
+					updatedAt = $jobClock().toLocal(local.row.updatedAt)
 				});
 			}
 		} catch (any e) {
@@ -565,8 +565,9 @@ component {
 						? DateAdd("s", Int(local.oldestRow.createdAt / 1000), CreateDate(1970, 1, 1))
 						: local.oldestRow.createdAt;
 				}
+				// Stored as UTC on the jobs clock; reported in the app's local time.
 				local.result.oldestPending = IsDate(local.normalized)
-					? local.normalized
+					? $jobClock().toLocal(local.normalized)
 					: local.oldestRow.createdAt;
 			}
 		} catch (any e) {
@@ -1160,12 +1161,21 @@ component {
 	}
 
 	/**
-	 * Returns Now() truncated to whole seconds.
-	 * Prevents MySQL/H2 DATETIME rounding: fractional seconds >= 0.5 round UP.
+	 * The current time on the jobs clock (wheels.JobClock): UTC, from the database's clock, in
+	 * whole seconds.
 	 */
 	private date function $now() {
-		local.n = Now();
-		return CreateDateTime(Year(local.n), Month(local.n), Day(local.n), Hour(local.n), Minute(local.n), Second(local.n));
+		return $jobClock().utcNow();
+	}
+
+	/**
+	 * Internal: the jobs clock for this worker's datasource.
+	 */
+	private any function $jobClock() {
+		if (!StructKeyExists(variables, "$jobClockInstance")) {
+			variables.$jobClockInstance = new wheels.JobClock(datasource = variables.$datasource, job = $jobBridge());
+		}
+		return variables.$jobClockInstance;
 	}
 
 	/**

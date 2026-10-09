@@ -105,7 +105,7 @@ component extends="wheels.WheelsTest" {
 
 			it("B1: checkTimeouts retry/fail UPDATE does not overwrite completed", function() {
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("s", -600, Now());
+				local.oldTime = DateAdd("s", -600, jobsNow());
 				$insertTestJob(
 					id = local.id,
 					jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
@@ -115,7 +115,7 @@ component extends="wheels.WheelsTest" {
 					createdAt = local.oldTime,
 					updatedAt = local.oldTime
 				);
-				local.now = Now();
+				local.now = jobsNow();
 				queryExecute(
 					"UPDATE wheels_jobs SET status = 'completed', completedAt = :now WHERE id = :id",
 					{
@@ -170,8 +170,8 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("B3: getMonitorData queue filter applies to recentJobs and oldestPending", function() {
-				local.otherCreated = DateAdd("h", -2, Now());
-				local.targetCreated = DateAdd("h", -1, Now());
+				local.otherCreated = DateAdd("h", -2, jobsNow());
+				local.targetCreated = DateAdd("h", -1, jobsNow());
 				local.otherPending = CreateUUID();
 				local.targetPending = CreateUUID();
 				local.otherDone = CreateUUID();
@@ -216,7 +216,8 @@ component extends="wheels.WheelsTest" {
 				}
 
 				expect(IsDate(local.data.oldestPending)).toBeTrue();
-				expect(Abs(DateDiff("s", local.targetCreated, local.data.oldestPending))).toBeLTE(2);
+				// Stored on the jobs clock (UTC), reported in the app's local time.
+				expect(Abs(DateDiff("s", DateAdd("h", -1, Now()), local.data.oldestPending))).toBeLTE(2);
 			});
 
 			it("S2/S3: config() backoff is applied and linear stays exponential", function() {
@@ -250,7 +251,7 @@ component extends="wheels.WheelsTest" {
 					}
 				);
 
-				local.threshold = DateAdd("s", 600, Now());
+				local.threshold = DateAdd("s", 600, jobsNow());
 				local.configCheck = queryExecute(
 					"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE id = :id AND status = 'pending' AND runAt > :threshold",
 					{
@@ -305,7 +306,7 @@ component extends="wheels.WheelsTest" {
 				expect(claim.type).toBe("Wheels.JobClaimFailed");
 
 				local.id = CreateUUID();
-				local.past = DateAdd("s", -30, Now());
+				local.past = DateAdd("s", -30, jobsNow());
 				$insertTestJob(
 					id = local.id,
 					jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
@@ -490,7 +491,7 @@ component extends="wheels.WheelsTest" {
 				$insertTestJob(id = local.failB, jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob", queue = "test_hard_s10_retry", status = "failed", attempts = 3);
 				expect(local.job.retryFailed(queue = "test_hard_s10_retry")).toBe(2);
 
-				local.oldTime = DateAdd("d", -30, Now());
+				local.oldTime = DateAdd("d", -30, jobsNow());
 				local.doneA = CreateUUID();
 				local.doneB = CreateUUID();
 				$insertTestJob(id = local.doneA, jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob", queue = "test_hard_s10_purge", status = "completed", createdAt = local.oldTime, updatedAt = local.oldTime);
@@ -521,7 +522,7 @@ component extends="wheels.WheelsTest" {
 		createdAt = "",
 		updatedAt = ""
 	) {
-		local.stamp = Now();
+		local.stamp = jobsNow();
 		local.createdAt = IsDate(arguments.createdAt) ? arguments.createdAt : local.stamp;
 		local.updatedAt = IsDate(arguments.updatedAt) ? arguments.updatedAt : local.stamp;
 		queryExecute(
@@ -541,6 +542,15 @@ component extends="wheels.WheelsTest" {
 			},
 			{datasource = application.wheels.dataSourceName}
 		);
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC from the database's clock, which job rows and
+	 * memos are stamped with. A row stamped with the app's local Now() is hours out on a server
+	 * that isn't on UTC.
+	 */
+	private date function jobsNow() {
+		return new wheels.Job().$jobClock().utcNow();
 	}
 
 }

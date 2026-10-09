@@ -435,10 +435,9 @@ component {
 		}
 	}
 
-	/** Now() truncated to whole seconds, as the job tables are written everywhere else. */
+	/** The current time on the jobs clock (wheels.JobClock): UTC, from the database's clock. */
 	private date function $now() {
-		local.n = Now();
-		return CreateDateTime(Year(local.n), Month(local.n), Day(local.n), Hour(local.n), Minute(local.n), Second(local.n));
+		return variables.$job.$jobClock().utcNow();
 	}
 
 }

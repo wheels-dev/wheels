@@ -81,9 +81,9 @@ component extends="wheels.WheelsTest" {
 		numeric idleSeconds = 0
 	) {
 		var id = CreateUUID();
-		var stamp = arguments.stale ? DateAdd("h", -2, Now()) : DateAdd("s", -5, Now());
+		var stamp = arguments.stale ? DateAdd("h", -2, jobsNow()) : DateAdd("s", -5, jobsNow());
 		if (arguments.idleSeconds > 0) {
-			stamp = DateAdd("s", -arguments.idleSeconds, Now());
+			stamp = DateAdd("s", -arguments.idleSeconds, jobsNow());
 		}
 		queryExecute(
 			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
@@ -110,6 +110,15 @@ component extends="wheels.WheelsTest" {
 			{datasource = application.wheels.dataSourceName}
 		);
 		return {status = q.recordCount ? q.status : "", claimTimeout = q.recordCount && !IsNull(q.claimTimeout[1]) ? q.claimTimeout[1] : ""};
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC from the database's clock, which job rows and
+	 * memos are stamped with. A row stamped with the app's local Now() is hours out on a server
+	 * that isn't on UTC.
+	 */
+	private date function jobsNow() {
+		return new wheels.Job().$jobClock().utcNow();
 	}
 
 }
