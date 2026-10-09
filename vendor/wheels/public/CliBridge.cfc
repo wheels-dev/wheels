@@ -78,6 +78,7 @@ component output="false" displayName="CLI Bridge" {
 			"jobsDrain" = "jobsDrain",
 			"jobsResume" = "jobsResume",
 			"jobsHostStatus" = "jobsHostStatus",
+			"jobsTick" = "jobsTick",
 			"jobsInstallSource" = "jobsInstallSource"
 		};
 		return this;
@@ -870,6 +871,23 @@ component output="false" displayName="CLI Bridge" {
 		} catch (any e) {
 			local.rv.success = false;
 			local.rv.message = "Error getting status: " & e.message;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * `wheels jobs tick`: one JobRunner.tick() on this server (record the host, reap, run jobs up to
+	 * the per-host cap). Mutating: it runs jobs.
+	 */
+	public struct function jobsTick(required struct context, required struct params) {
+		local.rv = {};
+		try {
+			local.rv.tick = new wheels.JobRunner().tick();
+			local.rv.success = true;
+			local.rv.message = "Tick done";
+		} catch (any e) {
+			local.rv.success = false;
+			local.rv.message = "Error running a tick: " & e.message;
 		}
 		return local.rv;
 	}

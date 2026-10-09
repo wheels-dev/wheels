@@ -68,7 +68,8 @@ component extends="wheels.WheelsTest" {
 						"jobsPurge",
 						"jobsEnqueue",
 						"jobsDrain",
-						"jobsResume"
+						"jobsResume",
+						"jobsTick"
 					];
 					for (var name in mutating) {
 						expect(state.publicCfc.$cliCommandIsMutating(name)).toBeTrue("expected #name# to be mutating");

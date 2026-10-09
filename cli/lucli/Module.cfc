@@ -586,7 +586,7 @@ component extends="modules.BaseModule" {
 
 	private any function jobsArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "action", default = "status", description = "work (long-lived worker loop), status (queue snapshot), enqueue (add a job), drain (stop this server starting new jobs), resume, or install (write a migration that creates the job tables). Defaults to status")
+			.positional(name = "action", default = "status", description = "work (long-lived worker loop), status (queue snapshot), enqueue (add a job), drain (stop this server starting new jobs), resume, tick (run one tick: reap, then run jobs up to the per-host cap), or install (write a migration that creates the job tables). Defaults to status")
 			.positional(name = "job", default = "", description = "enqueue only: the job class under app/jobs/, e.g. SendWelcomeEmailJob or billing.InvoiceJob")
 			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. enqueue: the queue to put the job on (default: the job's own). Empty = all queues")
 			.option(name = "data", default = "", description = "enqueue only: the job's data, a JSON object passed to perform()")
@@ -5886,7 +5886,7 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts and this server's running jobs, cap and drain (--format=json for machines), `enqueue <JobName>` adds a job now or after a delay, `drain [--wait]` stops this server starting new jobs (for deploys) and `resume` lifts it, `install` writes a migration that creates the job tables. retry/purge/monitor are tracked follow-ups (issue 3090).
+	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts and this server's running jobs, cap and drain (--format=json for machines), `enqueue <JobName>` adds a job now or after a delay, `drain [--wait]` stops this server starting new jobs (for deploys) and `resume` lifts it, `tick` runs one round (for cron/systemd timers), `install` writes a migration that creates the job tables. retry/purge/monitor are tracked follow-ups (issue 3090).
 	 */
 	public string function jobs() {
 		var opts = $parseJobsArgs(structuredArgs(arguments));
@@ -5902,6 +5902,8 @@ component extends="modules.BaseModule" {
 				return runJobsDrain(opts);
 			case "resume":
 				return runJobsResume(opts);
+			case "tick":
+				return runJobsTick(opts);
 			case "install":
 				return runJobsInstall(opts);
 			// The framework bridge (vendor/wheels/public/views/cli.cfm) already
@@ -5922,7 +5924,7 @@ component extends="modules.BaseModule" {
 				);
 			default:
 				out("Unknown jobs action: #opts.action#", "red");
-				out("Usage: wheels jobs [work|status|enqueue <JobName>|drain|resume|install [--force]] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--job-timeout=<seconds>] [--wait[=<seconds>]] [--expires=<seconds>] [--format=table|json]");
+				out("Usage: wheels jobs [work|status|enqueue <JobName>|drain|resume|tick|install [--force]] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--job-timeout=<seconds>] [--wait[=<seconds>]] [--expires=<seconds>] [--format=table|json]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
 		}
 	}
@@ -6280,6 +6282,32 @@ component extends="modules.BaseModule" {
 		} else {
 			out("Resume with: wheels jobs resume");
 		}
+		return "";
+	}
+
+	/**
+	 * `wheels jobs tick`: one JobRunner.tick() on this project's running server, for a cron job
+	 * or systemd timer that runs jobs without a long-lived worker. Mutating, so it goes through
+	 * the bridge's POST + reload-password gate like `work`.
+	 */
+	private string function runJobsTick(required struct opts) {
+		var serverPort = $requireOwnRunningServer([
+			"A tick needs this project's running server.",
+			"Start it with: wheels start"
+		]);
+		var httpResult = "";
+		try {
+			httpResult = makeBridgePost("#$serverUrlBase(serverPort)#/wheels/cli?command=jobsTick&format=json");
+		} catch (any httpErr) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Tick failed (connection error): #httpErr.message#");
+		}
+		var result = parseCliResponse(httpResult, "Jobs tick");
+		var tick = isStruct(result.tick ?: "") ? result.tick : {};
+		if (arguments.opts.format == "json") {
+			out(serializeJSON(tick));
+			return "";
+		}
+		out("Tick on #tick.host ?: '?'#: processed #tick.processed ?: 0#, failed #tick.failed ?: 0#, reaped #tick.reaped ?: 0#" & ((tick.draining ?: false) ? " (draining)" : "") & ((tick.capped ?: false) ? " (at the per-host cap)" : ""));
 		return "";
 	}
 
