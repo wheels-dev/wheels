@@ -89,7 +89,9 @@ jobs:
         run: bash tools/ci/mirror-images.sh check "$IMAGE"
 
   mirror:
-    if: github.event_name != 'pull_request'
+    # Only develop's reviewed script writes the live tags: a dispatch with
+    # --ref <unmerged branch> gets no write job.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
     needs: list
     name: "mirror ${{ matrix.image }}"
     runs-on: ubuntu-24.04
