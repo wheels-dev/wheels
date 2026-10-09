@@ -20,7 +20,7 @@ component extends="wheels.WheelsTest" {
 				local.bootstrapJob = new wheels.Job();
 				local.bootstrapJob.$ensureJobTable();
 				try {
-					queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_rob_%'", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("DELETE FROM wheels_jobs WHERE queue LIKE 'test_rob_%'", {}, {datasource = application.wheels.dataSourceName});
 				} catch (any e) {
 				}
 			});
@@ -32,7 +32,7 @@ component extends="wheels.WheelsTest" {
 				}
 				StructDelete(request, "$wheelsJobProbe");
 				try {
-					queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_rob_%'", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("DELETE FROM wheels_jobs WHERE queue LIKE 'test_rob_%'", {}, {datasource = application.wheels.dataSourceName});
 				} catch (any e) {
 				}
 			});
@@ -83,12 +83,12 @@ component extends="wheels.WheelsTest" {
 				// FailingBackoffJob declares baseDelay=600, so the first retry is
 				// scheduled Min(600 * 2^1, 7200) = 1200 seconds out. The base processing
 				// instance's defaults (baseDelay=2) would schedule it only 4 seconds out.
-				local.threshold = DateAdd("s", 600, Now());
-				local.check = queryExecute(
+				local.threshold = jobsNow() + 600;
+				local.check = jobsQuery(
 					"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE id = :id AND status = 'pending' AND runAt > :threshold",
 					{
 						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-						threshold = {value = local.threshold, cfsqltype = "cf_sql_timestamp"}
+						threshold = {value = local.threshold, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -166,7 +166,7 @@ component extends="wheels.WheelsTest" {
 				// Pre-fix this returned 2: the count of ALL pending rows after the UPDATE
 				expect(local.count).toBe(1);
 
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT status, attempts FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.failedId, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -193,7 +193,7 @@ component extends="wheels.WheelsTest" {
 
 			it("worker can bootstrap the wheels_jobs table on a fresh database", function() {
 				try {
-					queryExecute("DROP TABLE wheels_jobs", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("DROP TABLE wheels_jobs", {}, {datasource = application.wheels.dataSourceName});
 				} catch (any e) {
 					// If the drop is not permitted, the ensure call below still verifies existence
 				}
@@ -205,7 +205,7 @@ component extends="wheels.WheelsTest" {
 
 				// Pre-fix $ensureJobTable returned true without creating anything, so this
 				// SELECT threw because the table still did not exist
-				local.check = queryExecute(
+				local.check = jobsQuery(
 					"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0",
 					{},
 					{datasource = application.wheels.dataSourceName}
@@ -227,8 +227,8 @@ component extends="wheels.WheelsTest" {
 		numeric attempts = 0,
 		numeric maxRetries = 3
 	) {
-		local.now = Now();
-		queryExecute(
+		local.now = jobsNow();
+		jobsQuery(
 			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 			VALUES (:id, :jobClass, :queue, :data, 0, :status, :attempts, :maxRetries, :runAt, :createdAt, :updatedAt)",
 			{
@@ -239,11 +239,27 @@ component extends="wheels.WheelsTest" {
 				status = {value = arguments.status, cfsqltype = "cf_sql_varchar"},
 				attempts = {value = arguments.attempts, cfsqltype = "cf_sql_integer"},
 				maxRetries = {value = arguments.maxRetries, cfsqltype = "cf_sql_integer"},
-				runAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
-				createdAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}
+				runAt = {value = local.now, cfsqltype = "wheels_epoch"},
+				createdAt = {value = local.now, cfsqltype = "wheels_epoch"},
+				updatedAt = {value = local.now, cfsqltype = "wheels_epoch"}
 			},
 			{datasource = application.wheels.dataSourceName}
 		);
 	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC epoch seconds from the database's clock, which
+	 * job rows are stamped with.
+	 */
+	private numeric function jobsNow() {
+		return new wheels.Job().$jobClock().nowEpoch();
+	}
+
+	/**
+	 * queryExecute() with wheels_epoch timestamp parameters, as the jobs code binds them.
+	 */
+	private any function jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return new wheels.Job().$jobClock().query(arguments.sql, arguments.params, arguments.options);
+	}
+
 }

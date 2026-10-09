@@ -67,7 +67,7 @@ component extends="wheels.WheelsTest" {
 
 	private void function $cleanup() {
 		try {
-			queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_pq_%'", {}, {datasource = application.wheels.dataSourceName});
+			jobsQuery("DELETE FROM wheels_jobs WHERE queue LIKE 'test_pq_%'", {}, {datasource = application.wheels.dataSourceName});
 		} catch (any e) {
 		}
 	}
@@ -81,11 +81,11 @@ component extends="wheels.WheelsTest" {
 		numeric idleSeconds = 0
 	) {
 		var id = CreateUUID();
-		var stamp = arguments.stale ? DateAdd("h", -2, Now()) : DateAdd("s", -5, Now());
+		var stamp = arguments.stale ? jobsNow() - 2 * 3600 : jobsNow() - 5;
 		if (arguments.idleSeconds > 0) {
-			stamp = DateAdd("s", -arguments.idleSeconds, Now());
+			stamp = jobsNow() - arguments.idleSeconds;
 		}
-		queryExecute(
+		jobsQuery(
 			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 			VALUES (:id, :jobClass, :queue, '{}', 0, :status, :attempts, 3, :runAt, :createdAt, :updatedAt)",
 			{
@@ -94,9 +94,9 @@ component extends="wheels.WheelsTest" {
 				queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
 				status = {value = arguments.status, cfsqltype = "cf_sql_varchar"},
 				attempts = {value = arguments.attempts, cfsqltype = "cf_sql_integer"},
-				runAt = {value = stamp, cfsqltype = "cf_sql_timestamp"},
-				createdAt = {value = stamp, cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = stamp, cfsqltype = "cf_sql_timestamp"}
+				runAt = {value = stamp, cfsqltype = "wheels_epoch"},
+				createdAt = {value = stamp, cfsqltype = "wheels_epoch"},
+				updatedAt = {value = stamp, cfsqltype = "wheels_epoch"}
 			},
 			{datasource = application.wheels.dataSourceName}
 		);
@@ -104,12 +104,28 @@ component extends="wheels.WheelsTest" {
 	}
 
 	private struct function $row(required string id) {
-		var q = queryExecute(
+		var q = jobsQuery(
 			"SELECT status, claimTimeout FROM wheels_jobs WHERE id = :id",
 			{id = {value = arguments.id, cfsqltype = "cf_sql_varchar"}},
 			{datasource = application.wheels.dataSourceName}
 		);
 		return {status = q.recordCount ? q.status : "", claimTimeout = q.recordCount && !IsNull(q.claimTimeout[1]) ? q.claimTimeout[1] : ""};
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC epoch seconds from the database's clock, which
+	 * job rows and memos are stamped with. A row stamped with the app's local Now() is hours out
+	 * on a server that isn't on UTC.
+	 */
+	private numeric function jobsNow() {
+		return new wheels.Job().$jobClock().nowEpoch();
+	}
+
+	/**
+	 * jobsQuery() with wheels_epoch timestamp parameters, as the jobs code binds them.
+	 */
+	private any function jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return new wheels.Job().$jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 }

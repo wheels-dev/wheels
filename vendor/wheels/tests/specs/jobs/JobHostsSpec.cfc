@@ -84,10 +84,10 @@ component extends="wheels.WheelsTest" {
 				var pendingId = $insertJob(queue = "test_hosts_expired");
 				var runner = new wheels.JobRunner();
 				runner.drain(expiresInSeconds = 600);
-				queryExecute(
+				jobsQuery(
 					"UPDATE wheels_job_hosts SET drainExpiresAt = :past WHERE host = :host",
 					{
-						past = {value = DateAdd("n", -1, Now()), cfsqltype = "cf_sql_timestamp"},
+						past = {value = jobsNow() - 1 * 60, cfsqltype = "wheels_epoch"},
 						host = {value = request.$wheelsHostsSpec.host, cfsqltype = "cf_sql_varchar"}
 					},
 					{datasource = application.wheels.dataSourceName}
@@ -141,9 +141,9 @@ component extends="wheels.WheelsTest" {
 			it("fails closed when the registry exists but can't be read", function() {
 				var job = new wheels.Job();
 				job.$ensureHostsTable();
-				queryExecute("DROP TABLE wheels_job_hosts", {}, {datasource = application.wheels.dataSourceName});
+				jobsQuery("DROP TABLE wheels_job_hosts", {}, {datasource = application.wheels.dataSourceName});
 				// A table without drainExpiresAt: the drain query fails although the table exists.
-				queryExecute("CREATE TABLE wheels_job_hosts (host VARCHAR(128) NOT NULL PRIMARY KEY, draining INT DEFAULT 0 NOT NULL)", {}, {datasource = application.wheels.dataSourceName});
+				jobsQuery("CREATE TABLE wheels_job_hosts (host VARCHAR(128) NOT NULL PRIMARY KEY, draining INT DEFAULT 0 NOT NULL)", {}, {datasource = application.wheels.dataSourceName});
 				try {
 					var state = {threw = false};
 					try {
@@ -153,7 +153,7 @@ component extends="wheels.WheelsTest" {
 					}
 					expect(state.threw).toBeTrue("a registry that exists but can't be read must not count as 'not draining'");
 				} finally {
-					queryExecute("DROP TABLE wheels_job_hosts", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("DROP TABLE wheels_job_hosts", {}, {datasource = application.wheels.dataSourceName});
 					job.$ensureHostsTable();
 				}
 				expect(job.$hostDraining(request.$wheelsHostsSpec.host)).toBeFalse();
@@ -164,12 +164,12 @@ component extends="wheels.WheelsTest" {
 
 	private void function $cleanup() {
 		try {
-			queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_hosts_%'", {}, {datasource = application.wheels.dataSourceName});
+			jobsQuery("DELETE FROM wheels_jobs WHERE queue LIKE 'test_hosts_%'", {}, {datasource = application.wheels.dataSourceName});
 		} catch (any e) {
 		}
 		if (StructKeyExists(request, "$wheelsHostsSpec")) {
 			try {
-				queryExecute(
+				jobsQuery(
 					"DELETE FROM wheels_job_hosts WHERE host = :host",
 					{host = {value = request.$wheelsHostsSpec.host, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -187,7 +187,7 @@ component extends="wheels.WheelsTest" {
 		numeric attempts = 0
 	) {
 		var id = CreateUUID();
-		var stamp = arguments.stale ? DateAdd("h", -2, Now()) : DateAdd("s", -5, Now());
+		var stamp = arguments.stale ? jobsNow() - 2 * 3600 : jobsNow() - 5;
 		var columns = "id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt";
 		var values = ":id, 'wheels.tests._assets.jobs.ProcessOrdersJob', :queue, '{}', 0, :status, :attempts, 3, :runAt, :createdAt, :updatedAt";
 		var params = {
@@ -195,21 +195,21 @@ component extends="wheels.WheelsTest" {
 			queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
 			status = {value = arguments.status, cfsqltype = "cf_sql_varchar"},
 			attempts = {value = arguments.attempts, cfsqltype = "cf_sql_integer"},
-			runAt = {value = stamp, cfsqltype = "cf_sql_timestamp"},
-			createdAt = {value = stamp, cfsqltype = "cf_sql_timestamp"},
-			updatedAt = {value = stamp, cfsqltype = "cf_sql_timestamp"}
+			runAt = {value = stamp, cfsqltype = "wheels_epoch"},
+			createdAt = {value = stamp, cfsqltype = "wheels_epoch"},
+			updatedAt = {value = stamp, cfsqltype = "wheels_epoch"}
 		};
 		if (Len(arguments.claimedBy)) {
 			columns &= ", claimedBy";
 			values &= ", :claimedBy";
 			params.claimedBy = {value = arguments.claimedBy, cfsqltype = "cf_sql_varchar"};
 		}
-		queryExecute("INSERT INTO wheels_jobs (#columns#) VALUES (#values#)", params, {datasource = application.wheels.dataSourceName});
+		jobsQuery("INSERT INTO wheels_jobs (#columns#) VALUES (#values#)", params, {datasource = application.wheels.dataSourceName});
 		return id;
 	}
 
 	private string function $status(required string id) {
-		var q = queryExecute(
+		var q = jobsQuery(
 			"SELECT status FROM wheels_jobs WHERE id = :id",
 			{id = {value = arguments.id, cfsqltype = "cf_sql_varchar"}},
 			{datasource = application.wheels.dataSourceName}
@@ -218,11 +218,27 @@ component extends="wheels.WheelsTest" {
 	}
 
 	private query function $hostRow() {
-		return queryExecute(
+		return jobsQuery(
 			"SELECT * FROM wheels_job_hosts WHERE host = :host",
 			{host = {value = request.$wheelsHostsSpec.host, cfsqltype = "cf_sql_varchar"}},
 			{datasource = application.wheels.dataSourceName}
 		);
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC epoch seconds from the database's clock, which
+	 * job rows and memos are stamped with. A row stamped with the app's local Now() is hours out
+	 * on a server that isn't on UTC.
+	 */
+	private numeric function jobsNow() {
+		return new wheels.Job().$jobClock().nowEpoch();
+	}
+
+	/**
+	 * jobsQuery() with wheels_epoch timestamp parameters, as the jobs code binds them.
+	 */
+	private any function jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return new wheels.Job().$jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 }

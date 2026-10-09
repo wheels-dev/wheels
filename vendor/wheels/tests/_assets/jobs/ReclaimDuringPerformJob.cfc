@@ -9,10 +9,10 @@ component extends="wheels.Job" {
 
 	public void function perform(struct data = {}) {
 		// Age the row past every grace window so the reaper treats this attempt as stalled.
-		queryExecute(
+		$jobClock().query(
 			"UPDATE wheels_jobs SET updatedAt = :stale WHERE id = :id",
 			{
-				stale = {value = DateAdd("h", -2, Now()), cfsqltype = "cf_sql_timestamp"},
+				stale = {value = $jobClock().nowEpoch() - 7200, cfsqltype = "wheels_epoch"},
 				id = {value = arguments.data.jobId, cfsqltype = "cf_sql_varchar"}
 			},
 			{datasource = application.wheels.dataSourceName}
