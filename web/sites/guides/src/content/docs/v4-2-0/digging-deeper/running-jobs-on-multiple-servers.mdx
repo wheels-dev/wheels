@@ -404,7 +404,12 @@ Two things to know:
 - **The CFML API stays in local time.** `enqueueAt(runAt = …)` takes a local time and converts it to UTC for storage, and `JobRunner.status()` and the queue stats convert back, so your code and dashboards read local time as before. Only the stored column values are UTC.
 
 <Aside type="note" title="Converting a database upgraded from before 4.2">
-Rows written before 4.2 hold local-time values. The [install migration](#the-shared-schema) can shift them once: set `this.convertLocalOffsetMinutes` (your old server's offset from UTC, in minutes) in the generated migration before running it. The conversion runs in one transaction with a marker in `wheels_job_locks`, so a failed run converts nothing and running it again changes nothing. SQLite is skipped — its timestamps were never stored in local time.
+Rows written before 4.2 hold **local-time** values; servers already running in UTC — and SQLite, whose timestamps were never local — need nothing. On a non-UTC database, pick one:
+
+- **Drain first.** Upgrade once the queue is empty (no `pending` or `processing` jobs) and leave `this.convertLocalOffsetMinutes` at `0`. With no old rows left, there's nothing to convert.
+- **Convert in place.** Set `this.convertLocalOffsetMinutes` to your old servers' offset from UTC, in minutes (**`-300` for UTC-5, `60` for UTC+1**), in the [install migration](#the-shared-schema) before running it. It shifts the existing rows once, in one transaction with a marker in `wheels_job_locks`, so a failed run converts nothing and running it again changes nothing.
+
+Do neither on a non-UTC server and the old rows are misread: a delayed job runs early or late by the offset, and on a server **behind** UTC an in-flight job looks stale and is reclaimed and run again.
 </Aside>
 
 ## Upgrading from 4.1
