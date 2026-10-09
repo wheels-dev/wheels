@@ -39,7 +39,11 @@ jobs:
         run: bash tools/rustcfml/check-version.sh
 
       - name: Notify once for a rejected candidate
-        if: env.RUSTCFML_REJECTED != ''
+        # Also after a failed check step: when the newest release is rejected and the
+        # stable fallback then can't be evaluated, check-version.sh exits 1, but the
+        # newest's rejection (exported to GITHUB_ENV before that) must still be filed.
+        # Not on a cancelled run.
+        if: ${{ !cancelled() && env.RUSTCFML_REJECTED != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
