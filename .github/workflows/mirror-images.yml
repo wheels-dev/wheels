@@ -1,0 +1,84 @@
+name: Mirror Docker Hub images to GHCR
+
+# Copies the Docker Hub images CI pulls (tools/ci/mirror-images.txt) to
+# ghcr.io/wheels-dev/mirror/<name>, unchanged, so CI doesn't hit Docker Hub's
+# anonymous pull limit on shared GitHub runners. Weekly, on dispatch, and when
+# the image list changes (a same-repo PR mirrors a new image before anything
+# points at it). Each image copies in its own job, so the Docker Hub pulls
+# spread across runners, and an image already up to date costs no pull.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 5 * * 1'
+  push:
+    branches: [develop]
+    paths:
+      - 'tools/ci/mirror-images.txt'
+      - 'tools/ci/mirror-images.sh'
+      - '.github/workflows/mirror-images.yml'
+  pull_request:
+    paths:
+      - 'tools/ci/mirror-images.txt'
+      - 'tools/ci/mirror-images.sh'
+      - '.github/workflows/mirror-images.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  list:
+    # A fork PR's token can't write packages; the run after merge mirrors it.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      images: ${{ steps.list.outputs.images }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Read the image list
+        id: list
+        run: |
+          set -euo pipefail
+          images="$(bash tools/ci/mirror-images.sh list)"
+          echo "$images"
+          echo "images=${images}" >> "$GITHUB_OUTPUT"
+
+  mirror:
+    needs: list
+    name: "mirror ${{ matrix.image }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.list.outputs.images) }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install crane
+        uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
+
+      - name: Log in to GHCR
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | crane auth login ghcr.io -u "$GHCR_USER" --password-stdin
+
+      - name: Copy the image
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: bash tools/ci/mirror-images.sh copy "$IMAGE"
