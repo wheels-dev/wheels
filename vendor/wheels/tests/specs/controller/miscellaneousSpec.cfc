@@ -82,6 +82,7 @@ component extends="wheels.WheelsTest" {
 
 			afterEach(() => {
 				StructDelete(application.wheels.helperFileCache, "test")
+				StructDelete(application.wheels.helperFileCache, "$global")
 			})
 
 			it("is including global helper file", () => {
@@ -92,6 +93,19 @@ component extends="wheels.WheelsTest" {
 			it("is including controller helper file", () => {
 				_controller.renderView()
 				expect(request.test).toHaveKey("controllerHelperFunctionWasCalled")
+			})
+
+			it("includes the global helper file in the controller's class object too, where config() runs", () => {
+				application.wheels.controllers["test"].$invoke(method = "globalHelperFunction")
+				expect(request.test).toHaveKey("globalHelperFunctionWasCalled")
+			})
+
+			it("skips the global helper file when it is cached as missing", () => {
+				application.wheels.helperFileCache["$global"] = false
+				var fresh = application.wo.controller("test", {controller = "test", action = "helperCaller"})
+				expect(() => {
+					fresh.$invoke(method = "globalHelperFunction")
+				}).toThrow()
 			})
 		})
 
