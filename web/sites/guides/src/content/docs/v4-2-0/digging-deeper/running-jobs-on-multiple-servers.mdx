@@ -251,7 +251,7 @@ new wheels.JobRunner().tick(
 
 ### Drive it over HTTP: the tick route
 
-When your scheduler can only make an HTTP request — an engine scheduled task, a cron `curl`, a systemd timer — point it at `/wheels/jobs/tick`. Each call runs one `JobRunner.tick()` on that server and returns a JSON summary. Turn it on by setting a token:
+When your scheduler can only make an HTTP request — an engine scheduled task, a cron `curl`, a systemd timer — point it at `/wheels/jobs/tick`. Each call runs one `JobRunner.tick()` on that server with its defaults — so it reaps, enqueues any due schedules, and runs **at most one job** (capped at 300 s) — and returns a JSON summary. There's no request parameter to raise either limit, so one call a minute is one job a minute per server: fine for light, steady queues, but for volume run `wheels jobs work` (a continuous loop) or call `JobRunner.tick(maxJobs = n, timeout = …)` from CFML instead. Turn the route on by setting a token:
 
 ```cfm {test:compile} title="config/settings.cfm"
 set(jobsRunnerToken = "a-long-random-secret");   // the route is 404 until this is set
@@ -267,7 +267,7 @@ The **token is the boundary**, not the caller's address:
 
 - The route returns **404** unless `jobsRunnerToken` is set, and **403** without the right token (compared in constant time). The token goes in the `X-Wheels-Jobs-Token` header; `?token=` is accepted only with `set(jobsRunnerTokenInQuery = true)`, for a scheduler that can't set headers.
 - A request carrying **any forwarding header** (`X-Forwarded-*`, `Forwarded`, `X-Real-IP`, `CF-Connecting-IP`, …) is refused — call it on the server itself (localhost), not through your proxy, so a public request can't reach it.
-- It's answered before routing and the public-component gate, so it doesn't depend on your routes or middleware. An overlapping tick on the same server is skipped.
+- It's answered before routing and the public-component gate, so it doesn't depend on your routes or middleware. An overlapping tick on the same server is skipped. `GET` and `POST` are both accepted.
 
 `wheels jobs tick` runs one tick from the CLI, for a cron job that has the `wheels` binary instead of an HTTP client.
 
@@ -297,18 +297,16 @@ schedule("health-check")
 
 ### Running the schedules
 
-Schedules don't run themselves. Call `enqueueDue()` regularly — from a scheduled task, or right next to your job worker — and it enqueues each schedule whose slot has come due:
+**A running worker checks schedules for you.** `wheels jobs work`, `processQueue()`, and `JobRunner.tick()` each enqueue any due slots as they poll — at most once every `jobsScheduleCheckSeconds` (default `15`, `0` turns it off) per application. So once a schedule is in `config/schedules.cfm` and *anything* is draining the queue, it just runs; there's no separate scheduler to stand up. The check only runs when the schedules table exists, never throws (a failed check leaves the poll going), and `tick()`'s result reports how many slots it `scheduled`.
 
-```cfm {test:compile} title="run the schedules (every minute)"
+Each due slot is enqueued with a `uniqueKey` of `"<schedule>:<slot time in UTC>"`, so every server's worker can check and you still get **exactly one job per slot** — the duplicates are counted, not run (this rests on the [`uniqueKey`](/v4-2-0/digging-deeper/background-jobs/#enqueue-at-most-once-with-uniquekey) dedupe). A **draining** server still enqueues due slots; they run on another server. The enqueued jobs are then processed like any other.
+
+You only call `enqueueDue()` yourself when **nothing** is polling the queue — a box dedicated to scheduling, say:
+
+```cfm {test:compile} title="only needed when no worker polls this queue"
 new wheels.JobScheduler().enqueueDue();
 // {checked, enqueued, duplicates, skipped, errors}
 ```
-
-Each due slot is enqueued with a `uniqueKey` of `"<schedule>:<slot time in UTC>"`, so **you can call `enqueueDue()` on every server** and still get exactly one job per slot — the duplicates land as `duplicate: true` and are counted, not run (this rests on the [`uniqueKey`](/v4-2-0/digging-deeper/background-jobs/#enqueue-at-most-once-with-uniquekey) dedupe). The enqueued jobs are then processed like any other, by whatever is draining the queue. Run `enqueueDue()` about once a minute; it's cheap when nothing is due.
-
-<Aside type="note" title="Planned: automatic schedule runner">
-A follow-up in 4.2 (the schedule-runner wiring, [#4509](https://github.com/wheels-dev/wheels/pull/4509)) calls `enqueueDue()` for you: `wheels jobs work`, `processQueue()`, and `JobRunner.tick()` will check schedules roughly every `jobsScheduleCheckSeconds` (default 15), so a running worker fires schedules without a separate call — and a draining host still enqueues due slots, which then run on another server. It's **not built yet** — until it lands, call `enqueueDue()` yourself as above. Once it does, declaring a schedule in `config/schedules.cfm` is all a running worker needs.
-</Aside>
 
 ### Catch-up: missed slots
 
