@@ -251,7 +251,7 @@ new wheels.JobRunner().tick(
 
 ### Drive it over HTTP: the tick route
 
-When your scheduler can only make an HTTP request — an engine scheduled task, a cron `curl`, a systemd timer — point it at `/wheels/jobs/tick`. Each call runs one `JobRunner.tick()` on that server with its defaults — so it reaps, enqueues any due schedules, and runs **at most one job** (capped at 300 s) — and returns a JSON summary. There's no request parameter to raise either limit, so one call a minute is one job a minute per server: fine for light, steady queues, but for volume run `wheels jobs work` (a continuous loop) or call `JobRunner.tick(maxJobs = n, timeout = …)` from CFML instead. Turn the route on by setting a token:
+When your scheduler can only make an HTTP request — an engine scheduled task, a cron `curl`, a systemd timer — point it at `/wheels/jobs/tick`. Each call runs one `JobRunner.tick()` on that server with its defaults — so it reaps, enqueues any due schedules, and runs **at most one job** (capped at 300 s) — and returns a JSON summary. There's no request parameter to raise either limit yet ([#4520](https://github.com/wheels-dev/wheels/issues/4520) will make the route's batch size and timeout configurable), so one call a minute is one job a minute per server: fine for light, steady queues, but for volume run `wheels jobs work` (a continuous loop) or call `JobRunner.tick(maxJobs = n, timeout = …)` from CFML instead. Turn the route on by setting a token:
 
 ```cfm {test:compile} title="config/settings.cfm"
 set(jobsRunnerToken = "a-long-random-secret");   // the route is 404 until this is set
