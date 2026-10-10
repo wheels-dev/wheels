@@ -31,8 +31,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var m = moduleWithOut();
 					var context = contextFor(busy - 1, m);
 					expect(context.port).toBe(busy - 1);
+					// Assert only on the port the CLI chose. It comes from the ephemeral range, so another
+					// process can bind it after the choice; probing it again here would race.
 					expect(context.shutdownPort).toBeGT(busy);
-					expect(new cli.lucli.services.PortProbe().portInUse(context.shutdownPort)).toBeFalse();
 					var said = "";
 					for (var call in m.$callLog().out) {
 						said &= call[1] & chr(10);
