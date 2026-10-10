@@ -597,7 +597,7 @@ component extends="modules.BaseModule" {
 			.option(name = "max-jobs", default = 0, type = "numeric", description = "work only: stop after this many jobs (successes + failures count). 0 = run until stopped")
 			.flag(name = "stop-when-empty", default = false, description = "work only: exit when a poll finds no job ready to run, instead of waiting for more. For one-shot batches from cron or CI; combines with --max-jobs")
 			.flag(name = "quiet", default = false, description = "work only: suppress per-job completion output, only print failures")
-			.option(name = "job-timeout", default = 0, type = "numeric", description = "work only: cap, in seconds, on each job's run time. 0 = each job runs with its own timeout (this.timeout, default 300). Not --timeout: that is the runtime's own option and stops the whole worker")
+			.option(name = "job-timeout", default = 0, type = "numeric", description = "work only: cap, in seconds, on each job's run time. 0 = each job runs with its own timeout (this.timeout, default 300). Not --timeout: on some CLI runtimes that is the runtime's own option, which stops the whole worker")
 			.option(name = "format", default = "table", description = "status, enqueue, drain and resume: output format, table or json")
 			.option(name = "wait", default = "", type = "any", description = "drain only: after draining, wait until this server has no running jobs (--wait = up to 600 seconds, --wait=<seconds> for another limit). Exits with an error if jobs are still running at the limit")
 			.option(name = "expires", default = 3600, type = "numeric", description = "drain only: seconds until the drain lifts itself if nothing resumes it. 0 = until wheels jobs resume")
