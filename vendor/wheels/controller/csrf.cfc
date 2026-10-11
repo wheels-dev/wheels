@@ -293,8 +293,8 @@ component {
 		// Now we have everything we need, deserialize.
 		local.cookieAttrs = DeserializeJSON(local.cookieAttrs);
 
-		// Check to make sure the JSON we decoded has the authenticity token in it.
-		if (!StructKeyExists(local.cookieAttrs, "authenticityToken")) {
+		// Check to make sure the JSON we decoded is the payload, with the authenticity token in it.
+		if (!IsStruct(local.cookieAttrs) || !StructKeyExists(local.cookieAttrs, "authenticityToken")) {
 			return "";
 		}
 
@@ -405,7 +405,23 @@ component {
 	 * assumption about it. The caller re-checks the same thing before deserializing.
 	 */
 	public boolean function $isCsrfCookiePayload(required string value) {
-		return Len(arguments.value) > 0 && IsJSON(arguments.value);
+		if (!Len(arguments.value) || !IsJSON(arguments.value)) {
+			return false;
+		}
+		// A wrong-algorithm decrypt can also return garbage that happens to parse as JSON (a
+		// number, say), so the payload has to be the struct the cookie writes, with a token.
+		var parsed = {ok = false, value = ""};
+		try {
+			parsed.value = DeserializeJSON(arguments.value);
+			parsed.ok = true;
+		} catch (any e) {
+			parsed.ok = false;
+		}
+		return parsed.ok
+			&& IsStruct(parsed.value)
+			&& StructKeyExists(parsed.value, "authenticityToken")
+			&& IsSimpleValue(parsed.value.authenticityToken)
+			&& Len(parsed.value.authenticityToken) > 0;
 	}
 
 	/**
