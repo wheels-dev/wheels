@@ -26,7 +26,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ---
 
-# [4.2.0](https://github.com/wheels-dev/wheels/releases/tag/v4.2.0) => 2026-10-12
+# [4.2.0](https://github.com/wheels-dev/wheels/releases/tag/v4.2.0) => 2026-10-11
 
 ### Added
 
