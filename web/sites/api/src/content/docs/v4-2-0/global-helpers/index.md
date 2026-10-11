@@ -1,0 +1,35 @@
+---
+title: Global Helpers
+description: "30 Global Helpers functions in Wheels 4.2.0."
+---
+
+- [`appCacheClear()`](/v4-2-0/global-helpers/appcacheclear/) — Removes every entry from the application data cache. The framework's own caches (actions, pages,
+- [`appCacheDelete()`](/v4-2-0/global-helpers/appcachedelete/) — Removes the entry for <code>key</code>. Returns <code>true</code> when there was an unexpired entry to remove.
+- [`appCacheExists()`](/v4-2-0/global-helpers/appcacheexists/) — Returns <code>true</code> when an unexpired entry exists for <code>key</code>, even one holding <code>false</code>, <cod
+- [`appCacheFetch()`](/v4-2-0/global-helpers/appcachefetch/) — Returns the value cached under <code>key</code>. On a miss, calls <code>callback</code>, caches what it returns for <cod
+- [`appCacheRead()`](/v4-2-0/global-helpers/appcacheread/) — Returns the value cached under <code>key</code>, or <code>defaultValue</code> when there is no unexpired entry. A cached
+- [`appCacheWrite()`](/v4-2-0/global-helpers/appcachewrite/) — Caches <code>value</code> under <code>key</code> for <code>time</code>, replacing any entry already there. Complex value
+- [`capitalize()`](/v4-2-0/global-helpers/capitalize/) — Capitalizes the first character of the supplied string.
+- [`controller()`](/v4-2-0/global-helpers/controller/) — Creates and returns a controller object with your own custom name and params.
+- [`deobfuscateParam()`](/v4-2-0/global-helpers/deobfuscateparam/) — Deobfuscates a value.
+- [`distanceOfTimeInWords()`](/v4-2-0/global-helpers/distanceoftimeinwords/) — Pass in two dates to this method, and it will return a string describing the difference between them.
+- [`escapeForLike()`](/v4-2-0/global-helpers/escapeforlike/) — Escapes the <code>LIKE</code> wildcards in a string so it can be used as a literal search term in a
+- [`excerpt()`](/v4-2-0/global-helpers/excerpt/) — Extracts an excerpt from text that matches the first instance of a given phrase.
+- [`generateUUID()`](/v4-2-0/global-helpers/generateuuid/) — Generates a 36-character UUID compatible with SQL Server's uniqueidentifier.
+- [`humanize()`](/v4-2-0/global-helpers/humanize/) — Returns readable text by capitalizing and converting camel casing to multiple words.
+- [`hyphenize()`](/v4-2-0/global-helpers/hyphenize/) — Converts camelCase strings to lowercase strings with hyphens as word delimiters instead. Example: myVariable becomes my-
+- [`injector()`](/v4-2-0/global-helpers/injector/) — Return a reference to the DI container for direct configuration.
+- [`mimeTypes()`](/v4-2-0/global-helpers/mimetypes/) — Returns an associated MIME type based on a file extension.
+- [`model()`](/v4-2-0/global-helpers/model/) — Returns a reference to the requested model so that class level methods can be called on it.
+- [`obfuscateParam()`](/v4-2-0/global-helpers/obfuscateparam/) — Obfuscates a value. Typically used for hiding primary key values when passed along in the URL.
+- [`pluginNames()`](/v4-2-0/global-helpers/pluginnames/) — Returns a list of the names of all installed plugins.
+- [`pluralize()`](/v4-2-0/global-helpers/pluralize/) — Returns the plural form of the passed in word. Can also pluralize a word based on a value passed to the <code>count</cod
+- [`publish()`](/v4-2-0/global-helpers/publish/) — Publish an event to a channel.
+- [`service()`](/v4-2-0/global-helpers/service/) — Resolve a DI-registered service by name.
+- [`singularize()`](/v4-2-0/global-helpers/singularize/) — Returns the singular form of the passed in word.
+- [`timeAgoInWords()`](/v4-2-0/global-helpers/timeagoinwords/) — Returns a string describing the approximate time difference between the date passed in and the current date.
+- [`timeUntilInWords()`](/v4-2-0/global-helpers/timeuntilinwords/) — Returns a string describing the approximate time difference between the current date and the date passed in.
+- [`titleize()`](/v4-2-0/global-helpers/titleize/) — Capitalizes all words in the text to create a nicer looking title.
+- [`truncate()`](/v4-2-0/global-helpers/truncate/) — Truncates text to the specified length and replaces the last characters with the specified truncate string (which defaul
+- [`URLFor()`](/v4-2-0/global-helpers/urlfor/) — Creates an internal URL based on supplied arguments.
+- [`wordTruncate()`](/v4-2-0/global-helpers/wordtruncate/) — Truncates text to the specified length of words and replaces the remaining characters with the specified truncate string
