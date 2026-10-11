@@ -1,0 +1,48 @@
+---
+title: setPrimaryKeys()
+description: "Alias for <code>setPrimaryKey()</code>."
+sidebar:
+  label: setPrimaryKeys()
+  order: 0
+---
+
+## Signature
+
+`setPrimaryKeys()` — returns `void`
+
+**Available in:** `model`
+**Category:** Miscellaneous Functions
+
+## Description
+
+Alias for <code>setPrimaryKey()</code>.
+Use this for better readability when you're setting multiple properties as the primary key.
+
+
+
+## Parameters
+
+<div class="wd-params-table">
+
+| Name | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `property` | `string` | yes | — | Property (or list of properties) to set as the primary key. |
+
+</div>
+
+## Examples
+
+<pre><code class='javascript'>// 1. In `models/Subscription.cfc`, define the primary key as a composite of `customerId` and `publicationId`.
+component extends=&quot;Model&quot; {
+	function config() {
+		setPrimaryKeys(&quot;customerId,publicationId&quot;);
+	}
+}
+
+// 2. In `models/OrderItem.cfc`, define a composite primary key using three columns.
+component extends=&quot;Model&quot; {
+	function config() {
+		setPrimaryKeys(&quot;orderId,productId,warehouseId&quot;);
+	}
+}
+</code></pre>
