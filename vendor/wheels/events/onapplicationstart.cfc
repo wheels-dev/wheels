@@ -134,6 +134,9 @@ component {
 		application.$wheels.cache.page = {};
 		application.$wheels.cache.partial = {};
 		application.$wheels.cache.query = {};
+		// The application data cache (appCacheFetch() and friends), kept apart so appCacheClear() and
+		// app keys never touch the framework's own entries.
+		application.$wheels.cache.data = {};
 		application.$wheels.cacheLastCulledAt = Now();
 
 		// Set up paths to various folders in the framework. When the app
@@ -345,6 +348,26 @@ component {
 		// one at a time. A waiting instance gives up after migrationLockTimeout seconds; a holder
 		// that died frees the lock once its lease (renewed before each step) runs out.
 		application.$wheels.migratorLockTableName = "wheels_migrator_locks";
+		// The jobs tick route (/wheels/jobs/tick) is off unless a token is set. The token goes in the
+		// X-Wheels-Jobs-Token header; ?token= is accepted only with jobsRunnerTokenInQuery = true
+		// (a token in a URL ends up in access logs).
+		application.$wheels.jobsRunnerToken = "";
+		application.$wheels.jobsRunnerTokenInQuery = false;
+		// What each call to the tick route runs (JobRunner.tick()): at most this many jobs (1-1000),
+		// each capped at this many seconds (1-86400), from these queues ("" = every queue). Settings,
+		// not request parameters, so a caller holding the token can't widen the work one request does.
+		application.$wheels.jobsRunnerTickMaxJobs = 1;
+		application.$wheels.jobsRunnerTickTimeout = 300;
+		application.$wheels.jobsRunnerTickQueues = "";
+		// Job schedules (config/schedules.cfm) are checked and their due slots enqueued at most
+		// this often, from every worker poll, processQueue() and JobRunner.tick(). 0 = never.
+		application.$wheels.jobsScheduleCheckSeconds = 15;
+		// Background-job tables: true creates and upgrades them automatically at runtime; false
+		// leaves them to the app's own migration (`wheels jobs install`), for multi-server apps.
+		application.$wheels.jobsAutoCreateTables = true;
+		// A background job that has heartbeated is reclaimed once its heartbeats stop for this many
+		// seconds, even inside its timeout (0 = off; minimum 30). A job's this.heartbeatGrace wins.
+		application.$wheels.jobsHeartbeatGraceSeconds = 300;
 		application.$wheels.migrationLockTimeout = 300;
 		application.$wheels.migrationLockLease = 3600;
 		application.$wheels.createMigratorTable = true;
@@ -567,6 +590,10 @@ component {
 			}
 		}
 
+		// Sync the code-defined recurring job schedules (config/schedules.cfm) to
+		// wheels_job_schedules. Runs after any boot migration and never fails the start.
+		$syncJobSchedules();
+
 		// Redirect away from reloads on GET requests.
 		if (application.wheels.redirectAfterReload && StructKeyExists(url, "reload") && cgi.request_method == "get") {
 			if (StructKeyExists(cgi, "path_info") && Len(cgi.path_info)) {
@@ -690,6 +717,26 @@ component {
 			Throw(type = "Wheels.BootMigrationFailed", message = local.message, detail = Trim(local.output));
 		}
 		return local.output;
+	}
+
+	/**
+	 * Internal function. Sync config/schedules.cfm to wheels_job_schedules (a missing file
+	 * disables code-defined schedules already there). Logged, never thrown: a schedules problem
+	 * must not stop the application starting.
+	 */
+	public void function $syncJobSchedules() {
+		try {
+			if (FileExists(ExpandPath("/config/schedules.cfm"))) {
+				new wheels.JobScheduler().$syncFromConfig();
+			} else {
+				local.scheduler = new wheels.JobScheduler();
+				if (local.scheduler.$schedulesTableExists()) {
+					local.scheduler.$syncFromConfig();
+				}
+			}
+		} catch (any e) {
+			WriteLog(type = "error", file = "wheels_jobs", text = "Could not sync config/schedules.cfm: #e.message#");
+		}
 	}
 
 	/**

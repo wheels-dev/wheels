@@ -239,6 +239,21 @@
 	}
 
 	/**
+	 * Internal function. One `order` item as `<item> ASC` or `<item> DESC`: whitespace runs (spaces,
+	 * tabs) become single spaces, and a trailing direction is read whatever its case and emitted in
+	 * upper case. An item with no direction sorts ascending. A lowercase direction used to be
+	 * missed, so `order="id desc"` sorted ascending.
+	 */
+	public string function $normalizeOrderItem(required string item) {
+		local.text = Trim(ReReplace(arguments.item, "\s+", " ", "all"));
+		local.last = ListLast(local.text, " ");
+		if (ListLen(local.text, " ") > 1 && ListFindNoCase("ASC,DESC", local.last)) {
+			return Left(local.text, Len(local.text) - Len(local.last) - 1) & " " & UCase(local.last);
+		}
+		return local.text & " ASC";
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public string function $orderByClause(required string order, required string include) {
@@ -258,10 +273,7 @@
 				local.orderArray = ListToArray(arguments.order);
 				local.iEnd = ArrayLen(local.orderArray);
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.iItem = Trim(local.orderArray[local.i]);
-					if (!Find(" ASC", local.iItem) && !Find(" DESC", local.iItem)) {
-						local.iItem &= " ASC";
-					}
+					local.iItem = $normalizeOrderItem(local.orderArray[local.i]);
 					if (Find("(", local.iItem)) {
 						// Reject raw SQL expressions — calculated properties should be referenced by name
 						local.property = Trim(SpanExcluding(local.iItem, " "));
@@ -273,7 +285,10 @@
 					} else if (Find(".", local.iItem)) {
 						// Prevent SQL injection via dot-notation — only allow table.column identifiers
 						if (REFind("^[a-zA-Z_][a-zA-Z0-9_$]*\.[a-zA-Z_][a-zA-Z0-9_$]*(\s+(ASC|DESC))?$", local.iItem)) {
-							local.rv = ListAppend(local.rv, local.iItem);
+							// Quote it like a bare column when the table is this model's or an
+							// included one; an alias or other table stays as written.
+							local.resolved = $quotedQualifiedOrderItem(local.iItem, local.classes);
+							local.rv = ListAppend(local.rv, Len(local.resolved) ? local.resolved : local.iItem);
 						} else {
 							Throw(
 								type = "Wheels.InvalidOrderClause",
@@ -325,6 +340,39 @@
 			local.rv = "ORDER BY " & local.rv;
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. A validated `table.column [ASC|DESC]` order item with the table
+	 * and column quoted under their real names, the same way a bare property is, so a
+	 * reserved-word table or column works in both forms (4374). Matched case-insensitively
+	 * against the model's and its included associations' tables and columns (or a
+	 * property mapped to the column). "" when the table isn't one of them (an alias, say).
+	 */
+	public string function $quotedQualifiedOrderItem(required string item, required array classes) {
+		local.reference = SpanExcluding(Trim(arguments.item), " ");
+		local.tableName = ListFirst(local.reference, ".");
+		local.columnName = ListLast(local.reference, ".");
+		local.direction = Find(" ", Trim(arguments.item)) ? " " & UCase(Trim(ListLast(Trim(arguments.item), " "))) : "";
+		for (local.classData in arguments.classes) {
+			if (CompareNoCase(local.classData.tableName, local.tableName) != 0) {
+				continue;
+			}
+			for (local.property in local.classData.properties) {
+				local.column = local.classData.properties[local.property].column;
+				if (CompareNoCase(local.column, local.columnName) == 0 || CompareNoCase(local.property, local.columnName) == 0) {
+					return $quotedTableColumn(local.classData.tableName, local.column) & local.direction;
+				}
+			}
+		}
+		return "";
+	}
+
+	/**
+	 * Internal function. `table.column` with each part quoted by the model's adapter.
+	 */
+	public string function $quotedTableColumn(required string tableName, required string columnName) {
+		return variables.wheels.class.adapter.$quoteIdentifier(arguments.tableName) & "." & variables.wheels.class.adapter.$quoteIdentifier(arguments.columnName);
 	}
 
 	/**
@@ -1527,7 +1575,7 @@
 							Throw(
 								type = "Wheels.ColumnNotFound",
 								message = "Wheels looked for the column mapped to the `#local.param.property#` property but couldn't find it in the database table.",
-								extendedInfo = "Verify the `where` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
+								extendedInfo = $columnNotFoundWhereHint(property = local.param.property, where = arguments.where)
 							);
 						} else {
 							writeLog(
@@ -1560,6 +1608,10 @@
 					if (!StructIsEmpty(local.leftExpression)) {
 						local.where = Replace(local.where, local.element, Replace(local.element, local.leftExpression.dataPart, "?", "one"));
 						ArrayAppend(local.params, local.leftExpression.param);
+					} else if (Find("?", local.element)) {
+						// A value compared with something that isn't this model's (or an included
+						// model's) column, typically inside a subquery: there is no column to bind it to.
+						$throwUnbindableWhereValue(element = local.element);
 					} else if (ArrayLen(local.classes) > 1) {
 						local.where = $qualifyUnboundConditionColumn(where = local.where, element = local.element, classes = local.classes, useTableAlias = local.useTableAlias);
 					}
@@ -1584,6 +1636,7 @@
 						dataType = local.params[local.i].dataType,
 						scale = local.params[local.i].scale,
 						list = local.params[local.i].list,
+						operator = local.params[local.i].operator,
 						property = local.column
 					};
 					ArrayAppend(local.rv, local.param);
@@ -1628,6 +1681,39 @@
 			}
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. The detail for Wheels.ColumnNotFound raised by a `where` condition: what
+	 * to check, and, for a number in the column's place (`1 = 0`) or a clause with a subquery,
+	 * what `where` accepts instead.
+	 */
+	public string function $columnNotFoundWhereHint(required string property, required string where) {
+		local.rv = "Verify the `where` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct.";
+		if (ReFind("^[+-]?[0-9.]+$", arguments.property)) {
+			local.rv &= " `where` accepts this model's and included models' columns compared with values; a condition with no column, such as `1 = 0` or `1 = 1`, isn't supported. For no rows, use whereIn() with an empty array; for every row, leave the condition out.";
+		} else if (FindNoCase("SELECT", arguments.where)) {
+			local.rv &= " If `#arguments.property#` is a column inside a subquery: `where` binds every `column <operator> value` and accepts only this model's and included models' columns, so a value compared with a subquery's column can't be bound. Use whereIn() with a value array, or run the subquery as its own query first.";
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. Throws Wheels.UnbindableWhereValue for a `where` condition whose value
+	 * has no column of this model (or an included model) to be bound against. The condition is
+	 * echoed with its quoted values hidden: a bound one is already `?`, and any other quoted
+	 * literal (still in its masked, reversible form) is shown as '...'. Unquoted numbers in the
+	 * developer's own where text are shown as written.
+	 */
+	public void function $throwUnbindableWhereValue(required string element) {
+		local.condition = Trim(ReReplaceNoCase(Trim(arguments.element), "^(AND|OR)([^a-zA-Z0-9_$])", "\2"));
+		local.condition = ReReplace(local.condition, "'" & $whereLiteralSentinel() & "[^']*'", "'...'", "all");
+		local.condition = Replace(local.condition, Chr(2), "", "all");
+		Throw(
+			type = "Wheels.UnbindableWhereValue",
+			message = "Wheels can't bind the value in the `where` condition `#local.condition#` (bound values are shown as ? and quoted values as '...'): it isn't compared with a column of this model or an included model, such as a value inside a subquery.",
+			extendedInfo = "`where` binds every `column <operator> value` as a query parameter, and the column must belong to the model or an `include`d model. Compare subquery columns with each other only, pass the values with whereIn() (a value array), or run the subquery as its own query first and pass its results."
+		);
 	}
 
 	/**
@@ -2270,6 +2356,7 @@
 			// below); the lock is only taken before the marker exists so the hot path stays
 			// lock-free, and the values are derived solely from class data so filling them
 			// once per application lifetime is equivalent to the previous per-call rewrite
+			local.class.$resolvePolymorphicColumns(local.name);
 			$expandedAssociationsMetadata(
 				associationName = local.name,
 				association = local.classAssociations[local.name],

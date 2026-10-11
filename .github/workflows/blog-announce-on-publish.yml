@@ -33,7 +33,7 @@ concurrency:
 jobs:
   announce:
     name: Announce published posts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Generate App token

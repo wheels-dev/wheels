@@ -21,11 +21,11 @@ Same as [`wheels deploy`](/v4-2-0/command-line-tools/commands/deploy/deploy/).
 
 ## Behavior
 
-In Phase 2 the `setup` implementation reduces to the same flow as `wheels deploy`. The intent remains: on first run, the proxy container and any accessories boot as a side effect. On a fresh host, the first `wheels deploy setup` is slower than subsequent deploys because `docker pull` fetches every base image.
+`setup` first creates the `kamal` network on each accessory host and boots every accessory declared in `deploy.yml` (`docker run`, plus an audit entry), then runs the same flow as [`wheels deploy`](/v4-2-0/command-line-tools/commands/deploy/deploy/), which starts or boots `kamal-proxy`. On a fresh host, the first `wheels deploy setup` is slower than subsequent deploys because `docker pull` fetches every base image.
 
 Expected preconditions:
 
-- Docker is installed on every host. Run [`wheels deploy bootstrap`](/v4-2-0/command-line-tools/commands/deploy/server/bootstrap/) first if not (the flat alias — the nested `wheels deploy server bootstrap` form is picocli-shadowed).
+- Docker is installed on every host. Run [`wheels deploy bootstrap`](/v4-2-0/command-line-tools/commands/deploy/server/bootstrap/) first if not.
 - Registry credentials resolve in `.kamal/secrets`.
 - `ssh.user` has passwordless `sudo` (or is `root`).
 

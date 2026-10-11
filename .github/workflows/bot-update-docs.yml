@@ -23,7 +23,7 @@ concurrency:
 jobs:
   update-docs:
     name: Update docs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Auto-fire only for the bot's own PRs. The bot-identity check is
     # load-bearing: prevents human PRs from triggering this stage and

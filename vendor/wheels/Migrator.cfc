@@ -474,10 +474,7 @@ component output="false" extends="wheels.Global"{
 		}
 		StructDelete(local.held, arguments.migrationLock.key);
 		try {
-			$migrationLockQuery(
-				sql = "DELETE FROM #$migrationLockTable()# WHERE lockname = :lockName AND lockowner = :owner",
-				params = {lockName = $migrationLockText($migrationLockName()), owner = $migrationLockText(arguments.migrationLock.owner)}
-			);
+			$runMigrationLockStatement($migrationLease().releaseStatement(name = $migrationLockName(), owner = arguments.migrationLock.owner));
 		} catch (any e) {
 			WriteLog(type = "error", file = "wheels", text = "Migrator: could not release the migration lock: #e.message#");
 		}
@@ -495,13 +492,8 @@ component output="false" extends="wheels.Global"{
 			return;
 		}
 		local.migrationLock = local.held[local.key];
-		$migrationLockQuery(
-			sql = "UPDATE #$migrationLockTable()# SET expiresat = :expiresAt WHERE lockname = :lockName AND lockowner = :owner",
-			params = {
-				expiresAt = $migrationLockMs($migrationLockExpiry()),
-				lockName = $migrationLockText($migrationLockName()),
-				owner = $migrationLockText(local.migrationLock.owner)
-			}
+		$runMigrationLockStatement(
+			$migrationLease().renewStatement(name = $migrationLockName(), owner = local.migrationLock.owner, expiresAt = $migrationLockExpiry())
 		);
 		if ($migrationLockOwner() != local.migrationLock.owner) {
 			StructDelete(local.held, local.key);
@@ -526,7 +518,7 @@ component output="false" extends="wheels.Global"{
 				Throw(
 					type = "Wheels.MigrationLockTimeout",
 					message = "Another instance has held the migration lock for longer than migrationLockTimeout (#local.timeout# seconds), so the migrations were not run.",
-					extendedInfo = "Held by #local.holder#. If that instance is gone, the lock frees itself when its lease expires; to clear it now, delete the row from #$migrationLockTable()#."
+					extendedInfo = "Held by #local.holder#. If that instance is gone, the lock frees itself when its lease expires. To clear it now, run `wheels migrate unlock --force`, or delete the row from #$migrationLockTable()#."
 				);
 			}
 			Sleep(1000);
@@ -545,15 +537,14 @@ component output="false" extends="wheels.Global"{
 			return $takeOverExpiredMigrationLock(migrationLock = arguments.migrationLock, now = local.now);
 		}
 		try {
-			$migrationLockQuery(
-				sql = "INSERT INTO #$migrationLockTable()# (lockname, lockowner, lockhost, acquiredat, expiresat) VALUES (:lockName, :owner, :host, :acquiredAt, :expiresAt)",
-				params = {
-					lockName = $migrationLockText($migrationLockName()),
-					owner = $migrationLockText(arguments.migrationLock.owner),
-					host = $migrationLockText($migrationLockHost()),
-					acquiredAt = $migrationLockMs(local.now),
-					expiresAt = $migrationLockMs($migrationLockExpiry())
-				}
+			$runMigrationLockStatement(
+				$migrationLease().insertStatement(
+					name = $migrationLockName(),
+					owner = arguments.migrationLock.owner,
+					host = $migrationLockHost(),
+					acquiredAt = local.now,
+					expiresAt = $migrationLockExpiry()
+				)
 			);
 			return true;
 		} catch (any e) {
@@ -572,15 +563,14 @@ component output="false" extends="wheels.Global"{
 	 * WHERE makes it atomic; reading the owner back tells whether this migration lock won.
 	 */
 	public boolean function $takeOverExpiredMigrationLock(required struct migrationLock, required numeric now) {
-		$migrationLockQuery(
-			sql = "UPDATE #$migrationLockTable()# SET lockowner = :owner, lockhost = :host, acquiredat = :now, expiresat = :expiresAt WHERE lockname = :lockName AND expiresat < :now",
-			params = {
-				owner = $migrationLockText(arguments.migrationLock.owner),
-				host = $migrationLockText($migrationLockHost()),
-				now = $migrationLockMs(arguments.now),
-				expiresAt = $migrationLockMs($migrationLockExpiry()),
-				lockName = $migrationLockText($migrationLockName())
-			}
+		$runMigrationLockStatement(
+			$migrationLease().takeOverStatement(
+				name = $migrationLockName(),
+				owner = arguments.migrationLock.owner,
+				host = $migrationLockHost(),
+				now = arguments.now,
+				expiresAt = $migrationLockExpiry()
+			)
 		);
 		return $migrationLockOwner() == arguments.migrationLock.owner;
 	}
@@ -604,7 +594,7 @@ component output="false" extends="wheels.Global"{
 		try {
 			$query(
 				datasource = arguments.dataSource,
-				sql = "CREATE TABLE #local.table# (lockname VARCHAR(100) NOT NULL PRIMARY KEY, lockowner VARCHAR(64) NOT NULL, lockhost VARCHAR(255), acquiredat DECIMAL(15,0) NOT NULL, expiresat DECIMAL(15,0) NOT NULL)"
+				sql = $migrationLease().createTableSql()
 			);
 		} catch (any e) {
 			// Tolerate "already exists" from another instance creating it at the same time.
@@ -639,10 +629,7 @@ component output="false" extends="wheels.Global"{
 	 * Internal function. The owner id holding the migration lock, or "" when it is free.
 	 */
 	public string function $migrationLockOwner() {
-		local.rows = $migrationLockQuery(
-			sql = "SELECT lockowner FROM #$migrationLockTable()# WHERE lockname = :lockName",
-			params = {lockName = $migrationLockText($migrationLockName())}
-		);
+		local.rows = $runMigrationLockStatement($migrationLease().ownerStatement($migrationLockName()));
 		return local.rows.recordCount ? local.rows.lockowner : "";
 	}
 
@@ -650,16 +637,94 @@ component output="false" extends="wheels.Global"{
 	 * Internal function. A description of the instance holding the migration lock, for errors.
 	 */
 	public string function $migrationLockHolder() {
-		local.rows = $migrationLockQuery(
-			sql = "SELECT lockowner, lockhost, acquiredat, expiresat FROM #$migrationLockTable()# WHERE lockname = :lockName",
-			params = {lockName = $migrationLockText($migrationLockName())}
-		);
-		if (!local.rows.recordCount) {
+		local.status = migrationLockStatus();
+		if (!local.status.held) {
 			return "no instance any more";
 		}
-		local.heldFor = Int((GetTickCount() - Val(local.rows.acquiredat)) / 1000);
-		local.expiresIn = Int((Val(local.rows.expiresat) - GetTickCount()) / 1000);
-		return "host `#local.rows.lockhost#` (owner #local.rows.lockowner#) for #local.heldFor# seconds; its lease expires in #local.expiresIn# seconds";
+		return "host `#local.status.host#` (owner #local.status.owner#) for #local.status.heldForSeconds# seconds; its lease expires in #local.status.expiresInSeconds# seconds";
+	}
+
+	/**
+	 * Reports who holds the migration lock (#4209): `held`, `expired` (its lease ran out, so the
+	 * next migration takes it over), `owner`, `host`, `heldForSeconds` and `expiresInSeconds`
+	 * (negative once expired). A missing lock table means nothing holds it.
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public struct function migrationLockStatus() {
+		local.rv = {
+			"held" = false,
+			"expired" = false,
+			"owner" = "",
+			"host" = "",
+			"heldForSeconds" = 0,
+			"expiresInSeconds" = 0
+		};
+		if (!$migratorTableExists($migratorDataSource(), $migrationLockTable())) {
+			return local.rv;
+		}
+		local.rows = $runMigrationLockStatement($migrationLease().readStatement($migrationLockName()));
+		if (!local.rows.recordCount) {
+			return local.rv;
+		}
+		local.now = GetTickCount();
+		local.rv["held"] = true;
+		local.rv["owner"] = local.rows.lockowner;
+		local.rv["host"] = local.rows.lockhost;
+		local.rv["heldForSeconds"] = Fix((local.now - Val(local.rows.acquiredat)) / 1000);
+		local.rv["expiresInSeconds"] = Fix((Val(local.rows.expiresat) - local.now) / 1000);
+		local.rv["expired"] = Val(local.rows.expiresat) < local.now;
+		return local.rv;
+	}
+
+	/**
+	 * Removes the migration lock's lease row (#4209), for when the instance holding it is gone.
+	 * Without `force` only an expired lease is removed; with it the row goes whoever holds it, and
+	 * a holder that is still running fails its next renewal with Wheels.MigrationLockLost. Returns
+	 * `lock`, the migrationLockStatus() from before the removal; `heldBy`, the owner holding the lock
+	 * after it ("" when free, another owner when an instance took it meanwhile); and `released`,
+	 * true when the lock is free afterwards.
+	 *
+	 * @force Remove a lease that hasn't expired.
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public struct function releaseMigrationLock(boolean force = false) {
+		local.rv = {"released" = false, "heldBy" = "", "lock" = migrationLockStatus()};
+		if (!local.rv.lock.held) {
+			return local.rv;
+		}
+		// Without force, the expiry test is in the DELETE itself, so a holder renewing its lease
+		// meanwhile keeps it.
+		$runMigrationLockStatement(
+			$migrationLease().releaseStatement(
+				name = $migrationLockName(),
+				owner = local.rv.lock.owner,
+				expiredBefore = arguments.force ? "" : GetTickCount()
+			)
+		);
+		// Read back, not compared with the old owner: an instance that took the lease between the
+		// read and the DELETE keeps it, and that is not a release.
+		local.rv["heldBy"] = $migrationLockOwner();
+		local.rv["released"] = !Len(local.rv.heldBy);
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. The lease lock over the migration lock table. Builds the lock's SQL; the
+	 * Migrator runs it through $migrationLockQuery() for its datasource credentials.
+	 */
+	public any function $migrationLease() {
+		return new wheels.LeaseLock(table = $migrationLockTable());
+	}
+
+	/**
+	 * Internal function. Runs a LeaseLock statement through $migrationLockQuery().
+	 */
+	public query function $runMigrationLockStatement(required struct statement) {
+		return $migrationLockQuery(sql = arguments.statement.sql, params = arguments.statement.params);
 	}
 
 	/**
@@ -869,18 +934,28 @@ component output="false" extends="wheels.Global"{
 				inTransaction = false
 			);
 		}
-		transaction action="begin" {
-			local.result = $executeMigrationStep(
-				migration = arguments.migration,
-				direction = arguments.direction,
-				errorLabel = arguments.errorLabel,
-				divider = local.divider,
-				inTransaction = true
-			);
-			if (local.result.success) {
-				transaction action="commit";
-			} else {
-				transaction action="rollback";
+		// CockroachDB refuses a schema change after any other statement in a transaction at a
+		// weak isolation level, and Lucee leaves a pooled connection at read committed once a
+		// transaction on it has ended. So a step that reads (or writes) before its DDL fails there
+		// unless its transaction asks for serializable, CockroachDB's own default. Other databases
+		// keep the engine's default isolation.
+		if (arguments.migration.cfc.$getDBType() == "CockroachDB") {
+			transaction action="begin" isolation="serializable" {
+				local.result = $executeMigrationStep(migration = arguments.migration, direction = arguments.direction, errorLabel = arguments.errorLabel, divider = local.divider, inTransaction = true);
+				if (local.result.success) {
+					transaction action="commit";
+				} else {
+					transaction action="rollback";
+				}
+			}
+		} else {
+			transaction action="begin" {
+				local.result = $executeMigrationStep(migration = arguments.migration, direction = arguments.direction, errorLabel = arguments.errorLabel, divider = local.divider, inTransaction = true);
+				if (local.result.success) {
+					transaction action="commit";
+				} else {
+					transaction action="rollback";
+				}
 			}
 		}
 		return local.result;
@@ -1695,6 +1770,38 @@ component output="false" extends="wheels.Global"{
 			return Compare(a, b);
 		});
 		return local.orphans;
+	}
+
+	/**
+	 * Internal function. When each applied migration at this level was applied, as
+	 * {version: "yyyy-mm-dd HH:nn:ss"}, for `wheels db status` and `db version --detailed`
+	 * (4407). Empty when the tracking table has no applied_at column yet (installs that
+	 * haven't run $maybeEnsureTrackingColumns), and versions applied before that column
+	 * existed have no entry.
+	 */
+	public struct function $appliedAtByVersion() {
+		local.rv = {};
+		local.appKey = $appKey();
+		if (!StructKeyExists(application[local.appKey], "$trackingColumnsEnsured")) {
+			return local.rv;
+		}
+		try {
+			local.rows = $query(
+				datasource = $migratorDataSource(),
+				sql = "SELECT version, applied_at FROM #application[local.appKey].migratorTableName# "
+					& "WHERE core_level = #application[local.appKey].migrationLevel#"
+			);
+			for (local.row in local.rows) {
+				local.when = $normalizeDbTimestamp(local.row.applied_at ?: "");
+				if (IsDate(local.when)) {
+					local.rv[local.row.version] = DateTimeFormat(local.when, "yyyy-mm-dd HH:nn:ss");
+				}
+			}
+		} catch (any e) {
+			// Same fallback as $getOrphanVersionsWithMeta(): status still renders, without dates.
+			local.rv = {};
+		}
+		return local.rv;
 	}
 
 	/**

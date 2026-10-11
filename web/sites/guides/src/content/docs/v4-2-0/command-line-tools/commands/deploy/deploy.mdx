@@ -7,32 +7,36 @@ sidebar:
   order: 1
 ---
 
-The everyday deploy verb. Runs the full rolling flow: lock, build, push, pull, boot new containers, cut traffic, release lock.
+The everyday deploy verb. Runs the full rolling flow: lock, registry login, build and push, pull, boot new containers, cut traffic, stop old versions, release lock.
 
 ## Synopsis
 
 ```txt title="
-wheels deploy [--release=<v>] [--destination=<name>] [--dry-run]
+wheels deploy [--release=<v>] [--destination=<name>] [--skip-push] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--release=<v>` | Version label for the new containers. Defaults to `git rev-parse --short HEAD`. |
+| `--release=<v>` | Version label for the new containers. Defaults to `git rev-parse --short HEAD` (`unknown` when that fails). `--version=<v>` is an accepted alias. |
 | `--destination=<name>` | Overlay `deploy.<name>.yml` and `.kamal/secrets.<name>`. |
+| `--skip-push` | Skip the local `docker buildx build --push` step, for pipelines that already pushed this version. |
 | `--dry-run` | Print the commands that would run, prefixed by host. No network. |
 | `--config=<path>` | Override `config/deploy.yml`. `--configPath=<path>` is an accepted alias. |
 
 ## Behavior
 
-1. Fires `pre-deploy` hook on the control machine.
-2. Acquires a per-service lock on one host.
-3. Pulls the image on every host in parallel.
-4. Boots `kamal-proxy` if it isn't running.
-5. For each host sequentially: `docker run` new container, then `kamal-proxy deploy` to cut traffic.
-6. Releases the lock.
-7. Fires `post-deploy` hook (or `post-deploy-failure` if anything threw).
+1. Fires the `pre-deploy` hook on the control machine.
+2. Acquires the per-service lock on every host.
+3. Appends a "started deploy" entry to `/tmp/kamal-audit.log` on every host.
+4. Logs in to the registry locally and on every host (skipped when `registry.username` is empty).
+5. Builds and pushes the image locally with `docker buildx build --push` (skipped with `--skip-push`).
+6. Pulls the image on every host.
+7. Creates the `kamal` Docker network if missing, then starts `kamal-proxy` (or runs it) on every proxy-fronted host.
+8. For each role, host by host (in batches when `deploy.yml` has a `boot:` block): removes any container with the same name, uploads the role's env file when `env.secret` is set, runs the new container, asks `kamal-proxy` to cut traffic to it (proxy-fronted roles only), and stops the role's older containers. With a `migrate:` block, the migrate host goes first.
+9. Appends a "completed deploy" audit entry and releases the lock on every host.
+10. Fires the `post-deploy` hook (or `post-deploy-failure` if anything threw).
 
 ## Examples
 

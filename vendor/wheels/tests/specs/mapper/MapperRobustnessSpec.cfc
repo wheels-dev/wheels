@@ -12,15 +12,11 @@ component extends="wheels.WheelsTest" {
 	function beforeAll() {
 		// Mapper.$addRoute() also appends to the application-scoped route data,
 		// so snapshot and restore it to avoid polluting other specs.
-		_originalRoutes = Duplicate(application.wheels.routes);
-		_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(
-			application.wheels.staticRoutes
-		) : {};
+		_routeSnapshot = $snapshotRoutes();
 	}
 
 	function afterAll() {
-		application.wheels.routes = _originalRoutes;
-		application.wheels.staticRoutes = _originalStaticRoutes;
+		$restoreRoutes(_routeSnapshot);
 	}
 
 	function run() {

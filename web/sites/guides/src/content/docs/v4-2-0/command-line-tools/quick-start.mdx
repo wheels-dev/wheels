@@ -45,7 +45,7 @@ Back in the same terminal (the server is already running in the background), gen
 wheels generate scaffold Post title:string body:text
 ```
 
-This generates the full CRUD stack — a `Post` model, `Posts` controller with seven actions, index/show/new/edit views, a `CreatePosts` migration with `title` (string) and `body` (text) columns, a test spec, and a resource route. Attribute syntax is `name:type` — types map to the Wheels migration column types (`string`, `text`, `integer`, `boolean`, `decimal`, `datetime`, `date`, `time`).
+This generates the full CRUD stack — a `Post` model, `Posts` controller with seven actions, index/show/new/edit views, a `<timestamp>_create_posts_table.cfc` migration with `title` (string) and `body` (text) columns, a model spec and a controller spec, and a resource route. Attribute syntax is `name:type` — types map to the Wheels migration column types (`string`, `text`, `integer`, `boolean`, `decimal`, `datetime`, `date`, `time`).
 
 <Aside type="note" title="The `g` alias">
 `wheels generate` has a shorthand: `wheels g scaffold Post title:string body:text`. This page uses the full form for clarity; the alias is fine in day-to-day work.
@@ -57,11 +57,11 @@ This generates the full CRUD stack — a `Post` model, `Posts` controller with s
 wheels migrate latest
 ```
 
-This applies every pending migration — here, the `CreatePosts` migration the scaffold just wrote. Other subcommands: `wheels migrate up` (run the next migration), `wheels migrate down` (roll back one), `wheels migrate info` (show current state).
+This applies every pending migration — here, the `create_posts_table` migration the scaffold just wrote. Other subcommands: `wheels migrate up` (run the next migration), `wheels migrate down` (roll back one), `wheels migrate info` (show current state).
 
 ## 5. View the result
 
-Open `http://localhost:8080/posts` in your browser. You should see the Posts index view — empty at first. Click "New Post", create a record, and the full CRUD flow — list, show, edit, delete — is live against the SQLite database.
+Open `http://localhost:8080/posts` in your browser. You should see the Posts index view — empty at first. Click "New post", create a record, and the full CRUD flow — list, show, edit, delete — is live against the SQLite database.
 
 If you changed the port in step 2, substitute that port instead.
 
@@ -73,7 +73,7 @@ With the server still running in the background:
 wheels test posts
 ```
 
-The trailing positional is a directory scope, not a filename match — `posts` expands to `tests.specs.posts`. The scaffold generated `PostSpec.cfc` under `tests/specs/models/` and `PostsControllerSpec.cfc` under `tests/specs/controllers/`, so on a fresh scaffold the `posts` scope matches neither directory. The CLI treats that vacuous run as a failure (`Wheels.TestsFailed` — `bundlesDiscovered=0`). Use `wheels test models` or `wheels test controllers` to scope to the generated specs. Empty `describe` stubs under those directories still report `0 passed` and exit 0, because they loaded; a rejected `directory=`, a 0-bundle discovery, compile-skipped specs, or Fail/Error all throw `Wheels.TestsFailed`.
+The trailing positional is a folder or spec-file scope, not a name match — `posts` looks for `tests/specs/posts/` and `tests/specs/posts.cfc`. The scaffold generated `PostSpec.cfc` under `tests/specs/models/` and `PostsControllerSpec.cfc` under `tests/specs/controllers/`, so on a fresh scaffold neither exists: the command prints `No test folder or spec file matches 'posts'`, runs nothing, and exits with a non-zero status. Use `wheels test models` or `wheels test controllers` to scope to the generated specs. Empty `describe` stubs under those directories still report `0 passed` and exit 0, because they loaded; a rejected `directory=`, a 0-bundle discovery, compile-skipped specs, or Fail/Error all throw `Wheels.TestsFailed`.
 
 ## 7. What's next
 

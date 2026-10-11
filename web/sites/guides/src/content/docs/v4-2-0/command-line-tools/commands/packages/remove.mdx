@@ -7,24 +7,31 @@ sidebar:
   order: 6
 ---
 
-Removes an installed package by deleting `vendor/<name>/`. As a safety check, the command refuses if the directory has no `package.json` — that shape suggests the dir isn't a Wheels package and we shouldn't touch it.
+Removes an installed package by deleting `vendor/<name>/`. Removal is explicit: without `--yes` the command changes nothing, prints `Re-run with --yes to confirm removing '<name>'`, and exits non-zero. As a safety check, the command refuses if the directory has no `package.json` — that shape suggests the dir isn't a Wheels package and we shouldn't touch it.
 
 ## Synopsis
 
 ```txt title="
-wheels packages remove <name>
+wheels packages remove <name> --yes
 ```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--yes` | **Required.** Confirms the removal. Missing `--yes` throws `Wheels.Packages.ConfirmationRequired`. |
 
 ## Failure modes
 
 | Error | Cause |
 |-------|-------|
+| `Wheels.Packages.ConfirmationRequired` | `--yes` was not passed. Nothing was deleted. |
 | `Wheels.Packages.NotInstalled` | `vendor/<name>/` does not exist. |
 | `Wheels.Packages.NotAPackage` | `vendor/<name>/` has no `package.json`. Remove it manually if you're sure. |
 
 ## Example
 
 ```txt title="
-$ wheels packages remove wheels-sentry
+$ wheels packages remove wheels-sentry --yes
 Removed vendor/wheels-sentry.
 ```

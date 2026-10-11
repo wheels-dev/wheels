@@ -51,6 +51,8 @@ component output="false" displayName="CLI Bridge" {
 			"doctor" = "doctor",
 			"forgetVersion" = "forgetVersion",
 			"pretendVersion" = "pretendVersion",
+			"migrationLockStatus" = "migrationLockStatus",
+			"migrationUnlock" = "migrationUnlock",
 			// Database commands
 			"dbStatus" = "dbStatus",
 			"dbVersion" = "dbVersion",
@@ -71,7 +73,13 @@ component output="false" displayName="CLI Bridge" {
 			"jobsStatus" = "jobsStatus",
 			"jobsRetry" = "jobsRetry",
 			"jobsPurge" = "jobsPurge",
-			"jobsMonitor" = "jobsMonitor"
+			"jobsMonitor" = "jobsMonitor",
+			"jobsEnqueue" = "jobsEnqueue",
+			"jobsDrain" = "jobsDrain",
+			"jobsResume" = "jobsResume",
+			"jobsHostStatus" = "jobsHostStatus",
+			"jobsTick" = "jobsTick",
+			"jobsInstallSource" = "jobsInstallSource"
 		};
 		return this;
 	}
@@ -331,6 +339,26 @@ component output="false" displayName="CLI Bridge" {
 		return local.rv;
 	}
 
+	public struct function migrationLockStatus(required struct context, required struct params) {
+		// Who holds the cross-process migration lock, if anyone (#4209). Read-only.
+		local.rv = {};
+		local.rv.success = true;
+		local.rv.lock = arguments.context.migrator.migrationLockStatus();
+		return local.rv;
+	}
+
+	public struct function migrationUnlock(required struct context, required struct params) {
+		// Remove the migration lock's lease row (#4209). Only an expired lease unless force=true.
+		local.force = StructKeyExists(arguments.params, "force") && IsBoolean(arguments.params.force) && arguments.params.force;
+		local.releaseResult = arguments.context.migrator.releaseMigrationLock(force = local.force);
+		local.rv = {};
+		local.rv.success = true;
+		local.rv.released = local.releaseResult.released;
+		local.rv.heldBy = local.releaseResult.heldBy;
+		local.rv.lock = local.releaseResult.lock;
+		return local.rv;
+	}
+
 	public struct function pretendVersion(required struct context, required struct params) {
 		// Record a version as applied without running up().
 		local.rv = {};
@@ -352,7 +380,10 @@ component output="false" displayName="CLI Bridge" {
 	public struct function dbStatus(required struct context, required struct params) {
 		// Return migration status straight from the migrator's own status field.
 		local.rv = {};
-		local.statusReport = arguments.context.host.$cliFormatMigrationStatus(arguments.context.migrations);
+		local.statusReport = arguments.context.host.$cliFormatMigrationStatus(
+			migrations = arguments.context.migrations,
+			appliedAt = StructKeyExists(arguments.context, "migrator") ? arguments.context.migrator.$appliedAtByVersion() : {}
+		);
 		local.rv.success = true;
 		local.rv.migrations = local.statusReport.migrations;
 		local.rv.summary = local.statusReport.summary;
@@ -787,14 +818,37 @@ component output="false" displayName="CLI Bridge" {
 		try {
 			local.worker = new wheels.JobWorker();
 			local.jobQueues = structKeyExists(arguments.params, "queues") ? arguments.params.queues : "";
-			local.jobTimeout = structKeyExists(arguments.params, "timeout") ? val(arguments.params.timeout) : 300;
-			local.jobResult = local.worker.processNext(queues = local.jobQueues, timeout = local.jobTimeout);
+			// Each job runs with its own class's timeout, as processQueue() does; `wheels jobs work
+			// --timeout` passes a cap. 300 is the timeout for a job whose class can't be loaded.
+			local.worker.perJobTimeout = true;
+			local.worker.timeoutCap = structKeyExists(arguments.params, "timeout") && val(arguments.params.timeout) > 0 ? val(arguments.params.timeout) : 0;
+			local.pollTimeout = local.worker.timeoutCap > 0 ? local.worker.timeoutCap : 300;
+			local.worker.legacyReapTimeout = Max(local.worker.timeoutCap, 300);
+			local.jobResult = local.worker.processNext(queues = local.jobQueues, timeout = local.pollTimeout);
 			local.rv.success = true;
 			local.rv.jobResult = local.jobResult;
 			local.rv.message = local.jobResult.skipped ? "No jobs available" : "Processed job #local.jobResult.jobId#";
 		} catch (any e) {
 			local.rv.success = false;
 			local.rv.message = "Error processing job: " & e.message;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * `wheels jobs install`: the source of the migration that creates the job tables, built from
+	 * wheels.JobSchema. Read-only: the CLI writes the file, and nothing touches the database.
+	 */
+	public struct function jobsInstallSource(required struct context, required struct params) {
+		local.rv = {};
+		try {
+			local.rv.success = true;
+			local.rv.migrationName = "CreateWheelsJobTables";
+			local.rv.source = new wheels.JobSchema().migrationSource();
+			local.rv.message = "Jobs migration source generated";
+		} catch (any e) {
+			local.rv.success = false;
+			local.rv.message = "Error generating the jobs migration: " & e.message;
 		}
 		return local.rv;
 	}
@@ -806,10 +860,88 @@ component output="false" displayName="CLI Bridge" {
 			local.jobQueue = structKeyExists(arguments.params, "queue") ? arguments.params.queue : "";
 			local.rv.success = true;
 			local.rv.stats = local.worker.getStats(queue = local.jobQueue);
+			// This server's own state (running jobs, cap, drain), for `wheels jobs status`. Its own
+			// try: a problem reading the hosts registry must not hide the queue stats.
+			try {
+				local.rv.host = new wheels.JobRunner().status();
+			} catch (any hostErr) {
+				writeLog(text = "jobs status: could not read this server's job host state: #hostErr.message#", type = "warning", file = "wheels_jobs");
+			}
 			local.rv.message = "Queue statistics retrieved";
 		} catch (any e) {
 			local.rv.success = false;
 			local.rv.message = "Error getting status: " & e.message;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * `wheels jobs tick`: one JobRunner.tick() on this server (record the host, reap, run jobs up to
+	 * the per-host cap). Mutating: it runs jobs.
+	 */
+	public struct function jobsTick(required struct context, required struct params) {
+		local.rv = {};
+		try {
+			local.rv.tick = new wheels.JobRunner().tick();
+			local.rv.success = true;
+			local.rv.message = "Tick done";
+		} catch (any e) {
+			local.rv.success = false;
+			local.rv.message = "Error running a tick: " & e.message;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * `wheels jobs drain`: this server starts no new jobs until resumed or the drain expires
+	 * (`expiresInSeconds`, default 3600; 0 = until resumed). Jobs already running finish.
+	 * Mutating: POST, loopback, reload password.
+	 */
+	public struct function jobsDrain(required struct context, required struct params) {
+		local.rv = {};
+		try {
+			local.expires = StructKeyExists(arguments.params, "expiresInSeconds") && IsNumeric(arguments.params.expiresInSeconds)
+				? Int(arguments.params.expiresInSeconds)
+				: 3600;
+			local.rv.host = new wheels.JobRunner().drain(expiresInSeconds = local.expires);
+			local.rv.success = true;
+			local.rv.message = "Draining #local.rv.host.host#: no new jobs start; #local.rv.host.running# still running";
+		} catch (any e) {
+			local.rv.success = false;
+			local.rv.message = "Error draining: " & e.message;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * `wheels jobs resume`: this server starts jobs again. Mutating, like jobsDrain.
+	 */
+	public struct function jobsResume(required struct context, required struct params) {
+		local.rv = {};
+		try {
+			local.rv.host = new wheels.JobRunner().resume();
+			local.rv.success = true;
+			local.rv.message = "Resumed #local.rv.host.host#";
+		} catch (any e) {
+			local.rv.success = false;
+			local.rv.message = "Error resuming: " & e.message;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * This server's job state (host, running, maxConcurrent, draining, ...). Read-only; polled
+	 * by `wheels jobs drain --wait` until nothing is running.
+	 */
+	public struct function jobsHostStatus(required struct context, required struct params) {
+		local.rv = {};
+		try {
+			local.rv.host = new wheels.JobRunner().status();
+			local.rv.success = true;
+			local.rv.message = "Host status retrieved";
+		} catch (any e) {
+			local.rv.success = false;
+			local.rv.message = "Error getting host status: " & e.message;
 		}
 		return local.rv;
 	}
@@ -870,7 +1002,358 @@ component output="false" displayName="CLI Bridge" {
 		return local.rv;
 	}
 
+	/**
+	 * `wheels jobs enqueue`: enqueue a job now, or after `delaySeconds`. A mutating
+	 * command (POST, loopback, reload password). The class name comes from the
+	 * request, so it is checked from its name and its source file before anything is
+	 * loaded: a dotted identifier, on the worker's own allowlist (app.jobs plus any
+	 * jobClassPrefixes; a bare name resolves under app.jobs), a .cfc that exists,
+	 * and one whose `extends` chain reaches wheels.Job. Only then is it
+	 * instantiated, and the instance is checked again. Anything else is refused.
+	 * Not GetComponentMetadata(): on Lucee that loads the component and runs its
+	 * pseudo-constructor.
+	 */
+	public struct function jobsEnqueue(required struct context, required struct params) {
+		local.rv = {success = false};
+		local.name = StructKeyExists(arguments.params, "job") ? Trim(arguments.params.job) : "";
+		if (!ReFind("^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$", local.name)) {
+			local.rv.message = "Not a job class name: '#local.name#'. Use a component name such as SendWelcomeEmailJob or billing.InvoiceJob (under app/jobs/).";
+			return local.rv;
+		}
+
+		local.input = $jobsEnqueueInput(arguments.params);
+		if (Len(local.input.error)) {
+			local.rv.message = local.input.error;
+			return local.rv;
+		}
+
+		local.base = CreateObject("component", "wheels.Job").init();
+		local.jobClass = local.base.$isAllowedJobClass(local.name) ? local.name : "app.jobs." & local.name;
+		if (!local.base.$isAllowedJobClass(local.jobClass)) {
+			local.rv.message = "#local.jobClass# isn't on the jobs allowlist (app.jobs and jobClassPrefixes).";
+			return local.rv;
+		}
+		if (!FileExists($componentFilePath(local.jobClass))) {
+			local.rv.message = "#local.jobClass# isn't a job class: there is no #Replace(local.jobClass, ".", "/", "all")#.cfc." & $jobsEnqueueAvailable();
+			return local.rv;
+		}
+		if (!$sourceExtendsWheelsJob(local.jobClass)) {
+			local.rv.message = "#local.jobClass# doesn't extend wheels.Job, so it isn't a job.";
+			return local.rv;
+		}
+
+		local.job = local.base.$instantiateJobClass(local.jobClass);
+		if (!IsInstanceOf(local.job, "wheels.Job")) {
+			local.rv.message = "#local.jobClass# doesn't extend wheels.Job, so it isn't a job.";
+			return local.rv;
+		}
+		local.args = {data = local.input.data};
+		if (Len(local.input.queue)) {
+			local.args.queue = local.input.queue;
+		}
+		if (local.input.hasPriority) {
+			local.args.priority = local.input.priority;
+		}
+		if (local.input.delaySeconds > 0) {
+			local.args.seconds = local.input.delaySeconds;
+			local.result = local.job.enqueueIn(argumentCollection = local.args);
+		} else {
+			local.result = local.job.enqueue(argumentCollection = local.args);
+		}
+
+		local.rv.success = true;
+		local.rv.job = {
+			"id" = local.result.id,
+			"jobClass" = local.result.jobClass,
+			"status" = local.result.status,
+			"queue" = Len(local.input.queue) ? local.input.queue : local.job.queue,
+			"priority" = local.input.hasPriority ? local.input.priority : local.job.priority,
+			"delaySeconds" = local.input.delaySeconds
+		};
+		local.rv.message = "Enqueued #local.result.jobClass# (#local.result.id#)";
+		return local.rv;
+	}
+
 	// ── Internal ────────────────────────────────────────────────────────
+
+	/**
+	 * jobsEnqueue's data, queue, priority and delaySeconds, validated. `error` is
+	 * "" when they are all usable.
+	 */
+	public struct function $jobsEnqueueInput(required struct params) {
+		local.rv = {error = "", data = {}, queue = "", priority = 0, hasPriority = false, delaySeconds = 0};
+		local.raw = StructKeyExists(arguments.params, "data") ? Trim(arguments.params.data) : "";
+		if (Len(local.raw)) {
+			local.parsed = IsJSON(local.raw) ? DeserializeJSON(local.raw) : "";
+			if (!IsStruct(local.parsed)) {
+				local.rv.error = "The job data must be a JSON object, like {""userId"":42}.";
+				return local.rv;
+			}
+			local.rv.data = local.parsed;
+		}
+		local.rv.queue = StructKeyExists(arguments.params, "queue") ? Trim(arguments.params.queue) : "";
+		if (StructKeyExists(arguments.params, "priority") && Len(Trim(arguments.params.priority))) {
+			if (!ReFind("^-?[0-9]+$", Trim(arguments.params.priority))) {
+				local.rv.error = "The priority must be a whole number.";
+				return local.rv;
+			}
+			local.rv.priority = Val(arguments.params.priority);
+			local.rv.hasPriority = true;
+		}
+		if (StructKeyExists(arguments.params, "delaySeconds") && Len(Trim(arguments.params.delaySeconds))) {
+			if (!ReFind("^[0-9]+$", Trim(arguments.params.delaySeconds))) {
+				local.rv.error = "delaySeconds must be zero or a positive whole number of seconds.";
+				return local.rv;
+			}
+			local.rv.delaySeconds = Val(arguments.params.delaySeconds);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * The .cfc file a dotted component path names, through the application's mappings.
+	 */
+	public string function $componentFilePath(required string componentPath) {
+		return ExpandPath("/" & Replace(arguments.componentPath, ".", "/", "all") & ".cfc");
+	}
+
+	/**
+	 * True when a component's `extends` chain, read from its source files, reaches
+	 * wheels.Job. Nothing is loaded or run. A parent named without a dot is a
+	 * sibling in the same package, as CFML resolves it.
+	 */
+	public boolean function $sourceExtendsWheelsJob(required string componentPath) {
+		local.current = arguments.componentPath;
+		for (local.depth = 1; local.depth <= 10; local.depth++) {
+			local.file = $componentFilePath(local.current);
+			if (!FileExists(local.file)) {
+				return false;
+			}
+			local.parent = $sourceExtends(FileRead(local.file));
+			if (!Len(local.parent)) {
+				return false;
+			}
+			if (CompareNoCase(local.parent, "wheels.Job") == 0) {
+				return true;
+			}
+			if (!Find(".", local.parent) && Find(".", local.current)) {
+				local.parent = ListDeleteAt(local.current, ListLen(local.current, "."), ".") & "." & local.parent;
+			}
+			local.current = local.parent;
+		}
+		return false;
+	}
+
+	/**
+	 * The `extends` value in a component's declaration (script `component extends="X"`
+	 * or the tag form's extends attribute), with comments removed first so a commented-out
+	 * declaration doesn't count. "" when it extends nothing.
+	 */
+	public string function $sourceExtends(required string source) {
+		local.code = $stripComments(arguments.source);
+		local.at = $declarationStart(local.code);
+		return local.at > 0 ? $declarationAttribute(local.code, local.at, "extends") : "";
+	}
+
+	/**
+	 * Where the first component declaration (`component` or the tag form's
+	 * `cfcomponent`) starts in comment-free code, outside quoted strings; 0 if none.
+	 */
+	public numeric function $declarationStart(required string code) {
+		local.text = arguments.code;
+		local.length = Len(local.text);
+		local.quote = "";
+		for (local.i = 1; local.i <= local.length; local.i++) {
+			local.char = Mid(local.text, local.i, 1);
+			if (Len(local.quote)) {
+				if (local.char == local.quote) {
+					local.quote = "";
+				}
+				continue;
+			}
+			if (local.char == """" || local.char == "'") {
+				local.quote = local.char;
+				continue;
+			}
+			local.before = local.i > 1 ? Mid(local.text, local.i - 1, 1) : " ";
+			if (ReFind("[A-Za-z0-9_.$-]", local.before)) {
+				continue;
+			}
+			for (local.keyword in ["cfcomponent", "component"]) {
+				if (
+					LCase(Mid(local.text, local.i, Len(local.keyword))) == local.keyword
+					&& !ReFind("[A-Za-z0-9_.$-]", Mid(local.text, local.i + Len(local.keyword), 1))
+				) {
+					return local.i;
+				}
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * The value of one attribute in a component declaration starting at `start`, read
+	 * outside quoted values: the declaration ends at the first `{` or `>` that isn't
+	 * inside quotes, and a name only counts where an attribute name can stand (not
+	 * inside another attribute's value, not as the tail of a longer name). "" when the
+	 * attribute isn't there.
+	 */
+	public string function $declarationAttribute(required string code, required numeric start, required string attribute) {
+		local.text = arguments.code;
+		local.length = Len(local.text);
+		local.name = LCase(arguments.attribute);
+		local.quote = "";
+		local.i = arguments.start;
+		while (local.i <= local.length) {
+			local.char = Mid(local.text, local.i, 1);
+			if (Len(local.quote)) {
+				if (local.char == local.quote) {
+					local.quote = "";
+				}
+				local.i++;
+				continue;
+			}
+			if (local.char == """" || local.char == "'") {
+				local.quote = local.char;
+				local.i++;
+				continue;
+			}
+			if (local.char == "{" || local.char == ">") {
+				return "";
+			}
+			// A line comment inside the declaration: skip to the end of the line.
+			if (local.char == "/" && Mid(local.text, local.i + 1, 1) == "/") {
+				local.newline = Find(Chr(10), local.text, local.i);
+				if (local.newline == 0) {
+					return "";
+				}
+				local.i = local.newline + 1;
+				continue;
+			}
+			local.before = local.i > 1 ? Mid(local.text, local.i - 1, 1) : " ";
+			if (
+				!ReFind("[A-Za-z0-9_.-]", local.before)
+				&& LCase(Mid(local.text, local.i, Len(local.name))) == local.name
+			) {
+				local.value = $attributeValueAt(local.text, local.i + Len(local.name));
+				if (local.value.matched) {
+					return local.value.value;
+				}
+			}
+			local.i++;
+		}
+		return "";
+	}
+
+	/**
+	 * After an attribute name: optional spaces, `=`, optional spaces, then a quoted or
+	 * bare value made of identifier characters and dots. `matched` is false when no
+	 * `=` follows, so the name was a word, not an attribute.
+	 */
+	public struct function $attributeValueAt(required string text, required numeric position) {
+		local.rest = Mid(arguments.text, arguments.position, 300);
+		local.match = ReFind("^[[:space:]]*=[[:space:]]*([""']?)([A-Za-z0-9_.]*)", local.rest, 1, true);
+		if (local.match.pos[1] == 0) {
+			return {matched = false, value = ""};
+		}
+		return {matched = true, value = local.match.len[3] > 0 ? Mid(local.rest, local.match.pos[3], local.match.len[3]) : ""};
+	}
+
+	/**
+	 * Source with every comment replaced by a space: block comments, line comments
+	 * wherever they start on a line, and CFML tag comments, which nest. Quoted
+	 * strings are kept as they are, so comment markers inside them don't count.
+	 * The markers are built with Chr() so this file contains none of them literally.
+	 */
+	public string function $stripComments(required string source) {
+		local.text = arguments.source;
+		local.length = Len(local.text);
+		local.tagOpen = Chr(60) & Chr(33) & "---";
+		local.tagClose = "---" & Chr(62);
+		local.blockOpen = Chr(47) & Chr(42);
+		local.blockClose = Chr(42) & Chr(47);
+		local.rv = "";
+		local.chunkStart = 1;
+		local.quote = "";
+		local.i = 1;
+		while (local.i <= local.length) {
+			local.char = Mid(local.text, local.i, 1);
+			if (Len(local.quote)) {
+				if (local.char == local.quote) {
+					local.quote = "";
+				}
+				local.i++;
+				continue;
+			}
+			local.skipTo = 0;
+			if (Mid(local.text, local.i, 5) == local.tagOpen) {
+				local.skipTo = $tagCommentEnd(local.text, local.i, local.tagOpen, local.tagClose);
+			} else if (Mid(local.text, local.i, 2) == local.blockOpen) {
+				local.stop = Find(local.blockClose, local.text, local.i + 2);
+				local.skipTo = local.stop > 0 ? local.stop + 2 : local.length + 1;
+			} else if (Mid(local.text, local.i, 2) == "//") {
+				local.stop = Find(Chr(10), local.text, local.i);
+				local.skipTo = local.stop > 0 ? local.stop : local.length + 1;
+			}
+			if (local.skipTo > 0) {
+				local.rv &= Mid(local.text, local.chunkStart, local.i - local.chunkStart) & " ";
+				local.i = local.skipTo;
+				local.chunkStart = local.i;
+				continue;
+			}
+			if (local.char == """" || local.char == "'") {
+				local.quote = local.char;
+			}
+			local.i++;
+		}
+		local.rv &= Mid(local.text, local.chunkStart, local.length - local.chunkStart + 1);
+		return local.rv;
+	}
+
+	/**
+	 * The position just after the tag comment opening at `start`, counting nested
+	 * tag comments; past the end when it is never closed.
+	 */
+	public numeric function $tagCommentEnd(required string text, required numeric start, required string tagOpen, required string tagClose) {
+		local.depth = 0;
+		local.i = arguments.start;
+		local.length = Len(arguments.text);
+		while (local.i <= local.length) {
+			if (Mid(arguments.text, local.i, Len(arguments.tagOpen)) == arguments.tagOpen) {
+				local.depth++;
+				local.i += Len(arguments.tagOpen);
+			} else if (Mid(arguments.text, local.i, Len(arguments.tagClose)) == arguments.tagClose) {
+				local.depth--;
+				local.i += Len(arguments.tagClose);
+				if (local.depth == 0) {
+					return local.i;
+				}
+			} else {
+				local.i++;
+			}
+		}
+		return local.length + 1;
+	}
+
+	/**
+	 * " Job classes in app/jobs: A, B." for a refusal, or "" when there are none.
+	 */
+	public string function $jobsEnqueueAvailable() {
+		local.dir = ExpandPath("/app/jobs");
+		if (!DirectoryExists(local.dir)) {
+			return "";
+		}
+		local.names = [];
+		for (local.file in DirectoryList(local.dir, true, "path", "*.cfc")) {
+			local.relative = Mid(Replace(local.file, "\", "/", "all"), Len(Replace(local.dir, "\", "/", "all")) + 2, 1000);
+			ArrayAppend(local.names, Replace(ReReplace(local.relative, "\.cfc$", ""), "/", ".", "all"));
+			if (ArrayLen(local.names) >= 10) {
+				break;
+			}
+		}
+		return ArrayLen(local.names) ? " Job classes in app/jobs: " & ArrayToList(local.names, ", ") & "." : "";
+	}
+
 
 	/**
 	 * Seed orchestration, shared by `dbSeed` and `dbSetup`. Returns a struct

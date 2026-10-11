@@ -7,7 +7,7 @@ sidebar:
   order: 6
 ---
 
-Scaffold the files `wheels deploy` reads: `config/deploy.yml` and `.kamal/secrets`. Also creates `.kamal/hooks/` (empty) for optional hook scripts.
+Scaffold the files `wheels deploy` reads: `config/deploy.yml`, `.kamal/secrets`, a `Dockerfile` and a `.dockerignore`. Also creates `.kamal/hooks/` (empty) for optional hook scripts.
 
 ## Synopsis
 
@@ -22,12 +22,14 @@ wheels deploy init [--service=<name>] [--image=<path>] [--registry-username=<use
 | `--service=<name>` | Service name to bake in. Defaults to the project directory basename. |
 | `--image=<path>` | Image path. Defaults to `<service>/web`. |
 | `--registry-username=<user>` | Registry username. Defaults to `changeme` — you'll edit it. |
-| `--force` | Overwrite existing files. Without this, an existing `config/deploy.yml` aborts with `DeployMainCli.InitAlreadyExists`. |
+| `--force` | Overwrite existing files. Without this, an existing `config/deploy.yml` or `Dockerfile` aborts with `DeployMainCli.InitAlreadyExists` (exit code 1). An existing `.kamal/secrets` is never overwritten, even with `--force`. |
 
 ## What it creates
 
 - `config/deploy.yml` — a starter manifest with `service`, `image`, `servers`, `registry`, `env` stubs.
-- `.kamal/secrets` — key/value placeholders for the registry password and any app secrets.
+- `.kamal/secrets` — empty `KAMAL_REGISTRY_PASSWORD=` and `WHEELS_RELOAD_PASSWORD=` entries plus comments showing `$(cmd)` and `${VAR}` lookups. Created owner-only (0600).
+- `Dockerfile` — a Lucee-based image for the app. Review the `COPY` paths.
+- `.dockerignore` — kept if one already exists, unless `--force`.
 - `.kamal/hooks/` — empty directory. Drop executable `pre-deploy`, `post-deploy`, or `post-deploy-failure` scripts here later.
 
 `init` also adds `.kamal/secrets` to `.gitignore` (unless git already ignores it). If the file is already tracked, it prints a warning: run `git rm --cached .kamal/secrets` and rotate the secrets it held.

@@ -463,6 +463,7 @@
 	 * with `as`), and whether it is a polymorphic belongsTo.
 	 */
 	public struct function $nestedParentLink(required string association) {
+		$resolvePolymorphicColumns(arguments.association);
 		local.definition = variables.wheels.class.associations[arguments.association];
 		local.rv = {
 			type = local.definition.type,

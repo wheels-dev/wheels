@@ -25,6 +25,6 @@ Docker image lifecycle. Most build verbs run **locally** on the control machine;
 
 `wheels deploy` already calls `push` and `pull` as part of the rolling flow. Reach for `build` verbs directly when you want to:
 
-- Preview the exact `docker build` / `docker push` command that will run (`--dry-run`).
+- Preview the exact `docker buildx build --push` command that will run (`--dry-run`).
 - Build on CI and push without deploying.
 - Pull a fresh image onto every host without advancing versions.

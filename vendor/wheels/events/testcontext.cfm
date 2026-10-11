@@ -41,6 +41,9 @@
 			&& Right(this.name, Len(this.wheels.$testContext.suffix)) == this.wheels.$testContext.suffix
 		) {
 			this.wheels.$testContext.match = true;
+			// Already in the isolated application — isolation is configured and active. Lockstep with
+			// TestContext.requestIsTestContextConfigured(alreadyIsolated=true, environmentAllows=...).
+			request.$wheelsTestContextConfigured = true;
 		} else {
 			// (1) Resolve the environment from WHEELS_ENV. The constructor already
 			// computes `currentEnv` for the same purpose (session-cookie Secure);
@@ -66,19 +69,35 @@
 			);
 
 			if (this.wheels.$testContext.envAllows) {
-				// (2) Path trigger — anchored to the request PATH only.
-				if (IsDefined("cgi.path_info")) {
-					this.wheels.$testContext.pathHaystack &= " " & ToString(cgi.path_info);
-				}
-				if (IsDefined("cgi.script_name")) {
-					this.wheels.$testContext.pathHaystack &= " " & ToString(cgi.script_name);
-				}
-				if (
-					FindNoCase("/wheels/core/tests", this.wheels.$testContext.pathHaystack)
-					|| FindNoCase("/wheels/app/tests", this.wheels.$testContext.pathHaystack)
-				) {
-					this.wheels.$testContext.match = true;
-				}
+				// Isolation is configured AND the constructor's WHEELS_ENV gate allows it — mark the
+				// request so the runner actions (wheels.Public testbox / tests_testbox) refuse a
+				// live-scope run that reached them without binding isolation (e.g. a custom route the
+				// path trigger doesn't cover). Set ONLY here (and in the already-isolated branch): an
+				// app whose WHEELS_ENV doesn't allow isolation never binds and must keep the existing
+				// live-scope swap + #4354 warning, so it must NOT get the marker. Lockstep with
+				// TestContext.requestIsTestContextConfigured(alreadyIsolated || environmentAllows).
+				request.$wheelsTestContextConfigured = true;
+
+				// (2) Path trigger — path_info or script_name must START with a runner endpoint
+				// (/wheels/core/tests or /wheels/app/tests) at a whole-segment boundary, so a runner
+				// path merely embedded inside an application route does not bind the test context.
+				// For each value: lowercase/trim, then cut the query string off FIRST (so a '//' or
+				// '..' living inside a query cannot reject a legitimate runner URL), reject any
+				// remaining '..' traversal or '//' empty segment, then start-anchored match.
+				// Inline, constructor-safe copy of TestContext.$pathTriggersTestContext() (no vars/
+				// loops/CreateObject here) — keep the two in lockstep.
+				this.wheels.$testContext.pInfo = ReReplace(IsDefined("cgi.path_info") ? LCase(Trim(ToString(cgi.path_info))) : "", "\?.*$", "");
+				this.wheels.$testContext.pScript = ReReplace(IsDefined("cgi.script_name") ? LCase(Trim(ToString(cgi.script_name))) : "", "\?.*$", "");
+				this.wheels.$testContext.match = (
+					(
+						!ReFind("\.\.|//", this.wheels.$testContext.pInfo)
+						&& ReFindNoCase("^/wheels/(core/tests|app/tests|testbox|tests_testbox)(/|$)", this.wheels.$testContext.pInfo) > 0
+					)
+					|| (
+						!ReFind("\.\.|//", this.wheels.$testContext.pScript)
+						&& ReFindNoCase("^/wheels/(core/tests|app/tests|testbox|tests_testbox)(/|$)", this.wheels.$testContext.pScript) > 0
+					)
+				);
 
 				// (3) Header / cookie trigger — per-process secret (constant-time)
 				// AND a loopback socket peer. Skipped entirely until a runner has

@@ -29,11 +29,27 @@ component {
 			: {};
 	}
 
+	/**
+	 * The target platforms. Kamal accepts a scalar ("amd64", or "amd64,arm64") or a list. Each entry
+	 * goes into `docker buildx build --platform`, a shell command, so anything but a plain platform
+	 * name (letters, digits, `.`, `_`, `/`, `-`) is refused here rather than quoted there (#4423).
+	 */
 	public array function arch() {
 		if (!structKeyExists(variables.raw, "arch")) return ["amd64"];
-		// Kamal accepts either a scalar "amd64" or an array — normalize.
-		if (isArray(variables.raw.arch)) return variables.raw.arch;
-		return [variables.raw.arch];
+		var entries = isArray(variables.raw.arch) ? variables.raw.arch : listToArray(toString(variables.raw.arch), ",");
+		var rv = [];
+		for (var entry in entries) {
+			var value = trim(toString(entry));
+			if (!len(value)) continue;
+			if (!reFind("^[A-Za-z0-9._/-]+$", value)) {
+				throw(
+					type = "Wheels.Deploy.InvalidInput",
+					message = "Invalid builder.arch '#value#' in deploy.yml: use platform names such as amd64, arm64 or linux/arm/v7 (letters, digits, '.', '_', '/' and '-')."
+				);
+			}
+			arrayAppend(rv, value);
+		}
+		return arrayLen(rv) ? rv : ["amd64"];
 	}
 
 	public string function remote() {

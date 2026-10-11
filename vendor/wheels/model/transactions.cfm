@@ -165,7 +165,15 @@
 				arguments.closeTransaction
 				&& StructKeyExists(request.wheels.$txnCallbacks, arguments.connectionArgs)
 			) {
-				$resolveTransactionCallbacks(connection = arguments.connectionArgs, type = "afterRollback");
+				// After the transaction block has ended (a failed begin, or a method that threw).
+				// The original error is the one that propagates, not a failing callback's.
+				$resolveTransactionCallbacks(connection = arguments.connectionArgs, type = "afterRollback", propagateErrors = false);
+			}
+			if (arguments.closeTransaction) {
+				// The transaction rolled back (the body threw). Reads made inside it may have cached
+				// uncommitted rows, so drop the whole request query cache — otherwise a later read in
+				// this request returns phantom data that never committed (#4429).
+				$clearRequestCache();
 			}
 			rethrow;
 		}
@@ -182,6 +190,12 @@
 				connection = arguments.connectionArgs,
 				type = local.ctx.txnState.rolledBack ? "afterRollback" : "afterCommit"
 			);
+			if (local.ctx.txnState.rolledBack) {
+				// A non-exception rollback (the method returned false, or transaction = "rollback"):
+				// same phantom-read risk as the throw path above, so drop the request query cache.
+				// A commit does not need this — its reads are of committed rows (#4429).
+				$clearRequestCache();
+			}
 		}
 		return local.ctx.rv;
 	}
@@ -273,11 +287,7 @@
 	public void function $transactionBody(required struct ctx) {
 		arguments.ctx.txnState.entered = true;
 		try {
-			arguments.ctx.rv = $invoke(
-				method = arguments.ctx.method,
-				componentReference = this,
-				invokeArgs = arguments.ctx.methodArgs
-			);
+			$invokeTransactionMethod(arguments.ctx);
 			if (
 				!IsBoolean(arguments.ctx.rv)
 				|| (!IsNumeric(arguments.ctx.rv) && !arguments.ctx.rv)
@@ -289,11 +299,38 @@
 		} catch (any e) {
 			transaction action="rollback";
 			request.wheels.transactions[arguments.ctx.connectionArgs] = false;
-			// Marker reset above; fire afterRollback (owner only) before the rethrow.
-			if (arguments.ctx.closeTransaction) {
-				$resolveTransactionCallbacks(connection = arguments.ctx.connectionArgs, type = "afterRollback", propagateErrors = false);
-			}
+			// afterRollback fires in $runInTransaction's catch, once this transaction block has
+			// ended: a callback that writes (a job enqueued with transactional = false) must not
+			// run on the connection the block is about to roll back.
 			rethrow;
+		}
+	}
+
+	/**
+	 * Internal. Runs a Wheels-owned transaction's method. When the request ends with `abort`
+	 * inside it, the method has neither returned nor thrown, and the transaction is rolled back
+	 * here, as it is after a failure. The rollback must stay in a try/finally with no catch clause:
+	 * on BoxLang, abort skips a finally whose try has a catch clause (cross-engine invariant 22 in
+	 * CLAUDE.md), and the transaction would then keep the writes made before the abort.
+	 */
+	public void function $invokeTransactionMethod(required struct ctx) {
+		var exitState = {completed = false, threw = false};
+		try {
+			try {
+				arguments.ctx.rv = $invoke(
+					method = arguments.ctx.method,
+					componentReference = this,
+					invokeArgs = arguments.ctx.methodArgs
+				);
+				exitState.completed = true;
+			} catch (any e) {
+				exitState.threw = true;
+				rethrow;
+			}
+		} finally {
+			if (!exitState.completed && !exitState.threw) {
+				transaction action="rollback";
+			}
 		}
 	}
 
@@ -390,11 +427,16 @@
 			// A rollback that itself fails is logged, never allowed to replace the
 			// method's exception, which is what the caller needs to see.
 			$rollbackToSavepointQuietly(name = local.savepoint, connection = local.connectionArgs, mark = local.mark);
+			// The savepoint unit's reads may have cached rows it just rolled back; clear the request
+			// cache so the outer transaction, which carries on, does not serve them as phantoms (#4429).
+			$clearRequestCache();
 			rethrow;
 		}
 		// Same failure test as the commit branch: a numeric count (0-row bulk op) is not a failure.
 		if (!IsBoolean(local.rv) || (!IsNumeric(local.rv) && !local.rv)) {
 			$rollbackToSavepoint(name = local.savepoint, connection = local.connectionArgs, mark = local.mark);
+			// Same phantom-read risk as the exception path above (#4429).
+			$clearRequestCache();
 		}
 		if (!IsBoolean(local.rv)) {
 			Throw(

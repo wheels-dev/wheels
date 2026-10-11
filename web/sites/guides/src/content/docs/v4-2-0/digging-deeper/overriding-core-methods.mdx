@@ -53,7 +53,7 @@ component extends="Model" {
 }
 ```
 
-This works for any public framework method mixed into models — `findOne()`, `columnNames()`, `save()`, and so on.
+This works for any public framework method mixed into models — `findOne()`, `columnNames()`, `save()`, and so on. If your override takes arguments of its own, remove them from `arguments` before delegating: the original ignores them, and with [`strictArguments`](/v4-2-0/digging-deeper/strict-arguments/) on it reports them.
 
 ## Overriding a controller or view helper
 

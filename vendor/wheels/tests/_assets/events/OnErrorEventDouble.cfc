@@ -18,6 +18,12 @@ component extends="wheels.events.EventMethods" {
 		this.mailArgs = [];
 		this.mailShouldThrow = false;
 		this.formatOverride = "json";
+		// Agent-readable error seams: the ?format value and the Accept header the
+		// development-only JSON/Markdown bodies read, and a payload builder that throws.
+		this.formatParam = "";
+		this.acceptHeader = "";
+		this.payloadShouldThrow = false;
+		this.contentResets = 0;
 		return this;
 	}
 
@@ -49,6 +55,26 @@ component extends="wheels.events.EventMethods" {
 
 	public string function $getRequestFormat() {
 		return this.formatOverride;
+	}
+
+	// Counts buffer resets instead of clearing the test runner's response.
+	public void function $content() {
+		this.contentResets = this.contentResets + 1;
+	}
+
+	public string function $errorFormatParam() {
+		return this.formatParam;
+	}
+
+	public string function $errorAcceptHeader() {
+		return this.acceptHeader;
+	}
+
+	public any function $errorCopyPayloadBuilder() {
+		if (this.payloadShouldThrow) {
+			return CreateObject("component", "wheels.tests._assets.events.ThrowingErrorCopyPayload");
+		}
+		return CreateObject("component", "wheels.events.onerror.ErrorCopyPayload");
 	}
 
 	public string function $includeAndReturnOutput() {

@@ -218,11 +218,13 @@ component {
 			// transformation string ("AES/GCM/NoPadding"), so strip mode/padding.
 			local.authenticityToken = GenerateSecretKey(ListFirst(application.wheels.csrfCookieEncryptionAlgorithm, "/"));
 			local.value = SerializeJSON({sessionId = CreateUUID(), authenticityToken = local.authenticityToken});
-			local.value = Encrypt(
-				local.value,
-				local.encryptionKey,
-				application.wheels.csrfCookieEncryptionAlgorithm,
-				application.wheels.csrfCookieEncryptionEncoding
+			local.value = $csrfCookieTransportValue(
+				Encrypt(
+					local.value,
+					local.encryptionKey,
+					application.wheels.csrfCookieEncryptionAlgorithm,
+					application.wheels.csrfCookieEncryptionEncoding
+				)
 			);
 
 			if (application.wheels.csrfStore == "cookie") {
@@ -239,6 +241,21 @@ component {
 
 	/**
 	 * Internal function.
+	 * The CSRF cookie's value as read from the cookie scope. When this request set the
+	 * cookie (cookie[name] = {value, httpOnly, ...}), Lucee, Adobe and BoxLang read it
+	 * back as its value, but RustCFML returns the struct that was assigned, so take its
+	 * value. Anything else that isn't a string reads as no cookie ("").
+	 */
+	public string function $csrfCookieScopeValue(required any raw) {
+		local.rv = arguments.raw;
+		if (IsStruct(local.rv) && StructKeyExists(local.rv, "value")) {
+			local.rv = local.rv.value;
+		}
+		return IsSimpleValue(local.rv) ? local.rv : "";
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public string function $readAuthenticityTokenFromCookie() {
 		local.cookieName = application.wheels.csrfCookieName;
@@ -249,7 +266,10 @@ component {
 		}
 
 		// Cookie is there. Read it in.
-		local.cookie = cookie[local.cookieName];
+		local.cookieValue = $csrfCookieScopeValue(cookie[local.cookieName]);
+		if (!Len(local.cookieValue)) {
+			return "";
+		}
 
 		try {
 			local.encryptionKey = $ensureCsrfCookieEncryptionKey();
@@ -258,7 +278,7 @@ component {
 			return "";
 		}
 
-		local.cookieAttrs = $decryptCsrfCookieValue(local.cookie, local.encryptionKey);
+		local.cookieAttrs = $decryptCsrfCookieValue(local.cookieValue, local.encryptionKey);
 
 		// When cookie is corrupted (or encrypted with an unknown key/algorithm), fail.
 		if (!Len(local.cookieAttrs)) {
@@ -283,6 +303,40 @@ component {
 
 	/**
 	 * Internal function.
+	 * The cookie's ciphertext in the base64url alphabet ("-" and "_" for "+" and "/", no
+	 * "=" padding), when the configured encoding is Base64. Nothing in such a value needs
+	 * encoding in a cookie. A value whose only encoded character is %2B reads back with the
+	 * "+" turned into a space on some engines (Lucee 7.0.1 behind Tomcat), so about 3% of
+	 * standard-base64 cookies could not be decrypted and the next POST was refused.
+	 */
+	public string function $csrfCookieTransportValue(required string cipherText) {
+		if (CompareNoCase(application.wheels.csrfCookieEncryptionEncoding, "Base64") != 0) {
+			return arguments.cipherText;
+		}
+		local.rv = Replace(Replace(arguments.cipherText, "+", "-", "all"), "/", "_", "all");
+		return ReReplace(local.rv, "=+$", "");
+	}
+
+	/**
+	 * Internal function.
+	 * The standard-base64 ciphertext for a cookie value: base64url turned back, padding
+	 * restored, and a space (never valid base64, so a "+" the engine decoded) turned back
+	 * into "+". A cookie written as standard base64 before this change passes through.
+	 */
+	public string function $csrfCookieCipherText(required string cookieValue) {
+		if (CompareNoCase(application.wheels.csrfCookieEncryptionEncoding, "Base64") != 0) {
+			return arguments.cookieValue;
+		}
+		local.rv = Replace(Replace(Replace(arguments.cookieValue, "-", "+", "all"), "_", "/", "all"), " ", "+", "all");
+		local.remainder = Len(local.rv) % 4;
+		if (local.remainder > 0) {
+			local.rv &= RepeatString("=", 4 - local.remainder);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function.
 	 * Decrypts an encrypted CSRF cookie value using the configured algorithm, falling
 	 * back to the legacy bare "AES" (ECB) algorithm so cookies issued before the
 	 * engine-aware IV-based default (AES/GCM/NoPadding or AES/CBC/PKCS5Padding, see
@@ -294,10 +348,11 @@ component {
 		// do not persist after the catch on BoxLang.
 		local.state = {decrypted = ""};
 		local.legacyAvailable = application.wheels.csrfCookieEncryptionAlgorithm != "AES";
+		local.cipherText = $csrfCookieCipherText(arguments.encryptedValue);
 
 		try {
 			local.state.decrypted = Decrypt(
-				arguments.encryptedValue,
+				local.cipherText,
 				arguments.encryptionKey,
 				application.wheels.csrfCookieEncryptionAlgorithm,
 				application.wheels.csrfCookieEncryptionEncoding
@@ -321,7 +376,7 @@ component {
 		if (local.legacyAvailable && !$isCsrfCookiePayload(local.state.decrypted)) {
 			try {
 				local.legacyDecrypted = Decrypt(
-					arguments.encryptedValue,
+					local.cipherText,
 					arguments.encryptionKey,
 					"AES",
 					application.wheels.csrfCookieEncryptionEncoding
@@ -359,11 +414,18 @@ component {
 	public struct function $csrfCookieAttributeCollection(required string value) {
 		local.cookieStruct = {
 			value = arguments.value,
-			encodeValue = application.wheels.csrfCookieEncodeValue,
 			httpOnly = application.wheels.csrfCookieHttpOnly,
-			preserveCase = application.wheels.csrfCookiePreserveCase,
 			secure = application.wheels.csrfCookieSecure
 		};
+		// encodeValue and preserveCase default to "" (the engine's own default).
+		// Only set them when configured: Adobe CF rejects "" for these boolean
+		// cookie attributes, so the first cookie-store token was an HTTP 500.
+		if (Len(application.wheels.csrfCookieEncodeValue)) {
+			local.cookieStruct.encodeValue = application.wheels.csrfCookieEncodeValue;
+		}
+		if (Len(application.wheels.csrfCookiePreserveCase)) {
+			local.cookieStruct.preserveCase = application.wheels.csrfCookiePreserveCase;
+		}
 		if (Len(application.wheels.csrfCookieSameSite)) {
 			local.cookieStruct.sameSite = application.wheels.csrfCookieSameSite;
 		}

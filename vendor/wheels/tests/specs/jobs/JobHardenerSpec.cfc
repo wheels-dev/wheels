@@ -12,7 +12,7 @@ component extends="wheels.WheelsTest" {
 				local.bootstrapJob = new wheels.Job();
 				local.bootstrapJob.$ensureJobTable();
 				try {
-					queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_hard_%'", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("DELETE FROM wheels_jobs WHERE queue LIKE 'test_hard_%'", {}, {datasource = application.wheels.dataSourceName});
 				} catch (any e) {
 				}
 			});
@@ -29,7 +29,7 @@ component extends="wheels.WheelsTest" {
 				StructDelete(request, "$wheelsOffPathConstructed");
 				StructDelete(request, "$wheelsOffPathRan");
 				try {
-					queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_hard_%'", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("DELETE FROM wheels_jobs WHERE queue LIKE 'test_hard_%'", {}, {datasource = application.wheels.dataSourceName});
 				} catch (any e) {
 				}
 			});
@@ -61,7 +61,7 @@ component extends="wheels.WheelsTest" {
 				expect(local.jobResult.success).toBeFalse();
 				expect(local.jobResult.skipped).toBeFalse();
 
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT status FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -95,7 +95,7 @@ component extends="wheels.WheelsTest" {
 
 				expect(local.execResult.success).toBeTrue();
 
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT status FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -105,7 +105,7 @@ component extends="wheels.WheelsTest" {
 
 			it("B1: checkTimeouts retry/fail UPDATE does not overwrite completed", function() {
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("s", -600, Now());
+				local.oldTime = jobsNow() - 600;
 				$insertTestJob(
 					id = local.id,
 					jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
@@ -115,12 +115,12 @@ component extends="wheels.WheelsTest" {
 					createdAt = local.oldTime,
 					updatedAt = local.oldTime
 				);
-				local.now = Now();
-				queryExecute(
+				local.now = jobsNow();
+				jobsQuery(
 					"UPDATE wheels_jobs SET status = 'completed', completedAt = :now WHERE id = :id",
 					{
 						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-						now = {value = local.now, cfsqltype = "cf_sql_timestamp"}
+						now = {value = local.now, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -136,7 +136,7 @@ component extends="wheels.WheelsTest" {
 					errorMessage = "Job timed out after 300 seconds"
 				);
 
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT status FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -170,8 +170,8 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("B3: getMonitorData queue filter applies to recentJobs and oldestPending", function() {
-				local.otherCreated = DateAdd("h", -2, Now());
-				local.targetCreated = DateAdd("h", -1, Now());
+				local.otherCreated = jobsNow() - 2 * 3600;
+				local.targetCreated = jobsNow() - 1 * 3600;
 				local.otherPending = CreateUUID();
 				local.targetPending = CreateUUID();
 				local.otherDone = CreateUUID();
@@ -216,7 +216,8 @@ component extends="wheels.WheelsTest" {
 				}
 
 				expect(IsDate(local.data.oldestPending)).toBeTrue();
-				expect(Abs(DateDiff("s", local.targetCreated, local.data.oldestPending))).toBeLTE(2);
+				// Stored on the jobs clock (UTC), reported in the app's local time.
+				expect(Abs(DateDiff("s", DateAdd("h", -1, Now()), local.data.oldestPending))).toBeLTE(2);
 			});
 
 			it("S2/S3: config() backoff is applied and linear stays exponential", function() {
@@ -250,20 +251,20 @@ component extends="wheels.WheelsTest" {
 					}
 				);
 
-				local.threshold = DateAdd("s", 600, Now());
-				local.configCheck = queryExecute(
+				local.threshold = jobsNow() + 600;
+				local.configCheck = jobsQuery(
 					"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE id = :id AND status = 'pending' AND runAt > :threshold",
 					{
 						id = {value = local.configId, cfsqltype = "cf_sql_varchar"},
-						threshold = {value = local.threshold, cfsqltype = "cf_sql_timestamp"}
+						threshold = {value = local.threshold, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
-				local.linearCheck = queryExecute(
+				local.linearCheck = jobsQuery(
 					"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE id = :id AND status = 'pending' AND runAt > :threshold",
 					{
 						id = {value = local.linearId, cfsqltype = "cf_sql_varchar"},
-						threshold = {value = local.threshold, cfsqltype = "cf_sql_timestamp"}
+						threshold = {value = local.threshold, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -288,7 +289,7 @@ component extends="wheels.WheelsTest" {
 				// BoxLang catch writes are discarded on a local.-scoped struct (invariant 11).
 				var claim = {threw = false, type = "", returnedFalse = false};
 				local.claimer = new wheels.JobWorker();
-				queryExecute("DROP TABLE wheels_jobs", {}, {datasource = application.wheels.dataSourceName});
+				jobsQuery("DROP TABLE wheels_jobs", {}, {datasource = application.wheels.dataSourceName});
 				try {
 					if (local.claimer.$claimJob(jobId = CreateUUID()) == false) {
 						claim.returnedFalse = true;
@@ -305,7 +306,7 @@ component extends="wheels.WheelsTest" {
 				expect(claim.type).toBe("Wheels.JobClaimFailed");
 
 				local.id = CreateUUID();
-				local.past = DateAdd("s", -30, Now());
+				local.past = jobsNow() - 30;
 				$insertTestJob(
 					id = local.id,
 					jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob",
@@ -347,7 +348,7 @@ component extends="wheels.WheelsTest" {
 				local.job = new wheels.tests._assets.jobs.ProcessOrdersJob();
 				local.enqueued = local.job.enqueue(data = {batchSize: 1}, queue = "test_hard_s1_persist");
 				expect(local.enqueued.persisted).toBeTrue();
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT data FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -401,7 +402,7 @@ component extends="wheels.WheelsTest" {
 				local.job = new wheels.tests._assets.jobs.ProcessOrdersJob();
 				local.enqueued = local.job.enqueue(data = {orderId = 1}, queue = "test_hard_s7");
 				expect(local.enqueued.persisted).toBeTrue();
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT data FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -471,7 +472,7 @@ component extends="wheels.WheelsTest" {
 						maxRetries = 3
 					}
 				);
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT status FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -490,15 +491,15 @@ component extends="wheels.WheelsTest" {
 				$insertTestJob(id = local.failB, jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob", queue = "test_hard_s10_retry", status = "failed", attempts = 3);
 				expect(local.job.retryFailed(queue = "test_hard_s10_retry")).toBe(2);
 
-				local.oldTime = DateAdd("d", -30, Now());
+				local.oldTime = jobsNow() - 30 * 86400;
 				local.doneA = CreateUUID();
 				local.doneB = CreateUUID();
 				$insertTestJob(id = local.doneA, jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob", queue = "test_hard_s10_purge", status = "completed", createdAt = local.oldTime, updatedAt = local.oldTime);
 				$insertTestJob(id = local.doneB, jobClass = "wheels.tests._assets.jobs.ProcessOrdersJob", queue = "test_hard_s10_purge", status = "completed", createdAt = local.oldTime, updatedAt = local.oldTime);
-				queryExecute(
+				jobsQuery(
 					"UPDATE wheels_jobs SET completedAt = :oldTime WHERE id IN (:a, :b)",
 					{
-						oldTime = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						oldTime = {value = local.oldTime, cfsqltype = "wheels_epoch"},
 						a = {value = local.doneA, cfsqltype = "cf_sql_varchar"},
 						b = {value = local.doneB, cfsqltype = "cf_sql_varchar"}
 					},
@@ -521,10 +522,10 @@ component extends="wheels.WheelsTest" {
 		createdAt = "",
 		updatedAt = ""
 	) {
-		local.stamp = Now();
-		local.createdAt = IsDate(arguments.createdAt) ? arguments.createdAt : local.stamp;
-		local.updatedAt = IsDate(arguments.updatedAt) ? arguments.updatedAt : local.stamp;
-		queryExecute(
+		local.stamp = jobsNow();
+		local.createdAt = IsNumeric(arguments.createdAt) ? arguments.createdAt : local.stamp;
+		local.updatedAt = IsNumeric(arguments.updatedAt) ? arguments.updatedAt : local.stamp;
+		jobsQuery(
 			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 			VALUES (:id, :jobClass, :queue, :data, 0, :status, :attempts, :maxRetries, :runAt, :createdAt, :updatedAt)",
 			{
@@ -535,12 +536,28 @@ component extends="wheels.WheelsTest" {
 				status = {value = arguments.status, cfsqltype = "cf_sql_varchar"},
 				attempts = {value = arguments.attempts, cfsqltype = "cf_sql_integer"},
 				maxRetries = {value = arguments.maxRetries, cfsqltype = "cf_sql_integer"},
-				runAt = {value = local.createdAt, cfsqltype = "cf_sql_timestamp"},
-				createdAt = {value = local.createdAt, cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = local.updatedAt, cfsqltype = "cf_sql_timestamp"}
+				runAt = {value = local.createdAt, cfsqltype = "wheels_epoch"},
+				createdAt = {value = local.createdAt, cfsqltype = "wheels_epoch"},
+				updatedAt = {value = local.updatedAt, cfsqltype = "wheels_epoch"}
 			},
 			{datasource = application.wheels.dataSourceName}
 		);
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC epoch seconds from the database's clock, which
+	 * job rows and memos are stamped with. A row stamped with the app's local Now() is hours out
+	 * on a server that isn't on UTC.
+	 */
+	private numeric function jobsNow() {
+		return new wheels.Job().$jobClock().nowEpoch();
+	}
+
+	/**
+	 * jobsQuery() with wheels_epoch timestamp parameters, as the jobs code binds them.
+	 */
+	private any function jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return new wheels.Job().$jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 }

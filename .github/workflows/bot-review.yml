@@ -28,7 +28,7 @@ concurrency:
 jobs:
   review:
     name: Reviewer
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # Reviews bot PRs (even draft) and human ready-for-review PRs.
     if: |

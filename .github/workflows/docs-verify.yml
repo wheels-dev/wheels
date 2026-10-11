@@ -20,13 +20,13 @@ on:
 
 jobs:
   verify:
-    # ubuntu-latest with Linuxbrew. Was macos-latest, but Node 22's test-runner
+    # ubuntu-24.04 with Linuxbrew. Was macos-latest, but Node 22's test-runner
     # workers on macos-latest ARM64 have a broken child_process.spawn: ENOENT
     # on every exec, even /bin/bash, even with absolute paths that statSync
     # confirms exist. Direct `node -e "spawn('wheels')"` works fine; only
     # --test worker contexts fail. The wheels formula supports Linux via the
     # same install flow, and Linux posix_spawn is unaffected.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     env:
@@ -62,7 +62,7 @@ jobs:
       - name: Install Wheels CLI
         env:
           # Homebrew 5.x's Linux sandbox needs a rootless bwrap, which
-          # ubuntu-latest runners don't provide (and 24.04's unprivileged
+          # Ubuntu 24.04 runners don't provide (and its unprivileged
           # userns restrictions make it unreliable even when installed).
           # The ephemeral runner is already isolation enough for CI.
           HOMEBREW_NO_SANDBOX_LINUX: "1"
@@ -140,10 +140,8 @@ jobs:
         # lets `wheels new` succeed, which makes fixture cwds real. See
         # #2178 for the full root-cause write-up.
         #
-        # Still soft-fail: surfaces the remaining tutorial-driver fixture
-        # issues (e.g., blog-tutorial's lucee.json emission). Drop
-        # continue-on-error once those are fixed.
-        continue-on-error: true
+        # Blocking: the last known failure, the mini-tutorial reloading before
+        # any server was started, is fixed (#4426).
         env:
           WHEELS_FRAMEWORK_PATH: ${{ github.workspace }}/vendor/wheels
         run: |

@@ -28,11 +28,14 @@ function runEntry(args, env = {}) {
 }
 
 test('verify-docs reports pass/fail counts', { timeout: 300_000 }, async () => {
-  const { code, stdout } = await runEntry([fixture]);
+  // Runs the per-block examples four at a time, as a real run does: `wheels` JVM starts are staggered
+  // in runExec() because simultaneous starts in one CLI home race (#4450). Each command is bounded at
+  // 60 s so a stall surfaces quickly, and a failure shows the child's output.
+  const { code, stdout, stderr } = await runEntry([fixture], { WHEELS_EXEC_TIMEOUT_MS: '60000' });
   // Phase 1 drivers: cli + tutorial + compile. Fixture has compile + cli +
   // tutorial; all three pass (compile falls back to bracket-check when
   // LuCLI PR #1 isn't installed, which still accepts the balanced sample).
-  assert.equal(code, 0);
+  assert.equal(code, 0, `verify-docs exited ${code}\n--- stdout ---\n${stdout}\n--- stderr ---\n${stderr}`);
   assert.match(stdout, /passed/);
 });
 

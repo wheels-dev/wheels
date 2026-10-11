@@ -1,6 +1,6 @@
 ---
 title: "App Inspection"
-description: wheels routes, info, stats, notes, and doctor — read-only introspection commands for diagnosing a project, enumerating declared routes, counting artifacts, surfacing TODOs, and running health checks.
+description: wheels routes, info, stats, notes, doctor, and lookup — read-only commands for diagnosing a project, enumerating declared routes, counting artifacts, surfacing TODOs, running health checks, and looking up the API and guides offline.
 type: reference
 sidebar:
   order: 6
@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Five read-only commands cluster on this page. None of them mutate state — they read your project, print what they find, and exit. Reach for them when you're diagnosing an unfamiliar setup or getting a quick inventory of an app you haven't touched in a while.
+Six read-only commands cluster on this page. None of them mutate state — they read your project (or, for `wheels lookup`, the CLI's own docs index), print what they find, and exit. Reach for them when you're diagnosing an unfamiliar setup or getting a quick inventory of an app you haven't touched in a while.
 
 **You'll use this for:**
 
@@ -17,6 +17,7 @@ Five read-only commands cluster on this page. None of them mutate state — they
 - Counting models, controllers, views, and tests — and finding outliers with `--verbose`.
 - Sweeping the codebase for `TODO`, `FIXME`, and `OPTIMIZE` markers before a release.
 - Running a health check when something is misconfigured and you don't know where to start.
+- Looking up a framework function's parameters, or a guide topic, without a browser or a network connection.
 
 ### `wheels routes`
 
@@ -25,18 +26,21 @@ Print the dispatch table for the running application — every route declared in
 #### Synopsis
 
 ```
-wheels routes
+wheels routes [--filter=<text>] [--format=text|json]
 ```
 
 #### Description
 
-`wheels routes` HTTP-dispatches to the development server at `/wheels/ai?context=routing` and prints the response verbatim. That means **it requires a running server** — start one with `wheels start` first. If no server is detected on any configured port, the command prints an error and exits without output.
+`wheels routes` HTTP-dispatches to the development server at `/wheels/cli?command=routes&format=json` and formats the returned route table. That means **it requires a running server** — start one with `wheels start` first. If no server is detected on any configured port, the command prints an error and exits without output.
 
-Output is produced by the framework's routing inspector, not by the CLI. The shape is a columnar listing: HTTP method, pattern, controller#action, and any name the route was mapped under.
+The route table comes from the running application, so it includes the framework's own `/wheels/*` routes. The text output is a columnar listing: HTTP method, pattern, and controller#action with the route name in parentheses, followed by a `<n> route(s)` count.
 
 #### Flags
 
-None. The current implementation forwards no query arguments to the inspector endpoint.
+| Flag | Description |
+|---|---|
+| `--filter=<text>` | Show only routes whose name, pattern, or controller#action contains this text (case-insensitive). When nothing matches, prints `No routes match '<text>'.` |
+| `--format=<format>` | `text` (default, aligned table) or `json` (the route array as JSON). |
 
 #### Example
 
@@ -47,12 +51,16 @@ wheels routes
 Sample output (trimmed):
 
 ```text
-Method  Pattern                    Controller#Action       Name
-GET     /                          pages#home              root
-GET     /posts                     posts#index             posts
-GET     /posts/new                 posts#new               newPost
-POST    /posts                     posts#create
-GET     /posts/:key                posts#show              post
+METHOD  PATTERN                               CONTROLLER#ACTION
+-----------------------------------------------------------------------------------
+GET     /wheels/info                          wheels.public#info  (wheelsInfo)
+...
+GET     /posts                                posts#index  (posts)
+GET     /posts/new                            posts#new  (newPost)
+POST    /posts                                posts#create  (posts)
+GET     /                                     main#index  (root)
+
+41 route(s)
 ```
 
 <Aside type="note" title="Server required">
@@ -71,7 +79,7 @@ wheels info
 
 #### Description
 
-`wheels info` reads the project locally (no server required) and emits a human-readable summary. It detects the Wheels version from `vendor/wheels/events/onapplicationstart/settings.cfm`, the datasource from `config/settings.cfm`, the presence of `.env` and `lucee.json`, and counts any `.resources(…)` calls in `config/routes.cfm` plus the CFC files under `app/models/`. It also calls `detectServerPort()` to report whether the dev server is currently up.
+`wheels info` reads the project locally (no server required) and emits a human-readable summary. It detects the Wheels version from `vendor/wheels/wheels.json`, the datasource from `config/settings.cfm`, the presence of `.env` and `lucee.json`, and counts any `.resources(…)` calls in `config/routes.cfm` plus the CFC files under `app/models/`. It also calls `detectServerPort()` to report whether the dev server is currently up.
 
 When the current directory is not a Wheels project (no `vendor/wheels/` present), the command prints a single line saying so and exits.
 
@@ -187,7 +195,7 @@ When nothing matches, the command prints `No annotations found.` in green and ex
 
 ### `wheels doctor`
 
-Run a battery of health checks against the project — file layout, configuration presence, datasource reachability, migrator table state, and anything else the doctor service has wired up — and print a list of passes, warnings, and issues with an overall status.
+Run a battery of health checks against the project — required and recommended directories, required config files, write permissions, whether a datasource is configured, migration and test file counts, framework availability, and mixin collisions — and print a list of passes, warnings, and issues with an overall status. It reads files only; it does not connect to the database.
 
 #### Synopsis
 
@@ -213,25 +221,53 @@ Sample output (trimmed):
 Wheels Health Check
 ========================================
 
-Warnings (1):
-  ! .env file missing — copy _env and customise
-
-Passed (7):
-  + vendor/wheels/ installed
-  + config/settings.cfm present
-  + config/routes.cfm present
-  + app/models/ exists
-  + app/controllers/ exists
-  + tests/specs/ exists
-  + lucee.json present
+Warnings (2):
+  ! Missing recommended directory: tests/
+  ! Missing recommended directory: tests/specs/
 
 Status: WARNING
 
 Recommendations:
-  * Create a .env file from the _env template before running migrations.
+  * Run 'wheels generate test' to add test coverage
 ```
 
-Status is one of `HEALTHY`, `WARNING`, or `CRITICAL`. Issues (red) indicate the project cannot run as configured; warnings (yellow) flag things that work but look off; recommendations (cyan) are optional suggestions keyed off what the checks found.
+Status is one of `HEALTHY`, `WARNING`, or `CRITICAL`. `HEALTHY` and `WARNING` exit 0; `CRITICAL` exits non-zero, so `wheels doctor` can gate a script. Issues (red) indicate the project cannot run as configured; warnings (yellow) flag things that work but look off; recommendations (cyan) are optional suggestions keyed off what the checks found.
+
+### `wheels lookup`
+
+Look up the Wheels API reference and the guides offline. The CLI ships a docs index for its own framework version: every API function with its parameters and examples, and every guide section. It needs no network, no running server, and no project. AI assistants reach the same lookup through the `lookup` MCP tool.
+
+#### Synopsis
+
+```
+wheels lookup <query> [--kind=all|api|guides] [--limit=5] [--format=text|json]
+```
+
+#### Arguments and flags
+
+| Argument / flag | Default | Description |
+|---|---|---|
+| `<query>` | (required) | A function name (`findAll`, `findAll()`, `model.findAll`), a phrase (`nested resources`), or an id from an earlier result (`api:model.findAll`, `guides:basics/routing#nested-resources`). |
+| `--kind` | `all` | `api` searches only the API reference, `guides` only the guides. |
+| `--limit` | `5` | The most results to list, from 1 to 20. |
+| `--format` | `text` | `json` prints the result as JSON. |
+
+#### What it returns
+
+- **A function name** prints the whole API entry: the signature and return type, where it's available (model, controller, mapper, and so on), the description, every parameter with its type, default and description, the example, and the link to api.wheels.dev. A name that exists in several places (`delete` on a model object and on the route mapper) prints each one; `model.delete` narrows it to one.
+- **Anything else** lists the best matches, guide sections and API functions together, each with a snippet, its link, and an id. Pass that id back to print the whole entry.
+- **Nothing matching** prints `No matches` and exits 0.
+
+#### Examples
+
+```bash
+wheels lookup findAll
+wheels lookup "nested resources"
+wheels lookup "background job retry" --kind=guides --limit=3
+wheels lookup "guides:basics/routing#nested-resources"
+```
+
+The index describes the framework version the CLI was built with. When you run the CLI from a source checkout there's no index until you build one with `node tools/build/scripts/build-docs-index.mjs`; until then `wheels lookup` says so and exits non-zero. For the browsable HTML docs offline, use `wheels docs fetch`.
 
 ## Common workflows
 

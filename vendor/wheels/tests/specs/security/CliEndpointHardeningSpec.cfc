@@ -62,9 +62,14 @@ component extends="wheels.WheelsTest" {
 						"renameSystemTables",
 						"forgetVersion",
 						"pretendVersion",
+						"migrationUnlock",
 						"jobsProcessNext",
 						"jobsRetry",
-						"jobsPurge"
+						"jobsPurge",
+						"jobsEnqueue",
+						"jobsDrain",
+						"jobsResume",
+						"jobsTick"
 					];
 					for (var name in mutating) {
 						expect(state.publicCfc.$cliCommandIsMutating(name)).toBeTrue("expected #name# to be mutating");
@@ -75,6 +80,7 @@ component extends="wheels.WheelsTest" {
 					var readOnly = [
 						"info",
 						"doctor",
+						"migrationLockStatus",
 						"dbStatus",
 						"dbVersion",
 						"dbSchema",
@@ -89,7 +95,8 @@ component extends="wheels.WheelsTest" {
 						"routes",
 						"introspect",
 						"jobsStatus",
-						"jobsMonitor"
+						"jobsMonitor",
+						"jobsHostStatus"
 					];
 					for (var name in readOnly) {
 						expect(state.publicCfc.$cliCommandIsMutating(name)).toBeFalse("expected #name# to be read-only");

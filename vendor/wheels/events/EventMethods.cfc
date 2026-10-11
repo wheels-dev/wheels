@@ -7,7 +7,13 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			}
 			// Fire registered onError callbacks (packages like Sentry hook in here).
 			$fireOnErrorCallbacks(arguments.exception);
-			if ($get("showErrorInformation")) {
+			// Development only, and only while showErrorInformation is on: an error
+			// asked for as JSON or Markdown gets the structured error-page payload
+			// (agent-readable). Testing and production are unchanged.
+			local.agentFormat = $agentErrorFormat();
+			if (Len(local.agentFormat)) {
+				local.rv = $runOnErrorRenderAgentError(arguments.exception, local.agentFormat);
+			} else if ($get("showErrorInformation")) {
 				// Detect request format for format-specific error handling
 				local.format = $getRequestFormat();
 				local.wheelsError = $runOnErrorResolveWheelsError(arguments.exception);
@@ -247,6 +253,95 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			}
 		}
 		return local.rv;
+	}
+
+	/**
+	 * "json", "md" or "" (not an agent-readable error response). Only in the
+	 * development environment with showErrorInformation on; with it off the
+	 * response is today's. An explicit ?format= decides first (json or md; any
+	 * other value keeps today's handling); otherwise JSON when the request asks for
+	 * it, and Markdown when the Accept header lists text/markdown without
+	 * application/json. "md" is a format for error responses only, never added to
+	 * the formats setting, so controller content negotiation is unaffected.
+	 */
+	public string function $agentErrorFormat() {
+		if ($get("environment") != "development" || !$get("showErrorInformation")) {
+			return "";
+		}
+		local.param = $errorFormatParam();
+		if (Len(local.param)) {
+			return ListFindNoCase("json,md", local.param) ? LCase(local.param) : "";
+		}
+		local.accept = $errorAcceptHeader();
+		if (FindNoCase("application/json", local.accept) || $getRequestFormat() == "json") {
+			return "json";
+		}
+		if (FindNoCase("text/markdown", local.accept)) {
+			return "md";
+		}
+		return "";
+	}
+
+	/**
+	 * The request's ?format= value when it is alphanumeric (the same guard as
+	 * $getRequestFormat), else "".
+	 */
+	public string function $errorFormatParam() {
+		if (StructKeyExists(url, "format") && IsSimpleValue(url.format) && ReFind("^[A-Za-z0-9]+$", url.format)) {
+			return url.format;
+		}
+		return "";
+	}
+
+	public string function $errorAcceptHeader() {
+		return IsDefined("request.cgi.http_accept") ? request.cgi.http_accept : "";
+	}
+
+	public any function $errorCopyPayloadBuilder() {
+		return CreateObject("component", "wheels.events.onerror.ErrorCopyPayload");
+	}
+
+	/**
+	 * The development JSON / Markdown error response: the error-page payload plus
+	 * statusCode, with the same status mapping as the HTML page.
+	 */
+	public string function $runOnErrorRenderAgentError(required exception, required string format) {
+		local.wheelsError = $runOnErrorResolveWheelsError(arguments.exception);
+		local.isWheelsError = !StructIsEmpty(local.wheelsError);
+		local.statusCode = local.isWheelsError && StructKeyExists(local.wheelsError, "type")
+			? $wheelsErrorStatusCode(local.wheelsError.type)
+			: 500;
+		// Drop whatever the request wrote before it failed, so the body is only the
+		// JSON or Markdown (best-effort: a no-op once the response is committed).
+		$content(reset = true);
+		$header(statusCode = local.statusCode);
+		local.payload = $agentErrorPayload(local.isWheelsError ? local.wheelsError : arguments.exception);
+		local.payload["statusCode"] = local.statusCode;
+		if (arguments.format == "md") {
+			$header(name = "Content-Type", value = "text/markdown; charset=utf-8");
+			return $errorCopyPayloadBuilder().toMarkdown(local.payload);
+		}
+		$header(name = "Content-Type", value = "application/json; charset=utf-8");
+		return SerializeJSON(local.payload);
+	}
+
+	/**
+	 * The error-page payload for an error, or just its type and message when
+	 * building the payload fails, so the original error is never masked.
+	 */
+	public struct function $agentErrorPayload(required source) {
+		try {
+			return $errorCopyPayloadBuilder().build(wheelsError = arguments.source);
+		} catch (any e) {
+			return {
+				"source" = "wheels-error-page",
+				"exception" = {
+					"type" = IsStruct(arguments.source) && StructKeyExists(arguments.source, "type") && IsSimpleValue(arguments.source.type) ? arguments.source.type : "",
+					"message" = IsStruct(arguments.source) && StructKeyExists(arguments.source, "message") && IsSimpleValue(arguments.source.message) ? arguments.source.message : ""
+				},
+				"payloadError" = e.message
+			};
+		}
 	}
 
 	public string function $runOnErrorRenderException(required exception, required format) {

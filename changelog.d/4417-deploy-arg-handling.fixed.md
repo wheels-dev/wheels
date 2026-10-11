@@ -1,0 +1,5 @@
+- `wheels deploy` argument handling (#4417):
+  - A space-separated flag value works like the `=` form: `--release v8` no longer reads `v8` as the subcommand, and `init --service myapp2` no longer falls back to the directory name. When several space-form values can't be told apart, or a value flag has no value, the command asks for `--flag=value` instead of guessing.
+  - An unknown `--role` fails with `DeployAppCli.UnknownRole` and names the roles in `deploy.yml`, instead of doing nothing and exiting 0.
+  - `deploy config` prints `ssh.port` and `proxy.app_port` as whole numbers (`22`, not `22.0`).
+  - `rollback` without a version and `exec` / `server exec` without a command throw the typed `DeployMainCli.MissingVersion` / `DeployServerCli.MissingCommand`.

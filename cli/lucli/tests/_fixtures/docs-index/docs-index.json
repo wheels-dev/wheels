@@ -1,0 +1,154 @@
+{
+ "format": 1,
+ "frameworkVersion": "4.2.0",
+ "apiSource": "v4.2.0.json",
+ "guidesSlug": "v4-2-0",
+ "builtAt": "2026-10-05T00:00:00Z",
+ "entries": [
+  {
+   "id": "api:model.findAll",
+   "kind": "api",
+   "name": "findAll",
+   "scopes": [
+    "model"
+   ],
+   "section": "Model Class",
+   "category": "Read Functions",
+   "returns": "any",
+   "hint": "Returns records from the database table mapped to this model.",
+   "params": [
+    {
+     "name": "where",
+     "type": "string",
+     "required": false,
+     "default": "",
+     "hint": "Maps to the WHERE clause of the query."
+    },
+    {
+     "name": "order",
+     "type": "string",
+     "required": false,
+     "default": "",
+     "hint": "Maps to the ORDER BY clause of the query."
+    }
+   ],
+   "example": "users = model(\"User\").findAll(where=\"active=1\", order=\"lastName\");",
+   "url": "https://api.wheels.dev/v4-2-0/model-class/findall/"
+  },
+  {
+   "id": "api:model.findOne",
+   "kind": "api",
+   "name": "findOne",
+   "scopes": [
+    "model"
+   ],
+   "section": "Model Class",
+   "category": "Read Functions",
+   "returns": "any",
+   "hint": "Fetches the first record found based on the WHERE and ORDER BY clauses.",
+   "params": [],
+   "example": "",
+   "url": "https://api.wheels.dev/v4-2-0/model-class/findone/"
+  },
+  {
+   "id": "api:model.delete",
+   "kind": "api",
+   "name": "delete",
+   "scopes": [
+    "model"
+   ],
+   "section": "Model Object",
+   "category": "CRUD Functions",
+   "returns": "boolean",
+   "hint": "Deletes the object, which means the row is deleted from the database.",
+   "params": [],
+   "example": "",
+   "url": "https://api.wheels.dev/v4-2-0/model-object/delete/"
+  },
+  {
+   "id": "api:mapper.delete",
+   "kind": "api",
+   "name": "delete",
+   "scopes": [
+    "mapper"
+   ],
+   "section": "Configuration",
+   "category": "Routing",
+   "returns": "struct",
+   "hint": "Create a route that matches a URL requiring an HTTP DELETE method.",
+   "params": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true,
+     "default": "",
+     "hint": "Camel-case name of route."
+    }
+   ],
+   "example": "",
+   "url": "https://api.wheels.dev/v4-2-0/configuration/delete/"
+  },
+  {
+   "id": "api:mapper.resources",
+   "kind": "api",
+   "name": "resources",
+   "scopes": [
+    "mapper"
+   ],
+   "section": "Configuration",
+   "category": "Routing",
+   "returns": "struct",
+   "hint": "Create a group of routes that exposes actions for manipulating a collection of resources.",
+   "params": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true,
+     "default": "",
+     "hint": "Camel-case name of resource."
+    },
+    {
+     "name": "nested",
+     "type": "boolean",
+     "required": false,
+     "default": "false",
+     "hint": "Whether nested routes follow."
+    }
+   ],
+   "example": "",
+   "url": "https://api.wheels.dev/v4-2-0/configuration/resources/"
+  },
+  {
+   "id": "guides:basics/routing",
+   "kind": "guides",
+   "page": "Routing",
+   "heading": "Routing",
+   "text": "Routes map URLs to controller actions. Declare them in config/routes.cfm.",
+   "url": "https://guides.wheels.dev/v4-2-0/basics/routing/"
+  },
+  {
+   "id": "guides:basics/routing#nested-resources",
+   "kind": "guides",
+   "page": "Routing",
+   "heading": "Nested resources",
+   "text": "Nest one resource inside another with the callback form:\n\n```cfm\n.resources(name=\"posts\", callback=function(map) { map.resources(\"comments\"); })\n```\n\nThe nested routes get the parent key as postKey.",
+   "url": "https://guides.wheels.dev/v4-2-0/basics/routing/#nested-resources"
+  },
+  {
+   "id": "guides:database-interaction/soft-delete",
+   "kind": "guides",
+   "page": "Soft Delete",
+   "heading": "Soft Delete",
+   "text": "A deletedAt column turns delete() into a soft delete: the row stays and finders skip it.",
+   "url": "https://guides.wheels.dev/v4-2-0/database-interaction/soft-delete/"
+  },
+  {
+   "id": "guides:basics/reading-records#finding-many",
+   "kind": "guides",
+   "page": "Reading Records",
+   "heading": "Finding many records",
+   "text": "findAll() returns a query. Pass where and order to narrow and sort the records.",
+   "url": "https://guides.wheels.dev/v4-2-0/basics/reading-records/#finding-many"
+  }
+ ]
+}

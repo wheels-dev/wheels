@@ -24,76 +24,10 @@
 		numeric count = -1,
 		boolean returnCount = true
 	) {
-		// by default we pluralize/singularize the entire string
-		local.text = arguments.text;
-
-		// keep track of the success of any rule matches
-		local.ruleMatched = false;
-
-		// when count is 1 we don't need to pluralize at all so just set the return value to the input string
-		local.rv = local.text;
-
+		// when count is 1 we don't need to pluralize at all so just return the input string
+		local.rv = arguments.text;
 		if (arguments.count != 1) {
-			if (ReFind("[A-Z]", local.text)) {
-				// only pluralize/singularize the last part of a camelCased variable (e.g. in "websiteStatusUpdate" we only change the "update" part)
-				// also set a variable with the unchanged part of the string (to be prepended before returning final result)
-				local.upperCasePos = ReFind("[A-Z]", Reverse(local.text));
-				local.prepend = Mid(local.text, 1, Len(local.text) - local.upperCasePos);
-				local.text = Reverse(Mid(Reverse(local.text), 1, local.upperCasePos));
-			}
-
-			// Get global settings for uncountable and irregular words.
-			// For the irregular ones we need to convert them from a struct to a list.
-			local.uncountables = $listClean($get("uncountables"));
-			local.irregulars = "";
-			local.words = $get("irregulars");
-			for (local.word in local.words) {
-				local.irregulars = ListAppend(local.irregulars, LCase(local.word));
-				local.irregulars = ListAppend(local.irregulars, local.words[local.word]);
-			}
-
-			if (ListFindNoCase(local.uncountables, local.text)) {
-				local.rv = local.text;
-				local.ruleMatched = true;
-			} else if (ListFindNoCase(local.irregulars, local.text)) {
-				local.pos = ListFindNoCase(local.irregulars, local.text);
-				if (arguments.which == "singularize" && local.pos % 2 == 0) {
-					local.rv = ListGetAt(local.irregulars, local.pos - 1);
-				} else if (arguments.which == "pluralize" && local.pos % 2 != 0) {
-					local.rv = ListGetAt(local.irregulars, local.pos + 1);
-				} else {
-					local.rv = local.text;
-				}
-				local.ruleMatched = true;
-			} else {
-				if (arguments.which == "pluralize") {
-					local.ruleList = "(quiz)$,\1zes,^(ox)$,\1en,([m|l])ouse$,\1ice,(matr|vert|ind)ix,\1ices,ex$,ices,(x|ch|ss|sh)$,\1es,([^aeiouy]|qu)y$,\1ies,(hive)$,\1s,([^f])fe$,\1ves,([lr])f$,\1ves,sis$,ses,([ti])um$,\1a,(buffal|tomat|potat|volcan|her)o$,\1oes,(bu)s$,\1ses,(alias|status)$,\1es,(octop|vir)us$,\1i,(ax|test)is$,\1es,s$,s,$,s";
-				} else if (arguments.which == "singularize") {
-					local.ruleList = "(quiz)zes$,\1,(matr)ices$,\1ix,(vert|ind)ices$,\1ex,^(ox)en,\1,(alias|status)es$,\1,(octop|vir|cact|radi|foc)(us|i)$,\1us,(cris|ax|test)es$,\1is,(shoe)s$,\1,(o)es$,\1,(bus)es$,\1,([m|l])ice$,\1ouse,(x|ch|ss|sh)es$,\1,(m)ovies$,\1ovie,(s)eries$,\1eries,([^aeiouy]|qu)ies$,\1y,([lr])ves$,\1f,(tive)s$,\1,(hive)s$,\1,([^f])ves$,\1fe,(database)s$,\1,(^analy)ses$,\1sis,(analy|ba|diagno|parenthe|progno|synop|the)ses$,\1sis,([ti])a$,\1um,(n)ews$,\1ews,(.*)?ss$,\1ss,s$,#Chr(7)#";
-				}
-				local.rules = ArrayNew(2);
-				local.count = 1;
-				local.iEnd = ListLen(local.ruleList);
-				for (local.i = 1; local.i <= local.iEnd; local.i = local.i + 2) {
-					local.rules[local.count][1] = ListGetAt(local.ruleList, local.i);
-					local.rules[local.count][2] = ListGetAt(local.ruleList, local.i + 1);
-					local.count = local.count + 1;
-				}
-				local.iEnd = ArrayLen(local.rules);
-				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					if (ReFindNoCase(local.rules[local.i][1], local.text)) {
-						local.rv = ReReplaceNoCase(local.text, local.rules[local.i][1], local.rules[local.i][2]);
-						local.ruleMatched = true;
-						break;
-					}
-				}
-				local.rv = Replace(local.rv, Chr(7), "", "all");
-			}
-
-			// this was a camelCased string and we need to prepend the unchanged part to the result
-			if (StructKeyExists(local, "prepend") && local.ruleMatched) {
-				local.rv = local.prepend & local.rv;
-			}
+			local.rv = $cachedInflection(text = arguments.text, which = arguments.which);
 		}
 
 		// return the count number in the string (e.g. "5 sites" instead of just "sites")
@@ -103,6 +37,222 @@
 		return local.rv;
 	}
 
+
+	/**
+	 * Internal function. $inflect()'s result for `text`, served from an application-scoped
+	 * cache when one can be used (#4150). Struct keys are case-insensitive, so each entry
+	 * keeps the exact text it was computed for: a case variant of a cached word is computed,
+	 * not served the other spelling's result. Long texts aren't cached, and the cache is
+	 * cleared when it reaches its size limit, so arbitrary input can't grow it without bound.
+	 */
+	public string function $cachedInflection(required string text, required string which) {
+		local.cache = $inflectionCache();
+		if (!IsStruct(local.cache) || Len(arguments.text) > 100) {
+			return $inflect(text = arguments.text, which = arguments.which);
+		}
+		local.key = arguments.which & "|" & arguments.text;
+		if (StructKeyExists(local.cache.entries, local.key)) {
+			local.entry = local.cache.entries[local.key];
+			if (Compare(local.entry.text, arguments.text) == 0) {
+				return local.entry.rv;
+			}
+			return $inflect(text = arguments.text, which = arguments.which);
+		}
+		local.rv = $inflect(text = arguments.text, which = arguments.which);
+		if (StructCount(local.cache.entries) >= 2000) {
+			StructClear(local.cache.entries);
+		}
+		local.cache.entries[local.key] = {text = arguments.text, rv = local.rv};
+		return local.rv;
+	}
+
+
+	/**
+	 * Internal function. The inflection cache, or "" when it can't be used: before the
+	 * application settings exist, or when the current tenant overrides `uncountables` or
+	 * `irregulars`. It's rebuilt when those settings change: set() drops it, and a
+	 * fingerprint (the uncountables list and the number of irregulars) catches a word added
+	 * to or removed from the settings struct directly. Changing an existing irregular's plural
+	 * in place isn't detected, so change irregulars through set(). Fingerprinting every pair
+	 * would double the cost of a cache hit.
+	 */
+	public any function $inflectionCache() {
+		if (
+			StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "tenant")
+			&& StructKeyExists(request.wheels.tenant, "config")
+			&& (
+				StructKeyExists(request.wheels.tenant.config, "uncountables")
+				|| StructKeyExists(request.wheels.tenant.config, "irregulars")
+			)
+		) {
+			return "";
+		}
+		local.appKey = $appKey();
+		if (!StructKeyExists(application, local.appKey)) {
+			return "";
+		}
+		local.settings = application[local.appKey];
+		if (!StructKeyExists(local.settings, "uncountables") || !StructKeyExists(local.settings, "irregulars")) {
+			return "";
+		}
+		local.fingerprint = local.settings.uncountables & "|" & StructCount(local.settings.irregulars);
+		if (
+			!StructKeyExists(local.settings, "inflectionCache")
+			|| Compare(local.settings.inflectionCache.fingerprint, local.fingerprint) != 0
+		) {
+			local.settings.inflectionCache = {fingerprint = local.fingerprint, entries = {}};
+		}
+		return local.settings.inflectionCache;
+	}
+
+
+	/**
+	 * Internal function. Pluralizes or singularizes `text` (`which` is "pluralize" or
+	 * "singularize") using the uncountable, irregular and regular rules.
+	 */
+	public string function $inflect(required string text, required string which) {
+		// by default we pluralize/singularize the entire string
+		local.text = arguments.text;
+
+		// keep track of the success of any rule matches
+		local.ruleMatched = false;
+		local.rv = local.text;
+
+		if (ReFind("[A-Z]", local.text)) {
+			// only pluralize/singularize the last part of a camelCased variable (e.g. in "websiteStatusUpdate" we only change the "update" part)
+			// also set a variable with the unchanged part of the string (to be prepended before returning final result)
+			local.upperCasePos = ReFind("[A-Z]", Reverse(local.text));
+			local.prepend = Mid(local.text, 1, Len(local.text) - local.upperCasePos);
+			local.text = Reverse(Mid(Reverse(local.text), 1, local.upperCasePos));
+		}
+
+		// Get global settings for uncountable and irregular words.
+		// For the irregular ones we need to convert them from a struct to a list.
+		local.uncountables = $listClean($get("uncountables"));
+		local.irregulars = "";
+		local.words = $get("irregulars");
+		for (local.word in local.words) {
+			local.irregulars = ListAppend(local.irregulars, LCase(local.word));
+			local.irregulars = ListAppend(local.irregulars, local.words[local.word]);
+		}
+
+		if (ListFindNoCase(local.uncountables, local.text)) {
+			local.rv = local.text;
+			local.ruleMatched = true;
+		} else if (ListFindNoCase(local.irregulars, local.text)) {
+			local.pos = ListFindNoCase(local.irregulars, local.text);
+			if (arguments.which == "singularize" && local.pos % 2 == 0) {
+				local.rv = ListGetAt(local.irregulars, local.pos - 1);
+			} else if (arguments.which == "pluralize" && local.pos % 2 != 0) {
+				local.rv = ListGetAt(local.irregulars, local.pos + 1);
+			} else {
+				local.rv = local.text;
+			}
+			local.ruleMatched = true;
+		} else {
+			if (arguments.which == "pluralize") {
+				local.ruleList = "(quiz)$,\1zes,^(ox)$,\1en,([m|l])ouse$,\1ice,(matr|vert|ind)ix,\1ices,ex$,ices,(x|ch|ss|sh)$,\1es,([^aeiouy]|qu)y$,\1ies,(hive)$,\1s,([^f])fe$,\1ves,([lr])f$,\1ves,sis$,ses,([ti])um$,\1a,(buffal|tomat|potat|volcan|her)o$,\1oes,(bu)s$,\1ses,(alias|status)$,\1es,(octop|vir)us$,\1i,(ax|test)is$,\1es,s$,s,$,s";
+			} else if (arguments.which == "singularize") {
+				local.ruleList = "(quiz)zes$,\1,(matr)ices$,\1ix,(vert|ind)ices$,\1ex,^(ox)en,\1,(alias|status)es$,\1,(octop|vir|cact|radi|foc)(us|i)$,\1us,(cris|ax|test)es$,\1is,(shoe)s$,\1,(o)es$,\1,(bus)es$,\1,([m|l])ice$,\1ouse,(x|ch|ss|sh)es$,\1,(m)ovies$,\1ovie,(s)eries$,\1eries,([^aeiouy]|qu)ies$,\1y,([lr])ves$,\1f,(tive)s$,\1,(hive)s$,\1,([^f])ves$,\1fe,(database)s$,\1,(^analy)ses$,\1sis,(analy|ba|diagno|parenthe|progno|synop|the)ses$,\1sis,([ti])a$,\1um,(n)ews$,\1ews,(.*)?ss$,\1ss,s$,#Chr(7)#";
+			}
+			local.rules = ArrayNew(2);
+			local.count = 1;
+			local.iEnd = ListLen(local.ruleList);
+			for (local.i = 1; local.i <= local.iEnd; local.i = local.i + 2) {
+				local.rules[local.count][1] = ListGetAt(local.ruleList, local.i);
+				local.rules[local.count][2] = ListGetAt(local.ruleList, local.i + 1);
+				local.count = local.count + 1;
+			}
+			local.iEnd = ArrayLen(local.rules);
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				if (ReFindNoCase(local.rules[local.i][1], local.text)) {
+					local.rv = ReReplaceNoCase(local.text, local.rules[local.i][1], local.rules[local.i][2]);
+					local.ruleMatched = true;
+					break;
+				}
+			}
+			local.rv = Replace(local.rv, Chr(7), "", "all");
+		}
+
+		// this was a camelCased string and we need to prepend the unchanged part to the result
+		if (StructKeyExists(local, "prepend") && local.ruleMatched) {
+			local.rv = local.prepend & local.rv;
+		}
+
+		return local.rv;
+	}
+
+
+	/**
+	 * Escapes the `LIKE` wildcards in a string so it can be used as a literal search term in a
+	 * `LIKE` comparison that declares `ESCAPE '\'`. The escape character `\` is escaped first, then
+	 * `%` and `_`; `[` is escaped only when the application's default adapter is SQL Server (where `[`
+	 * opens a character class — on Oracle `\[` is an illegal escape sequence, ORA-01424). Add your own
+	 * surrounding wildcards and place the result in a quoted literal whose `LIKE` declares `ESCAPE '\'`:
+	 *
+	 * `model("post").findAll(where="title LIKE '%#escapeForLike(params.q)#%' ESCAPE '\'")`
+	 *
+	 * Wheels binds the quoted literal as a query parameter (`parameterize` is on by default), and the
+	 * explicit `ESCAPE '\'` makes the escaped wildcards literal on every supported database — MySQL,
+	 * PostgreSQL, SQL Server, SQLite, Oracle, H2 and CockroachDB. Always declare the clause: MySQL,
+	 * PostgreSQL, CockroachDB and H2 default the `LIKE` escape character to `\`, but SQLite, Oracle and
+	 * SQL Server have none, and the three-argument query builder (`where("title", "LIKE", ...)`) emits no
+	 * `ESCAPE` either, so without the clause `\` is matched literally.
+	 *
+	 * This escapes `LIKE` metacharacters only, not SQL quotes; quote the value the same way you would
+	 * any other `where`-string literal.
+	 *
+	 * On SQL Server, `[` is escaped only once a model has initialised the adapter. If you call
+	 * `escapeForLike()` before any `model()` call in a fresh or just-reloaded app, the adapter is not
+	 * known yet and `[` is left unescaped — call a `model()` finder first, or handle `[` yourself. Every
+	 * other database treats `[` as a literal, so this edge affects SQL Server only.
+	 *
+	 * [section: Global Helpers]
+	 * [category: String Functions]
+	 *
+	 * @value String whose `LIKE` wildcards should be treated as literals.
+	 */
+	public string function escapeForLike(required string value) {
+		local.rv = Replace(arguments.value, "\", "\\", "all");
+		local.rv = Replace(local.rv, "%", "\%", "all");
+		local.rv = Replace(local.rv, "_", "\_", "all");
+		// `[` opens a character class in a LIKE pattern only on SQL Server. Escaping it is needed there,
+		// redundant on MySQL / PostgreSQL / SQLite / H2 / CockroachDB (where `[` is literal), and on
+		// Oracle `\[` is an illegal escape sequence (ORA-01424), so escape it only when the adapter is
+		// SQL Server.
+		if ($adapterNameForLike() == "MicrosoftSQLServerModel") {
+			local.rv = Replace(local.rv, "[", "\[", "all");
+		}
+		return local.rv;
+	}
+
+	/**
+	 * The adapter class name escapeForLike() uses to decide whether to escape `[`. On a model instance
+	 * it is that model's own adapter, so a multi-datasource app escapes `[` per the database the query
+	 * actually runs against; otherwise it is the application default.
+	 *
+	 * The default is guarded against the case $timestamp() also guards for — no model class has set
+	 * `adapterName` on the application scope yet (a fresh app, or right after a reload) — where a bare
+	 * `$get("adapterName")` would throw. There is no database type to read here without a model
+	 * ($getDBType() lives on the migrator, not on this mixin's host), so it returns "", which
+	 * escapeForLike treats as "not SQL Server": `[` is left unescaped. That is correct on every database
+	 * except an as-yet-uninitialised SQL Server app (a rare edge — call `model()` first), and it never
+	 * risks Oracle's ORA-01424.
+	 */
+	public string function $adapterNameForLike() {
+		if (
+			StructKeyExists(variables, "wheels")
+			&& StructKeyExists(variables.wheels, "class")
+			&& StructKeyExists(variables.wheels.class, "adapterName")
+		) {
+			return variables.wheels.class.adapterName;
+		}
+		if (StructKeyExists(application[$appKey()], "adapterName")) {
+			return $get("adapterName");
+		}
+		return "";
+	}
 
 	/**
 	 * Capitalizes the first character of the supplied string.
@@ -333,13 +483,13 @@
 	public string function $timestamp(string timeStampMode = application.wheels.timeStampMode) {
 		switch (arguments.timeStampMode) {
 			case "utc":
-				local.rv = DateConvert("local2Utc", Now());
+				local.rv = DateConvert("local2Utc", $now());
 				break;
 			case "local":
-				local.rv = Now();
+				local.rv = $now();
 				break;
 			case "epoch":
-				local.rv = Now().getTime();
+				local.rv = $now().getTime();
 				break;
 			default:
 				Throw(type = "Wheels.InvalidTimeStampMode", message = "Timestamp mode #arguments.timeStampMode# is invalid");

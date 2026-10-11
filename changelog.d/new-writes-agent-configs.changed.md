@@ -1,0 +1,1 @@
+- `wheels new` (and `wheels create app`) now writes `.mcp.json` and `.opencode.json` in the new app, the files `wheels setup agents` writes, so an AI assistant opening the app finds the Wheels MCP server without a second command. Pass `--no-agents` to skip them. If they can't be written, `wheels new` warns and still creates the app.

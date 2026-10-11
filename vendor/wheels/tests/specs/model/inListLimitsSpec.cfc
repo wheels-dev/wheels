@@ -4,8 +4,9 @@
  * parenthesised groups: OR-joined for IN, AND-joined for NOT IN, every value still
  * bound. Oracle 23ai has no such limit, but the split runs there too, which is how
  * these specs exercise it. SQL Server accepts at most 2100 parameters per request,
- * a few of which the driver uses itself, so a query that would bind more than the
- * adapter's limit (2097) is refused with Wheels.TooManyParameters before it runs.
+ * a few of which the driver uses itself. A query that would bind more than the
+ * adapter's limit (2097) binds its largest IN lists as one STRING_SPLIT parameter on
+ * SQL Server 2016+ (#4103), and is refused with Wheels.TooManyParameters below that.
  */
 component extends="wheels.WheelsTest" {
 
@@ -123,26 +124,19 @@ component extends="wheels.WheelsTest" {
 				expect(named.recordCount).toBe(authors.recordCount);
 			});
 
-			it("runs the adapter's limit and refuses one more on SQL Server before the query runs", () => {
+			// Past the limit, SQL Server 2016+ binds the list as one STRING_SPLIT parameter (#4103);
+			// below compatibility level 130 it is refused (sqlServerStringSplitSpec).
+			it("runs the adapter's limit and one more on SQL Server", () => {
 				if (g.get("adapterName") != "MicrosoftSQLServerModel") {
 					skip("SQL Server's bound-parameter limit.");
 				}
 				var adapter = g.model("author").$classData().adapter;
 				var limit = adapter.$maxBoundParameters();
 				expect(g.model("author").whereIn("id", paddedKeys(limit)).count()).toBe(ArrayLen(realIds));
-				var state = {type = "", message = ""};
-				try {
-					g.model("author").whereIn("id", paddedKeys(limit + 1)).count();
-				} catch (any e) {
-					state.type = e.type;
-					state.message = e.message;
-				}
-				expect(state.type).toBe("Wheels.TooManyParameters");
-				expect(state.message).toInclude("#limit + 1#");
-				expect(state.message).toInclude("#limit#");
+				expect(g.model("author").whereIn("id", paddedKeys(limit + 1)).count()).toBe(ArrayLen(realIds));
 			});
 
-			it("counts a scalar parameter alongside a list against SQL Server's limit", () => {
+			it("counts a scalar parameter alongside a list against SQL Server's limit and still runs", () => {
 				if (g.get("adapterName") != "MicrosoftSQLServerModel") {
 					skip("SQL Server's bound-parameter limit.");
 				}
@@ -151,15 +145,7 @@ component extends="wheels.WheelsTest" {
 				var first = g.model("author").findByKey(realIds[1]);
 				var expected = g.model("author").findAll(where = "firstName = '#Replace(first.firstName, "'", "''", "all")#'", returnAs = "query");
 				expect(g.model("author").whereIn("id", paddedKeys(limit - 1)).where("firstName", first.firstName).count()).toBe(expected.recordCount);
-				var state = {type = "", message = ""};
-				try {
-					g.model("author").whereIn("id", paddedKeys(limit)).where("firstName", first.firstName).count();
-				} catch (any e) {
-					state.type = e.type;
-					state.message = e.message;
-				}
-				expect(state.type).toBe("Wheels.TooManyParameters");
-				expect(state.message).toInclude("#limit + 1#");
+				expect(g.model("author").whereIn("id", paddedKeys(limit)).where("firstName", first.firstName).count()).toBe(expected.recordCount);
 			});
 
 		});

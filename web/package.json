@@ -32,11 +32,10 @@
 	},
 	"pnpm": {
 		"overrides": {
-			"fast-uri": "^3.1.2",
+			"fast-uri": "^3.1.8",
 			"fast-xml-builder": "^1.1.7",
-			"esbuild": "^0.27.3",
-			"yaml": "^2.8.3",
-			"astro": "^6.3.1"
+			"esbuild": "^0.28.1",
+			"yaml": "^2.8.3"
 		}
 	}
 }

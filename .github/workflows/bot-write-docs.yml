@@ -26,7 +26,7 @@ concurrency:
 jobs:
   write-docs:
     name: Write docs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Auto-fires from wheels-bot[bot] comments with docs-confidence:high
     # OR docs-confidence:medium. Low stays manual.

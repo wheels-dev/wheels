@@ -41,7 +41,7 @@ This command does not require a running server. It reads the project off disk an
 | `controllers` | `app/controllers/` only |
 | `views` | `app/views/` only |
 
-If you pass anything else, the command falls through to `all`.
+Any other value is rejected with `Invalid value '<target>' for target. Valid values: all, models, controllers, views.` and a non-zero exit. Run outside a project (no `app/` directory), the command stops with `No app/ directory found` and exits non-zero.
 
 #### Flags
 

@@ -35,18 +35,18 @@ wheels upgrade check [--to=<version>] [--format=json] [--strict] [--offline]
 wheels upgrade apply [--to=<version>] [--nobackup] [--allow-downgrade]
 ```
 
-Calling `wheels upgrade` with no subcommand prints concise usage listing both verbs and exits 0. Any other subcommand — a typo like `wheels upgrade chekc` — prints an error naming the valid verbs (`check`, `apply`, `help`) and the usage, then exits non-zero, so a misspelled verb in a script fails loudly instead of looking like a successful run.
+Calling `wheels upgrade` with no subcommand prints concise usage listing both verbs, changes nothing, and exits non-zero. Any other subcommand — a typo like `wheels upgrade chekc` — prints an error naming the valid verbs (`check`, `apply`, `help`) and the usage, then exits non-zero, so a misspelled verb in a script fails loudly instead of looking like a successful run.
 
 ### What it does
 
 `wheels upgrade check` performs four steps, in order:
 
-1. **Reads the current version** from `vendor/wheels/box.json`. If the file is missing or malformed, the version is reported as `unknown` and the comparison below is skipped.
-2. **Resolves the target version.** If you pass `--to=<version>`, that wins. Otherwise the command hits the GitHub releases API (`api.github.com/repos/wheels-dev/wheels/releases/latest`) and strips the leading `v` from the tag name. If the network call fails, the command prints a yellow notice and exits — it will not invent a target.
+1. **Reads the current version** from `vendor/wheels/wheels.json`, falling back to `vendor/wheels/box.json`, and then to the version set in the framework's `onapplicationstart` file (for 3.0 and 2.x apps whose manifest carries none). If none of these yields a version, it is reported as `unknown` and the comparison below is skipped.
+2. **Resolves the target version.** If you pass `--to=<version>`, that wins. Otherwise the command hits the GitHub releases API (`api.github.com/repos/wheels-dev/wheels/releases/latest`) and strips the leading `v` from the tag name. If the network call fails, the command exits non-zero with `Wheels.UpgradeCheckFailed` (so a CI gate never passes without having scanned anything); pass `--to=<version>` when you can't reach GitHub.
 3. **Compares major versions.** If current and target share the same major, the command notes "Same major version — no known breaking changes" for the major-transition checks, then still runs its advisory scan for the same-major patterns below.
 4. **Runs breaking-change checks.** Each check is either a directory existence test or a regex grep across a sub-tree of the project. Major-version transitions add their own checks on top of the advisory scan. Every run, whatever the versions, also includes the app template drift advisory described below. Hits are printed as issues (yellow); absences are printed as passed checks (green).
 
-**Exit status:** when breaking findings exist the command throws `Wheels.UpgradeCheckFailed` after the report flushes, exiting non-zero so it can gate CI. Without `--strict`, advisory findings never affect the exit code. With `--strict`, advisory findings escalate to the same hard-fail path — useful for CI pipelines that want to gate on opt-in convention changes, not just breaking ones. With `--format=json` the human report is replaced by a single JSON document (`currentVersion`, `targetVersion`, `success`, `strict`, `breaking`, `advisories`, `passed`, `guide`) — the non-zero exit on breaking or strict-mode advisory findings still applies. The document's `success` field tracks the exit code precisely: it is `false` whenever the process exits non-zero, including the `--strict` + advisory-only case, and the `strict` field is echoed back so consumers can tell `success: false` with empty `breaking[]` apart from a data inconsistency.
+**Exit status:** when breaking findings exist the command throws `Wheels.UpgradeCheckFailed` after the report flushes, exiting non-zero so it can gate CI. Without `--strict`, advisory findings never affect the exit code. With `--strict`, advisory findings escalate to the same hard-fail path — useful for CI pipelines that want to gate on opt-in convention changes, not just breaking ones. With `--format=json` the human report is replaced by a single JSON document (`currentVersion`, `targetVersion`, `cliVersion`, `cliBehindTarget`, `success`, `strict`, `breaking`, `advisories`, `warnings`, `passed`, `guide`) — the non-zero exit on breaking or strict-mode advisory findings still applies. The document's `success` field tracks the exit code precisely: it is `false` whenever the process exits non-zero, including the `--strict` + advisory-only case, and the `strict` field is echoed back so consumers can tell `success: false` with empty `breaking[]` apart from a data inconsistency.
 
 Nothing in the project is modified. No files are written. The command does not stage, commit, or touch git state.
 
@@ -79,19 +79,20 @@ Sample output (trimmed):
 Current version: 3.5.1
 Target version:  4.0.0
 
-Breaking Changes (2 found):
-  ! Legacy plugin directory (deprecated in 4.x)
+Breaking Changes (1 found):
+  ! Legacy plugins (deprecated as of 4.0, removed in 5.0)
     plugins/
-    -> Migrate to packages/ + vendor/ system
+    -> Migrate plugins to packages installed under vendor/ (wheels packages add <name>), ...
 
-  ! Old test base class (wheels.Test)
+Upgrade guide: https://guides.wheels.dev/v4-2-0/upgrading/3x-to-4x/
+
+Recommended Improvements (1 found):
+  ~ RocketUnit test base class wheels.Test (deprecated; still runs on 4.x)
     tests/specs/models/UserSpec.cfc:1
-    -> Change to extends="wheels.WheelsTest"
 
-All Clear (1 checks):
-  + Direct WireBox references
-
-Apply with: wheels upgrade apply
+All Clear (39 checks):
+  + Direct WireBox references (application.wirebox / wirebox.system.ioc)
+  ...
 ```
 
 When current and target share a major version, the major-transition note is shown but the advisory scan still runs:
@@ -100,8 +101,8 @@ When current and target share a major version, the major-transition note is show
 Current version: 4.0.0
 Target version:  4.0.1
 
-Same major version — no known breaking changes.
-Scanning for opt-in recommendations...
+Same major version — no new breaking changes in this upgrade.
+Scanning for code left over from 3.x and for opt-in recommendations...
 
 Apply with: wheels upgrade apply
 ```
@@ -113,14 +114,14 @@ The checks are hard-coded in the CLI and keyed by the major-version transition:
 **2.x → 3.x**
 
 - Existence of `plugins/` at the project root (legacy plugin directory; skipped on a 2.x → 4.x jump where the 4.x check below covers it).
-- `extends="wheels.Test"` or `extends="wheels.Testbox"` (either quote style) anywhere under `tests/` (old test base classes).
+- *(advisory)* `extends="wheels.Test"` or `extends="wheels.Testbox"` (either quote style) anywhere under `tests/`. `wheels.Test` is the RocketUnit base class (deprecated, still runs on 4.x); `wheels.Testbox` is an alias of `wheels.WheelsTest` that 5.0 removes.
 
 **3.x → 4.x**
 
 - Legacy plugins (deprecated plugin system): a non-empty `plugins/` at the project root, plugin packages in `box.json` (an install path under `plugins/`, or a `cfwheels-*` package with no install path), and code that reads `application.wheels.plugins`. An empty `plugins/` isn't enough to pass: 3.x deletes plugin folders at runtime by default, and `box install` brings them back.
-- `extends="wheels.Test"` or `extends="wheels.Testbox"` (either quote style) anywhere under `tests/`.
+- *(advisory)* `extends="wheels.Test"` or `extends="wheels.Testbox"` (either quote style) anywhere under `tests/`. `wheels.Test` is the RocketUnit base class (deprecated, still runs on 4.x); `wheels.Testbox` is an alias of `wheels.WheelsTest` that 5.0 removes.
 - `application.wirebox` or `wirebox.system.ioc` references under `app/`, `config/`, the root `Application.cfc` and `public/Application.cfc`, skipping third-party packages there (a `box.json` install path, or any folder with its own `box.json`, such as `app/lib/logbox/`) — these must move to `service()` / `application.wheelsdi`, and `new wirebox.system.ioc.Injector(...)` bootstraps to `new wheels.Injector("wheels.Bindings")` (#1888).
-- `renderPage()` / `renderPageToString()` under `app/` — removed in 4.0; replace with `renderView()` / `renderView(returnAs="string")`, or install `wheels-legacy-adapter` for a soft landing.
+- `renderPage()` / `renderPageToString()` under `app/` — pre-2.0 API that 2.0 replaced and later versions don't have; replace with `renderView()` / `renderView(returnAs="string")`, or install `wheels-legacy-adapter` for a soft landing.
 - `new wheels.middleware.Cors()` without `allowOrigins` in `config/` — the 4.0 default changed from wildcard to deny-all (#2039).
 - `new wheels.middleware.RateLimiter` in `config/` — prompts the user to verify `trustProxy` and `proxyStrategy`, whose defaults hardened in 4.0 (#2024, #2088).
 - `allowEnvironmentSwitchViaUrl=true` in `config/` — the production default flipped to `false` (#2076).

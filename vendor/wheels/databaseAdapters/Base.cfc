@@ -17,6 +17,10 @@ component output=false extends="wheels.Global"{
 		local.sqlArray = args.sql;
 		local.sqlLen   = arrayLen(sqlArray);
 		$assertBoundParameterCount(sql = args.sql, parameterize = args.parameterize);
+		// A spec recording queries (recordQueries() / assertQueries()) sees this statement (F4).
+		if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "$queryRecorders") && ArrayLen(request.wheels.$queryRecorders)) {
+			$recordQuery(sql = args.sql, queryAttributes = args.queryAttributes);
+		}
 
 		// Build query
 		cfquery(attributeCollection = args.queryAttributes) {
@@ -119,6 +123,34 @@ component output=false extends="wheels.Global"{
 
 		wheels.rv.result = wheels.result;
 		return wheels.rv;
+	}
+
+	/**
+	 * Internal function. Adds a statement to every active query recorder (F4): its SQL with a `?` for
+	 * each bound value (an IN list shows one `?` per list), so a failure message doesn't put bound data
+	 * in a log. A value written into the SQL itself (`parameterize=false`) appears as written. A recorder
+	 * with a `dataSource` filter only takes that datasource's statements.
+	 */
+	public void function $recordQuery(required array sql, required struct queryAttributes) {
+		local.text = "";
+		for (local.part in arguments.sql) {
+			if (IsStruct(local.part)) {
+				local.text &= (StructKeyExists(local.part, "list") && local.part.list) ? "(?)" : "?";
+			} else {
+				local.text &= " " & Trim(local.part);
+			}
+		}
+		local.entry = {
+			sql = Trim(ReReplace(local.text, "\s+", " ", "all")),
+			dataSource = StructKeyExists(arguments.queryAttributes, "datasource") ? arguments.queryAttributes.datasource : ""
+		};
+		local.iEnd = ArrayLen(request.wheels.$queryRecorders);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.filter = request.wheels.$queryRecorders[local.i].dataSource;
+			if (!Len(local.filter) || CompareNoCase(local.filter, local.entry.dataSource) == 0) {
+				ArrayAppend(request.wheels.$queryRecorders[local.i].queries, Duplicate(local.entry));
+			}
+		}
 	}
 
 	/**
@@ -664,6 +696,22 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. The parameters a parameterized statement binds: one per value of an
+	 * IN list and one per other param; a NULL is written inline and not counted.
+	 */
+	public numeric function $boundParameterCount(required array sql) {
+		local.count = 0;
+		for (local.part in arguments.sql) {
+			if (!IsStruct(local.part) || (StructKeyExists(local.part, "null") && local.part.null)) {
+				continue;
+			}
+			local.isList = StructKeyExists(local.part, "list") && local.part.list && StructKeyExists(local.part, "value");
+			local.count += local.isList ? ListLen(local.part.value, ",") : 1;
+		}
+		return local.count;
+	}
+
+	/**
 	 * Throws Wheels.TooManyParameters before a parameterized statement runs when it
 	 * would bind more parameters than the database accepts. Every value of an IN
 	 * list binds as its own parameter; a NULL is written inline and not counted.
@@ -673,21 +721,22 @@ component output=false extends="wheels.Global"{
 		if (!arguments.parameterize || local.limit <= 0) {
 			return;
 		}
-		local.count = 0;
-		for (local.part in arguments.sql) {
-			if (!IsStruct(local.part) || (StructKeyExists(local.part, "null") && local.part.null)) {
-				continue;
-			}
-			local.isList = StructKeyExists(local.part, "list") && local.part.list && StructKeyExists(local.part, "value");
-			local.count += local.isList ? ListLen(local.part.value, ",") : 1;
-		}
+		local.count = $boundParameterCount(arguments.sql);
 		if (local.count > local.limit) {
 			Throw(
 				type = "Wheels.TooManyParameters",
 				message = "This query would bind #local.count# parameters, but the database accepts at most #local.limit# per statement.",
-				extendedInfo = "Each value of an IN list (whereIn(), whereNotIn() or a hand-written IN (...)) binds as its own parameter. Query the values in batches of fewer than #local.limit#, or select them with a join or a subquery instead of a long list."
+				extendedInfo = $tooManyParametersAdvice(limit = local.limit)
 			);
 		}
+	}
+
+	/**
+	 * Internal function. What Wheels.TooManyParameters tells the developer to do. An adapter
+	 * that runs some long lists another way says which ones.
+	 */
+	public string function $tooManyParametersAdvice(required numeric limit) {
+		return "Each value of an IN list (whereIn(), whereNotIn() or a hand-written IN (...)) binds as its own parameter. Query the values in batches of fewer than #arguments.limit#, or select them with a join or a subquery instead of a long list.";
 	}
 
 	/**
@@ -1209,6 +1258,81 @@ component output=false extends="wheels.Global"{
 	 */
 	public boolean function $supportsAdvisoryLocks() {
 		return false;
+	}
+
+	/**
+	 * Internal function. Reports whether this adapter supports transaction-scoped advisory locks —
+	 * the opt-in `withAdvisoryLock(transaction = true)` path (#4198). The lock is acquired on the
+	 * connection pinned by an enclosing transaction, so it covers the callback's own queries and
+	 * (where the lock is transaction-scoped) auto-releases when that transaction ends.
+	 *
+	 * Distinct from `$supportsAdvisoryLocks()`, which reports standalone (session) support; an
+	 * adapter may support one and not the other. SQL Server supports both with a session-owned
+	 * `sp_getapplock @LockOwner = 'Session'` lock, on the transaction-pinned connection here.
+	 */
+	public boolean function $supportsTransactionalAdvisoryLock() {
+		return false;
+	}
+
+	/**
+	 * Internal function. Reports whether this adapter's transaction-scoped lock is actually
+	 * session-scoped and so must be released explicitly before the transaction closes (#4198).
+	 * MySQL's `GET_LOCK` and SQL Server's `sp_getapplock @LockOwner = 'Session'` are session- not
+	 * transaction-scoped: pinning them to the transaction's connection still guards the callback, but
+	 * they do not auto-release at transaction end, so the caller releases them with
+	 * `$releaseAdvisoryLockTransactional()` first. PostgreSQL (`pg_advisory_xact_lock`) auto-releases
+	 * at transaction end and leaves this false.
+	 */
+	public boolean function $transactionalAdvisoryLockIsSessionScoped() {
+		return false;
+	}
+
+	/**
+	 * Internal function. Acquires a transaction-scoped advisory lock on the current (pinned)
+	 * connection (#4198). Called only inside an open transaction, and only after
+	 * `$supportsTransactionalAdvisoryLock()` has reported true, so the default is never reached in
+	 * practice; it throws for safety. Throws `Wheels.AdvisoryLockTimeout` when the lock cannot be
+	 * taken in time.
+	 */
+	public void function $acquireAdvisoryLockTransactional(required string name, numeric timeout = 10) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "Transaction-scoped advisory locks are not supported for this database adapter.",
+			extendedInfo = "The #GetMetaData(this).name# adapter does not implement transaction-scoped advisory locking. Call withAdvisoryLock() without transaction = true, or use a database that supports it (PostgreSQL, MySQL, or SQL Server)."
+		);
+	}
+
+	/**
+	 * Internal function. Releases a transaction-scoped advisory lock before the transaction closes
+	 * (#4198). Only session-scoped locks (MySQL, SQL Server) need this; a transaction-scoped lock
+	 * (PostgreSQL) auto-releases at transaction end, so the default is a no-op.
+	 */
+	public void function $releaseAdvisoryLockTransactional(required string name) {
+	}
+
+	/**
+	 * Internal function. The connection attributes for an advisory-lock query, built the SAME way the
+	 * model's own query path does (`$performQuery`): empty username/password are OMITTED (#4198). This
+	 * matters for the transaction-scoped path: on Adobe CF a query with `{datasource}` and one with
+	 * `{datasource, username:"", password:""}` resolve to DIFFERENT pooled connections, so a lock taken
+	 * with the always-on form lands on a different connection than the model's writes — the writes then
+	 * run outside the lock's transaction and are not rolled back with it. Matching the model's form
+	 * pins the lock and the callback's queries to one connection on every engine. Lucee treats the two
+	 * forms as the same connection, which is why this only surfaced on Adobe.
+	 *
+	 * The datasource is resolved through `$effectiveDataSource()`, exactly as `$performQuery` does, so a
+	 * non-shared (tenant) model takes the lock on its tenant datasource — the same one its writes use —
+	 * rather than on the default datasource.
+	 */
+	public struct function $advisoryLockConnection() {
+		local.conn = {datasource = $effectiveDataSource()};
+		if (Len(variables.username)) {
+			local.conn.username = variables.username;
+		}
+		if (Len(variables.password)) {
+			local.conn.password = variables.password;
+		}
+		return local.conn;
 	}
 
 	/**

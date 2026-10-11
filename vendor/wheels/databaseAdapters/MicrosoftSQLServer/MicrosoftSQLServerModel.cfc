@@ -17,7 +17,9 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Internal function. Casts high-precision decimal params exactly before running the query.
+	 * Internal function. Splits IN lists that would exceed the parameter limit into one parameter
+	 * each (#4103), casts date and time conditions to their column's type (#4326, #4327), then casts
+	 * high-precision decimal params exactly (#4172), before running the query.
 	 */
 	public struct function $performQuery(
 		required array sql,
@@ -29,8 +31,611 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		string $debugName = "query",
 		boolean $captureResult = true
 	) {
+		$splitLargeInLists(args = arguments);
+		$castTemporalParams(args = arguments);
 		$castWideDecimalParams(args = arguments);
 		return super.$performQuery(argumentCollection = arguments);
+	}
+
+	/**
+	 * Internal function. The SQL Server type a condition on a column of `dataType` compares in, or
+	 * "" to keep the bind as it is (#4326, #4327). Every engine binds cf_sql_timestamp as
+	 * DATETIME2(7), and SQL Server then converts a DATETIME or SMALLDATETIME column exactly, so a
+	 * value with a fraction never equals what the column stored in 1/300-second (or one-minute)
+	 * steps; compared as DATETIME / SMALLDATETIME, the value rounds the way the stored value did.
+	 * cf_sql_time binds as DATETIME on Lucee, not at all on BoxLang and without its fraction on
+	 * Adobe, so a TIME column compares as TIME(7), which holds any TIME(n) value exactly.
+	 */
+	public string function $temporalComparisonType(required string dataType) {
+		switch (LCase(arguments.dataType)) {
+			case "datetime":
+				return "DATETIME";
+			case "smalldatetime":
+				return "SMALLDATETIME";
+			case "time":
+				return "TIME(7)";
+		}
+		return "";
+	}
+
+	/**
+	 * Internal function. Rewrites each date or time condition param that $isTemporalCastParam()
+	 * selects into `CAST(? AS <column type>)`, an IN list into one CAST per value (#4326, #4327).
+	 * The number of bound parameters is unchanged.
+	 */
+	public void function $castTemporalParams(required struct args) {
+		if (!arguments.args.parameterize) {
+			return;
+		}
+		local.rv = [];
+		for (local.part in arguments.args.sql) {
+			// Adobe CF passes arrays by value, so the parts are returned and appended here.
+			if ($isTemporalCastParam(local.part)) {
+				local.parts = $castTemporalParts(local.part);
+			} else {
+				local.parts = [local.part];
+			}
+			for (local.item in local.parts) {
+				ArrayAppend(local.rv, local.item);
+			}
+		}
+		arguments.args.sql = local.rv;
+	}
+
+	/**
+	 * Internal function. True for a WHERE condition param on a DATETIME or SMALLDATETIME column
+	 * compared with =, <>, !=, IN or NOT IN, or on a TIME column with any comparison. A range on a
+	 * DATETIME column keeps the exact comparison: rounding its bound could move a row across it.
+	 */
+	public boolean function $isTemporalCastParam(required any part) {
+		if (
+			!IsStruct(arguments.part)
+			|| !StructKeyExists(arguments.part, "dataType")
+			|| !StructKeyExists(arguments.part, "operator")
+			|| !StructKeyExists(arguments.part, "type")
+			|| !StructKeyExists(arguments.part, "value")
+			|| !ListFindNoCase("cf_sql_timestamp,cf_sql_time,cf_sql_date", arguments.part.type)
+			|| (StructKeyExists(arguments.part, "null") && arguments.part.null)
+		) {
+			return false;
+		}
+		local.castType = $temporalComparisonType(arguments.part.dataType);
+		if (!Len(local.castType)) {
+			return false;
+		}
+		local.operator = UCase(ReReplace(Trim(arguments.part.operator), "\s+", " ", "all"));
+		if (local.castType == "TIME(7)") {
+			return ListFind("=,<>,!=,<,<=,>,>=,IN,NOT IN", local.operator) > 0;
+		}
+		return ListFind("=,<>,!=,IN,NOT IN", local.operator) > 0;
+	}
+
+	/**
+	 * Internal function. The SQL parts for a date or time condition param as `CAST(? AS <type>)`,
+	 * or for an IN list as `(CAST(...), CAST(...))` with one param per value. A TIME value binds as
+	 * text (HH:mm:ss.fffffff), which every engine sends as it is.
+	 */
+	public array function $castTemporalParts(required struct part) {
+		local.castType = $temporalComparisonType(arguments.part.dataType);
+		// $queryParams() unmasks an IN list's values and joins them with Chr(7).
+		local.qp = $queryParams(arguments.part);
+		local.isList = StructKeyExists(local.qp, "list") && local.qp.list;
+		local.values = local.isList ? ListToArray(local.qp.value, Chr(7)) : [local.qp.value];
+		local.rv = [];
+		local.iEnd = ArrayLen(local.values);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.param = StructCopy(arguments.part);
+			StructDelete(local.param, "list");
+			local.param.value = local.values[local.i];
+			if (local.castType == "TIME(7)") {
+				local.param.value = $timeText(local.values[local.i]);
+				local.param.type = "cf_sql_varchar";
+			}
+			ArrayAppend(local.rv, (local.i == 1 ? (local.isList ? "(" : "") : ", ") & "CAST(");
+			ArrayAppend(local.rv, local.param);
+			ArrayAppend(local.rv, " AS #local.castType#)" & (local.isList && local.i == local.iEnd ? ")" : ""));
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. A time value as SQL Server TIME text: `HH:mm[:ss[.fffffff]]` as written, the
+	 * time of a `yyyy-mm-dd HH:mm:ss.f` string (up to 7 fraction digits), or any other date's time to
+	 * the millisecond. A date-time without a fraction goes through Millisecond(): RustCFML treats a
+	 * date object as a simple value whose text drops the milliseconds. Any other text is returned
+	 * unchanged, so the CAST reports it.
+	 */
+	public string function $timeText(required any value) {
+		if (IsSimpleValue(arguments.value)) {
+			local.text = Trim(arguments.value);
+			if (ReFind("^\d{1,2}:\d{2}(:\d{2}(\.\d{1,7})?)?$", local.text)) {
+				return local.text;
+			}
+			local.match = ReFind("^\d{4}-\d{2}-\d{2}[ T](\d{1,2}:\d{2}:\d{2}\.\d{1,7})$", local.text, 1, true);
+			if (local.match.pos[1]) {
+				return Mid(local.text, local.match.pos[2], local.match.len[2]);
+			}
+		}
+		if (IsDate(arguments.value)) {
+			return TimeFormat(arguments.value, "HH:mm:ss") & "." & NumberFormat(Millisecond(arguments.value), "000");
+		}
+		return arguments.value;
+	}
+
+	/**
+	 * Internal function. When a statement would bind more parameters than SQL Server accepts,
+	 * rewrites IN lists, largest first until it fits, to one parameter each (#4103):
+	 * `(SELECT CAST(value AS <type>) FROM STRING_SPLIT(?, NCHAR(31)))`. A statement that fits keeps
+	 * its SQL. STRING_SPLIT needs compatibility level 130; below it, and for lists of other types
+	 * (times among them), the statement is left for $assertBoundParameterCount() to refuse. Date and
+	 * timestamp lists are split only when the driver's bind type is known (#4318).
+	 */
+	public void function $splitLargeInLists(required struct args) {
+		local.limit = $inListSplitLimit();
+		if (!arguments.args.parameterize || $boundParameterCount(arguments.args.sql) <= local.limit) {
+			return;
+		}
+		if (!$supportsStringSplit(arguments.args.dataSource)) {
+			return;
+		}
+		local.dateCasts = $stringSplitDateCasts(arguments.args.dataSource);
+		local.convert = $inListsToSplit(sql = arguments.args.sql, limit = local.limit, dateCasts = local.dateCasts);
+		local.rv = [];
+		local.iEnd = ArrayLen(arguments.args.sql);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			// Adobe CF passes arrays by value, so the parts are returned and appended here.
+			if (StructKeyExists(local.convert, local.i)) {
+				local.parts = $stringSplitParts(part = arguments.args.sql[local.i], dateCasts = local.dateCasts);
+			} else {
+				local.parts = [arguments.args.sql[local.i]];
+			}
+			for (local.item in local.parts) {
+				ArrayAppend(local.rv, local.item);
+			}
+		}
+		arguments.args.sql = local.rv;
+	}
+
+	/**
+	 * Internal function. The positions of the IN lists to split, largest first, until the statement
+	 * binds no more than `limit` parameters (as a struct keyed by position). `dateCasts` is
+	 * $stringSplitDateCasts()'s result; without it, date and timestamp lists aren't split.
+	 */
+	public struct function $inListsToSplit(required array sql, required numeric limit, struct dateCasts = {}) {
+		local.sizes = {};
+		local.iEnd = ArrayLen(arguments.sql);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.split = $stringSplitList(part = arguments.sql[local.i], dateCasts = arguments.dateCasts);
+			if (!StructIsEmpty(local.split) && ArrayLen(local.split.values) > 1) {
+				local.sizes[local.i] = ArrayLen(local.split.values);
+			}
+		}
+		local.count = $boundParameterCount(arguments.sql);
+		local.rv = {};
+		while (local.count > arguments.limit && !StructIsEmpty(local.sizes)) {
+			local.largest = "";
+			for (local.key in local.sizes) {
+				if (!Len(local.largest) || local.sizes[local.key] > local.sizes[local.largest]) {
+					local.largest = local.key;
+				}
+			}
+			local.rv[local.largest] = true;
+			local.count -= local.sizes[local.largest] - 1;
+			StructDelete(local.sizes, local.largest);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. The SQL parts for an IN list bound as one STRING_SPLIT parameter.
+	 */
+	public array function $stringSplitParts(required struct part, struct dateCasts = {}) {
+		local.split = $stringSplitList(part = arguments.part, dateCasts = arguments.dateCasts);
+		return [
+			"(SELECT " & local.split.expression & " FROM STRING_SPLIT(",
+			{type = "cf_sql_nvarchar", value = ArrayToList(local.split.values, Chr(31))},
+			", NCHAR(31)))"
+		];
+	}
+
+	/**
+	 * Internal function. For an IN list STRING_SPLIT can carry, its values and the expression that
+	 * turns each split value back into the list's type: integers and decimals are validated here
+	 * and CAST (never TRY_CAST, which turns '' into 0), strings are compared as they are. Dates and
+	 * timestamps are cast to the type the driver binds them as, given in `dateCasts` (#4318), except
+	 * on a DATETIME / SMALLDATETIME column, which compares in its own type as the normal path does,
+	 * and times are cast to TIME(7) ($temporalComparisonType(), #4326, #4327). An empty struct for
+	 * any other list, or one with a value that doesn't validate.
+	 */
+	public struct function $stringSplitList(required any part, struct dateCasts = {}) {
+		if (
+			!IsStruct(arguments.part)
+			|| !StructKeyExists(arguments.part, "list")
+			|| !arguments.part.list
+			|| !StructKeyExists(arguments.part, "value")
+			|| !StructKeyExists(arguments.part, "type")
+		) {
+			return {};
+		}
+		local.values = ListToArray($queryParams(arguments.part).value, Chr(7));
+		local.integerType = $stringSplitIntegerType(arguments.part.type);
+		if (Len(local.integerType)) {
+			return $stringSplitNumbers(values = local.values, pattern = "^-?[0-9]+$", sqlType = local.integerType);
+		}
+		if (ListFindNoCase("cf_sql_decimal,cf_sql_numeric", arguments.part.type)) {
+			return $stringSplitDecimals(local.values);
+		}
+		if (ListFindNoCase("cf_sql_varchar,cf_sql_char", arguments.part.type)) {
+			return $stringSplitStrings(local.values);
+		}
+		// The split compares in the same type the normal path does (#4326, #4327).
+		local.columnCast = StructKeyExists(arguments.part, "dataType") ? $temporalComparisonType(arguments.part.dataType) : "";
+		if (CompareNoCase(arguments.part.type, "cf_sql_time") == 0 && local.columnCast == "TIME(7)") {
+			return $stringSplitTimes(local.values);
+		}
+		if (StructKeyExists(arguments.dateCasts, arguments.part.type)) {
+			return $stringSplitDates(
+				values = local.values,
+				sqlType = (Len(local.columnCast) && CompareNoCase(arguments.part.type, "cf_sql_timestamp") == 0) ? local.columnCast : arguments.dateCasts[arguments.part.type],
+				dateOnly = CompareNoCase(arguments.part.type, "cf_sql_date") == 0
+			);
+		}
+		return {};
+	}
+
+	/**
+	 * Internal function. Time values as TIME text ($timeText()), cast to TIME(7) like a time
+	 * condition on the normal path; empty when a value isn't `HH:mm[:ss[.fffffff]]` once converted.
+	 */
+	public struct function $stringSplitTimes(required array values) {
+		local.rv = [];
+		for (local.value in arguments.values) {
+			local.text = $timeText(local.value);
+			if (!ReFind("^[0-9]{1,2}:[0-9]{2}(:[0-9]{2}(\.[0-9]{1,7})?)?$", local.text)) {
+				return {};
+			}
+			ArrayAppend(local.rv, local.text);
+		}
+		return {expression = "CAST(value AS TIME(7))", values = local.rv};
+	}
+
+	/**
+	 * Internal function. Date or timestamp values written in a form SQL Server reads the same way
+	 * under every language and DATEFORMAT setting, cast to `sqlType`; empty when a value isn't in a
+	 * form $isoDateTimeValue() accepts.
+	 */
+	public struct function $stringSplitDates(required array values, required string sqlType, required boolean dateOnly) {
+		local.rv = [];
+		for (local.value in arguments.values) {
+			local.iso = $isoDateTimeValue(value = local.value, dateOnly = arguments.dateOnly);
+			if (!Len(local.iso)) {
+				return {};
+			}
+			ArrayAppend(local.rv, local.iso);
+		}
+		return {expression = "CAST(value AS #arguments.sqlType#)", values = local.rv};
+	}
+
+	/**
+	 * Internal function. `value` as `yyyy-mm-ddTHH:nn:ss.lll` (or `yyyy-mm-dd` when `dateOnly`), or ""
+	 * when it isn't a valid date written as `yyyy-mm-dd` with an optional ` HH:nn`, `:ss` and
+	 * `.lll`, or CFML's `{ts '...'}` / `{d '...'}` form of one. Other forms (locale dates, time
+	 * zones, other fractions) are left to the one-parameter-per-value path, whose parsing they need.
+	 */
+	public string function $isoDateTimeValue(required string value, required boolean dateOnly) {
+		local.text = Trim(arguments.value);
+		local.wrapped = ReFind("^\{(ts|d) '([^']*)'\}$", local.text, 1, true);
+		if (local.wrapped.pos[1]) {
+			local.text = Mid(local.text, local.wrapped.pos[3], local.wrapped.len[3]);
+		}
+		local.pattern = arguments.dateOnly ? "^([0-9]{4})-([0-9]{2})-([0-9]{2})$" : "^([0-9]{4})-([0-9]{2})-([0-9]{2})([ T]([0-9]{2}):([0-9]{2})(:([0-9]{2})(\.([0-9]{3}))?)?)?$";
+		local.parts = $regexGroups(pattern = local.pattern, text = local.text, count = 10);
+		if (!ArrayLen(local.parts)) {
+			return "";
+		}
+		local.date = Left(local.text, 10);
+		if (!$isCalendarDate(local.date)) {
+			return "";
+		}
+		if (arguments.dateOnly) {
+			return local.date;
+		}
+		local.hour = Len(local.parts[5]) ? local.parts[5] : "00";
+		local.minute = Len(local.parts[6]) ? local.parts[6] : "00";
+		local.second = Len(local.parts[8]) ? local.parts[8] : "00";
+		local.fraction = Len(local.parts[10]) ? local.parts[10] : "000";
+		if (Val(local.hour) > 23 || Val(local.minute) > 59 || Val(local.second) > 59) {
+			return "";
+		}
+		return local.date & "T" & local.hour & ":" & local.minute & ":" & local.second & "." & local.fraction;
+	}
+
+	/**
+	 * Internal function. The text of groups 1 to `count` when `pattern` matches `text` ("" for a
+	 * group that took no part), or an empty array when it doesn't match. Engines differ in how
+	 * they report a group that took no part (0 or -1, or a shorter array), so any of those is "".
+	 */
+	public array function $regexGroups(required string pattern, required string text, required numeric count) {
+		local.match = ReFind(arguments.pattern, arguments.text, 1, true);
+		if (local.match.pos[1] < 1) {
+			return [];
+		}
+		local.rv = [];
+		for (local.i = 2; local.i <= arguments.count + 1; local.i++) {
+			if (local.i <= ArrayLen(local.match.pos) && local.match.pos[local.i] > 0 && local.match.len[local.i] > 0) {
+				ArrayAppend(local.rv, Mid(arguments.text, local.match.pos[local.i], local.match.len[local.i]));
+			} else {
+				ArrayAppend(local.rv, "");
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. True when `yyyy-mm-dd` names a real calendar day.
+	 */
+	public boolean function $isCalendarDate(required string ymd) {
+		local.year = Val(ListGetAt(arguments.ymd, 1, "-"));
+		local.month = Val(ListGetAt(arguments.ymd, 2, "-"));
+		local.day = Val(ListGetAt(arguments.ymd, 3, "-"));
+		if (local.year < 1 || local.month < 1 || local.month > 12 || local.day < 1) {
+			return false;
+		}
+		return local.day <= DaysInMonth(CreateDate(local.year, local.month, 1));
+	}
+
+	/**
+	 * Internal function. The SQL Server type an integer IN list is cast to, or "" for other types.
+	 */
+	public string function $stringSplitIntegerType(required string sqlType) {
+		local.types = {cf_sql_tinyint = "TINYINT", cf_sql_smallint = "SMALLINT", cf_sql_integer = "INT", cf_sql_bigint = "BIGINT"};
+		return StructKeyExists(local.types, arguments.sqlType) ? local.types[arguments.sqlType] : "";
+	}
+
+	/**
+	 * Internal function. Trimmed values cast to `sqlType`, when every value matches `pattern`.
+	 */
+	public struct function $stringSplitNumbers(required array values, required string pattern, required string sqlType) {
+		local.rv = [];
+		for (local.value in arguments.values) {
+			local.value = Trim(local.value);
+			if (!ReFind(arguments.pattern, local.value)) {
+				return {};
+			}
+			ArrayAppend(local.rv, local.value);
+		}
+		return {expression = "CAST(value AS #arguments.sqlType#)", values = local.rv};
+	}
+
+	/**
+	 * Internal function. Plain decimal values cast exactly to DECIMAL(38, s), `s` being the most
+	 * fraction digits of any value; empty when a value isn't a plain decimal or doesn't fit 38 digits.
+	 */
+	public struct function $stringSplitDecimals(required array values) {
+		local.scale = 0;
+		local.integerDigits = 0;
+		for (local.value in arguments.values) {
+			local.value = Trim(local.value);
+			if (!ReFind("^-?[0-9]+(\.[0-9]+)?$", local.value)) {
+				return {};
+			}
+			local.scale = Max(local.scale, $fractionDigitCount(local.value));
+			local.integerDigits = Max(local.integerDigits, $integerDigitCount(local.value));
+		}
+		if (local.integerDigits + local.scale > 38) {
+			return {};
+		}
+		return $stringSplitNumbers(
+			values = arguments.values,
+			pattern = "^-?[0-9]+(\.[0-9]+)?$",
+			sqlType = "DECIMAL(38, #local.scale#)"
+		);
+	}
+
+	/**
+	 * Internal function. String values, compared as they are. A value holding the NCHAR(31)
+	 * delimiter can't be split, so it is refused with a clear error.
+	 */
+	public struct function $stringSplitStrings(required array values) {
+		for (local.value in arguments.values) {
+			if (Find(Chr(31), local.value)) {
+				Throw(
+					type = "Wheels.QueryParamValue",
+					message = "An IN list value contains the control character Chr(31), which Wheels uses to bind long IN lists on SQL Server.",
+					extendedInfo = "Remove the character from the value, or query the values in batches of fewer than #$maxBoundParameters()#."
+				);
+			}
+		}
+		return {expression = "value", values = arguments.values};
+	}
+
+	/**
+	 * Internal function. The parameter count above which IN lists are split: the database limit,
+	 * or a lower value set by $setInListSplitLimit() (used by the specs to exercise the split path).
+	 */
+	public numeric function $inListSplitLimit() {
+		if (StructKeyExists(variables, "inListSplitLimit") && variables.inListSplitLimit > 0) {
+			return variables.inListSplitLimit;
+		}
+		return $maxBoundParameters();
+	}
+
+	/**
+	 * Internal function. Sets the split limit; 0 restores the database limit.
+	 */
+	public void function $setInListSplitLimit(required numeric limit) {
+		variables.inListSplitLimit = arguments.limit;
+	}
+
+	/**
+	 * Internal function. Wheels.TooManyParameters advice for SQL Server: which long lists run as one
+	 * STRING_SPLIT parameter, and that every other list (or a database below level 130) doesn't.
+	 */
+	public string function $tooManyParametersAdvice(required numeric limit) {
+		return super.$tooManyParametersAdvice(limit = arguments.limit)
+			& " On SQL Server 2016 and later (database compatibility level 130 or higher), Wheels runs a long list of integers, plain decimals (up to 38 digits), strings or uniqueidentifiers as one parameter, and also a list of dates or timestamps written as yyyy-mm-dd with an optional HH:nn, :ss and .lll, or of times written as HH:mm with an optional :ss and fraction. Any other list (dates written another way, float, real, bit, text or binary values, or numbers written another way, such as +5, .5 or 1E5), or a database below level 130, still needs batching.";
+	}
+
+	/**
+	 * Internal function. True when the datasource's database has compatibility level 130 or higher,
+	 * which STRING_SPLIT needs. Read once per datasource and kept in the application's Wheels
+	 * settings, so an application reload reads it again. A failed read isn't kept: it is tried again
+	 * once $probeRetrySeconds() have passed, and until then the answer is false.
+	 */
+	public boolean function $supportsStringSplit(required string dataSource) {
+		local.appKey = $appKey();
+		local.dataSource = $effectiveDataSource(arguments.dataSource);
+		if (!StructKeyExists(application[local.appKey], "sqlServerCompatibilityLevels")) {
+			application[local.appKey].sqlServerCompatibilityLevels = {};
+		}
+		local.levels = application[local.appKey].sqlServerCompatibilityLevels;
+		if (!StructKeyExists(local.levels, local.dataSource)) {
+			if ($probeFailedRecently(probe = "compatibilityLevel", dataSource = local.dataSource)) {
+				return false;
+			}
+			local.level = $readCompatibilityLevel(local.dataSource);
+			if (local.level <= 0) {
+				$noteProbeResult(probe = "compatibilityLevel", dataSource = local.dataSource, failed = true);
+				return false;
+			}
+			$noteProbeResult(probe = "compatibilityLevel", dataSource = local.dataSource, failed = false);
+			local.levels[local.dataSource] = local.level;
+		}
+		return local.levels[local.dataSource] >= 130;
+	}
+
+	/**
+	 * Internal function. The database's compatibility level, or 0 when it can't be read.
+	 */
+	public numeric function $readCompatibilityLevel(required string dataSource) {
+		local.options = {datasource = arguments.dataSource};
+		if (Len(variables.username)) {
+			local.options.username = variables.username;
+		}
+		if (Len(variables.password)) {
+			local.options.password = variables.password;
+		}
+		try {
+			local.query = QueryExecute("SELECT compatibility_level AS lvl FROM sys.databases WHERE name = DB_NAME()", [], local.options);
+			return local.query.recordCount ? Val(local.query.lvl) : 0;
+		} catch (any e) {
+			return 0;
+		}
+	}
+
+	/**
+	 * Internal function. The CAST each date or timestamp IN list is split with, keyed by cf_sql type:
+	 * the type the datasource's driver binds that cf_sql type as, so a split list matches exactly
+	 * the rows a list bound one parameter per value matches (#4318). Read once per datasource and
+	 * kept in the application's Wheels settings, like the compatibility level; a failed read is
+	 * tried again once $probeRetrySeconds() have passed, and until then no date list is split.
+	 */
+	public struct function $stringSplitDateCasts(required string dataSource) {
+		local.appKey = $appKey();
+		local.dataSource = $effectiveDataSource(arguments.dataSource);
+		if (!StructKeyExists(application[local.appKey], "sqlServerDateBindTypes")) {
+			application[local.appKey].sqlServerDateBindTypes = {};
+		}
+		local.bindTypes = application[local.appKey].sqlServerDateBindTypes;
+		if (!StructKeyExists(local.bindTypes, local.dataSource)) {
+			if ($probeFailedRecently(probe = "dateBindTypes", dataSource = local.dataSource)) {
+				return {};
+			}
+			local.read = $readDateBindTypes(local.dataSource);
+			$noteProbeResult(probe = "dateBindTypes", dataSource = local.dataSource, failed = StructIsEmpty(local.read));
+			if (StructIsEmpty(local.read)) {
+				return {};
+			}
+			local.bindTypes[local.dataSource] = local.read;
+		}
+		return $dateCastsFor(local.bindTypes[local.dataSource]);
+	}
+
+	/**
+	 * Internal function. True when `probe` failed for `dataSource` less than $probeRetrySeconds() ago,
+	 * so it isn't run again yet: a broken probe would otherwise run before every long statement.
+	 */
+	public boolean function $probeFailedRecently(required string probe, required string dataSource) {
+		local.failures = $probeFailures();
+		local.key = arguments.probe & "|" & arguments.dataSource;
+		return StructKeyExists(local.failures, local.key) && GetTickCount() - local.failures[local.key] < $probeRetrySeconds() * 1000;
+	}
+
+	/**
+	 * Internal function. Records when `probe` failed for `dataSource`, or forgets an earlier failure
+	 * once it succeeds.
+	 */
+	public void function $noteProbeResult(required string probe, required string dataSource, required boolean failed) {
+		local.failures = $probeFailures();
+		local.key = arguments.probe & "|" & arguments.dataSource;
+		if (arguments.failed) {
+			local.failures[local.key] = GetTickCount();
+		} else {
+			StructDelete(local.failures, local.key);
+		}
+	}
+
+	/**
+	 * Internal function. When each SQL Server probe last failed, keyed by `probe|dataSource`, kept in
+	 * the application's Wheels settings so a reload starts afresh.
+	 */
+	public struct function $probeFailures() {
+		local.appKey = $appKey();
+		if (!StructKeyExists(application[local.appKey], "sqlServerProbeFailures")) {
+			application[local.appKey].sqlServerProbeFailures = {};
+		}
+		return application[local.appKey].sqlServerProbeFailures;
+	}
+
+	/**
+	 * Internal function. How long a failed SQL Server probe waits before it is tried again.
+	 */
+	public numeric function $probeRetrySeconds() {
+		return 60;
+	}
+
+	/**
+	 * Internal function. Casts for the bind types $readDateBindTypes() found. Only the bind types the
+	 * split form is proven to mirror get one: a timestamp bound as datetime2(7) and a date bound as
+	 * date. Any other driver behaviour leaves those lists to Wheels.TooManyParameters.
+	 */
+	public struct function $dateCastsFor(required struct bindTypes) {
+		local.rv = {};
+		if (StructKeyExists(arguments.bindTypes, "cf_sql_timestamp") && Compare(arguments.bindTypes.cf_sql_timestamp, "datetime2/7") == 0) {
+			local.rv.cf_sql_timestamp = "DATETIME2(7)";
+		}
+		if (StructKeyExists(arguments.bindTypes, "cf_sql_date") && Compare(arguments.bindTypes.cf_sql_date, "date/0") == 0) {
+			local.rv.cf_sql_date = "DATE";
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. The SQL Server base type and scale (`datetime2/7`) the driver binds a
+	 * cf_sql_timestamp and a cf_sql_date parameter as, or an empty struct when it can't be read.
+	 */
+	public struct function $readDateBindTypes(required string dataSource) {
+		local.options = {datasource = arguments.dataSource};
+		if (Len(variables.username)) {
+			local.options.username = variables.username;
+		}
+		if (Len(variables.password)) {
+			local.options.password = variables.password;
+		}
+		local.property = "CAST(SQL_VARIANT_PROPERTY(CAST(? AS SQL_VARIANT), '%s') AS VARCHAR(30))";
+		local.sql = "SELECT " & Replace(local.property, "%s", "BaseType") & " AS tsType, " & Replace(local.property, "%s", "Scale") & " AS tsScale, "
+			& Replace(local.property, "%s", "BaseType") & " AS dType, " & Replace(local.property, "%s", "Scale") & " AS dScale";
+		local.ts = {value = "2026-01-02 10:00:00", cfsqltype = "cf_sql_timestamp"};
+		local.d = {value = "2026-01-02", cfsqltype = "cf_sql_date"};
+		try {
+			local.query = QueryExecute(local.sql, [local.ts, local.ts, local.d, local.d], local.options);
+			return {
+				cf_sql_timestamp = LCase(local.query.tsType) & "/" & local.query.tsScale,
+				cf_sql_date = LCase(local.query.dType) & "/" & local.query.dScale
+			};
+		} catch (any e) {
+			return {};
+		}
 	}
 
 	/**
@@ -330,37 +935,241 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Acquire a SQL Server application lock using sp_getapplock.
-	 * The lock is scoped to the current session.
+	 * Acquire a SQL Server application lock using sp_getapplock, owned by the database session
+	 * (#4220), so no transaction is needed.
 	 */
 	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
-		queryExecute(
-			"EXEC sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockTimeout = ?",
-			[arguments.name, arguments.timeout * 1000],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
-		);
+		$acquireAdvisoryLockSession(name = arguments.name, timeout = arguments.timeout);
 	}
 
 	/**
-	 * Release a SQL Server application lock.
+	 * Internal function. Acquires a session-owned application lock (sp_getapplock @LockOwner =
+	 * 'Session') and returns the holding session's id, @@SPID read in the same batch (#4220, #4197).
+	 * The default 'Transaction' owner needs an open transaction, so withAdvisoryLock() used to fail
+	 * outside one.
+	 *
+	 * sp_getapplock RETURNS a status rather than throwing: >= 0 granted (0 immediately, 1 after
+	 * waiting), < 0 failed (-1 timeout, -2 canceled, -3 deadlock victim, -999 parameter/other). The
+	 * batch opens with SET NOCOUNT ON so the driver does not surface a leading update count ahead of
+	 * the SELECT, which would leave QueryExecute without a result set.
+	 */
+	public string function $acquireAdvisoryLockSession(required string name, numeric timeout = 10) {
+		local.result = queryExecute(
+			"SET NOCOUNT ON; DECLARE @r int; EXEC @r = sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = ?; SELECT @r AS lockResult, @@SPID AS sessionId",
+			[arguments.name, arguments.timeout * 1000],
+			$advisoryLockConnection()
+		);
+		local.status = (IsQuery(local.result) && local.result.recordCount) ? Val(local.result.lockResult) : -999;
+		if (local.status < 0) {
+			if (local.status == -1) {
+				Throw(
+					type = "Wheels.AdvisoryLockTimeout",
+					message = "Could not acquire advisory lock '#arguments.name#' within #arguments.timeout# seconds.",
+					extendedInfo = "SQL Server sp_getapplock returned -1 (timeout), indicating another session holds the lock."
+				);
+			}
+			Throw(
+				type = "Wheels.AdvisoryLockError",
+				message = "Could not acquire advisory lock '#arguments.name#' (sp_getapplock returned #local.status#).",
+				extendedInfo = "SQL Server sp_getapplock returned a negative status: -2 canceled, -3 deadlock victim, -999 parameter or other error."
+			);
+		}
+		return local.result.sessionId;
+	}
+
+	/**
+	 * Release a SQL Server application lock held by this session. A session that doesn't hold it
+	 * releases nothing.
 	 */
 	public void function $releaseAdvisoryLock(required string name) {
-		queryExecute(
-			"EXEC sp_releaseapplock @Resource = ?",
-			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
-		);
+		$tryReleaseAdvisoryLock(name = arguments.name);
 	}
 
 	/**
-	 * SQL Server's sp_getapplock requires an active user transaction; calling
-	 * `withAdvisoryLock` outside one raises "The statement or function must be
-	 * executed in the context of a user transaction." Until the locking path
-	 * grows an implicit transaction wrapper, report as unsupported so the test
-	 * suite (and any capability-aware callers) skip rather than error.
+	 * Internal function. Releases the lock when this pooled session holds it and reports whether it
+	 * did (#4197). APPLOCK_MODE is checked first: sp_releaseapplock on a session that doesn't hold
+	 * the lock raises an error instead of returning a status.
+	 */
+	public boolean function $tryReleaseAdvisoryLock(required string name) {
+		local.result = queryExecute(
+			"SET NOCOUNT ON; DECLARE @n nvarchar(255) = ?; DECLARE @r int = -1; IF APPLOCK_MODE('public', @n, 'Session') <> 'NoLock' EXEC @r = sp_releaseapplock @Resource = @n, @LockOwner = 'Session'; SELECT @r AS released",
+			[arguments.name],
+			$advisoryLockConnection()
+		);
+		return IsQuery(local.result) && local.result.recordCount && Val(local.result.released) >= 0;
+	}
+
+	/**
+	 * Internal function. True while the named lock is held: by the session `holder` when given, by
+	 * any session otherwise (#4197). The holder is read from sys.dm_tran_locks, where an application
+	 * lock appears as `<db>:[<first 32 characters of the name>]:(<hash>)`. That view needs the VIEW
+	 * SERVER (PERFORMANCE) STATE permission; without it the check falls back to whether ANY session
+	 * holds the lock (APPLOCK_MODE for this session, APPLOCK_TEST for the others), which can only
+	 * make a release wait longer, never report a held lock as free.
+	 */
+	public boolean function $isAdvisoryLockHeld(required string name, string holder = "") {
+		if (!StructKeyExists(variables, "$applockViewDenied")) {
+			try {
+				return $isAdvisoryLockHeldBySession(name = arguments.name, holder = arguments.holder);
+			} catch (any e) {
+				// Only a missing permission switches this adapter to the fallback for good.
+				if (!$isPermissionDenied(e)) {
+					rethrow;
+				}
+				variables.$applockViewDenied = true;
+			}
+		}
+		return $isAdvisoryLockHeldByAnySession(name = arguments.name);
+	}
+
+	/**
+	 * Internal function. True when a database error is SQL Server refusing a permission: error 300
+	 * (VIEW ... STATE permission was denied), 297 (the user does not have permission to perform this
+	 * action) or 229 (permission denied on an object). Keyed on the error number, so it holds on a
+	 * server whose messages aren't in English; the message text is a fallback for an engine that
+	 * gives no number.
+	 */
+	public boolean function $isPermissionDenied(required any exception) {
+		if (ListFind("229,297,300", $sqlServerErrorNumber(arguments.exception))) {
+			return true;
+		}
+		local.text = "";
+		for (local.key in ["message", "detail"]) {
+			try {
+				local.text &= " " & arguments.exception[local.key];
+			} catch (any e) {
+			}
+		}
+		return FindNoCase("permission", local.text) > 0;
+	}
+
+	/**
+	 * Internal function. SQL Server's error number for a database error, or 0. Each engine keeps it
+	 * somewhere else: Lucee and Adobe in nativeErrorCode, BoxLang only on the driver's
+	 * SQLServerException in the Java cause chain, and a thrown error (cfthrow) in errorCode.
+	 */
+	public numeric function $sqlServerErrorNumber(required any exception) {
+		try {
+			local.native = arguments.exception.nativeErrorCode;
+			if (IsNumeric(local.native) && local.native > 0) {
+				return Val(local.native);
+			}
+		} catch (any e) {
+		}
+		try {
+			local.cause = arguments.exception.getCause();
+			local.depth = 0;
+			while (!IsNull(local.cause) && local.depth < 5) {
+				local.code = local.cause.getErrorCode();
+				if (IsNumeric(local.code) && local.code > 0) {
+					return Val(local.code);
+				}
+				local.cause = local.cause.getCause();
+				local.depth++;
+			}
+		} catch (any e) {
+		}
+		try {
+			local.code = arguments.exception.errorCode;
+			if (IsNumeric(local.code) && local.code > 0) {
+				return Val(local.code);
+			}
+		} catch (any e) {
+		}
+		return 0;
+	}
+
+	/**
+	 * Internal function. The sys.dm_tran_locks form of $isAdvisoryLockHeld(); throws without the VIEW
+	 * SERVER (PERFORMANCE) STATE permission.
+	 */
+	public boolean function $isAdvisoryLockHeldBySession(required string name, string holder = "") {
+		local.sql = "SELECT COUNT(*) AS n FROM sys.dm_tran_locks WHERE resource_type = 'APPLICATION' AND request_owner_type = 'SESSION' AND CHARINDEX('[' + LEFT(?, 32) + ']', resource_description) > 0";
+		local.params = [arguments.name];
+		if (Len(arguments.holder)) {
+			local.sql &= " AND request_session_id = ?";
+			ArrayAppend(local.params, {value = arguments.holder, cfsqltype = "cf_sql_integer"});
+		}
+		local.result = queryExecute(local.sql, local.params, $advisoryLockConnection());
+		return IsQuery(local.result) && local.result.recordCount && Val(local.result.n) > 0;
+	}
+
+	/**
+	 * Internal function. True when any session holds the lock, read without special permissions:
+	 * APPLOCK_MODE for this session (APPLOCK_TEST grants a session its own lock), APPLOCK_TEST for the
+	 * others.
+	 */
+	public boolean function $isAdvisoryLockHeldByAnySession(required string name) {
+		local.result = queryExecute(
+			"SET NOCOUNT ON; DECLARE @n nvarchar(255) = ?; SELECT CASE WHEN APPLOCK_MODE('public', @n, 'Session') <> 'NoLock' THEN 1 WHEN APPLOCK_TEST('public', @n, 'Exclusive', 'Session') = 0 THEN 1 ELSE 0 END AS held",
+			[arguments.name],
+			$advisoryLockConnection()
+		);
+		return IsQuery(local.result) && local.result.recordCount && Val(local.result.held) == 1;
+	}
+
+	/**
+	 * SQL Server supports standalone advisory locks with a session-owned sp_getapplock (#4220).
 	 */
 	public boolean function $supportsAdvisoryLocks() {
-		return false;
+		return true;
+	}
+
+	/**
+	 * SQL Server supports the transaction-scoped path (#4198), using a SESSION-owned application lock
+	 * (sp_getapplock @LockOwner = 'Session'). The sp_getapplock 'Transaction' owner is unusable under
+	 * Lucee / Adobe: cftransaction sets the JDBC connection to autocommit = false without issuing an
+	 * explicit BEGIN TRANSACTION, so @@TRANCOUNT stays 0 and sp_getapplock @LockOwner = 'Transaction'
+	 * returns -999 (verified on Lucee 7 — the pinning gate proved same-connection but not
+	 * @@TRANCOUNT > 0). The transaction's role here is purely to pin one connection, exactly as for
+	 * MySQL, so the session lock, the callback's queries and the release all run on one session.
+	 */
+	public boolean function $supportsTransactionalAdvisoryLock() {
+		return true;
+	}
+
+	/**
+	 * A SESSION-owned application lock is session- not transaction-scoped: it does not auto-release at
+	 * transaction end, so the caller releases it explicitly on the pinned connection before the
+	 * transaction closes (#4198). Same contract as MySQL.
+	 */
+	public boolean function $transactionalAdvisoryLockIsSessionScoped() {
+		return true;
+	}
+
+	/**
+	 * Internal function. Acquires a SQL Server session-owned application lock with sp_getapplock on
+	 * the current (pinned) connection (#4198). @LockOwner = 'Session' is required because cftransaction
+	 * does not raise @@TRANCOUNT on SQL Server (see $supportsTransactionalAdvisoryLock).
+	 *
+	 * The same session-owned acquire as the standalone path ($acquireAdvisoryLockSession); the
+	 * enclosing transaction is what pins it to the callback's connection.
+	 */
+	public void function $acquireAdvisoryLockTransactional(required string name, numeric timeout = 10) {
+		$acquireAdvisoryLockSession(name = arguments.name, timeout = arguments.timeout);
+	}
+
+	/**
+	 * Internal function. Releases the SQL Server session-owned application lock on the pinned
+	 * connection before the transaction closes (#4198). sp_releaseapplock returns >= 0 on success
+	 * (0 released) and < 0 on error; on the pinned connection a negative result is a real failure and
+	 * is thrown (no retry). SET NOCOUNT ON keeps the status SELECT the only result set. The caller runs
+	 * this in a finally inside the transaction, so a release error never replaces the callback's own.
+	 */
+	public void function $releaseAdvisoryLockTransactional(required string name) {
+		local.result = queryExecute(
+			"SET NOCOUNT ON; DECLARE @r int; EXEC @r = sp_releaseapplock @Resource = ?, @LockOwner = 'Session'; SELECT @r AS releaseResult",
+			[arguments.name],
+			$advisoryLockConnection()
+		);
+		local.status = (IsQuery(local.result) && local.result.recordCount) ? Val(local.result.releaseResult) : -999;
+		if (local.status < 0) {
+			Throw(
+				type = "Wheels.AdvisoryLockReleaseFailed",
+				message = "Advisory lock '#arguments.name#' could not be released on its pinned connection.",
+				extendedInfo = "SQL Server sp_releaseapplock returned #local.status# on the connection that holds the lock, which should not happen inside the lock's own transaction."
+			);
+		}
 	}
 
 	/**

@@ -10,6 +10,7 @@ component {
 	 */
 	public void function provides(string formats = "") {
 		$combineArguments(args = arguments, combine = "formats,format", required = true);
+		$checkArguments(args = arguments, name = "provides");
 		arguments.formats = $listClean(arguments.formats);
 		local.possibleFormats = StructKeyList($get("formats"));
 		local.formatsArray = ListToArray(arguments.formats);

@@ -14,28 +14,34 @@ component output="false" {
 
 	this.bufferOutput = true;
 
+	// The project root, one level up from this public/ directory. Built from this file's own
+	// path, not expandPath("../"): that resolves against the REQUESTED page's directory on
+	// some engines, so for a page under public/sub/ every mapping below pointed inside
+	// public/ and the request failed (#4470).
+	this.wheels.projectRoot = REReplace(this.wheels.rootPath, "[^/\\]+[/\\]$", "");
+
 	// Set up the application paths.
-	this.appDir     = expandPath("../app/");
-	this.vendorDir  = expandPath("../vendor/");
+	this.appDir     = this.wheels.projectRoot & "app/";
+	this.vendorDir  = this.wheels.projectRoot & "vendor/";
 	this.wheelsDir  = this.vendorDir & "wheels/";
 	// Set up the mappings for the application.
 	this.mappings["/app"]     = this.appDir;
 	this.mappings["/vendor"]  = this.vendorDir;
 	this.mappings["/wheels"]  = this.wheelsDir;
-	this.mappings["/tests"] = expandPath("../tests");
-	this.mappings["/config"] = expandPath("../config");
-	this.mappings["/plugins"] = expandPath("../plugins");
-	this.mappings["/cli"] = expandPath("../cli/");
+	this.mappings["/tests"] = this.wheels.projectRoot & "tests";
+	this.mappings["/config"] = this.wheels.projectRoot & "config";
+	this.mappings["/plugins"] = this.wheels.projectRoot & "plugins";
+	this.mappings["/cli"] = this.wheels.projectRoot & "cli/";
 	// Mirror LuCLI's runtime mapping so production code under cli/lucli/services/
 	// can resolve its own modules.wheels.X dotted-path refs when running inside
 	// the framework's own test server (e.g. via /wheels/cli/tests). The CLI
 	// services use modules.wheels.X for their internal cross-references because
 	// that prefix resolves identically across every install context (dev
 	// symlink, brew bottle, choco package). See PR #2309 for context.
-	this.mappings["/modules/wheels"] = expandPath("../cli/lucli/");
+	this.mappings["/modules/wheels"] = this.wheels.projectRoot & "cli/lucli/";
 
 	// Test double for LuCLI's modules.BaseModule under /wheels/cli/tests — see #2829 / PR #2831.
-	this.mappings["/modules"] = expandPath("../cli/lucli/tests/_modules");
+	this.mappings["/modules"] = this.wheels.projectRoot & "cli/lucli/tests/_modules";
 
 	// We turn on "sessionManagement" by default since the Flash uses it.
 	this.sessionManagement = true;

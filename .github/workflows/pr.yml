@@ -13,7 +13,7 @@ permissions:
 jobs:
   commitlint:
     name: Validate Commit Messages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
@@ -28,7 +28,7 @@ jobs:
   fast-test:
     name: "Lucee 7 + SQLite (LuCLI)"
     if: github.event.action != 'edited'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       WHEELS_CI: "true"
       # A framework-repository run: RequireRepoPathSpec fails if the repository-only
@@ -198,7 +198,7 @@ jobs:
   tutorial-e2e:
     name: "Tutorial E2E (new → scaffold → migrate → routes → .json → test)"
     if: github.event.action != 'edited'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 

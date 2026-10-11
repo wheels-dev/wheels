@@ -21,11 +21,22 @@
 	}
 
 	/**
-	 * Deletes all queries stored during the request for this model.
+	 * Clears the ENTIRE per-request query cache — every model's slot, not just this model's (#4429).
+	 *
+	 * A finder's result is cached in the base model's slot keyed by its SQL, so a query that joins
+	 * another model through `include=` lives in the base model's slot. Clearing only the writing
+	 * model's slot left such a cross-model query returning this model's pre-write columns for the rest
+	 * of the request. Every ORM write path funnels through here (create / update / delete / *All /
+	 * *ByKey / the #4397 soft-delete UPDATE via $runDeleteStatement), so clearing all of it here means
+	 * no write path can forget the cross-model case. The cache is request-scoped, so re-running the
+	 * affected reads after a write is both correct and cheap. Raw (non-ORM) writes are the caller's job
+	 * via `forgetCachedQueries(all = true)`.
 	 */
 	public void function $clearRequestCache() {
-		$ensureRequestQueryCache();
-		request.wheels["$queryCache"][variables.wheels.class.modelName] = {};
+		if (!StructKeyExists(request, "wheels")) {
+			request.wheels = {};
+		}
+		request.wheels["$queryCache"] = {};
 	}
 
 	/**
@@ -64,6 +75,7 @@
 	 * @name Name of the table to map this model to.
 	 */
 	public void function table(required any name) {
+		$checkArguments(args = arguments, name = "table");
 		variables.wheels.class.tableName = arguments.name;
 	}
 

@@ -180,6 +180,34 @@ Since 4.1, the message blocks worth pasting into a coding agent have a **Copy** 
 
 The development error page has a **Copy** button too. It copies a JSON dump of the exception: type, message, suggested action, file and line, the source snippet, and the app and framework stack frames.
 
+### Errors for agents and scripts
+
+In the `development` environment, a request that fails gets that same content without a browser, when it asks for it:
+
+| The request | The error response |
+|---|---|
+| `Accept: application/json`, or `?format=json` | The JSON payload, with `statusCode` added. `Content-Type: application/json; charset=utf-8`. |
+| `Accept: text/markdown` (without `application/json`), or `?format=md` | The same content as Markdown: a heading with the type and message, the status and request, the suggested action, the location with its source snippet, and the stack with app frames listed and framework frames counted. `Content-Type: text/markdown; charset=utf-8`. |
+
+The HTTP status is the one the error page uses: 404 for a missing record or route, 403 for an authorization failure, 500 for anything else. Anything the request wrote before it failed is dropped, so the body is only the JSON or Markdown. A request for HTML still gets the error page.
+
+```bash
+curl -H "Accept: text/markdown" http://localhost:8080/posts/999
+curl -H "Accept: application/json" http://localhost:8080/posts/999
+curl "http://localhost:8080/posts/999?format=md"
+```
+
+```md title="The Markdown response (trimmed)"
+# Wheels.RecordNotFound: No post 999
+
+**Status:** 404 | **Request:** GET /posts/999 | **Wheels** 4.2.0
+
+## Location
+`app/controllers/Posts.cfc:12`
+```
+
+This is development only: it needs the `development` environment and `showErrorInformation` on (its development default). With `showErrorInformation` off, development errors render as they did before. In `testing`, `maintenance` and `production` the error responses are unchanged; production still renders your `app/events/onerror.cfm` (or `onerror.json.cfm`), with no exception details. `md` is a format for error responses only: it isn't added to the `formats` setting, so it doesn't change how your controllers negotiate content.
+
 ## Tools tab
 
 Shown when `enablePublicComponent` is `true` (the default in development). Opens a short grid of link cards, each opening in a new tab. Routes, Tests, Migrator and Packages used to be cards here; since 4.1 they are tabs of their own (see above).

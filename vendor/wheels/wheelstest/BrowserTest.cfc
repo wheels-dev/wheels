@@ -396,9 +396,14 @@ component extends="wheels.WheelsTest" {
      *   2. get("browserTestBaseUrl")          — Wheels setting
      *   3. -Dwheels.browserTest.baseUrl=...   — JVM system property
      *   4. WHEELS_BROWSER_TEST_BASE_URL env   — CI / shell
-     *   5. $detectBaseUrlFromCgi(cgi)         — derived from the in-flight
+     *   5. probed servlet local listen port   — when the request's local port
+     *                                            differs from its Host port,
+     *                                            probe the loopback candidate
+     *                                            (http then https) and use the
+     *                                            one that answers as HTTP
+     *   6. $detectBaseUrlFromCgi(cgi)         — derived from the in-flight
      *                                            test-runner request
-     *   6. "http://localhost:8080" default    — bare LuCLI port
+     *   7. "http://localhost:8080" default    — bare LuCLI port
      *
      * For specs that use only `visitUrl(absolute)` (e.g. data:/file:), the
      * baseUrl is effectively unused.
@@ -406,6 +411,37 @@ component extends="wheels.WheelsTest" {
     public string function $resolveBaseUrl() {
         if (len(this.baseUrl ?: "")) return this.baseUrl;
 
+        var configured = $configuredBrowserBaseUrl();
+        if (len(configured)) return configured;
+
+        try {
+            var mapped = $resolveServletLoopbackBaseUrl(cgi);
+            if (len(mapped)) return mapped;
+        } catch (any e) {
+            // Servlet request unavailable or probe failed — fall through to cgi.
+        }
+
+        try {
+            var detected = $detectBaseUrlFromCgi(cgi);
+            if (len(detected)) return detected;
+        } catch (any e) {
+            // cgi scope unavailable (rare; e.g. background thread) — fall
+            // through to the hardcoded default.
+        }
+
+        return "http://localhost:8080";
+    }
+
+    /**
+     * The configured (non-per-instance) browser base URL override: the
+     * `browserTestBaseUrl` setting, then `-Dwheels.browserTest.baseUrl`, then
+     * the `WHEELS_BROWSER_TEST_BASE_URL` env var, or "" when none is set. A
+     * public seam so resolver-level specs can neutralise every ambient
+     * override at once — the env var in particular cannot be unset from the
+     * JVM, so save/restore is not an option — and drive the probe/cgi path
+     * deterministically regardless of the CI environment.
+     */
+    public string function $configuredBrowserBaseUrl() {
         try {
             var setting = get(name="browserTestBaseUrl");
             if (len(setting ?: "")) return setting;
@@ -421,18 +457,9 @@ component extends="wheels.WheelsTest" {
             if (!isNull(env) && len(env)) return env;
         } catch (any e) {
             // Best-effort: a SecurityManager could deny system access.
-            // Falling through to CGI detection / default is correct.
         }
 
-        try {
-            var detected = $detectBaseUrlFromCgi(cgi);
-            if (len(detected)) return detected;
-        } catch (any e) {
-            // cgi scope unavailable (rare; e.g. background thread) — fall
-            // through to the hardcoded default.
-        }
-
-        return "http://localhost:8080";
+        return "";
     }
 
     /**

@@ -12,11 +12,11 @@
 	// `jdbc:h2:file:./db/...` resolves against the server process's working
 	// directory, which for a LuCLI server is the Lucee Express install, so
 	// every checkout on the machine shared (and locked) one database file.
-	// expandPath("../") is the app root, as for the SQLite datasources below
-	// and in the `wheels new` template.
+	// this.wheels.projectRoot is the app root (set in public/Application.cfc from its own
+	// path), as for the SQLite datasources below and in the `wheels new` template (#4470).
 	this.datasources['wheels-dev'] = {
 		class: 'org.h2.Driver'
-	, connectionString: "jdbc:h2:file:" & expandPath("../db/h2/wheels-dev") & ";MODE=MySQL"
+	, connectionString: "jdbc:h2:file:" & this.wheels.projectRoot & "db/h2/wheels-dev;MODE=MySQL"
 	, username: 'sa'
 	};
 
@@ -24,7 +24,7 @@
 	// separate database, and refuse to run without one.
 	this.datasources['wheels-dev_test'] = {
 		class: 'org.h2.Driver'
-	, connectionString: "jdbc:h2:file:" & expandPath("../db/h2/wheels-dev_test") & ";MODE=MySQL"
+	, connectionString: "jdbc:h2:file:" & this.wheels.projectRoot & "db/h2/wheels-dev_test;MODE=MySQL"
 	, username: 'sa'
 	};
 
@@ -33,11 +33,11 @@
 	if (server.system.environment.WHEELS_CI ?: "" == "true") {
 		this.datasources["wheelstestdb_sqlite"] = {
 			class: "org.sqlite.JDBC",
-			connectionString: "jdbc:sqlite:#expandPath('../')#wheelstestdb.db"
+			connectionString: "jdbc:sqlite:#this.wheels.projectRoot#wheelstestdb.db"
 		};
 		this.datasources["wheelstestdb_sqlite_tenant_b"] = {
 			class: "org.sqlite.JDBC",
-			connectionString: "jdbc:sqlite:#expandPath('../')#wheelstestdb_tenant_b.db"
+			connectionString: "jdbc:sqlite:#this.wheels.projectRoot#wheelstestdb_tenant_b.db"
 		};
 	}
 

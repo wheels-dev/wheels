@@ -1,0 +1,1 @@
+- The dependency injector no longer throws a spurious `Wheels.DI.CircularDependency` when two of a request's `cfthread`s resolve the same transient (or request-scoped) service at the same time; the circular-dependency guard is now keyed per thread while keeping its per-request scope (#4448)

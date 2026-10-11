@@ -1,0 +1,1 @@
+- `wheels generate controller <Name>` with no actions now writes an empty controller instead of an `index()` stub with no matching view, which 500s at runtime (#4414)

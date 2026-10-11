@@ -207,6 +207,7 @@
 	 * Internal function.
 	 */
 	public void function $registerCallback(required string type, required string methods) {
+		$checkArguments(args = arguments, name = arguments.type, accepted = "type,method");
 		// Create this type in the array if it doesn't already exist.
 		if (!StructKeyExists(variables.wheels.class.callbacks, arguments.type)) {
 			variables.wheels.class.callbacks[arguments.type] = [];
@@ -374,6 +375,7 @@
 	 * @on Restrict to one or more operations: create, update, delete (comma-delimited; blank = all).
 	 */
 	public void function afterCommit(string methods = "", string on = "") {
+		$checkArguments(args = arguments, name = "afterCommit");
 		$registerTransactionCallback(type = "afterCommit", methods = arguments.methods, on = arguments.on);
 	}
 
@@ -387,6 +389,7 @@
 	 * @on Restrict to one or more operations: create, update, delete (comma-delimited; blank = all).
 	 */
 	public void function afterRollback(string methods = "", string on = "") {
+		$checkArguments(args = arguments, name = "afterRollback");
 		$registerTransactionCallback(type = "afterRollback", methods = arguments.methods, on = arguments.on);
 	}
 
@@ -425,9 +428,18 @@
 	 * fire; or, with no real transaction (none/false mode), fires afterCommit now
 	 * because the write is already committed (decision B1). Inside a foreign raw
 	 * transaction{} (detectable engines only) it skips both callbacks and warns once.
+	 * With `callbacks = false` (a save or delete that skips its callbacks) only the saved-change
+	 * restore is queued.
 	 */
-	public void function $enqueueTransactionCallbacks(required string operation) {
-		if (!$hasTransactionCallbacks()) {
+	public void function $enqueueTransactionCallbacks(required string operation, struct savedBefore, boolean callbacks = true, struct softDeleteBefore) {
+		// A delete changes no saved-change state, so a rollback puts back the current one.
+		if (!StructKeyExists(arguments, "savedBefore")) {
+			arguments.savedBefore = $savedChangesState();
+		}
+		if (!arguments.callbacks || !$hasTransactionCallbacks()) {
+			// No callbacks to fire, but a rollback must still put back what savedChanges() reported
+			// before this save (F49), so the save is queued for that alone.
+			$enqueueSavedChangesRestore(argumentCollection = arguments);
 			return;
 		}
 		local.conn = this.$hashedConnectionArgs();
@@ -447,12 +459,48 @@
 			&& StructKeyExists(request.wheels.$txnCallbacks, local.conn)
 			&& request.wheels.$txnCallbacks[local.conn].real
 		) {
-			ArrayAppend(
-				request.wheels.$txnCallbacks[local.conn].queue,
-				{object = this, operation = arguments.operation}
-			);
+			local.entry = {
+				object = this,
+				operation = arguments.operation,
+				callbacks = true,
+				savedChanges = $savedChangesState(),
+				savedBefore = arguments.savedBefore
+			};
+			if (StructKeyExists(arguments, "softDeleteBefore")) {
+				local.entry.softDeleteBefore = arguments.softDeleteBefore;
+			}
+			ArrayAppend(request.wheels.$txnCallbacks[local.conn].queue, local.entry);
 		} else {
 			this.$runTransactionCallbacks(type = "afterCommit", operation = arguments.operation);
+		}
+	}
+
+	/**
+	 * Internal. Queues a save of a model with no afterCommit / afterRollback callbacks, inside a real
+	 * Wheels transaction only, so a rollback puts back the saved-change state from before it (F49).
+	 * Checked cheaply first: outside a Wheels transaction there is nothing to queue.
+	 */
+	public void function $enqueueSavedChangesRestore(required string operation, required struct savedBefore, struct softDeleteBefore) {
+		if (
+			!StructKeyExists(request, "wheels")
+			|| !StructKeyExists(request.wheels, "$txnCallbacks")
+			|| StructIsEmpty(request.wheels.$txnCallbacks)
+		) {
+			return;
+		}
+		local.conn = this.$hashedConnectionArgs();
+		if (StructKeyExists(request.wheels.$txnCallbacks, local.conn) && request.wheels.$txnCallbacks[local.conn].real) {
+			local.entry = {
+				object = this,
+				operation = arguments.operation,
+				callbacks = false,
+				savedChanges = $savedChangesState(),
+				savedBefore = arguments.savedBefore
+			};
+			if (StructKeyExists(arguments, "softDeleteBefore")) {
+				local.entry.softDeleteBefore = arguments.softDeleteBefore;
+			}
+			ArrayAppend(request.wheels.$txnCallbacks[local.conn].queue, local.entry);
 		}
 	}
 
@@ -742,14 +790,89 @@
 	 * leave a stuck transaction marker or a leaked queue.
 	 */
 	public void function $runQueueCallbacks(required array queue, required string type, boolean propagateErrors = true) {
+		// The first entry not yet run. A struct, not local: read in finally after a throw.
+		var progress = {next = 1};
+		try {
+			local.iEnd = ArrayLen(arguments.queue);
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				progress.next = local.i + 1;
+				local.entry = arguments.queue[local.i];
+				// An entry queued only to restore the saved-change state fires nothing (F49).
+				if (StructKeyExists(local.entry, "callbacks") && !local.entry.callbacks) {
+					continue;
+				}
+				$runQueueEntryCallbacks(entry = local.entry, type = arguments.type, propagateErrors = arguments.propagateErrors);
+			}
+		} finally {
+			// A callback that threw stops the queue as before, but a durable entry after it (a job
+			// enqueued with transactional = false) is still written, once. Helper calls: Lucee 7
+			// miscompiles loops inside finally.
+			$runRemainingDurableEntries(queue = arguments.queue, type = arguments.type, from = progress.next);
+			// A rollback puts each object back to what savedChanges() reported before its first
+			// rolled-back save.
+			if (arguments.type == "afterRollback") {
+				$restoreSavedChangesBeforeQueue(arguments.queue);
+			}
+		}
+	}
+
+	/**
+	 * Internal. Runs the durable entries of `queue` from position `from` on, without propagating their
+	 * errors: [see:$runQueueCallbacks] calls it once the main loop has stopped, so after a throwing
+	 * callback the durable entries it didn't reach are still attempted, each exactly once.
+	 */
+	public void function $runRemainingDurableEntries(required array queue, required string type, required numeric from) {
 		local.iEnd = ArrayLen(arguments.queue);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+		for (local.i = arguments.from; local.i <= local.iEnd; local.i++) {
 			local.entry = arguments.queue[local.i];
-			local.entry.object.$runTransactionCallbacks(
+			if (StructKeyExists(local.entry, "durable") && local.entry.durable) {
+				$runQueueEntryCallbacks(entry = local.entry, type = arguments.type, propagateErrors = false);
+			}
+		}
+	}
+
+	/**
+	 * Internal. Fires one queue entry's callbacks with the object reporting the save that queued it
+	 * (savedChanges(), F49), then puts back the object's own state, also when a callback throws.
+	 */
+	public void function $runQueueEntryCallbacks(required struct entry, required string type, boolean propagateErrors = true) {
+		local.object = arguments.entry.object;
+		// Only a model save carries a snapshot; other entries (a deferred job enqueue) just fire.
+		if (!StructKeyExists(arguments.entry, "savedChanges")) {
+			local.object.$runTransactionCallbacks(
 				type = arguments.type,
-				operation = local.entry.operation,
+				operation = arguments.entry.operation,
 				propagateErrors = arguments.propagateErrors
 			);
+			return;
+		}
+		local.current = local.object.$savedChangesState();
+		local.object.$restoreSavedChanges(arguments.entry.savedChanges);
+		try {
+			local.object.$runTransactionCallbacks(
+				type = arguments.type,
+				operation = arguments.entry.operation,
+				propagateErrors = arguments.propagateErrors
+			);
+		} finally {
+			local.object.$restoreSavedChanges(local.current);
+		}
+	}
+
+	/**
+	 * Internal. After a rollback, puts each object in `queue` back to the saved-change state from before
+	 * its first rolled-back save (F49): walked last to first, so the earliest entry's state wins.
+	 */
+	public void function $restoreSavedChangesBeforeQueue(required array queue) {
+		for (local.i = ArrayLen(arguments.queue); local.i >= 1; local.i--) {
+			local.entry = arguments.queue[local.i];
+			if (StructKeyExists(local.entry, "savedBefore")) {
+				local.entry.object.$restoreSavedChanges(local.entry.savedBefore);
+			}
+			// A rolled-back soft delete also puts back the object's deletedAt.
+			if (StructKeyExists(local.entry, "softDeleteBefore")) {
+				local.entry.object.$restoreSoftDeleteState(local.entry.softDeleteBefore);
+			}
 		}
 	}
 
@@ -801,7 +924,12 @@
 		local.rolledBack = [];
 		local.iEnd = ArrayLen(local.store.queue);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			if (local.i <= arguments.mark) {
+			// A durable entry (a job enqueued with transactional = false) stays queued: it must be
+			// written when the outermost transaction ends, not dropped with the savepoint.
+			if (
+				local.i <= arguments.mark
+				|| (StructKeyExists(local.store.queue[local.i], "durable") && local.store.queue[local.i].durable)
+			) {
 				ArrayAppend(local.kept, local.store.queue[local.i]);
 			} else {
 				ArrayAppend(local.rolledBack, local.store.queue[local.i]);

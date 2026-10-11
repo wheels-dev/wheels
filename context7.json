@@ -4,14 +4,13 @@
   "folders": [
     "docs/api",
     "web/sites/guides/src/content/docs",
+    "docs/consumer-ai",
     "app/snippets"
   ],
   "excludeFolders": [
     "cli",
-    "design_docs",
     "examples",
     "vendor",
-    "test-artifacts",
     "tests",
     "tools"
   ],
@@ -36,12 +35,20 @@
   ],
   "versions": [
     {
-      "tag": "v3.1.0",
-      "description": "Latest version with modern directory structure and enhanced features"
+      "tag": "v4.1.2",
+      "description": "Current release (the 4.1 line)"
     },
     {
-      "tag": "v2.5.0",
-      "description": "Stable release with traditional structure"
+      "tag": "v4.0.6",
+      "description": "Last release of the 4.0 line"
+    },
+    {
+      "tag": "v3.0.0+50",
+      "description": "Wheels 3.0.0"
+    },
+    {
+      "tag": "v2.5.1",
+      "description": "Last release of the 2.5 line"
     }
   ]
 }

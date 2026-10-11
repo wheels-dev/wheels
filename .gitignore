@@ -117,3 +117,6 @@ public/wheels-docs/
 .wheels-test-local.lock/
 .wheels-test-local.lock.takeover/
 lucee.json.test-local.bak
+
+# Built at release/snapshot time by tools/build/scripts/build-docs-index.mjs (wheels lookup)
+cli/lucli/data/docs-index.json

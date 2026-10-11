@@ -1,0 +1,1 @@
+- `$testClient().get()` accepts an optional `timeout` (seconds, default 30) that bounds the underlying HTTP request, so a request that may hang fails the asserting test case rather than timing out the whole test run (#4219)

@@ -6,15 +6,15 @@
 component extends="wheels.Job" {
 
 	public void function perform(struct data = {}) {
-		local.now = Now();
-		queryExecute(
+		local.now = $jobClock().nowEpoch();
+		$jobClock().query(
 			"UPDATE wheels_jobs
 			SET status = 'failed', failedAt = :failedAt, updatedAt = :updatedAt
 			WHERE id = :id",
 			{
 				id = {value = arguments.data.jobId, cfsqltype = "cf_sql_varchar"},
-				failedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}
+				failedAt = {value = local.now, cfsqltype = "wheels_epoch"},
+				updatedAt = {value = local.now, cfsqltype = "wheels_epoch"}
 			},
 			{datasource = application.wheels.dataSourceName}
 		);

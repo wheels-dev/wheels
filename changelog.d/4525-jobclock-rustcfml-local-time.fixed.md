@@ -1,0 +1,1 @@
+- On RustCFML, converting epoch timestamps to app-local time no longer goes wrong by the host's UTC offset when the engine runs outside UTC. The jobs clock (`enqueueAt()`, `JobRunner.status()`, queue stats) and other epoch-to-date reads now count from the epoch instant instead of local midnight on 1970-01-01. JVM engines were not affected (#4525).

@@ -1,0 +1,5 @@
+# RustCFML releases the daily version check (check-version.sh) must not evaluate or pin.
+# One per line: <tag> <link> <reason>. The link points at the upstream issue, or at the
+# commit when no issue exists. A listed release is skipped with a notice and the pin stays
+# where it is; the next unlisted release is evaluated as usual.
+v0.712.0 https://github.com/RustCFML/RustCFML/commit/f1ce5878bc9f A loop that runs `local.v = {}; local.v.args = Duplicate(arguments)` two or more times never returns, so the core suite hangs until the job times out. Introduced by the fix for RustCFML#465; v0.715.0 returns normally.

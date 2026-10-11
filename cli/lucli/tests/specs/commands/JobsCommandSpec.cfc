@@ -60,6 +60,37 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		return serializeJSON({success: true, jobResult: {skipped: true}});
 	}
 
+	// A Module for drain/resume: makeBridgePost returns `drained`; each makeHttpRequest (the
+	// --wait status poll) returns the next of `polls`; the pause between polls is skipped.
+	private any function drainModule(required string drained, required array polls) {
+		var m = new cli.lucli.Module(cwd = variables.tempRoot);
+		prepareMock(m);
+		m.$("out");
+		m.$("$jobsPause");
+		m.$(method = "$requireOwnRunningServer", returns = 61999);
+		m.$(method = "makeBridgePost", returns = arguments.drained);
+		if (arrayLen(arguments.polls)) {
+			m.$("makeHttpRequest").$results(argumentCollection = $positional(arguments.polls));
+		} else {
+			m.$("makeHttpRequest");
+		}
+		return m;
+	}
+
+	private string function hostJson(required numeric running, required boolean draining) {
+		return serializeJSON({success: true, host: {host: "spec-host", running: arguments.running, maxConcurrent: 0, draining: arguments.draining, drainExpiresAt: ""}});
+	}
+
+	// A Module whose `jobs install` gets `source` back from a canned jobsInstallSource response.
+	private any function installModule(required string source) {
+		var m = new cli.lucli.Module(cwd = variables.tempRoot);
+		prepareMock(m);
+		m.$("out");
+		m.$(method = "$requireRunningServer", returns = 61999);
+		m.$("makeHttpRequest", serializeJSON({success: true, migrationName: "CreateWheelsJobTables", source: arguments.source}));
+		return m;
+	}
+
 	private string function printed(required any m) {
 		var said = "";
 		for (var call in arguments.m.$callLog().out) {
@@ -185,6 +216,48 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("work --job-timeout", () => {
+
+			it("defaults to 0, each job's own timeout", () => {
+				expect(mod.$parseJobsArgs({arg1 = "work"}).jobTimeout).toBe(0);
+			});
+
+			it("parses --job-timeout=<seconds>", () => {
+				expect(mod.$parseJobsArgs({arg1 = "work", "job-timeout" = "1800"}).jobTimeout).toBe(1800);
+			});
+
+			it("refuses a negative --job-timeout", () => {
+				expect(() => mod.$parseJobsArgs({arg1 = "work", "job-timeout" = "-1"})).toThrow(type = "Wheels.InvalidArguments");
+			});
+
+			it("doesn't send a timeout without --job-timeout, so each job runs with its own", () => {
+				var m = workerModule([idlePoll()]);
+				m.jobs(arg1 = "work", "stop-when-empty" = "true");
+				expect(m.$callLog().makeBridgePost[1][1]).notToInclude("timeout=");
+				expect(printed(m)).toInclude("each job's own timeout");
+			});
+
+			it("names no option after a LuCLI root option, which the runtime would take before the module", () => {
+				// LuCLI's root command owns --timeout (it stops the whole command), --env and --envfile;
+				// `wheels test` uses --test-timeout for the same reason.
+				var m = new cli.lucli.Module(cwd = variables.tempRoot);
+				makePublic(m, "$commandOptionLines", "$jobsOptionLines");
+				var help = arrayToList(m.$jobsOptionLines("jobs"), chr(10));
+				expect(help).toInclude("--job-timeout");
+				for (var rootOption in ["timeout", "env", "envfile", "verbose", "debug", "timing", "whitespace"]) {
+					expect(reFind("(^|\s)--#rootOption#[\s=<]", help)).toBe(0, "jobs must not define --#rootOption#");
+				}
+			});
+
+			it("sends --job-timeout to the server as the cap", () => {
+				var m = workerModule([idlePoll()]);
+				m.jobs(arg1 = "work", "stop-when-empty" = "true", "job-timeout" = "1800");
+				expect(m.$callLog().makeBridgePost[1][1]).toInclude("&timeout=1800");
+				expect(printed(m)).toInclude("1800s");
+			});
+
+		});
+
 		describe("$formatJobsStatusTable — status rendering", () => {
 
 			it("reports no jobs for an empty stats struct", () => {
@@ -218,6 +291,130 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// partial payload instead of throwing mid-render.
 				var rendered = mod.$formatJobsStatusTable({});
 				expect(rendered).toInclude("No jobs found");
+			});
+
+		});
+
+		describe("drain and resume", () => {
+
+			it("parses a bare --wait as up to 600 seconds", () => {
+				var opts = mod.$parseJobsArgs({arg1: "drain", wait: "true"});
+				expect(opts.action).toBe("drain");
+				expect(opts.wait).toBe(600);
+				expect(opts.expires).toBe(3600);
+			});
+
+			it("parses --wait=<seconds> and --expires", () => {
+				var opts = mod.$parseJobsArgs({arg1: "drain", wait: "900", expires: "0"});
+				expect(opts.wait).toBe(900);
+				expect(opts.expires).toBe(0);
+			});
+
+			it("does not wait without --wait", () => {
+				expect(mod.$parseJobsArgs({arg1: "drain"}).wait).toBe(0);
+			});
+
+			it("refuses a --wait that is not a number of seconds", () => {
+				expect(() => mod.$parseJobsArgs({arg1: "drain", wait: "soon"})).toThrow("Wheels.InvalidArguments");
+			});
+
+			it("refuses the space form --wait 30 instead of silently waiting 600", () => {
+				// LuCLI hands `--wait 30` over as a bare --wait plus a positional "30".
+				expect(() => mod.$parseJobsArgs({arg1: "drain", wait: "true", arg2: "30"})).toThrow("Wheels.InvalidArguments");
+			});
+
+			it("refuses a negative --expires", () => {
+				expect(() => mod.$parseJobsArgs({arg1: "drain", expires: "-5"})).toThrow("Wheels.InvalidArguments");
+			});
+
+			it("drain --wait polls until this server has no running jobs", () => {
+				var m = drainModule(
+					drained = hostJson(running = 2, draining = true),
+					polls = [hostJson(running = 1, draining = true), hostJson(running = 0, draining = true)]
+				);
+				expect(m.jobs(arg1 = "drain", wait = "60")).toBe("");
+				expect(m.$count("makeBridgePost")).toBe(1);
+				expect(m.$count("makeHttpRequest")).toBe(2);
+				expect(printed(m)).toInclude("it is safe to stop");
+			});
+
+			it("drain --wait gives up with Wheels.JobsDrainTimeout while jobs still run", () => {
+				var m = drainModule(
+					drained = hostJson(running = 1, draining = true),
+					polls = [hostJson(running = 1, draining = true), hostJson(running = 1, draining = true)]
+				);
+				expect(() => m.jobs(arg1 = "drain", wait = "4")).toThrow("Wheels.JobsDrainTimeout");
+			});
+
+			it("drain without --wait returns at once", () => {
+				var m = drainModule(drained = hostJson(running = 3, draining = true), polls = []);
+				expect(m.jobs(arg1 = "drain")).toBe("");
+				expect(m.$count("makeHttpRequest")).toBe(0);
+				expect(printed(m)).toInclude("Resume with: wheels jobs resume");
+			});
+
+			it("resume reports the host", () => {
+				var m = drainModule(drained = hostJson(running = 0, draining = false), polls = []);
+				expect(m.jobs(arg1 = "resume")).toBe("");
+				expect(printed(m)).toInclude("Resumed spec-host");
+			});
+
+			it("formats the host line with its cap and drain", () => {
+				var line = mod.$formatJobsHostLine({host: "web-1", running: 2, maxConcurrent: 4, draining: true, drainExpiresAt: "2026-10-08 12:00:00"});
+				expect(line).toInclude("web-1: 2 running, max 4");
+				expect(line).toInclude("draining until 2026-10-08 12:00:00");
+				expect(mod.$formatJobsHostLine({host: "web-2", running: 0, maxConcurrent: 0, draining: false})).toInclude("max no cap");
+			});
+
+		});
+
+		describe("tick", () => {
+
+			it("runs one tick through the bridge and prints its summary", () => {
+				var m = new cli.lucli.Module(cwd = variables.tempRoot);
+				prepareMock(m);
+				m.$("out");
+				m.$(method = "$requireOwnRunningServer", returns = 61999);
+				m.$("makeBridgePost", serializeJSON({success: true, tick: {host: "web-1", processed: 2, failed: 0, reaped: 1, capped: false, draining: false}}));
+				expect(m.jobs(arg1 = "tick")).toBe("");
+				expect(m.$count("makeBridgePost")).toBe(1);
+				expect(m.$callLog().makeBridgePost[1][1]).toInclude("command=jobsTick");
+				expect(printed(m)).toInclude("Tick on web-1: processed 2, failed 0, reaped 1");
+			});
+
+		});
+
+		describe("install", () => {
+
+			it("parses install and --force", () => {
+				expect(mod.$parseJobsArgs({arg1 = "install"}).action).toBe("install");
+				expect(mod.$parseJobsArgs({arg1 = "install"}).force).toBeFalse();
+				expect(mod.$parseJobsArgs({arg1 = "install", force = "true"}).force).toBeTrue();
+			});
+
+			it("writes the migration the server generates, once, and rewrites it in place with --force", () => {
+				var dir = variables.tempRoot & "/app/migrator/migrations";
+				if (directoryExists(dir)) {
+					for (var old in directoryList(dir, false, "path", "*_CreateWheelsJobTables.cfc")) {
+						fileDelete(old);
+					}
+				}
+				var m = installModule("// first");
+				m.jobs(arg1 = "install");
+				var written = directoryList(dir, false, "name", "*_CreateWheelsJobTables.cfc");
+				expect(arrayLen(written)).toBe(1);
+				expect(fileRead(dir & "/" & written[1])).toBe("// first");
+				expect(printed(m)).toInclude("jobsAutoCreateTables = false");
+
+				var again = installModule("// second");
+				again.jobs(arg1 = "install");
+				expect(fileRead(dir & "/" & written[1])).toBe("// first", "without --force an existing migration is left alone");
+				expect(printed(again)).toInclude("already exists");
+
+				var forced = installModule("// third");
+				forced.jobs(arg1 = "install", force = "true");
+				expect(directoryList(dir, false, "name", "*_CreateWheelsJobTables.cfc")).toBe(written, "rewritten under the same name and version");
+				expect(fileRead(dir & "/" & written[1])).toBe("// third");
 			});
 
 		});

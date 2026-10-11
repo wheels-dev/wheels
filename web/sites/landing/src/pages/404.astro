@@ -1,0 +1,26 @@
+---
+// A real 404 page. Without one, Cloudflare Pages serves the home page with a 200 for any path
+// that doesn't exist, so broken links look like the home page and search engines index them.
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Page not found — Wheels" description="This page doesn't exist.">
+	<section class="not-found">
+		<h1>Page not found</h1>
+		<p>There's no page at this address. It may have moved, or the link may be mistyped.</p>
+		<ul>
+			<li><a href="/">Home</a></li>
+			<li><a href="https://guides.wheels.dev/">Guides</a></li>
+			<li><a href="https://api.wheels.dev/">API reference</a></li>
+			<li><a href="https://blog.wheels.dev/">Blog</a></li>
+		</ul>
+	</section>
+</BaseLayout>
+
+<style>
+	.not-found {
+		max-width: 40rem;
+		margin: 4rem auto;
+		padding: 0 1rem;
+	}
+</style>

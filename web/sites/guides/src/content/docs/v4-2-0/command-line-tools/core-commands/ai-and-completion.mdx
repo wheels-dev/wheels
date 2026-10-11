@@ -8,12 +8,12 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-`wheels ai` and `wheels completion` are two unrelated LuCLI utilities grouped here because neither is part of the day-to-day Wheels inner loop. `ai` is a thin CLI wrapper over Lucee's server-side AI engines (OpenAI, Claude, Gemini, and other OpenAI-compatible providers) that lets you configure endpoints, run one-shot prompts, and manage reusable "skills" from your shell. `completion` emits a shell-completion script you install once so `wheels <TAB>` completes subcommands and flags.
+`wheels ai` and `wheels completion` are two unrelated LuCLI utilities grouped here because neither is part of the day-to-day Wheels inner loop. `ai` is a thin CLI wrapper over Lucee's server-side AI engines (OpenAI, Claude, Gemini, and other OpenAI-compatible providers) that lets you configure endpoints, run one-shot prompts, and manage reusable "skills" from your shell. `completion` emits a shell-completion script you install once so `wheels <TAB>` completes the LuCLI runtime subcommands and flags.
 
 **You'll use this for:**
 
 - Registering AI provider credentials in the local Lucee server and running ad-hoc prompts or skills from the CLI.
-- Installing bash or zsh completion so `wheels`, `wheels server`, `wheels generate` and friends auto-complete.
+- Installing bash or zsh completion so `wheels server`, `wheels deps`, `wheels ai` and the other LuCLI runtime commands auto-complete. Wheels module commands (`generate`, `migrate`, `test`, ...) are not in the generated script.
 
 ## `wheels ai`
 
@@ -68,7 +68,7 @@ wheels ai config add [flags]
 | `--secret-key=<value>` | Secret/API key. Supports placeholders like `#env:CHATGPT_SECRET_KEY#`. |
 | `--model=<model>` | Model name (e.g. `gpt-4o`). |
 | `--message=<text>` | System message. Default: `Keep all answers as short as possible`. |
-| `--timeout=<ms>` | Provider timeout in milliseconds. Default: `5000`. |
+| `--timeout=<ms>` | Provider timeout in milliseconds. Omitted unless you pass it; `--guided` offers `5000` as the default. |
 | `--default-mode=<mode>` | Default mode for this endpoint entry. Default: `exception`. |
 | `--guided` | Interactive guided setup — walks through the required fields. |
 | `--test-after-save` | Run a lightweight connection test after saving. |
@@ -184,8 +184,8 @@ wheels ai config defaults --default-endpoint=mychatgpt --default-model=gpt-4o
 # Verify
 wheels ai test
 
-# One-shot prompt
-wheels ai prompt --text="Summarize this file in one line." --text=@README.md
+# One-shot prompt (--text may be given only once)
+wheels ai prompt --system="Summarize this file in one line." --text=@README.md
 
 # Estimate tokens and cost without sending
 wheels ai prompt --text=@README.md --estimate \
@@ -193,12 +193,12 @@ wheels ai prompt --text=@README.md --estimate \
 ```
 
 <Aside type="note" title="Requires a running Lucee server">
-`ai prompt` and `ai test` execute against the Lucee runtime, which is why the endpoint configuration lives in `CFConfig.json` rather than a LuCLI-local file. See [Configuration](../../configuration/) for how LuCLI boots its Lucee server.
+`ai prompt` and `ai test` need an endpoint: pass `--endpoint` or set one with `ai config defaults --default-endpoint`, otherwise they fail with `No endpoint specified`. `--dry-run` and `--estimate` print the resolved payload or estimate without sending a request. Prompts execute against the Lucee runtime, which is why the endpoint configuration lives in `CFConfig.json` rather than a LuCLI-local file. See [Configuration](../../configuration/) for how LuCLI boots its Lucee server.
 </Aside>
 
 ## `wheels completion`
 
-Generate a shell completion script for the `wheels` (LuCLI) binary. Picocli's standard bash completion generator is used — the script works in both bash and zsh (via `bashcompinit`).
+Generate a shell completion script for the `wheels` (LuCLI) binary. Picocli's standard bash completion generator is used — the script works in both bash and zsh (via `bashcompinit`). It covers the LuCLI runtime command tree (`server`, `modules`, `deps`, `cfml`, `repl`, `secrets`, `system`, `run`, `daemon`, `ai`, ...); it does not include the Wheels module commands such as `generate` or `migrate`.
 
 <Aside type="note" title="Hidden from --help">
 `completion` is marked hidden in LuCLI's top-level help, but it's a stable, publicly supported surface. Call it by name.
@@ -255,8 +255,8 @@ Open a new shell (or `source ~/.bashrc` / `source ~/.zshrc`) and verify:
 wheels <TAB>
 ```
 
-<Aside type="caution" title="Version-list autocomplete requires lucli">
-The generated script includes dynamic completion for `--version` values that invokes `lucli versions-list` under the hood. The `wheels` binary is the LuCLI launcher renamed (name-routing selects the wheels module), so this generally works, but if you've aliased `wheels` to a non-LuCLI binary, that portion of completion will fall back to empty.
+<Aside type="caution" title="Version-list autocomplete calls the binary">
+The generated script includes dynamic completion for `--version` values that runs `wheels versions-list` (the name of the binary that generated the script) under the hood. If you've aliased `wheels` to a non-LuCLI binary, that portion of completion will fall back to empty.
 </Aside>
 
 ### Markdown reference (`completion md`)

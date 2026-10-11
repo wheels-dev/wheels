@@ -215,12 +215,13 @@ followed by the Wheels ASCII-art banner. The richer check is `wheels version` (n
 
 ```txt title="
 Wheels 4.0.3 (stable)
+LuCLI 0.6.2.2
 Java 21.0.11
 ```
 
 If either line is missing or reports an unexpected value — say a Java major version other than 21 — jump to troubleshooting below.
 
-Running `wheels` with no arguments is also a quick sanity check — it prints the same Wheels help banner as `wheels --help`. (`wheels help` falls through to LuCLI's own generic help rather than the Wheels banner, so prefer `wheels --help`.) If you see a `Component [modules.wheels.Module] has no function with name [main]` error instead, you are running a build that predates this fix — upgrade to the latest 4.0.x release to restore the expected behavior.
+Running `wheels` with no arguments is also a quick sanity check — it prints the same Wheels help banner as `wheels --help` and `wheels help`. If you see a `Component [modules.wheels.Module] has no function with name [main]` error instead, you are running a build that predates this fix — upgrade to the latest 4.0.x release to restore the expected behavior.
 
 Once the version check passes, `wheels info` inside a Wheels project gives you a deeper sanity check against a real app — datasource connection, environment, route count. See [App Inspection](../wheels-commands/app-inspection/) for the full output and how to read it.
 

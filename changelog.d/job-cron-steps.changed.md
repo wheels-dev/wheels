@@ -1,0 +1,1 @@
+- Job schedules: a cron step on a single value (`N/S`) now runs from N to the end of the field, as in Vixie cron and cronie. `5/1` in the minute field was minute 5 alone and is now `5-59`. In day-of-week, `N/S` now runs through `7` (Sunday), so `1/2` adds Sunday, and `7/2` (Sunday) is accepted instead of refused as a reversed range. `5/15`, `N-M/S` and `*/S` are unchanged.

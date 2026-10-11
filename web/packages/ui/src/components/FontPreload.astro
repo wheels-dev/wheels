@@ -1,0 +1,11 @@
+---
+// Preload the two brand fonts every page renders text in, so the browser
+// fetches them with the HTML instead of after the stylesheet. `?url` gives the
+// same hashed, base-prefixed file the @font-face rules in fonts.css point at.
+// The italic face is left to load on demand.
+import interUrl from '../assets/fonts/inter-latin-wght-normal.woff2?url';
+import monoUrl from '../assets/fonts/jetbrains-mono-latin-wght-normal.woff2?url';
+---
+
+<link rel="preload" href={interUrl} as="font" type="font/woff2" crossorigin />
+<link rel="preload" href={monoUrl} as="font" type="font/woff2" crossorigin />

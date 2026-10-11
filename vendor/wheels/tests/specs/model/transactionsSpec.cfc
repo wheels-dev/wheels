@@ -5,6 +5,9 @@ component extends="wheels.WheelsTest" {
 		g = application.wo
 		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
+		// The tagWithDataCallbacks class's callbacks before any spec here runs, for the no-leftover check.
+		variables.tagCallbacksAtStart = SerializeJSON(application.wo.$canonicalCacheValue(value = g.model("tagWithDataCallbacks").$classData().callbacks))
+
 		describe("Tests that invokewithtransaction", () => {
 
 			beforeEach(() => {
@@ -259,14 +262,26 @@ component extends="wheels.WheelsTest" {
 			it("rollback when error raised", () => {
 				if (_isCockroachDB) return;
 				tagModel = g.model("tagWithDataCallbacks").new(name = "Kermit", description = "The Frog")
-				tagModel.afterSave(methods = "crashMe")
+				// afterSave() on an object registers on the shared class: put its callbacks back so
+				// later saves of this model don't run crashMe.
+				var tagClass = tagModel.$classData()
+				var savedCallbacks = Duplicate(tagClass.callbacks)
 				try {
-					tagModel.save()
-				} catch (any e) {
-					results = g.model("tag").findAll(where = "name = 'Kermit'")
+					tagModel.afterSave(methods = "crashMe")
+					try {
+						tagModel.save()
+					} catch (any e) {
+						results = g.model("tag").findAll(where = "name = 'Kermit'")
+					}
+				} finally {
+					tagClass.callbacks = savedCallbacks
 				}
-				
+
 				expect(results.recordcount).toBe(0)
+			})
+
+			it("leaves the tagWithDataCallbacks class with only the callbacks it was configured with", () => {
+				expect(SerializeJSON(application.wo.$canonicalCacheValue(value = g.model("tagWithDataCallbacks").$classData().callbacks))).toBe(variables.tagCallbacksAtStart)
 			})
 		})
 	}

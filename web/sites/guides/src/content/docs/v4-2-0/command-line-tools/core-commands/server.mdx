@@ -50,6 +50,7 @@ wheels server start [PROJECT_DIR] [flags]
 | `-v, --version=<version>` | Lucee version to use (e.g. `6.2.2.91`). |
 | `-n, --name=<name>` | Custom name for the server instance. |
 | `-p, --port=<port>` | Port number for the server (e.g. `8080`). |
+| `--host=<address>` | Address to listen on (default `127.0.0.1`, this machine only). Use `0.0.0.0` to accept connections from other machines. |
 | `-f, --force` | Force replace an existing server with the same name. |
 | `-c, --config=<file>` | Configuration file to use (defaults to `lucee.json`). |
 | `--env, --environment=<env>` | Environment to use (e.g. `dev`, `staging`, `prod`). |
@@ -68,6 +69,8 @@ wheels server start [PROJECT_DIR] [flags]
 | `--agents=<ids>` | Comma-separated list of agent IDs to include. |
 | `--enable-agent=<id>` | Enable a specific agent by ID (repeatable). |
 | `--disable-agent=<id>` | Disable a specific agent by ID (repeatable). |
+| `--include=<sections>` | Comma-separated `--dry-run` sections: `config`, `env`, `lucee`, `tomcat-web`, `tomcat-server`, `https-keystore-plan`, `https-redirect-rules`, `all`. |
+| `--include-env` | Include environment previews in `--dry-run` output. |
 | `--include-lucee` | Include Lucee CFConfig in `--dry-run` output. |
 | `--include-tomcat-web` | Include Tomcat `web.xml` in `--dry-run` output. |
 | `--include-tomcat-server` | Include Tomcat `server.xml` in `--dry-run` output. |
@@ -84,14 +87,25 @@ wheels server start --name=dev --version=6.2.2.91 --port=8080
 Sample output:
 
 ```txt title="
-Starting Lucee server 'dev' on port 8080...
-Lucee version: 6.2.2.91
-Server started successfully. Visit: http://localhost:8080/
+Starting server 'dev' on:
+  Listening on:  127.0.0.1
+  HTTP port:     8080
+  Shutdown port: 9080
+...
+Server started successfully on port 8080
+Starting Lucee server in: /Users/you/projects/app
+   Server Name:   dev
+   Process ID:    42117
+   HTTP Port:     8080
+   ...
+   URL:           http://localhost:8080
+   Admin URL:     http://localhost:8080/lucee/admin.cfm
+✅ Server started successfully!
 ```
 
 ### `run`
 
-Same as `start`, but runs the server in the foreground with log streaming. Useful when you want to keep the process attached to the terminal and hit `Ctrl+C` to stop it. Flags mirror `start` minus the `--dry-run` / `--include-*` preview set and `--create-config`.
+Same as `start`, but runs the server in the foreground with log streaming. Useful when you want to keep the process attached to the terminal and hit `Ctrl+C` to stop it. It accepts the same flags as `start` except `--create-config`, `--source`, `--dest`, the browser-opening flags, and the Lucee/Tomcat/HTTPS `--include-*` previews; `--dry-run` takes only the `config`, `env`, and `all` sections.
 
 #### Synopsis
 
@@ -126,8 +140,8 @@ wheels server stop --name=dev
 Sample output:
 
 ```txt title="
-Stopping server 'dev'...
-Server 'dev' stopped.
+Stopping server: dev
+✅ Server 'dev' stopped successfully.
 ```
 
 ### `restart`
@@ -173,11 +187,14 @@ wheels server status --name=dev
 Sample output:
 
 ```txt title="
-Server: dev
-Status: RUNNING
-Port: 8080
-PID: 42117
-URL: http://localhost:8080/
+Server status for 'dev':
+✅ Server is RUNNING
+   Server Name:   dev
+   Process ID:    42117
+   Port:          8080
+   URL:           http://localhost:8080
+   Web Root:      /Users/you/projects/app
+   Server Dir:    /Users/you/.wheels/servers/dev
 ```
 
 ### `list`
@@ -205,9 +222,11 @@ wheels server list
 Sample output:
 
 ```txt title="
-NAME          STATUS    PORT    VERSION       DIRECTORY
-dev           RUNNING   8080    6.2.2.91      /Users/you/projects/app
-scratchpad    STOPPED   8081    6.2.0.280     /Users/you/projects/scratch
+Server instances:
+
+NAME                 STATUS     PID      PORT       WEBROOT                                  SERVER DIR
+────────────────────────────────────────────────────────────────────────────────────────────
+dev                  RUNNING    42117    8080       /Users/you/projects/app                  /Users/you/.wheels/servers/dev
 ```
 
 ### `log`
@@ -226,7 +245,7 @@ wheels server log [flags]
 |---|---|
 | `-n, --name=<name>` | Name of the server instance. |
 | `-f, --follow` | Follow log output (like `tail -f`). |
-| `-t, --type=<type>` | Log type: `server`, `access`, or `error`. |
+| `-t, --type=<type>` | Log type: `tomcat` (default, the Tomcat logs), `server` (Lucee server logs), or `web` (Lucee web application logs). Any other value prints an error and exits `1`. |
 
 #### Example
 
@@ -234,7 +253,7 @@ wheels server log [flags]
 wheels server log --name=dev --follow
 ```
 
-Streams the server log until you hit `Ctrl+C`. Swap in `--type=error` for just the error log or `--type=access` for the request log.
+Streams the Tomcat log until you hit `Ctrl+C`. Swap in `--type=server` for the Lucee server logs or `--type=web` for the Lucee web application logs.
 
 ### `info`
 
@@ -445,7 +464,7 @@ Boots a background server named `dev` on Lucee `6.0.1.103`. The name makes it ad
 wheels server log --name=dev --follow
 ```
 
-Streams the server log until you `Ctrl+C`. Add `--type=error` for just the error log or `--type=access` for request logging.
+Streams the Tomcat log until you `Ctrl+C`. Add `--type=server` for the Lucee server logs or `--type=web` for the Lucee web application logs.
 
 ### Inventory and shut down
 
@@ -462,7 +481,7 @@ wheels server stop --name=dev
 - **`wheels start`** — Wheels project wrapper. Auto-scoped to the current project's `lucee.json`, minimal ceremony, exactly what you want for the day-to-day dev loop. See [Dev Server](../../wheels-commands/dev-server/).
 - **`wheels server start`** — LuCLI native. Full control over naming, version pinning, environments, and multi-instance layout. Reach for this when you need named servers, multiple Lucee versions running at once, or cross-project administration (e.g. `list`, `prune`, `monitor`).
 
-Under the hood `wheels start` just forwards to `wheels server start` inside the project directory, so any flag you can pass here works there too.
+Under the hood `wheels start` forwards to `wheels server start` inside the project directory. It handles `--force`, `--engine`, and `--port` itself and passes every other flag through, so most flags you can pass here work there too.
 </Aside>
 
 ## Related commands

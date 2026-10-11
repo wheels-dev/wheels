@@ -1,0 +1,3 @@
+- `wheels migrate diff` on SQLite no longer reports DATETIME, DATE and TIME columns as changed to `string`, which made `--write` produce a migration converting them to strings (#4405)
+- The all-models `wheels migrate diff` covers every model file, not only the models a request had already loaded (#4406)
+- `wheels migrate diff --write` names its migration with the same 14-digit version as `wheels generate migration`, moving on a second while that version is taken (#4419)

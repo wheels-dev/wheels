@@ -26,7 +26,7 @@ permissions:
 jobs:
   guard-tests:
     name: Republish guard fixtures
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - name: Test the republish guard

@@ -40,7 +40,7 @@ Open the file for a topic before working on it:
 - Routing and route model binding: `.ai/routing.md`
 - JSON APIs: `.ai/api.md`
 - Pagination, development error page: `.ai/views.md`
-- Partial caching: `.ai/caching.md`
+- Partial caching and caching your own data (`appCacheFetch()`): `.ai/caching.md`
 - Middleware, rate limiting: `.ai/middleware.md`
 - DI container: `.ai/di.md`
 - Auth: `.ai/auth.md`
@@ -51,6 +51,7 @@ Open the file for a topic before working on it:
 - Sending email (mailers): `.ai/mailers.md`
 - Server-sent events: `.ai/sse.md`
 - Changing settings in specs: `.ai/testing.md`
+- Upgrading, changed APIs: `.ai/upgrading.md`
 - Guides, `/wheels/ai`: `.ai/README.md`
 
 ## Testing Quick Reference
@@ -86,8 +87,7 @@ The runner compiles every CFC under the spec directory, so one compilation error
 
 - **Test infra scope**: Wheels internals (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files the test runner includes, such as `tests/populate.cfm`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
 - **`#` escape**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiter. In string literals, escape: `&##111;`. Comments (`//`) are fine. Unescaped `#` in strings crashes the **entire** test suite, not just that file.
-- **`$clearRoutes()` in test specs**: not inherited from `wheels.WheelsTest`. A spec that manipulates routes defines its own:
-  `public void function $clearRoutes() { application.wheels.routes = []; application.wheels.staticRoutes = {}; application.wheels.namedRoutePositions = {}; }`
+- **Route state in specs**: `wheels.WheelsTest` has `$snapshotRoutes()` / `$restoreRoutes()` / `$clearRoutes()`; snapshot in `beforeEach`, restore in `afterEach` (see `.ai/testing.md`).
 
 ### Running tests locally
 

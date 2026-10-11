@@ -1,0 +1,1 @@
+- `wheels upgrade check` dates the `renderPage()` / `renderPageToString()` rename correctly: it happened in 2.0 (to `renderView()` and `renderView(returnAs="string")`), not 4.0. It also now flags a route that targets an action named `isSafeRedirectUrl`, which 4.2 made a framework helper: a request for that action gets `Wheels.ActionNotAllowed` (#4376).

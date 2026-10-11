@@ -91,3 +91,13 @@ test('tutorial driver walks mini-tutorial end to end', { timeout: 300_000 }, asy
     await session.stopServer();
   }
 });
+
+test('cli steps that need the dev server start it first', async () => {
+  const { needsServer } = await import('../drivers/tutorial.mjs');
+  for (const cmd of ['wheels reload', 'wheels routes', 'wheels test', 'wheels migrate latest', 'wheels seed', 'wheels console']) {
+    assert.equal(needsServer(cmd), true, cmd);
+  }
+  for (const cmd of ['wheels generate model Post', 'wheels start', 'wheels stop', 'wheels new app', 'npm test', '']) {
+    assert.equal(needsServer(cmd), false, cmd);
+  }
+});

@@ -1,13 +1,13 @@
 ---
 title: "wheels deploy accessory details"
-description: docker ps filtered to the named accessory container.
+description: docker inspect the state of the named accessory container.
 type: reference
 sidebar:
   label: "details"
   order: 6
 ---
 
-`docker ps --filter name=<service>-<name>` on each of the accessory's hosts. Confirms it's up and shows uptime.
+`docker inspect --format={{.State.Status}} <service>-<name>` on each of the accessory's hosts. Prints the container state (running, exited, paused).
 
 ## Synopsis
 

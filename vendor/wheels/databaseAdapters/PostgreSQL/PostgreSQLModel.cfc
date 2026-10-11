@@ -195,7 +195,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			local.result = queryExecute(
 				"SELECT pg_try_advisory_lock(hashtext(?)) AS lockresult, pg_backend_pid() AS sessionid",
 				[arguments.name],
-				{datasource: variables.dataSource, username: variables.username, password: variables.password}
+				$advisoryLockConnection()
 			);
 			if (IsQuery(local.result) && IsBoolean(local.result.lockresult) && local.result.lockresult) {
 				return local.result.sessionid;
@@ -218,7 +218,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		queryExecute(
 			"SELECT pg_advisory_unlock(hashtext(?))",
 			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 	}
 
@@ -229,7 +229,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		local.result = queryExecute(
 			"SELECT pg_advisory_unlock(hashtext(?)) AS released",
 			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 		return IsQuery(local.result) && IsBoolean(local.result.released) && local.result.released;
 	}
@@ -254,7 +254,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		local.result = queryExecute(
 			local.sql,
 			local.params,
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			$advisoryLockConnection()
 		);
 		return IsQuery(local.result) && Val(local.result.holders) > 0;
 	}
@@ -265,6 +265,45 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public boolean function $supportsAdvisoryLocks() {
 		return true;
+	}
+
+	/**
+	 * PostgreSQL supports transaction-scoped advisory locks via pg_advisory_xact_lock, which
+	 * auto-releases at transaction commit or rollback (#4198).
+	 */
+	public boolean function $supportsTransactionalAdvisoryLock() {
+		return true;
+	}
+
+	/**
+	 * Internal function. Acquires a PostgreSQL transaction-scoped advisory lock on the current
+	 * (pinned) connection by polling pg_try_advisory_xact_lock until the timeout expires (#4198).
+	 * The blocking pg_advisory_xact_lock would ignore the timeout, so the try form is polled, exactly
+	 * as the session-scoped acquire does. The lock auto-releases when the enclosing transaction ends,
+	 * so there is no release step. The query never raises on contention (pg_try_* returns a boolean),
+	 * which matters here: a statement error inside the transaction would abort the whole transaction.
+	 */
+	public void function $acquireAdvisoryLockTransactional(required string name, numeric timeout = 10) {
+		local.startedAt = GetTickCount();
+		local.timeoutMs = arguments.timeout * 1000;
+		while (true) {
+			local.result = queryExecute(
+				"SELECT pg_try_advisory_xact_lock(hashtext(?)) AS lockresult",
+				[arguments.name],
+				$advisoryLockConnection()
+			);
+			if (IsQuery(local.result) && IsBoolean(local.result.lockresult) && local.result.lockresult) {
+				return;
+			}
+			if (GetTickCount() - local.startedAt >= local.timeoutMs) {
+				Throw(
+					type = "Wheels.AdvisoryLockTimeout",
+					message = "Could not acquire advisory lock '#arguments.name#' within #arguments.timeout# seconds.",
+					extendedInfo = "The PostgreSQL pg_try_advisory_xact_lock function kept returning false, indicating another transaction holds the lock."
+				);
+			}
+			Sleep(250);
+		}
 	}
 
 	/**

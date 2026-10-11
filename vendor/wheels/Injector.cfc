@@ -304,14 +304,12 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 		required string componentPath,
 		required struct initArguments
 	) {
-		// Circular dependency guard. The resolving struct is request-scoped —
-		// it tracks "what this thread is currently resolving" — so concurrent
-		// requests don't trip each other's guard. Application-scoping it (the
-		// previous behavior) caused spurious self-loop errors when two
-		// requests near-simultaneously hit getInstance for the same controller
-		// on a cold framework, before Lucee had compiled the CFC. The chain
-		// "X -> X" in the error message was thread A's in-flight entry being
-		// observed by thread B before B even started. See issue #2331.
+		// Circular dependency guard. The resolving stack is per-thread (within a request-scoped outer
+		// struct) — so it tracks only what THIS thread is currently resolving. Application-scoping it
+		// (the original behavior) caused spurious "X -> X" self-loops when two requests near-
+		// simultaneously hit getInstance for the same controller on a cold framework (#2331); scoping
+		// it to the bare request scope then caused the same false positive between a request's own
+		// cfthreads, which share that scope on Lucee (#4448). Keying by thread id fixes both.
 		var resolving = $getResolvingStack();
 		if (structKeyExists(resolving, arguments.name)) {
 			throw(
@@ -368,17 +366,50 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 	}
 
 	/**
-	 * Per-request resolving stack. Tracks which names are currently being
-	 * resolved in THIS thread/request, so the circular-dependency guard
-	 * doesn't see entries from concurrent requests.
+	 * Per-thread resolving stack. Tracks which names the CURRENT thread is resolving, so the
+	 * circular-dependency guard doesn't see entries from a concurrent request OR from a sibling
+	 * cfthread of the same request.
 	 *
-	 * Lazy-creates request.$wheelsDIResolving on first access.
+	 * The outer struct is request-scoped — that is what keeps a cold-start race between two requests
+	 * from reporting a false "X -> X" cycle (#2331). But on Lucee a `cfthread` shares its parent's
+	 * request scope, so a single request's threads shared one stack: while thread A was inside a slow
+	 * `init()` of service X, thread B's getInstance("X") saw X already present and threw a spurious
+	 * Wheels.DI.CircularDependency (#4448). Keying the stack by thread id gives each thread its own set
+	 * while keeping the request-scoped outer struct (and so #2331's semantics).
+	 *
+	 * The lazy creation of the shared outer struct and of each thread's sub-struct is locked so
+	 * concurrent threads of one request don't race it (one overwriting the other's in-flight entries).
 	 */
 	private struct function $getResolvingStack() {
-		if (!structKeyExists(request, "$wheelsDIResolving")) {
-			request.$wheelsDIResolving = {};
+		var tid = $resolvingThreadId();
+		if (!StructKeyExists(request, "$wheelsDIResolving")) {
+			lock scope="request" type="exclusive" timeout="10" {
+				if (!StructKeyExists(request, "$wheelsDIResolving")) {
+					request.$wheelsDIResolving = {};
+				}
+			}
 		}
-		return request.$wheelsDIResolving;
+		if (!StructKeyExists(request.$wheelsDIResolving, tid)) {
+			lock scope="request" type="exclusive" timeout="10" {
+				if (!StructKeyExists(request.$wheelsDIResolving, tid)) {
+					request.$wheelsDIResolving[tid] = {};
+				}
+			}
+		}
+		return request.$wheelsDIResolving[tid];
+	}
+
+	/**
+	 * The current thread's id, or "0" on a JVM-free engine that has no java.lang.Thread (all such
+	 * threads then share one key — the pre-#4448 behaviour, acceptable where cfthreads don't share a
+	 * request scope anyway). Mirrors Migrator.$migrationLockThreadId().
+	 */
+	private string function $resolvingThreadId() {
+		try {
+			return CreateObject("java", "java.lang.Thread").currentThread().getId();
+		} catch (any e) {
+			return "0";
+		}
 	}
 
 	/**

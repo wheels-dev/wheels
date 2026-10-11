@@ -40,7 +40,7 @@ concurrency:
 jobs:
   address-review:
     name: Address review
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     # Opt-in only: the maintainer-applied `bot-address-review` label
     # (labeling requires triage access or higher — keep the triage role

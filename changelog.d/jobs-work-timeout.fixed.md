@@ -1,0 +1,1 @@
+- `wheels jobs work` no longer cuts every job off at 300 seconds: each job now runs with its own `this.timeout`, like `processQueue()`. The new `--job-timeout=<seconds>` option caps it. (#4517)

@@ -90,6 +90,7 @@ The association methods read like English because they use the association name,
 - **`dependent="deleteAll"`** — issue a single `DELETE FROM children WHERE parentId = ?` statement. Fast, but skips the child's callbacks.
 - **`dependent="remove"`** — instantiate each child and set its foreign key to `NULL`. Child's `beforeUpdate` / `afterUpdate` fire. Use when children can survive without a parent.
 - **`dependent="removeAll"`** — single `UPDATE children SET parentId = NULL WHERE parentId = ?`. Fast, skips callbacks.
+- **On a soft delete** — when the parent has a `deletedAt` column and is soft-deleted, children whose model also has one are soft-deleted, and every other child is left alone (no delete, no `NULL` foreign key), so restoring the parent finds them intact. `dependent=` applies to them only when the parent is really deleted (`delete(softDelete=false)`, or a parent without a soft-delete column).
 - **Default (not set)** — no cascade. Deleting the parent leaves orphaned child rows whose foreign key points at a row that no longer exists. You almost always want a `dependent` value, even on small associations.
 
 Choose `delete` (or `deleteAll` if the children don't have callbacks) for strict ownership — comments, line items, anything that can't outlive its parent. Choose `remove` or `removeAll` for looser links — employees who survive their department, posts that survive their author, and so on.
@@ -299,6 +300,28 @@ component extends="Model" {
 ```
 
 Wheels resolves the parent at runtime by reading `commentableType` on each row. `comment.commentable()` returns a Post or a Photo depending on the row's type column.
+
+### Column names
+
+Wheels finds the two columns on the child's table: `<name>id` and `<name>type` (`commentableid` and `commentabletype` for `commentable`) when they exist, otherwise `<name>_id` and `<name>_type`, which is how `t.references(columnNames="commentable", polymorphic=true)` writes them when `useUnderscoreReferenceColumns` is on. If a table has both shapes, the names without the underscore win. For any other names, pass both on every side:
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        belongsTo(name="commentable", polymorphic=true, foreignKey="commentable_id", foreignType="commentable_type");
+    }
+}
+```
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        hasMany(name="comments", as="commentable", foreignKey="commentable_id", foreignType="commentable_type");
+    }
+}
+```
+
+`foreignType` is accepted by `belongsTo` (with `polymorphic=true`), `hasMany` and `hasOne` (with `as`).
 
 <Aside type="caution">
   One limitation: `findAll(include="commentable")` on the polymorphic side throws `Wheels.PolymorphicIncludeNotSupported`. A single JOIN can't span multiple target tables. Load the comments first, then load each parent type separately if you need eager loading.

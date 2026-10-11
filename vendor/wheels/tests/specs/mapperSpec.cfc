@@ -3,15 +3,11 @@ component extends="wheels.WheelsTest" {
 	function beforeAll() {
 		config = {path = "wheels", fileName = "Mapper", method = "$init"}
 		_params = {controller = "test", action = "index"}
-		_originalRoutes = Duplicate(application.wheels.routes)
-		_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
-		_originalNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
+		_routeSnapshot = $snapshotRoutes()
 	}
 
 	function afterAll() {
-		application.wheels.routes = _originalRoutes
-		application.wheels.staticRoutes = _originalStaticRoutes
-		application.wheels.namedRoutePositions = _originalNamedRoutePositions
+		$restoreRoutes(_routeSnapshot)
 	}
 
 	function run() {
@@ -706,11 +702,6 @@ component extends="wheels.WheelsTest" {
 
 	public struct function $inspect() {
 		return variables
-	}
-
-	public void function $clearRoutes() {
-		application.wheels.routes = []
-		application.wheels.staticRoutes = {}
 	}
 
 	public boolean function validateRegexPattern(required string pattern) {

@@ -16,6 +16,11 @@
 #   tools/test-matrix.sh --down                # Tear down all containers
 #   tools/test-matrix.sh --keep lucee7 sqlite  # Default — leave containers up
 #
+# Time zone (mirrors the compat-matrix TZ lanes; lucee7, adobe2025, boxlang):
+#   ENGINE_TZ=America/New_York tools/test-matrix.sh lucee7 sqlite
+#   compose.yml passes it to the engine container as TZ, so its JVM runs in that zone instead
+#   of UTC (the default).
+#
 # Engines (mirrors compat-matrix.yml matrix.cfengine):
 #   lucee6, lucee7, adobe2023, adobe2025, boxlang
 #

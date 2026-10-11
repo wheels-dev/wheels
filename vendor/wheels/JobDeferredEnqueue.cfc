@@ -5,9 +5,11 @@
  */
 component {
 
-	public any function init(required any job, required struct row) {
+	public any function init(required any job, required struct row, boolean durable = false) {
 		variables.job = arguments.job;
 		variables.row = arguments.row;
+		// durable (enqueue transactional = false): written on rollback too.
+		variables.durable = arguments.durable;
 		return this;
 	}
 
@@ -15,7 +17,7 @@ component {
 	 * Called by the model layer when the owning transaction resolves.
 	 */
 	public void function $runTransactionCallbacks(required string type, string operation = "", boolean propagateErrors = true) {
-		if (CompareNoCase(arguments.type, "afterCommit") != 0) {
+		if (CompareNoCase(arguments.type, "afterCommit") != 0 && !variables.durable) {
 			writeLog(
 				text = "Job '#variables.row.jobClass#' [#variables.row.id#] was not enqueued: the transaction it was enqueued in rolled back",
 				type = "information",

@@ -5,6 +5,9 @@
 		// it must never be briefly true in production (issue ##3671).
 		application.$wheels.showDebugInformation = application.$wheels.environment == "development";
 		application.$wheels.showErrorInformation = application.$wheels.environment != "production";
+		// Unknown arguments to framework declarations (associations, validations, callbacks, ...):
+		// "warn" logs them to wheels.log, "throw" raises Wheels.UnknownArgument, "off" ignores them.
+		application.$wheels.strictArguments = application.$wheels.environment == "development" ? "warn" : "off";
 		application.$wheels.sendEmailOnError = false;
 		application.$wheels.errorEmailSubject = "Error";
 		application.$wheels.excludeFromErrorEmail = "";

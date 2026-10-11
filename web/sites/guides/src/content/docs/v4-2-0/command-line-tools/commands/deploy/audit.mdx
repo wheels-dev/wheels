@@ -7,7 +7,7 @@ sidebar:
   order: 8
 ---
 
-Tail the on-host audit log. Every deploy appends an entry with the actor, version, and timestamp to `/tmp/kamal-audit.log` on every host; `audit` reads the last N lines from each host and streams them back.
+Tail the on-host audit log. Deploys, rollbacks and accessory boots append a line with the timestamp, service and event (for example `deploy-a started deploy of version v1`) to `/tmp/kamal-audit.log` on every host; `audit` reads the last N lines from each host and streams them back.
 
 ## Synopsis
 

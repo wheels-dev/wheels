@@ -306,6 +306,7 @@ component extends="modules.BaseModule" {
 			"destroy" = destroyArgSpec().toInputSchema(),
 			"doctor"  = verboseFlagSpec().toInputSchema(),
 			"generate" = generateArgSpec().toInputSchema(),
+			"lookup"  = lookupArgSpec().toInputSchema(),
 			"migrate" = migrateArgSpec().toInputSchema(),
 			"notes"   = notesArgSpec().toInputSchema(),
 			"packages" = packagesArgSpec().toInputSchema(),
@@ -326,9 +327,10 @@ component extends="modules.BaseModule" {
 	 */
 	private any function migrateArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "action", default = "latest", choices = "latest,up,down,info,doctor,forget,pretend,rename-system-tables,diff", description = "Migration action: latest, up, down, info, doctor, forget, pretend, rename-system-tables, diff")
+			.positional(name = "action", default = "latest", choices = "latest,up,down,info,doctor,forget,pretend,unlock,rename-system-tables,diff", description = "Migration action: latest, up, down, info, doctor, forget, pretend, unlock, rename-system-tables, diff")
 			.positional(name = "version", default = "", description = "Version for forget/pretend")
 			.flag(name = "yes", default = false, description = "Confirm forget/pretend")
+			.flag(name = "force", default = false, description = "unlock: remove the migration lock even when an instance holds it")
 			.flag(name = "dry-run", default = false, description = "Preview rename-system-tables without writing")
 			.positional(name = "model", default = "", description = "Model to diff (diff action; omit for all models)")
 			.option(name = "rename", default = "", description = "Rename hint OLD:NEW (repeatable; Model.OLD:NEW for diffAll)")
@@ -528,7 +530,7 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.positional(name = "type", default = "", choices = "resource,model,controller,view", description = "What to remove: resource, model, controller, or view")
 			.positional(name = "name", default = "", description = "Name of the artifact to remove")
-			.flag(name = "force", default = false, description = "Skip the confirmation prompt");
+			.flag(name = "force", default = false, description = "Delete the files; without it, destroy only lists what it would delete");
 	}
 
 	// Feeds only the MCP inputSchema (mcpToolSpecs). `app` is no longer
@@ -584,13 +586,22 @@ component extends="modules.BaseModule" {
 
 	private any function jobsArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "action", default = "status", description = "work (long-lived worker loop) or status (queue snapshot). Defaults to status")
-			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. Empty = all queues")
+			.positional(name = "action", default = "status", description = "work (long-lived worker loop), status (queue snapshot), enqueue (add a job), drain (stop this server starting new jobs), resume, tick (run one tick: reap, then run jobs up to the per-host cap), or install (write a migration that creates the job tables). Defaults to status")
+			.positional(name = "job", default = "", description = "enqueue only: the job class under app/jobs/, e.g. SendWelcomeEmailJob or billing.InvoiceJob")
+			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. enqueue: the queue to put the job on (default: the job's own). Empty = all queues")
+			.option(name = "data", default = "", description = "enqueue only: the job's data, a JSON object passed to perform()")
+			.option(name = "priority", default = "", description = "enqueue only: a whole number; higher runs first (default: the job's own)")
+			.option(name = "in", default = "", description = "enqueue only: run it after this many seconds instead of now")
+			.option(name = "at", default = "", description = "enqueue only: run it at this time, ISO 8601 (2026-10-05T14:30:00Z, or 2026-10-05 14:30 for local time). A one-off delayed run, not a recurring schedule")
 			.option(name = "interval", default = 5, type = "numeric", description = "work only: seconds to wait between polls when no job is available")
 			.option(name = "max-jobs", default = 0, type = "numeric", description = "work only: stop after this many jobs (successes + failures count). 0 = run until stopped")
 			.flag(name = "stop-when-empty", default = false, description = "work only: exit when a poll finds no job ready to run, instead of waiting for more. For one-shot batches from cron or CI; combines with --max-jobs")
 			.flag(name = "quiet", default = false, description = "work only: suppress per-job completion output, only print failures")
-			.option(name = "format", default = "table", description = "status only: output format, table or json");
+			.option(name = "job-timeout", default = 0, type = "numeric", description = "work only: cap, in seconds, on each job's run time. 0 = each job runs with its own timeout (this.timeout, default 300). Not --timeout: on some CLI runtimes that is the runtime's own option, which stops the whole worker")
+			.option(name = "format", default = "table", description = "status, enqueue, drain and resume: output format, table or json")
+			.option(name = "wait", default = "", type = "any", description = "drain only: after draining, wait until this server has no running jobs (--wait = up to 600 seconds, --wait=<seconds> for another limit). Exits with an error if jobs are still running at the limit")
+			.option(name = "expires", default = 3600, type = "numeric", description = "drain only: seconds until the drain lifts itself if nothing resumes it. 0 = until wheels jobs resume")
+			.flag(name = "force", default = false, description = "install only: overwrite the jobs migration this command wrote before");
 	}
 
 	private any function dbArgSpec() {
@@ -798,11 +809,11 @@ component extends="modules.BaseModule" {
 		help &= "  generate            Generate model, controller, scaffold, migration, etc." & nl;
 		help &= "  destroy (or d)      Remove generated files" & nl & nl;
 		help &= "Database:" & nl;
-		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables, diff)" & nl;
+		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, unlock, rename-system-tables, diff)" & nl;
 		help &= "  seed                Run database seeds" & nl;
 		help &= "  db                  Database management (reset, status, version)" & nl & nl;
 		help &= "Background Jobs:" & nl;
-		help &= "  jobs                Job queue worker and stats (work, status)" & nl & nl;
+		help &= "  jobs                Job queue worker, stats and enqueue (work, status, enqueue)" & nl & nl;
 		help &= "Testing & Inspection:" & nl;
 		help &= "  test                Run the test suite" & nl;
 		help &= "  browser             Browser-based tests (Playwright)" & nl;
@@ -821,6 +832,7 @@ component extends="modules.BaseModule" {
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
 		help &= "  setup               Configure this app for external tools (setup agents: AI assistants)" & nl;
+		help &= "  lookup              Look up the Wheels API and guides offline (a function name or a phrase)" & nl;
 		help &= "  version             Show Wheels CLI version" & nl;
 		help &= "  help                Show this help" & nl & nl;
 		help &= "For command-specific help: wheels <command> --help" & nl & nl;
@@ -950,7 +962,8 @@ component extends="modules.BaseModule" {
 				return [
 					"  wheels new myapp                              SQLite, port 8080",
 					"  wheels new myapp --port=3000 --setup-h2       H2 instead of SQLite",
-					"  wheels new myapp --datasource=mydb --no-sqlite  Your own datasource"
+					"  wheels new myapp --datasource=mydb --no-sqlite  Your own datasource",
+					"  wheels new myapp --no-agents                  No .mcp.json / .opencode.json"
 				];
 			case "test":
 				return [
@@ -1391,7 +1404,7 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables)
+	 * hint: Run database migrations (latest, up, down, info, doctor, forget, pretend, unlock, rename-system-tables)
 	 */
 	public string function migrate() {
 		var args = $migrateArgv(structuredArgs(arguments));
@@ -1424,6 +1437,8 @@ component extends="modules.BaseModule" {
 				return runForgetOrPretend("forgetVersion", args);
 			case "pretend":
 				return runForgetOrPretend("pretendVersion", args);
+			case "unlock":
+				return runMigrationUnlock(args);
 			case "rename-system-tables":
 				// F15 Phase 2: opt-in one-shot rename of legacy c_o_r_e_*
 				// system tables to wheels_*. Idempotent (no-op when nothing
@@ -1442,7 +1457,7 @@ component extends="modules.BaseModule" {
 				return runMigrationDiff(args);
 			default:
 				out("Unknown migration action: #action#", "red");
-				out("Usage: wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables|diff]");
+				out("Usage: wheels migrate [latest|up|down|info|doctor|forget|pretend|unlock|rename-system-tables|diff]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown migration action: #action#");
 		}
 	}
@@ -1716,14 +1731,17 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Parse args for `wheels coverage`: --top N (report length) and
-	 * --no-test-db (test-db=false).
+	 * `wheels coverage` options: --top N (report length) and --no-test-db
+	 * (test-db=false). Named <command>ArgSpec so `--help` lists them.
 	 */
+	private any function coverageArgSpec() {
+		return new services.ArgSpec()
+			.option(name = "top", default = "15", description = "How many functions the CRAP ranking lists")
+			.flag(name = "test-db", default = true, description = "Run the suite against the test database");
+	}
+
 	private struct function parseCoverageArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.option(name = "top", default = "15")
-			.flag(name = "test-db", default = true)
-			.parse(arguments.coll);
+		var parsed = coverageArgSpec().parse(arguments.coll);
 		return {
 			top = Val(parsed.top),
 			useTestDb = parsed["test-db"]
@@ -1994,6 +2012,136 @@ component extends="modules.BaseModule" {
 		return "/";
 	}
 
+
+	// ─────────────────────────────────────────────────
+	//  lookup — Offline API and guides lookup
+	// ─────────────────────────────────────────────────
+
+	private any function lookupArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "query", required = true, description = "A function name (findAll, model.findAll), a phrase (nested resources), or an id from an earlier result (api:model.findAll)")
+			.option(name = "kind", default = "all", choices = "all,api,guides", description = "Search the API reference, the guides, or both")
+			.option(name = "limit", default = 5, type = "numeric", description = "Most results to return (1-20)")
+			.option(name = "format", default = "text", choices = "text,json", description = "Output format");
+	}
+
+	/**
+	 * hint: Look up the Wheels API and guides offline: a function name, a phrase, or an id from an earlier result
+	 */
+	public string function lookup() {
+		var usage = "Usage: wheels lookup <query> [--kind=all|api|guides] [--limit=5] [--format=text|json]";
+		var opts = {};
+		try {
+			opts = lookupArgSpec().parse(structuredArgs(arguments));
+		} catch (Wheels.CLI.MissingArgument e) {
+			$refuse("Missing a query: a function name (findAll), a phrase (nested resources), or an id from an earlier result. " & usage);
+		}
+
+		var index = new services.DocsIndex($docsIndexPath());
+		if (!index.exists()) {
+			// Self-contained: an MCP client sees only the message (it drops what was printed).
+			throw(
+				type = "Wheels.DocsIndexMissing",
+				message = "This Wheels CLI has no docs index (#$docsIndexPath()#). Release and snapshot builds include it; "
+					& "from a source checkout, build it with: node tools/build/scripts/build-docs-index.mjs"
+			);
+		}
+
+		var result = index.lookup(opts.query, opts.kind, opts.limit);
+		result["index"] = index.meta();
+		var note = $docsIndexVersionNote(result.index.frameworkVersion);
+
+		if (opts.format == "json") {
+			if (len(note)) {
+				result["note"] = note;
+			}
+			out(serializeJSON(result));
+			return "";
+		}
+
+		if (result.mode != "search") {
+			if (!arrayLen(result.entries)) {
+				out("No entry with id ""#result.query#"".");
+			}
+			for (var entry in result.entries) {
+				$printDocsEntry(entry);
+			}
+		} else if (!arrayLen(result.results)) {
+			out("No matches for ""#result.query#"". Try fewer or different words, or search https://guides.wheels.dev/");
+		} else {
+			for (var i = 1; i <= arrayLen(result.results); i++) {
+				var hit = result.results[i];
+				out("#i#. [#hit.kind#] #hit.title#", "bold");
+				if (len(hit.snippet)) {
+					out("   " & hit.snippet);
+				}
+				out("   " & hit.url);
+				out("   id: " & hit.id);
+			}
+			out("");
+			out("For a whole entry: wheels lookup <id>");
+		}
+		if (len(note)) {
+			out(note, "yellow");
+		}
+		return "";
+	}
+
+	/**
+	 * The docs index the CLI module ships (built at release and snapshot time).
+	 * Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public string function $docsIndexPath() {
+		return getDirectoryFromPath(getCurrentTemplatePath()) & "data/docs-index.json";
+	}
+
+	/**
+	 * A note when the index describes another framework version than this CLI
+	 * (a stale index in a source checkout). Pre-release suffixes are ignored:
+	 * a 4.2.0-snapshot.N CLI reads a 4.2.0 snapshot index.
+	 */
+	private string function $docsIndexVersionNote(required string indexVersion) {
+		var cliBase = reMatch("^\d+\.\d+\.\d+", $displayVersion());
+		var indexBase = reMatch("^\d+\.\d+\.\d+", arguments.indexVersion);
+		if (!arrayLen(cliBase) || !arrayLen(indexBase) || cliBase[1] == indexBase[1]) {
+			return "";
+		}
+		return "This docs index is for Wheels #arguments.indexVersion#; this CLI is #$displayVersion()#.";
+	}
+
+	private void function $printDocsEntry(required struct entry) {
+		var e = arguments.entry;
+		if (e.kind == "api") {
+			var names = [];
+			for (var p in e.params) {
+				arrayAppend(names, p.name);
+			}
+			out("#e.name#(#arrayToList(names, ", ")#) returns #e.returns#", "bold");
+			out("Available in: #arrayToList(e.scopes, ", ")#   Section: #e.section#");
+			out("");
+			out(e.hint);
+			if (arrayLen(e.params)) {
+				out("");
+				out("Parameters:", "bold");
+				for (var p in e.params) {
+					var detail = p.type & (p.required ? ", required" : "") & (len(p["default"]) ? ", default " & p["default"] : "");
+					out("  #p.name# (#detail#)" & (len(p.hint) ? ": " & p.hint : ""));
+				}
+			}
+			if (len(e.example)) {
+				out("");
+				out("Example:", "bold");
+				out(e.example);
+			}
+		} else {
+			out(compare(e.page, e.heading) == 0 ? e.page : e.page & " › " & e.heading, "bold");
+			out("");
+			out(e.text);
+		}
+		out("");
+		out(e.url);
+		out("");
+	}
 
 	// ─────────────────────────────────────────────────
 	//  docs — Local offline documentation bundle
@@ -2602,28 +2750,11 @@ component extends="modules.BaseModule" {
 		// recovery prompt referencing `lucli server start --force`, but `lucli`
 		// isn't on PATH after `brew install wheels` — the user gets an
 		// unactionable error from a fresh `wheels start`. Onboarding F1/F2.
-		var force = false;
-		var engine = "lucee";
-		var enginePort = 0;
-		var passThrough = [];
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var a = args[i];
-			if (a == "--force") {
-				force = true;
-			} else if (a == "--engine") {
-				engine = lCase($startFlagValue(args, i, "engine"));
-				i++;
-			} else if (left(a, 9) == "--engine=") {
-				engine = lCase(mid(a, 10, len(a) - 9));
-			} else if (a == "--port") {
-				enginePort = val($startFlagValue(args, i, "port"));
-				i++;
-			} else if (left(a, 7) == "--port=") {
-				enginePort = val(mid(a, 8, len(a) - 7));
-			} else {
-				arrayAppend(passThrough, a);
-			}
-		}
+		var opts = $parseStartArgs(args);
+		var force = opts.force;
+		var engine = opts.engine;
+		var enginePort = opts.enginePort;
+		var passThrough = opts.passThrough;
 
 		// An unknown engine used to fall through to Lucee silently (#3895).
 		if (!listFind("lucee,rustcfml", engine)) {
@@ -2645,8 +2776,17 @@ component extends="modules.BaseModule" {
 		// the warning emitted further down. `--port` used to be parsed and then
 		// dropped for Lucee projects — only the RustCFML branch consumed it — so
 		// `wheels start --port=8090` silently booted on the lucee.json port.
-		if (engine != "rustcfml") {
-			$resolveStartPorts(enginePort);
+		if (opts.dryRun) {
+			if (engine == "rustcfml") {
+				throw(type = "Wheels.InvalidArguments", message = "wheels start --dry-run isn't supported with --engine=rustcfml.");
+			}
+			// LuCLI's own --dry-run prints the config it would start with and changes nothing, so the
+			// port goes to it rather than into lucee.json.
+			if (enginePort > 0) {
+				arrayAppend(passThrough, "--port=" & enginePort);
+			}
+			executeCommand("server", $startCommandArgs(passThrough), variables.projectRoot);
+			return "";
 		}
 
 		// RustCFML backend — separate lifecycle from LuCLI (no JDK/Lucee
@@ -2675,6 +2815,10 @@ component extends="modules.BaseModule" {
 			out("To restart: wheels stop && wheels start", "cyan");
 			return "";
 		}
+
+		// Only now that a start will happen: resolving the ports can move the shutdown port and
+		// write lucee.json, which a start of a running server must not do (#4411).
+		$resolveStartPorts(enginePort);
 
 		// A failed start leaves a registration holding only LuCLI's config file
 		// and no project path. That exact shape is a leftover, not another
@@ -2741,8 +2885,7 @@ component extends="modules.BaseModule" {
 
 		// Delegate to LuCLI's server start command. Forward only args we
 		// haven't consumed ourselves (--force is wheels-side, not LuCLI-side).
-		var cmdArgs = ["start"];
-		cmdArgs.append(passThrough, true);
+		var cmdArgs = $startCommandArgs(passThrough);
 
 		try {
 			executeCommand("server", cmdArgs, variables.projectRoot);
@@ -3098,11 +3241,12 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.positional(name = "appName", description = "Name of the application and of the directory it's created in")
 			.option(name = "port", default = 8080, type = "numeric", description = "Server port (default: 8080, or the first port above it that is free and no other project pins)")
-			.option(name = "datasource", default = "", description = "Datasource name (default: the app name)")
+			.option(name = "datasource", default = "", description = "Datasource name (default: the app name, lowercased)")
 			.option(name = "reload-password", default = "", description = "Reload password (default: random)")
 			.flag(name = "setup-h2", default = false, description = "Use the H2 embedded database instead of SQLite")
 			.flag(name = "sqlite", default = true, description = "Set up the zero-config SQLite database")
-			.flag(name = "open-browser", default = true, description = "Open the browser when the server starts");
+			.flag(name = "open-browser", default = true, description = "Open the browser when the server starts")
+			.flag(name = "agents", default = true, description = "Write .mcp.json and .opencode.json so AI assistants find the Wheels MCP server; skip with --no-agents");
 	}
 
 	/**
@@ -3125,6 +3269,7 @@ component extends="modules.BaseModule" {
 			setupH2 = parsed["setup-h2"],
 			noSQLite = !parsed.sqlite,
 			openBrowser = parsed["open-browser"],
+			agents = parsed.agents,
 			isEmpty = structIsEmpty(arguments.coll)
 		};
 	}
@@ -3165,7 +3310,8 @@ component extends="modules.BaseModule" {
 			reloadPassword: opts.reloadPassword,
 			setupH2: opts.setupH2,
 			noSQLite: opts.noSQLite,
-			openBrowser: opts.openBrowser
+			openBrowser: opts.openBrowser,
+			agents: opts.agents
 		};
 
 		if (!len(appName)) {
@@ -3586,67 +3732,13 @@ component extends="modules.BaseModule" {
 			if (a == "--force") force = true;
 		}
 
-		if (!$isWheelsProjectDir(variables.projectRoot)) {
-			out("Not in a Wheels project directory.", "yellow");
-			out("Run this from the root of a Wheels app (the directory holding config/settings.cfm).");
-			return "";
-		}
+		// Outside a Wheels project, `setup agents` has nothing to write .mcp.json beside. It used to
+		// print a note and return "" — exit 0, so a scripted `wheels setup agents` in the wrong directory
+		// looked like it succeeded (#4409). Guard with the shared project check (same throw/type/guidance
+		// as `wheels generate` and `wheels destroy`) so it exits non-zero.
+		$requireWheelsProject("wheels setup agents");
 
-		// Two clients, two shapes. Claude Code reads `.mcp.json` (mcpServers +
-		// separate command/args); OpenCode reads `.opencode.json` (an `mcp` key,
-		// `type: "local"`, and command+args as ONE array). Both are written —
-		// that is what the wrapper's own `wheels mcp` help has always promised.
-		var targets = [
-			{
-				file: ".mcp.json",
-				label: "Claude Code",
-				rootKey: "mcpServers",
-				entry: {command: "wheels", args: ["mcp", "wheels"]},
-				schema: ""
-			},
-			{
-				file: ".opencode.json",
-				label: "OpenCode",
-				rootKey: "mcp",
-				entry: {type: "local", command: ["wheels", "mcp", "wheels"], enabled: true},
-				schema: "https://opencode.ai/config.json"
-			}
-		];
-
-		// Load and validate everything BEFORE writing anything: a bad
-		// .opencode.json must not leave a half-applied setup with .mcp.json
-		// already rewritten.
-		var loaded = [];
-		for (var t in targets) {
-			arrayAppend(loaded, $loadMcpConfig(variables.projectRoot & "/" & t.file, t));
-		}
-
-		var changed = [];
-		for (var i = 1; i <= arrayLen(targets); i++) {
-			var t = targets[i];
-			var state = loaded[i];
-			var config = state.config;
-			if (!structKeyExists(config, t.rootKey) || !IsStruct(config[t.rootKey])) {
-				config[t.rootKey] = {};
-			}
-			if (len(t.schema) && !structKeyExists(config, "$schema")) {
-				config["$schema"] = t.schema;
-			}
-			var existing = config[t.rootKey].wheels ?: {};
-			var correct = $mcpEntryMatches(existing, t.entry);
-			if (!correct || force) {
-				config[t.rootKey].wheels = t.entry;
-				fileWrite(state.path, serializeJSON(config));
-				arrayAppend(changed, {
-					file: t.file,
-					path: state.path,
-					verb: !state.existed ? "Created" : (correct ? "Rewrote" : (structCount(existing) ? "Updated" : "Added")),
-					others: structCount(config[t.rootKey]) - 1
-				});
-			} else {
-				arrayAppend(changed, {file: t.file, path: state.path, verb: "", others: structCount(config[t.rootKey]) - 1});
-			}
-		}
+		var changed = $writeAgentConfigs(variables.projectRoot, force);
 
 		var wrote = [];
 		for (var c in changed) {
@@ -3677,6 +3769,91 @@ component extends="modules.BaseModule" {
 		out("  Restart your AI assistant so it picks up the new server,");
 		out("  then ask it to run `wheels routes` to confirm the connection.");
 		return "";
+	}
+
+	/**
+	 * Write the wheels entry into `.mcp.json` and `.opencode.json` under `root`,
+	 * merging into whatever else those files list. Returns one {file, path, verb,
+	 * others} per file; `verb` is "" when the file already had the right entry.
+	 * Prints nothing, so `setup agents` and `wheels new` each report it their own
+	 * way. Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public array function $writeAgentConfigs(required string root, boolean force = false) {
+		// Two clients, two shapes. Claude Code reads `.mcp.json` (mcpServers +
+		// separate command/args); OpenCode reads `.opencode.json` (an `mcp` key,
+		// `type: "local"`, and command+args as ONE array). Both are written —
+		// that is what the wrapper's own `wheels mcp` help has always promised.
+		var targets = [
+			{
+				file: ".mcp.json",
+				label: "Claude Code",
+				rootKey: "mcpServers",
+				entry: {command: "wheels", args: ["mcp", "wheels"]},
+				schema: ""
+			},
+			{
+				file: ".opencode.json",
+				label: "OpenCode",
+				rootKey: "mcp",
+				entry: {type: "local", command: ["wheels", "mcp", "wheels"], enabled: true},
+				schema: "https://opencode.ai/config.json"
+			}
+		];
+
+		// Load and validate everything BEFORE writing anything: a bad
+		// .opencode.json must not leave a half-applied setup with .mcp.json
+		// already rewritten.
+		var loaded = [];
+		for (var t in targets) {
+			arrayAppend(loaded, $loadMcpConfig(arguments.root & "/" & t.file, t));
+		}
+
+		var changed = [];
+		for (var i = 1; i <= arrayLen(targets); i++) {
+			var t = targets[i];
+			var state = loaded[i];
+			var config = state.config;
+			if (!structKeyExists(config, t.rootKey) || !IsStruct(config[t.rootKey])) {
+				config[t.rootKey] = {};
+			}
+			if (len(t.schema) && !structKeyExists(config, "$schema")) {
+				config["$schema"] = t.schema;
+			}
+			var existing = config[t.rootKey].wheels ?: {};
+			var correct = $mcpEntryMatches(existing, t.entry);
+			if (!correct || arguments.force) {
+				config[t.rootKey].wheels = t.entry;
+				fileWrite(state.path, serializeJSON(config));
+				arrayAppend(changed, {
+					file: t.file,
+					path: state.path,
+					verb: !state.existed ? "Created" : (correct ? "Rewrote" : (structCount(existing) ? "Updated" : "Added")),
+					others: structCount(config[t.rootKey]) - 1
+				});
+			} else {
+				arrayAppend(changed, {file: t.file, path: state.path, verb: "", others: structCount(config[t.rootKey]) - 1});
+			}
+		}
+
+		return changed;
+	}
+
+	/**
+	 * `wheels new`'s AI-assistant configs: the files `setup agents` writes, in the
+	 * new app's root. Never fails the scaffold, since the app works without them:
+	 * returns a warning to print instead, or "" when they were written.
+	 */
+	private string function $writeNewAppAgentConfigs(required string targetDir, required string appName) {
+		try {
+			for (var written in $writeAgentConfigs(arguments.targetDir)) {
+				if (len(written.verb)) {
+					printCreated(arguments.appName & "/" & written.file);
+				}
+			}
+			return "";
+		} catch (any e) {
+			return "Couldn't write the AI-assistant configs (#e.message#). Add them later with: cd #arguments.appName# && wheels setup agents";
+		}
 	}
 
 	/**
@@ -4080,7 +4257,12 @@ component extends="modules.BaseModule" {
 				return "handled";
 
 			case "/routes":
-				if (!consoleExec(arguments.evalUrl, "application.wheels.routes.map(function(r){ return r.pattern & ' -> ' & r.controller & '##' & r.action; })", arguments.password)) {
+				// Not an eval expression: formatting each route needs a per-element loop, and the console's
+				// eval endpoint runs expressions through evaluate() (consoleeval.cfm), which has no closure
+				// or arrow grammar — `.map(function(r){...})` and `.map((r)=>...)` both fail to parse
+				// ("Closing )] for function [MAP] not found", #4410). Fetch the route table from the same
+				// CLI endpoint `wheels routes` uses and format it here instead.
+				if (!$consoleRoutes(arguments.evalUrl)) {
 					return "error";
 				}
 				return "handled";
@@ -4099,6 +4281,46 @@ component extends="modules.BaseModule" {
 				return "handled";
 		}
 		return "";
+	}
+
+	/**
+	 * Print the application route table for the console's `/routes` command as
+	 * `pattern -> controller#action` lines. The console's eval endpoint can't
+	 * format routes itself — evaluate() has no closure/arrow grammar to map over
+	 * them (#4410) — so this reads the route table from the same CLI endpoint
+	 * `wheels routes` uses (derived from evalUrl, which shares the server base)
+	 * and formats it here. Returns false, so the REPL records a failed command
+	 * and exits non-zero on EOF, when the fetch fails or the server refuses.
+	 */
+	private boolean function $consoleRoutes(required string evalUrl) {
+		try {
+			var routesUrl = replace(arguments.evalUrl, "/wheels/console/eval", "/wheels/cli?command=routes&format=json");
+			var httpResult = makeHttpRequest(routesUrl);
+			if (!isJSON(httpResult)) {
+				out("Failed to fetch routes: the server returned a non-JSON response.", "red");
+				verbose(httpResult);
+				return false;
+			}
+			var result = deserializeJSON(httpResult);
+			if (!(structKeyExists(result, "success") && result.success)) {
+				out("Failed to fetch routes: #result.message ?: 'unknown error'#", "red");
+				return false;
+			}
+			var routes = structKeyExists(result, "routes") && isArray(result.routes) ? result.routes : [];
+			if (!arrayLen(routes)) {
+				out("(no routes)");
+				return true;
+			}
+			// chr(35) is '#': built by concatenation so neither the value nor out() treats it as an
+			// interpolation delimiter.
+			for (var route in routes) {
+				out((route.pattern ?: "") & " -> " & (route.controller ?: "") & chr(35) & (route.action ?: ""));
+			}
+			return true;
+		} catch (any e) {
+			out("Failed to fetch routes: #e.message#", "red");
+			return false;
+		}
 	}
 
 	/**
@@ -4835,7 +5057,7 @@ component extends="modules.BaseModule" {
 		// Each command starts with an empty secret/warning registry, so a
 		// long-lived process never carries one command's secrets into the next.
 		new modules.wheels.services.deploy.lib.SecretRedaction().reset();
-		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		var args = $deployArgv(structuredArgs(arguments));
 		var opts = $deployArgsToOptions(args);
 		if (!structKeyExists(opts, "configPath") || !len(opts.configPath)) {
 			opts.configPath = expandPath("config/deploy.yml");
@@ -4873,6 +5095,32 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The deploy argv, with space-form values bound to their flags (#4417). LuCLI hands
+	 * `--release v8` over as release="true" plus a positional after a gap, so without binding `v8`
+	 * became the subcommand ("Unknown deploy subcommand: v8") and `--service myapp2` was dropped.
+	 * `bindSpaceFormValues()` binds only what it can match one-to-one; a value flag still left bare
+	 * (several space-form values it can't tell apart, or a flag given no value) is an error that
+	 * asks for the `--flag=value` form, rather than a silent misread.
+	 */
+	private array function $deployArgv(required struct coll) {
+		var valueFlags = "account,adapter,config,configPath,container,destination,from,host,image,keep,message,registry-username,release,role,service,tail,version";
+		var matchers = {};
+		for (var flag in listToArray(valueFlags)) {
+			matchers[flag] = listFind("keep,tail", flag) ? "^[0-9]+$" : "";
+		}
+		var bound = new services.ArgSpec().bindSpaceFormValues(arguments.coll, matchers);
+		for (var flag in listToArray(valueFlags)) {
+			if (structKeyExists(bound, flag) && isSimpleValue(bound[flag]) && compareNoCase(trim(toString(bound[flag])), "true") == 0) {
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "wheels deploy: --#flag# needs a value. Write it as --#flag#=<value>."
+				);
+			}
+		}
+		return new services.ArgSpec().toArgv(bound);
+	}
+
+	/**
 	 * Dispatch the direct DeployMainCli verbs. Extracted from deploy() to keep
 	 * its dispatcher under the complexity gate.
 	 */
@@ -4884,7 +5132,7 @@ component extends="modules.BaseModule" {
 				return arguments.dmc.redeploy(arguments.opts);
 			case "rollback":
 				if (arrayLen(arguments.positional) < 2) {
-					throw(message = "rollback requires a version argument: wheels deploy rollback <version>");
+					throw(type = "DeployMainCli.MissingVersion", message = "rollback requires a version argument: wheels deploy rollback <version>");
 				}
 				arguments.opts.version = arguments.positional[2];
 				return arguments.dmc.rollback(arguments.opts);
@@ -5093,7 +5341,7 @@ component extends="modules.BaseModule" {
 				return bootstrapCli.bootstrap(arguments.opts);
 			case "exec":
 				if (arrayLen(arguments.positional) < 2) {
-					throw(message = "wheels deploy exec requires a command");
+					throw(type = "DeployServerCli.MissingCommand", message = "wheels deploy exec requires a command");
 				}
 				// Preserve multi-token commands: join all positional args after `exec`.
 				var execCmdParts = [];
@@ -5113,7 +5361,7 @@ component extends="modules.BaseModule" {
 				var serverVerb = arguments.positional[2];
 				if (serverVerb == "exec") {
 					if (arrayLen(arguments.positional) < 3) {
-						throw(message = "wheels deploy server exec requires a command");
+						throw(type = "DeployServerCli.MissingCommand", message = "wheels deploy server exec requires a command");
 					}
 					// Preserve multi-token commands: join all positional args after the verb.
 					var cmdParts = [];
@@ -5361,7 +5609,7 @@ component extends="modules.BaseModule" {
 		help &= "  add <name>[@<version>] [--force]        Install a package into vendor/<name>/ (canonical)" & nl;
 		help &= "  update <name> --yes                     Update an installed package" & nl;
 		help &= "  update --all --yes                      Update every installed package" & nl;
-		help &= "  remove <name>                           Delete an installed package from vendor/" & nl;
+		help &= "  remove <name> --yes                     Delete an installed package from vendor/" & nl;
 		help &= "  registry refresh                        Bust the 24-hour registry cache" & nl;
 		help &= "  registry info                           Show the registry URL and cache state" & nl;
 		help &= "  help, --help, -h                        Show this help" & nl & nl;
@@ -5582,7 +5830,16 @@ component extends="modules.BaseModule" {
 			maxJobs = parsed["max-jobs"],
 			stopWhenEmpty = parsed["stop-when-empty"],
 			quiet = parsed.quiet,
-			format = lCase(trim(parsed.format))
+			jobTimeout = parsed["job-timeout"],
+			format = lCase(trim(parsed.format)),
+			job = trim(parsed.job),
+			data = trim(parsed.data),
+			priority = trim(parsed.priority),
+			"in" = trim(parsed["in"]),
+			at = trim(parsed.at),
+			wait = $jobsWaitSeconds(trim(parsed.wait)),
+			expires = parsed.expires,
+			force = parsed.force
 		};
 		if (!len(opts.action)) {
 			opts.action = "status";
@@ -5599,6 +5856,26 @@ component extends="modules.BaseModule" {
 				message = "--max-jobs must be zero (unlimited) or a positive number."
 			);
 		}
+		// `--wait 30` (a space, not =) reaches here as a bare --wait plus a stray positional "30",
+		// which would silently mean the 600-second default. Refuse it instead of guessing.
+		if (listFindNoCase("drain,resume", opts.action) && len(opts.job)) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "wheels jobs #opts.action# takes no value '#opts.job#'. For a wait limit write --wait=<seconds>, with an equals sign."
+			);
+		}
+		if (opts.jobTimeout < 0) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "--job-timeout must be zero (each job's own timeout) or a positive number of seconds."
+			);
+		}
+		if (opts.expires < 0) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "--expires must be zero (until resumed) or a positive number of seconds."
+			);
+		}
 		if (!listFindNoCase("table,json", opts.format)) {
 			throw(
 				type = "Wheels.InvalidArguments",
@@ -5609,7 +5886,7 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts (--format=json for machines). retry/purge/monitor are tracked follow-ups (issue 3090).
+	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts and this server's running jobs, cap and drain (--format=json for machines), `enqueue <JobName>` adds a job now or after a delay, `drain [--wait]` stops this server starting new jobs (for deploys) and `resume` lifts it, `tick` runs one round (for cron/systemd timers), `install` writes a migration that creates the job tables. retry/purge/monitor are tracked follow-ups (issue 3090).
 	 */
 	public string function jobs() {
 		var opts = $parseJobsArgs(structuredArgs(arguments));
@@ -5619,6 +5896,16 @@ component extends="modules.BaseModule" {
 				return runJobsWork(opts);
 			case "status":
 				return runJobsStatus(opts);
+			case "enqueue":
+				return runJobsEnqueue(opts);
+			case "drain":
+				return runJobsDrain(opts);
+			case "resume":
+				return runJobsResume(opts);
+			case "tick":
+				return runJobsTick(opts);
+			case "install":
+				return runJobsInstall(opts);
 			// The framework bridge (vendor/wheels/public/views/cli.cfm) already
 			// implements jobsRetry/jobsPurge/jobsMonitor — the CLI verbs are
 			// deliberate follow-ups tracked in ##3090. Fail loudly with the
@@ -5637,7 +5924,7 @@ component extends="modules.BaseModule" {
 				);
 			default:
 				out("Unknown jobs action: #opts.action#", "red");
-				out("Usage: wheels jobs [work|status] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--format=table|json]");
+				out("Usage: wheels jobs [work|status|enqueue <JobName>|drain|resume|tick|install [--force]] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--stop-when-empty] [--quiet] [--job-timeout=<seconds>] [--wait[=<seconds>]] [--expires=<seconds>] [--format=table|json]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
 		}
 	}
@@ -5659,10 +5946,15 @@ component extends="modules.BaseModule" {
 		if (len(arguments.opts.queue)) {
 			workUrl &= "&queues=" & urlEncodedFormat(arguments.opts.queue);
 		}
+		// Without --job-timeout the server runs each job with its own class's timeout.
+		if (arguments.opts.jobTimeout > 0) {
+			workUrl &= "&timeout=" & arguments.opts.jobTimeout;
+		}
 
 		out("Wheels Job Worker", "cyan");
 		out("Queues: " & (len(arguments.opts.queue) ? arguments.opts.queue : "all"));
 		out("Poll interval: #arguments.opts.interval#s");
+		out("Job timeout: " & (arguments.opts.jobTimeout > 0 ? "each job's own, capped at #arguments.opts.jobTimeout#s" : "each job's own timeout"));
 		if (arguments.opts.maxJobs > 0) {
 			out("Max jobs: #arguments.opts.maxJobs#");
 		}
@@ -5735,6 +6027,59 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * `wheels jobs install`: write app/migrator/migrations/<timestamp>_CreateWheelsJobTables.cfc,
+	 * the migration that creates the job tables (or tops up the ones Wheels already created), so a
+	 * multi-server app applies the jobs schema once, under migration control. The source comes from
+	 * the running app (wheels.JobSchema) so it matches what auto-create builds; nothing touches the
+	 * database until `wheels migrate latest`.
+	 */
+	private string function runJobsInstall(required struct opts) {
+		var serverPort = $requireRunningServer(
+			hints = ["Start one with: wheels start (the migration is generated from the app's own framework version)"]
+		);
+		var httpResult = "";
+		try {
+			httpResult = makeHttpRequest("#$serverUrlBase(serverPort)#/wheels/cli?command=jobsInstallSource&format=json");
+		} catch (any httpErr) {
+			throw(
+				type    = "Wheels.Cli.CommandFailed",
+				message = "Jobs install failed (connection error): #httpErr.message#",
+				detail  = httpErr.detail ?: ""
+			);
+		}
+		var result = parseCliResponse(httpResult, "Jobs install");
+		if (!len(result.source ?: "")) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Jobs install: the server returned no migration source.");
+		}
+
+		var migrationDir = variables.projectRoot & "/app/migrator/migrations";
+		$ensureProjectDirectory(migrationDir);
+		var existing = directoryList(migrationDir, false, "name", "*_#result.migrationName#.cfc");
+		var fileName = "";
+		if (arrayLen(existing)) {
+			if (!arguments.opts.force) {
+				out("The jobs migration already exists: app/migrator/migrations/#existing[1]#", "yellow");
+				out("Run it with: wheels migrate latest. To rewrite it from this framework version, pass --force.");
+				return "";
+			}
+			// Same file name, so a migration that already ran keeps its version.
+			fileName = existing[1];
+		} else {
+			fileName = getService("helpers").generateMigrationTimestamp() & "_" & result.migrationName & ".cfc";
+		}
+		fileWrite(migrationDir & "/" & fileName, result.source);
+
+		out("Wrote app/migrator/migrations/#fileName#", "green");
+		out("");
+		out("Next:");
+		out("  1. Review it, then apply it: wheels migrate latest");
+		out("     It creates the job tables, or adds what existing ones are missing.");
+		out("  2. In config/settings.cfm: set(jobsAutoCreateTables = false)");
+		out("     so servers never change the job tables at startup.");
+		return "";
+	}
+
+	/**
 	 * Print why the worker loop is ending, plus its counts, and return "" for
 	 * runJobsWork() to return.
 	 */
@@ -5743,6 +6088,116 @@ component extends="modules.BaseModule" {
 		out(arguments.reason, "green");
 		out("Processed: #arguments.counters.processed# | Failed: #arguments.counters.failed#");
 		return "";
+	}
+
+	/**
+	 * `wheels jobs enqueue <JobName>`: add a job to the queue, now or after a delay
+	 * (--in seconds, or --at a time). Everything that can be checked here is
+	 * checked before the server call; --at becomes a delay in seconds, so the
+	 * server never parses a date. The framework's jobsEnqueue command allowlists
+	 * the class. Enqueueing writes a row, so this is write-side: strict server
+	 * identity and POST + reload password, like `jobs work`.
+	 */
+	private string function runJobsEnqueue(required struct opts) {
+		var usage = "Usage: wheels jobs enqueue <JobName> [--data=<JSON object>] [--queue=<name>] [--priority=<n>] [--in=<seconds> | --at=<ISO 8601 time>]";
+		if (!len(arguments.opts.job)) {
+			$refuse("Missing the job to enqueue. " & usage);
+		}
+		if (len(arguments.opts.data)) {
+			var parsedData = isJSON(arguments.opts.data) ? deserializeJSON(arguments.opts.data) : "";
+			if (!isStruct(parsedData)) {
+				$refuse("--data must be a JSON object, like {""userId"":42}.");
+			}
+		}
+		if (len(arguments.opts.priority) && !reFind("^-?[0-9]+$", arguments.opts.priority)) {
+			$refuse("--priority must be a whole number.");
+		}
+		if (len(arguments.opts["in"]) && len(arguments.opts.at)) {
+			$refuse("Use either --in or --at, not both.");
+		}
+		var delay = 0;
+		if (len(arguments.opts["in"])) {
+			if (!reFind("^[0-9]+$", arguments.opts["in"])) {
+				$refuse("--in must be zero or a positive whole number of seconds.");
+			}
+			delay = val(arguments.opts["in"]);
+		} else if (len(arguments.opts.at)) {
+			delay = $jobsDelayUntil(arguments.opts.at, getTickCount());
+		}
+
+		var serverPort = $requireOwnRunningServer([
+			"Enqueueing a job requires a running server bound to this project.",
+			"Start this project's own server with: wheels start"
+		]);
+		var enqueueUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=jobsEnqueue&format=json&job=#URLEncodedFormat(arguments.opts.job)#"
+			& (len(arguments.opts.data) ? "&data=" & URLEncodedFormat(arguments.opts.data) : "")
+			& (len(arguments.opts.queue) ? "&queue=" & URLEncodedFormat(arguments.opts.queue) : "")
+			& (len(arguments.opts.priority) ? "&priority=" & arguments.opts.priority : "")
+			& (delay > 0 ? "&delaySeconds=" & delay : "");
+
+		var httpResult = "";
+		try {
+			httpResult = makeBridgePost(enqueueUrl);
+		} catch (any httpErr) {
+			throw(type = "Wheels.JobEnqueueFailed", message = "Enqueue failed (connection error): #httpErr.message#");
+		}
+		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {success: false, message: "Invalid response from the server."};
+		if (!(parsed.success ?: false) || !isStruct(parsed.job ?: "")) {
+			// Self-contained: the thrown message is all the caller may see.
+			throw(type = "Wheels.JobEnqueueFailed", message = "Enqueue failed: " & (parsed.message ?: "no reason given."));
+		}
+
+		var job = parsed.job;
+		if (arguments.opts.format == "json") {
+			out(serializeJSON(job));
+			return "";
+		}
+		var when = delay > 0
+			? "runs in #delay# seconds (#dateTimeFormat(dateAdd("s", delay, now()), "yyyy-mm-dd HH:nn:ss")# local time)"
+			: "runs now";
+		out("Enqueued #job.jobClass# (#job.id#) on queue #job.queue#, #when#.", "green");
+		out("A worker picks it up: wheels jobs work");
+		return "";
+	}
+
+	/**
+	 * Seconds from `nowMs` (epoch milliseconds) until an ISO 8601 time: with a Z or
+	 * an offset it is read in that offset, without one in this machine's local time
+	 * ("2026-10-05T14:30", "2026-10-05 14:30:00"). Refuses an unreadable or past
+	 * time. Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public numeric function $jobsDelayUntil(required string at, required numeric nowMs) {
+		var text = trim(arguments.at);
+		var epochMs = $parseIsoInstantMs(text);
+		if (epochMs < 0) {
+			$refuse("Can't read --at '#text#': use an ISO 8601 time like 2026-10-05T14:30:00Z, 2026-10-05T16:30:00+02:00, or 2026-10-05 14:30 for local time.");
+		}
+		var delayMs = epochMs - arguments.nowMs;
+		if (delayMs <= 0) {
+			$refuse("--at #text# is in the past. Leave out --in and --at to run the job now.");
+		}
+		return ceiling(delayMs / 1000);
+	}
+
+	/**
+	 * Epoch milliseconds for an ISO 8601 time (see $jobsDelayUntil), or -1.
+	 */
+	private numeric function $parseIsoInstantMs(required string text) {
+		try {
+			if (reFind("(Z|[+-][0-9]{2}:[0-9]{2})$", arguments.text)) {
+				return createObject("java", "java.time.OffsetDateTime").parse(arguments.text).toInstant().toEpochMilli();
+			}
+			var local8601 = replace(arguments.text, " ", "T");
+			if (reFind("T[0-9]{2}:[0-9]{2}$", local8601)) {
+				local8601 &= ":00";
+			}
+			return createObject("java", "java.time.LocalDateTime").parse(local8601)
+				.atZone(createObject("java", "java.time.ZoneId").systemDefault())
+				.toInstant()
+				.toEpochMilli();
+		} catch (any e) {
+			return -1;
+		}
 	}
 
 	/**
@@ -5772,14 +6227,185 @@ component extends="modules.BaseModule" {
 		var result = parseCliResponse(httpResult, "Jobs status");
 		var stats = structKeyExists(result, "stats") && isStruct(result.stats) ? result.stats : {};
 
+		var host = structKeyExists(result, "host") && isStruct(result.host) ? result.host : {};
+
 		if (arguments.opts.format == "json") {
-			out(serializeJSON(stats));
+			var payload = duplicate(stats);
+			if (!structIsEmpty(host)) {
+				payload.host = host;
+			}
+			out(serializeJSON(payload));
 			return "";
 		}
 
 		out("Job Queue Status", "cyan");
 		out($formatJobsStatusTable(stats));
+		if (!structIsEmpty(host)) {
+			out($formatJobsHostLine(host));
+		}
 		return "";
+	}
+
+	/**
+	 * `wheels jobs drain`: this server starts no new jobs (deploys). With --wait, keep polling
+	 * until it has no running jobs, so the deploy can stop it safely; refuse (non-zero exit) if
+	 * jobs are still running when the wait runs out.
+	 */
+	private string function runJobsDrain(required struct opts) {
+		var serverPort = $requireOwnRunningServer([
+			"Draining needs this project's running server.",
+			"Start it with: wheels start"
+		]);
+		var base = $serverUrlBase(serverPort);
+		var httpResult = "";
+		try {
+			httpResult = makeBridgePost("#base#/wheels/cli?command=jobsDrain&format=json&expiresInSeconds=#int(arguments.opts.expires)#");
+		} catch (any httpErr) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Drain failed (connection error): #httpErr.message#");
+		}
+		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {success: false, message: "Invalid response from the server."};
+		if (!(parsed.success ?: false) || !isStruct(parsed.host ?: "")) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Drain failed: " & (parsed.message ?: "no reason given."));
+		}
+		var host = parsed.host;
+		if (arguments.opts.wait > 0) {
+			host = $jobsWaitForDrain(base = base, host = host, waitSeconds = arguments.opts.wait);
+		}
+		if (arguments.opts.format == "json") {
+			out(serializeJSON(host));
+			return "";
+		}
+		out("Draining #host.host#: no new jobs will start there.", "green");
+		out($formatJobsHostLine(host));
+		if (arguments.opts.wait > 0) {
+			out("No jobs are running on #host.host#; it is safe to stop.", "green");
+		} else {
+			out("Resume with: wheels jobs resume");
+		}
+		return "";
+	}
+
+	/**
+	 * `wheels jobs tick`: one JobRunner.tick() on this project's running server, for a cron job
+	 * or systemd timer that runs jobs without a long-lived worker. Mutating, so it goes through
+	 * the bridge's POST + reload-password gate like `work`.
+	 */
+	private string function runJobsTick(required struct opts) {
+		var serverPort = $requireOwnRunningServer([
+			"A tick needs this project's running server.",
+			"Start it with: wheels start"
+		]);
+		var httpResult = "";
+		try {
+			httpResult = makeBridgePost("#$serverUrlBase(serverPort)#/wheels/cli?command=jobsTick&format=json");
+		} catch (any httpErr) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Tick failed (connection error): #httpErr.message#");
+		}
+		var result = parseCliResponse(httpResult, "Jobs tick");
+		var tick = isStruct(result.tick ?: "") ? result.tick : {};
+		if (arguments.opts.format == "json") {
+			out(serializeJSON(tick));
+			return "";
+		}
+		out("Tick on #tick.host ?: '?'#: processed #tick.processed ?: 0#, failed #tick.failed ?: 0#, reaped #tick.reaped ?: 0#" & ((tick.draining ?: false) ? " (draining)" : "") & ((tick.capped ?: false) ? " (at the per-host cap)" : ""));
+		return "";
+	}
+
+	/**
+	 * `wheels jobs resume`: this server starts jobs again.
+	 */
+	private string function runJobsResume(required struct opts) {
+		var serverPort = $requireOwnRunningServer([
+			"Resuming needs this project's running server.",
+			"Start it with: wheels start"
+		]);
+		var httpResult = "";
+		try {
+			httpResult = makeBridgePost("#$serverUrlBase(serverPort)#/wheels/cli?command=jobsResume&format=json");
+		} catch (any httpErr) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Resume failed (connection error): #httpErr.message#");
+		}
+		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {success: false, message: "Invalid response from the server."};
+		if (!(parsed.success ?: false) || !isStruct(parsed.host ?: "")) {
+			throw(type = "Wheels.Cli.CommandFailed", message = "Resume failed: " & (parsed.message ?: "no reason given."));
+		}
+		if (arguments.opts.format == "json") {
+			out(serializeJSON(parsed.host));
+			return "";
+		}
+		out("Resumed #parsed.host.host#: it starts jobs again.", "green");
+		out($formatJobsHostLine(parsed.host));
+		return "";
+	}
+
+	/**
+	 * Poll this server's job state until nothing is running, checking every 2 seconds for up
+	 * to waitSeconds. Returns the last state; throws Wheels.JobsDrainTimeout when jobs are
+	 * still running at the limit. Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public struct function $jobsWaitForDrain(required string base, required struct host, required numeric waitSeconds) {
+		var state = arguments.host;
+		var pollSeconds = 2;
+		var polls = ceiling(arguments.waitSeconds / pollSeconds);
+		for (var poll = 0; poll <= polls; poll++) {
+			if (val(state.running ?: 0) <= 0) {
+				return state;
+			}
+			if (poll == polls) {
+				break;
+			}
+			out("Waiting for #state.running# running job(s) on #state.host# to finish...");
+			$jobsPause(pollSeconds);
+			var httpResult = makeHttpRequest("#arguments.base#/wheels/cli?command=jobsHostStatus&format=json");
+			var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {};
+			if (isStruct(parsed.host ?: "")) {
+				state = parsed.host;
+			}
+		}
+		throw(
+			type = "Wheels.JobsDrainTimeout",
+			message = "#state.host# is draining, but #state.running# job(s) were still running after #arguments.waitSeconds# seconds.",
+			detail = "Don't stop the server yet: wait longer (--wait=<seconds>), or check the jobs with: wheels jobs status"
+		);
+	}
+
+	/**
+	 * --wait's value in seconds: "" = don't wait, a bare --wait = 600, a number = that many.
+	 * Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public numeric function $jobsWaitSeconds(required string wait) {
+		if (!len(arguments.wait) || arguments.wait == "false") {
+			return 0;
+		}
+		if (arguments.wait == "true") {
+			return 600;
+		}
+		if (!reFind("^[0-9]+$", arguments.wait)) {
+			throw(type = "Wheels.InvalidArguments", message = "--wait must be a whole number of seconds (or just --wait for up to 600).");
+		}
+		return val(arguments.wait);
+	}
+
+	/**
+	 * Pause between drain polls. Its own method so specs can skip the wait.
+	 */
+	public void function $jobsPause(required numeric seconds) {
+		sleep(arguments.seconds * 1000);
+	}
+
+	/**
+	 * One line describing this server's job state, from JobRunner.status(). Public for specs.
+	 */
+	public string function $formatJobsHostLine(required struct host) {
+		var hostName = arguments.host.host ?: "";
+		var running = val(arguments.host.running ?: 0);
+		var cap = val(arguments.host.maxConcurrent ?: 0) > 0 ? arguments.host.maxConcurrent : "no cap";
+		var line = "Host #hostName#: #running# running, max #cap#";
+		if (arguments.host.draining ?: false) {
+			var expires = len(arguments.host.drainExpiresAt ?: "") ? " until #arguments.host.drainExpiresAt#" : " until resumed";
+			line &= ", draining#expires#";
+		}
+		return line;
 	}
 
 	/**
@@ -6311,9 +6937,11 @@ component extends="modules.BaseModule" {
 			case "test":
 				return browserTest(args);
 			default:
-				out("Unknown browser command: #subcommand#", "red");
-				out("Valid commands: setup, test");
-				return "";
+				$refuse(
+					"Unknown browser command: #subcommand#",
+					"Wheels.InvalidArguments",
+					["Valid commands: setup, test"]
+				);
 		}
 	}
 
@@ -6914,9 +7542,11 @@ component extends="modules.BaseModule" {
 		// Look up the named snippet pattern
 		var snippets = getSnippetRegistry();
 		if (!structKeyExists(snippets, pattern)) {
-			out("Unknown snippet pattern: #pattern#", "red");
-			out("Run 'wheels generate snippets' for available patterns.");
-			return "";
+			$refuse(
+				"Unknown snippet pattern: #pattern#",
+				"Wheels.Generate.Refused",
+				["Run 'wheels generate snippets' for available patterns."]
+			);
 		}
 
 		var snippet = snippets[pattern];
@@ -7227,16 +7857,16 @@ component extends="modules.BaseModule" {
 			"seed-data": {
 				name: "Seed Data",
 				description: "Database seeding template with seedOnce() examples",
-				hint: "Run seeds with: wheels seed.",
+				hint: "Seeds go in app/db/seeds.cfm and app/db/seeds/development.cfm, where wheels seed reads them; existing files are kept unless you pass --force. Run them with: wheels seed.",
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
 					var content = fileRead(snippetDir & "seeds.txt");
-					var p = writeSnippetFile(projectRoot, "app/snippets/seeds.cfm", content, force);
+					var p = writeSnippetFile(projectRoot, "app/db/seeds.cfm", content, force);
 					if (len(p)) arrayAppend(created, p);
 
 					var devContent = fileRead(snippetDir & "seeds-development.txt");
-					p = writeSnippetFile(projectRoot, "app/snippets/seeds-development.cfm", devContent, force);
+					p = writeSnippetFile(projectRoot, "app/db/seeds/development.cfm", devContent, force);
 					if (len(p)) arrayAppend(created, p);
 
 					return created;
@@ -7569,6 +8199,99 @@ component extends="modules.BaseModule" {
 
 		out(msg, "green");
 		return "";
+	}
+
+	/**
+	 * `wheels migrate unlock [--force]` (#4209). Without --force it only reports
+	 * the migration lock: exit 0 when nothing live holds it, a refusal naming
+	 * --force when an instance does, so nobody clears a running migration by
+	 * habit. --force removes the lease row and says what it removed. --yes is
+	 * not an alias: an MCP client confirming out of habit (it confirms
+	 * forget/pretend) must not remove a live lock without naming force.
+	 */
+	private string function runMigrationUnlock(required array args) {
+		var force = false;
+		for (var i = 2; i <= arrayLen(arguments.args); i++) {
+			if (arguments.args[i] == "--force") {
+				force = true;
+			}
+		}
+		if (force) {
+			return runMigrationUnlockForce();
+		}
+
+		var serverPort = $resolveMigrationServerPort(false);
+		var statusUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=migrationLockStatus&format=json";
+		var lock = $migrationLockResponse(makeHttpRequest(statusUrl), "unlock").lock;
+		if (!lock.held) {
+			out("No migration lock is held.", "green");
+			return "";
+		}
+		if (lock.expired) {
+			out("The migration lock is held by #$migrationLockDescription(lock)#, but its lease expired #abs(lock.expiresInSeconds)# seconds ago.", "yellow");
+			out("The next migration takes it over, so there is nothing to clear.");
+			return "";
+		}
+		// One self-contained message: an MCP client sees only the thrown message.
+		$refuse(
+			"The migration lock is held by #$migrationLockDescription(lock)#; its lease expires in #lock.expiresInSeconds# seconds. "
+				& "Nothing was removed. If that instance is gone, remove the lock with: wheels migrate unlock --force",
+			"Wheels.MigrationLocked"
+		);
+		return "";
+	}
+
+	private string function runMigrationUnlockForce() {
+		var serverPort = $requireOwnRunningServer([
+			"Removing the migration lock requires a running server bound to this project.",
+			"Start this project's own server with: wheels start (it registers the server as this project's)"
+		]);
+		var unlockUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=migrationUnlock&force=true&format=json";
+		var httpResult = "";
+		try {
+			// migrationUnlock deletes a row — POST + reload password.
+			httpResult = makeBridgePost(unlockUrl);
+		} catch (any httpErr) {
+			throw(type = "MigrationError", message = "unlock failed (connection error): #httpErr.message#", detail = httpErr.detail ?: "");
+		}
+		var parsed = $migrationLockResponse(httpResult, "unlock");
+		if (parsed.released ?: false) {
+			out("Removed the migration lock held by #$migrationLockDescription(parsed.lock)#.", "green");
+			return "";
+		}
+		if (!parsed.lock.held) {
+			out("No migration lock was held, so there was nothing to remove.", "green");
+			return "";
+		}
+		var heldBy = parsed.heldBy ?: "";
+		if (len(heldBy) && heldBy != parsed.lock.owner) {
+			throw(
+				type = "MigrationError",
+				message = "The migration lock changed hands while it was being removed: owner #heldBy# holds it now, and it was left in place. Run wheels migrate unlock to see who holds it."
+			);
+		}
+		throw(type = "MigrationError", message = "The migration lock held by #$migrationLockDescription(parsed.lock)# was not removed.");
+	}
+
+	/**
+	 * Parse a migrationLockStatus / migrationUnlock bridge response, throwing
+	 * MigrationError when the server reports a failure. Public for specs.
+	 */
+	public struct function $migrationLockResponse(required string body, required string verb) {
+		var parsed = isJSON(arguments.body) ? deserializeJSON(arguments.body) : {success: false, message: "Invalid response"};
+		if (!(parsed.success ?: false) || !isStruct(parsed.lock ?: "")) {
+			var msg = parsed.message ?: "";
+			out(len(msg) ? msg : "#arguments.verb# failed.", "red");
+			throw(type = "MigrationError", message = len(msg) ? msg : "#arguments.verb# failed: no lock status in the response.");
+		}
+		return parsed;
+	}
+
+	/**
+	 * "host `web-1` (owner abc) for 120 seconds", from a migrationLockStatus().
+	 */
+	public string function $migrationLockDescription(required struct lock) {
+		return "host `#arguments.lock.host#` (owner #arguments.lock.owner#) for #arguments.lock.heldForSeconds# seconds";
 	}
 
 	private string function runRenameSystemTables(boolean dryRun = false) {
@@ -8635,11 +9358,12 @@ component extends="modules.BaseModule" {
 				skipPackages: true,
 				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector(""wheels.Bindings"")` (the constructor requires the bindings path). The legacy adapter does NOT shim this item."
 			});
-			// renderPage()/renderPageToString() removed in 4.0 — shimmed by
-			// the optional wheels-legacy-adapter package, but unshimmed apps
-			// throw at first render.
+			// renderPage()/renderPageToString() were renamed in 2.0 (to renderView()
+			// and renderView(returnAs="string")); old code that still calls them
+			// throws at first render on 4.x unless the optional
+			// wheels-legacy-adapter package shims them.
 			arrayAppend(checks, {
-				description: "Removed renderPage()/renderPageToString() helpers",
+				description: "renderPage()/renderPageToString(), renamed to renderView() in 2.0",
 				pattern: "renderPage(ToString)?\s*\(",
 				checkType: "grep",
 				scanDir: "app",
@@ -8956,7 +9680,7 @@ component extends="modules.BaseModule" {
 				fix: "On Adobe ColdFusion, session cleanup can call onSessionEnd() after the application scope is gone, and a bare application.wo then throws. Route it through arguments.applicationScope.wo, guarded with StructKeyExists. #adopt# Guide: ""Adobe teardown guards in onError / onSessionEnd"", #guide41#"},
 			{since: "4.0.6", severity: "advisory", pattern: "testcontext\.cfm",
 				description: "public/Application.cfc doesn't include the isolated test context",
-				fix: "Without it the test suites run against your live application scope. #adopt# Guide: ""Isolated test-application include"", #guide41#"},
+				fix: "Without it the test suites run against your live application scope: a run that uses the test database switches the live application's datasource for the whole run, so other requests to the app read and write the test database meanwhile. #adopt# Guide: ""Isolated test-application include"", #guide41#"},
 			{since: "4.1.0", severity: "advisory", pattern: "resources/java",
 				description: "public/Application.cfc doesn't put the bundled jBCrypt jar on the Java load path",
 				fix: "Without it bcryptHash()/bcryptVerify() use the slow pure-CFML fallback, and code that loads a BCrypt class can fail. #adopt# Guide: ""jBCrypt load path"", #guide41#"},
@@ -9052,6 +9776,25 @@ component extends="modules.BaseModule" {
 			scanTargets: [{path: ".gitignore"}],
 			fix: "Remove the vendor line and commit vendor/, so a clone, CI run or image build has the framework and your packages. Guide: ""Commit vendor/"", #guide#"
 		});
+		// `null` was the migration column option's name before 3.0 renamed it allowNull, with no
+		// alias until 4.2. From 3.0 through 4.1 a null=false column was created nullable; 4.2 reads
+		// null=false again, so a database rebuilt on 4.2 can be stricter than one built earlier.
+		arrayAppend(arguments.checks, {
+			description: "Migrations use null=false, the column option's name before Wheels 3.0",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "[,(]\s*null\s*=\s*[""']?(false|no|0)[""']?\s*[,)]",
+			scanTargets: [{path: "app/migrator/migrations", extensions: "cfc", recurse: true}],
+			fix: "Wheels 3.0 through 4.1 ignored null=false, so a database built or rebuilt by them from these migrations has these columns NULLABLE, and they may now hold NULL rows. 4.2 reads null=false again: a database rebuilt on 4.2 gets NOT NULL columns, stricter than the one you run. Check each column for NULL rows before you tighten it with changeColumn(allowNull=false), and rename null to allowNull in the migrations. Guide: ""Migration column option null"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "Migrations use null=true, the column option's name before Wheels 3.0",
+			severity: "advisory",
+			checkType: "grep",
+			pattern: "[,(]\s*null\s*=\s*[""']?(true|yes|1)[""']?\s*[,)]",
+			scanTargets: [{path: "app/migrator/migrations", extensions: "cfc", recurse: true}],
+			fix: "4.2 reads null as a deprecated alias of allowNull and logs a warning. Rename it to allowNull. Guide: ""Migration column option null"", #guide#"
+		});
 		arrayAppend(arguments.checks, {
 			description: "findAll(returnAs=""structs"") now returns an array",
 			severity: "advisory",
@@ -9108,6 +9851,14 @@ component extends="modules.BaseModule" {
 			pattern: "renderNotFound",
 			scanTargets: [{path: "config/routes.cfm"}],
 			fix: "A request for that action gets Wheels.ActionNotAllowed. Rename the action and its route. Guide: ""renderNotFound is a framework helper"", #guide#"
+		});
+		arrayAppend(arguments.checks, {
+			description: "A route targets an action named isSafeRedirectUrl (now a reserved framework helper)",
+			severity: "breaking",
+			checkType: "grep",
+			pattern: "isSafeRedirectUrl",
+			scanTargets: [{path: "config/routes.cfm"}],
+			fix: "A request for that action gets Wheels.ActionNotAllowed. Rename the action and its route; a controller's own isSafeRedirectUrl helper that no route targets keeps working. Guide: ""isSafeRedirectUrl is a framework helper"", #guide#"
 		});
 		arrayAppend(arguments.checks, {
 			description: "A MySQL datasource sets tinyInt1isBit=false",
@@ -10049,6 +10800,36 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The error message a failed test-runner response carries, or "" when it carries none. A run that
+	 * failed before producing counts returns {success:false, error, message} — e.g. the core runner's
+	 * "Test database not available" guard, or a test-db populate failure. Some engine errors instead
+	 * surface as a serialized exception document whose Message / RootCause.message holds the cause, so
+	 * those are checked as a fallback. Used to surface the real cause instead of "no test bundles ran"
+	 * (#4408). Public only so the CLI specs can reach it (cli/CLAUDE.md "public for specs" carve-out);
+	 * hidden from MCP via the $-prefix sweep.
+	 */
+	public string function $runnerErrorMessage(required any result) {
+		if (!isStruct(arguments.result)) {
+			return "";
+		}
+		for (var key in ["error", "message"]) {
+			if (structKeyExists(arguments.result, key) && isSimpleValue(arguments.result[key]) && len(trim(arguments.result[key]))) {
+				return trim(arguments.result[key]);
+			}
+		}
+		if (
+			structKeyExists(arguments.result, "RootCause")
+			&& isStruct(arguments.result.RootCause)
+			&& structKeyExists(arguments.result.RootCause, "message")
+			&& isSimpleValue(arguments.result.RootCause.message)
+			&& len(trim(arguments.result.RootCause.message))
+		) {
+			return trim(arguments.result.RootCause.message);
+		}
+		return "";
+	}
+
+	/**
 	 * True when a run of the DEFAULT scope (no --filter / --directory / path)
 	 * discovered no spec bundles, the spec root has no .cfc files on disk, and
 	 * nothing else went wrong: an app with no specs yet, such as a fresh
@@ -10208,7 +10989,7 @@ component extends="modules.BaseModule" {
 				out("", "yellow");
 				out("Warning: --db only applies to --core tests; ignoring for the app suite.", "yellow");
 				out("App tests run against the configured app datasource (or", "yellow");
-				out("<datasource>_test when --useTestDB is set). To test against a different", "yellow");
+				out("<datasource>_test when --test-db is set). To test against a different", "yellow");
 				out("engine, point your app's datasource env var at it (or use --core).", "yellow");
 				out("See: command-line-tools/wheels-commands/testing##testing-against-different-engines", "yellow");
 				out("", "yellow");
@@ -10773,6 +11554,16 @@ component extends="modules.BaseModule" {
 			};
 		}
 		if (isStruct(arguments.result) && $cliTestResultFailed(result = arguments.result)) {
+			// Surface the runner's own error when it carries one — a failed test-db populate, a missing
+			// datasource ("Datasource [...] doesn't exist") — instead of masking it as "no test bundles
+			// ran for this scope", which hid the real cause and read like an empty run (#4408).
+			var runnerError = $runnerErrorMessage(arguments.result);
+			if (len(runnerError)) {
+				return {
+					text = "Test run failed: #runnerError##arguments.duration#",
+					color = "red"
+				};
+			}
 			return {
 				text = "#arguments.totalPass# passed, but no test bundles ran for this scope#arguments.duration#",
 				color = "red"
@@ -11011,7 +11802,8 @@ component extends="modules.BaseModule" {
 			luceeAdminPassword: generateRandomPassword(),
 			setupH2: structKeyExists(options, "setupH2") ? options.setupH2 : false,
 			noSQLite: structKeyExists(options, "noSQLite") ? options.noSQLite : false,
-			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true
+			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true,
+			agents: structKeyExists(options, "agents") ? options.agents : true
 		};
 
 		// Resolve the Wheels framework source BEFORE creating any files. A
@@ -11086,6 +11878,10 @@ component extends="modules.BaseModule" {
 		// a reviewable file rather than an inline string means an edit to it
 		// cannot live only in a working tree and vanish without a trace.
 
+		// The AI-assistant configs `wheels setup agents` writes, so the new app's
+		// assistant finds the Wheels MCP server without a second command.
+		var agentsWarning = opts.agents ? $writeNewAppAgentConfigs(targetDir, appName) : "";
+
 		out("");
 		out("Application created!", "green");
 		out("");
@@ -11098,6 +11894,12 @@ component extends="modules.BaseModule" {
 			out("  Database:        H2 embedded (db/h2/)", "green");
 		} else if (!opts.noSQLite) {
 			out("  Database:        SQLite (db/development.sqlite)", "green");
+		}
+		if (opts.agents && !len(agentsWarning)) {
+			out("  AI assistants:   .mcp.json and .opencode.json (skip with --no-agents)");
+		}
+		if (len(agentsWarning)) {
+			out("  " & agentsWarning, "yellow");
 		}
 		out("");
 		out("Next steps:", "bold");
@@ -11159,14 +11961,14 @@ component extends="modules.BaseModule" {
 		h2Config &= tab & "// H2 embedded database (configured by wheels new --setup-h2)" & nl;
 		h2Config &= tab & 'this.datasources["#datasourceName#"] = {' & nl;
 		h2Config &= tab & tab & 'class: "org.h2.Driver",' & nl;
-		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & expandPath("../db/h2/#datasourceName#") & ";MODE=MySQL",' & nl;
+		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & this.wheels.projectRoot & "db/h2/#datasourceName#;MODE=MySQL",' & nl;
 		h2Config &= tab & tab & 'username: "sa"' & nl;
 		h2Config &= tab & "};";
 
 		// Also add a test database datasource
 		h2Config &= nl & tab & 'this.datasources["wheelstestdb"] = {' & nl;
 		h2Config &= tab & tab & 'class: "org.h2.Driver",' & nl;
-		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & expandPath("../db/h2/wheelstestdb") & ";MODE=MySQL",' & nl;
+		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & this.wheels.projectRoot & "db/h2/wheelstestdb;MODE=MySQL",' & nl;
 		h2Config &= tab & tab & 'username: "sa"' & nl;
 		h2Config &= tab & "};";
 
@@ -11218,13 +12020,13 @@ component extends="modules.BaseModule" {
 		sqliteConfig &= tab & "// SQLite zero-config database (configured by wheels new)" & nl;
 		sqliteConfig &= tab & 'this.datasources["#datasourceName#"] = {' & nl;
 		sqliteConfig &= tab & tab & 'class: "org.sqlite.JDBC",' & nl;
-		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & expandPath("../db/development.sqlite")' & nl;
+		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & this.wheels.projectRoot & "db/development.sqlite"' & nl;
 		sqliteConfig &= tab & "};";
 
 		// Also add a test database datasource
 		sqliteConfig &= nl & tab & 'this.datasources["#datasourceName#_test"] = {' & nl;
 		sqliteConfig &= tab & tab & 'class: "org.sqlite.JDBC",' & nl;
-		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & expandPath("../db/test.sqlite")' & nl;
+		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & this.wheels.projectRoot & "db/test.sqlite"' & nl;
 		sqliteConfig &= tab & "};";
 
 		// Inject into config/app.cfm at the CLI-Appends-Here marker
@@ -11631,7 +12433,12 @@ component extends="modules.BaseModule" {
 			var why = structKeyExists(pins, arguments.opts.port + 1) ? "pinned by " & pins[arguments.opts.port + 1] : "in use";
 			out("Shutdown port #arguments.opts.port + 1# is #why#; using #shutdownPort#.", "yellow");
 		}
-		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
+		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621) or --setup-h2.
+		// With --setup-h2 the H2 datasources are written into config/app.cfm (configureH2Database), so
+		// lucee.json must not also carry the SQLite pair — otherwise the app keeps stale SQLite
+		// datasource entries alongside its H2 ones (#4413).
+		var noLuceeDatasources = arguments.opts.noSQLite
+			|| (structKeyExists(arguments.opts, "setupH2") && arguments.opts.setupH2);
 		return {
 			"appName": arguments.appName,
 			"datasourceName": arguments.opts.datasource,
@@ -11640,8 +12447,109 @@ component extends="modules.BaseModule" {
 			"port": arguments.opts.port,
 			"shutdownPort": shutdownPort,
 			"openBrowser": arguments.opts.openBrowser ? "true" : "false",
-			"datasourcesBlock": arguments.opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(arguments.opts.datasource)
+			"datasourcesBlock": noLuceeDatasources ? "{}" : buildSQLiteDatasourcesBlock(arguments.opts.datasource)
 		};
+	}
+
+	/**
+	 * The flags `wheels start` handles itself, out of its argv: `--force`, `--engine`, `--port`
+	 * (also `-p N` / `-p=N`, which LuCLI would otherwise take without moving the shutdown port off
+	 * it, #4411) and `--dry-run` (noted, and still passed on). Everything else is passed on to
+	 * LuCLI's `server start` in `passThrough`.
+	 */
+	private struct function $parseStartArgs(required array args) {
+		var rv = {force = false, engine = "lucee", enginePort = 0, dryRun = false, passThrough = []};
+		for (var i = 1; i <= arrayLen(arguments.args); i++) {
+			var a = arguments.args[i];
+			if (a == "--force") {
+				rv.force = true;
+			} else if (a == "--engine") {
+				rv.engine = lCase($startFlagValue(arguments.args, i, "engine"));
+				i++;
+			} else if (left(a, 9) == "--engine=") {
+				rv.engine = lCase(mid(a, 10, len(a) - 9));
+			} else if (a == "--port" || a == "-p") {
+				rv.enginePort = val($startFlagValue(arguments.args, i, "port"));
+				i++;
+			} else if (left(a, 7) == "--port=" || left(a, 4) == "--p=") {
+				rv.enginePort = val(listRest(a, "="));
+			} else {
+				if (a == "--dry-run") {
+					rv.dryRun = true;
+				}
+				arrayAppend(rv.passThrough, a);
+			}
+		}
+		return rv;
+	}
+
+	/**
+	 * The argv for LuCLI's `server start`: "start" and the flags `wheels start` passed on, plus the
+	 * environment LuCLI took from its root `--env` / `-e` option, which never reaches the module's
+	 * own arguments (#4412). An explicit `--env` / `--environment` that did reach them wins.
+	 */
+	private array function $startCommandArgs(required array passThrough) {
+		var rv = ["start"];
+		rv.append(arguments.passThrough, true);
+		var env = $lucliRootEnvironment();
+		if (len(env) && !$hasEnvironmentFlag(arguments.passThrough)) {
+			arrayAppend(rv, "--environment=" & env);
+		}
+		return rv;
+	}
+
+	/**
+	 * Whether the argv already names an environment for LuCLI's `server start`.
+	 */
+	private boolean function $hasEnvironmentFlag(required array argv) {
+		for (var a in arguments.argv) {
+			if (reFind("^--(env|environment)(=|$)", a)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * The environment LuCLI took from its root `--env` / `-e` option (or LUCLI_ENV), or "" when
+	 * there is none. LuCLI records LUCLI_ENV in LuCLI.getCurrentEnvironment(), but on the route
+	 * that runs a module under its binary name it parses `--env` / `-e` without recording them, so
+	 * those are read back from this process's own command line.
+	 */
+	private string function $lucliRootEnvironment() {
+		try {
+			var env = createObject("java", "org.lucee.lucli.LuCLI").getCurrentEnvironment();
+			if (!isNull(env) && len(trim(env))) {
+				return trim(env);
+			}
+		} catch (any e) {
+			// An older LuCLI without getCurrentEnvironment(): fall back to the command line.
+		}
+		try {
+			var processArgs = createObject("java", "java.lang.ProcessHandle").current().info().arguments();
+			return processArgs.isPresent() ? $environmentFromArgv(processArgs.get()) : "";
+		} catch (any e) {
+			return "";
+		}
+	}
+
+	/**
+	 * The value of a root `--env` / `-e` option in an argv (`--env=prod`, `--env prod`, `-e prod`,
+	 * `-e=prod`), or "". Public ONLY so StartSideEffectsSpec can unit-test it; hidden from MCP by the
+	 * $-prefix sweep in mcpHiddenTools().
+	 */
+	public string function $environmentFromArgv(required any argv) {
+		var n = arrayLen(arguments.argv);
+		for (var i = 1; i <= n; i++) {
+			var a = toString(arguments.argv[i]);
+			if (reFind("^(--env|-e)=.+", a)) {
+				return listRest(a, "=");
+			}
+			if ((a == "--env" || a == "-e") && i < n) {
+				return toString(arguments.argv[i + 1]);
+			}
+		}
+		return "";
 	}
 
 	/**
@@ -13982,11 +14890,9 @@ component extends="modules.BaseModule" {
 		var basePath = opts.basePath;
 		var directory = opts.directory;
 
-		// Pre-flight: verify Playwright JARs
+		// Pre-flight: verify Playwright JARs (throws Wheels.Browser.NotInstalled, exit non-zero, if not set up)
 		var manifestPath = variables.projectRoot & "/vendor/wheels/browser-manifest.json";
-		if (!$browserVerifyPlaywright(manifestPath)) {
-			return "";
-		}
+		$browserVerifyPlaywright(manifestPath);
 
 		out("Running browser tests...", "cyan");
 		out("Directory: #directory#");
@@ -14090,12 +14996,18 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * Pre-flight: verify the Playwright JARs in browser-manifest.json are
-	 * present and SHA-matched. Prints guidance and returns false when not.
+	 * present and SHA-matched. Throws Wheels.Browser.NotInstalled (which exits
+	 * non-zero) when the manifest is missing or a JAR is absent / SHA-mismatched,
+	 * so a scripted `wheels browser test` on an un-set-up host fails instead of
+	 * silently exiting 0 (#4409). Returns normally when everything is in place.
 	 */
-	private boolean function $browserVerifyPlaywright(required string manifestPath) {
+	private void function $browserVerifyPlaywright(required string manifestPath) {
 		if (!fileExists(arguments.manifestPath)) {
-			out("browser-manifest.json not found at: #arguments.manifestPath#", "red");
-			return false;
+			$refuse(
+				"browser-manifest.json not found at: #arguments.manifestPath#",
+				"Wheels.Browser.NotInstalled",
+				["Run: wheels browser setup"]
+			);
 		}
 		var manifest = deserializeJSON(fileRead(arguments.manifestPath));
 		var installDir = $resolveBrowserInstallDir();
@@ -14115,18 +15027,18 @@ component extends="modules.BaseModule" {
 		}
 
 		if (!allInstalled) {
-			out("Playwright not installed.", "red");
 			if (arrayLen(missingJars)) {
 				out("Missing: #arrayToList(missingJars, ', ')#", "yellow");
 			}
 			if (arrayLen(mismatchedJars)) {
 				out("SHA mismatch: #arrayToList(mismatchedJars, ', ')#", "yellow");
 			}
-			out("");
-			out("Run: wheels browser setup");
-			return false;
+			$refuse(
+				"Playwright not installed.",
+				"Wheels.Browser.NotInstalled",
+				["Run: wheels browser setup"]
+			);
 		}
-		return true;
 	}
 
 	/**

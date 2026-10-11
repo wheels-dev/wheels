@@ -1,0 +1,1 @@
+- When a Wheels-managed transaction rolls back because its method threw, `afterRollback` callbacks now run after the transaction block has ended, as they already did for a rollback without an exception. A callback's database writes on this path are kept instead of being discarded with the transaction, and a callback that throws doesn't replace the method's exception

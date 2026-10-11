@@ -157,6 +157,10 @@
 			}
 		} else {
 			application[local.appKey][StructKeyList(arguments)] = arguments[1];
+			// Inflection results depend on these; drop the cache (#4150).
+			if (ListFindNoCase("uncountables,irregulars", StructKeyList(arguments))) {
+				StructDelete(application[local.appKey], "inflectionCache");
+			}
 			// GHSA-8r22: keep the debug-settings boot snapshot in step with an
 			// explicit set() of these flags, so a runtime set() is still honoured
 			// while $get() serves the snapshot for an app with the legacy block.

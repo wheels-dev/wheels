@@ -248,7 +248,14 @@ component extends="Base" {
 		} else {
 			arguments.columnNames = arguments.columnName ?: "";
 		}
-		invoke(t, arguments.columnType, arguments);
+		// The column helper gets the column's options, not this function's own arguments.
+		local.columnArgs = StructCopy(arguments);
+		StructDelete(local.columnArgs, "table");
+		StructDelete(local.columnArgs, "addColumns");
+		if (arguments.columnType != "references") {
+			StructDelete(local.columnArgs, "referenceName");
+		}
+		invoke(t, arguments.columnType, local.columnArgs);
 		t.change(addColumns = arguments.addColumns);
 	}
 

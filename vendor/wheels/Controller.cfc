@@ -60,6 +60,9 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 		$setFlashStorage($get("flashStorage"));
 		$setFlashAppend($get("flashAppend"));
 
+		// The application's global helpers, so config() can call them.
+		$includeGlobalHelpers();
+
 		// Call the developer's "config" function if it exists.
 		if (StructKeyExists(variables, "config")) {
 			config();
@@ -70,12 +73,40 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. Includes the application's global helper file (`<viewPath>/helpers.cfm`)
+	 * into this object, once per object: called from $initControllerClass() and
+	 * $initControllerObject(). It used to be included in the pseudo-constructor, which relies on
+	 * the engine running that per instance, and only while the application scope was ready. Whether
+	 * the file exists is checked once and kept in helperFileCache (under a key no controller name
+	 * can take) when cacheFileChecking is on, like the controller-specific helper file.
+	 */
+	public void function $includeGlobalHelpers() {
+		local.template = $get("viewPath") & "/helpers.cfm";
+		local.cacheKey = "$global";
+		local.canCache = StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "helperFileCache");
+		if (local.canCache && StructKeyExists(application.wheels.helperFileCache, local.cacheKey)) {
+			local.exists = application.wheels.helperFileCache[local.cacheKey];
+		} else {
+			local.exists = FileExists(ExpandPath(local.template));
+			if (local.canCache && $get("cacheFileChecking")) {
+				application.wheels.helperFileCache[local.cacheKey] = local.exists;
+			}
+		}
+		if (local.exists) {
+			$include(template = local.template);
+		}
+	}
+
+	/**
 	 * Initialize the controller instance level object and return it.
 	 */
 	public any function $initControllerObject(required string name, required struct params) {
 		// Create a struct for storing request specific data.
 		variables.$instance = {};
 		variables.$instance.contentFor = {};
+
+		// The application's global helpers first, so a controller helper can override one.
+		$includeGlobalHelpers();
 
 		// Set file name to look for (e.g. "app/views/folder/helpers.cfm").
 		// Name could be dot notation so we need to change delimiters.
@@ -363,14 +394,6 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 			}
 		}
 		return false;
-	}
-
-	if (
-		IsDefined("application")
-		&& StructKeyExists(application, "wheels")
-		&& StructKeyExists(application.wheels, "viewPath")
-	) {
-		include "#application.wheels.viewPath#/helpers.cfm";
 	}
 
 	/**

@@ -1,13 +1,13 @@
 ---
 title: "wheels deploy build dev"
-description: Build a local dev-tagged image without pushing to a registry.
+description: Build a local image tagged dirty without pushing to a registry.
 type: reference
 sidebar:
   label: "dev"
   order: 7
 ---
 
-Build the app image locally and tag it with `:dev`. No registry push; intended for local smoke testing.
+Build the app image locally and tag it with `:dirty`. No registry push; intended for local smoke testing.
 
 ## Synopsis
 
@@ -24,11 +24,11 @@ wheels deploy build dev [--destination=<name>] [--dry-run]
 
 ## Behavior
 
-Emits `docker build -t <image>:dev ...` on the control machine, using the same `builder.context`, `dockerfile`, and `args` as a regular push. No `docker push`. Useful when you want to verify the image builds before running `wheels deploy build push`.
+Emits `docker buildx build --load --tag <image>:dirty --file <dockerfile> <context>` on the control machine, using the same `builder.context` and `builder.dockerfile` as a regular push. No push. The tag is always `dirty`. Useful when you want to verify the image builds before running `wheels deploy build push`.
 
 ## Example
 
 ```bash title="illustrative"
 wheels deploy build dev
-docker run --rm -it <image>:dev   # spot-check locally
+docker run --rm -it <image>:dirty   # spot-check locally
 ```

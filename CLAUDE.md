@@ -154,6 +154,25 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
 
 21. **On Adobe CF, a mixin UDF that creates a subclass whose pseudo-constructor copies that same UDF onto `this` fails the first time per JVM.** Adobe CF 2023 and 2025 (Lucee and BoxLang are fine): the call's epilogue pops a super scope its prologue never pushed, so it throws `java.util.EmptyStackException` (or a `NullPointerException` on `this.SymTab_superScopes`) at `NeoPageContext.popSuperScope`. The call's own body completes normally. In Wheels, `application.wo` (a plain `wheels.Global`) runs the `global/objects.cfm` mixin `$createObjectFromRoot` to create `wheels.Public`, and Global's pseudo-constructor (`$promoteIncludedGlobalsToThis()`) copies `$createObjectFromRoot` onto the new object. That made **the first request after every cold start** a 500 at the `Public` line in `onapplicationstart.cfc` ([#3730](https://github.com/wheels-dev/wheels/issues/3730)). Any earlier request absorbs the one-time failure, including the Docker healthcheck `GET /` or a readiness retry. That is why the test suite and CI never see it, and why 51edf9dce "fixed" the wrong thing (a Public.$init include nest). Fix: create **any** Global subclass outside a mixin call first, which initializes the engine state for every Global mixin. `onapplicationstart.$init()` creates `wheels.events.SuperScopePrimer` as its first statement; keep it first, and keep the primer empty. Guard: `vendor/wheels/tests/specs/events/SuperScopePrimerSpec.cfc` (structural, because the state is once per JVM). Verify a change in this area with a **cold first request, healthcheck disabled**, never the suite. CI runs exactly that on every engine in `.github/workflows/cold-start-smoke.yml` (`tools/ci/cold-start-smoke.sh`, #3735). Deep reference: [.ai/wheels/cross-engine-compatibility.md](.ai/wheels/cross-engine-compatibility.md).
 
+22. **On BoxLang, a request that ends with `abort` skips any `finally` whose `try` has a `catch` clause — even an unreached `catch (any) { rethrow; }`.** A catch-free `try/finally` runs, and so does one whose finally issues a `transaction action=` statement; whether the try or finally contains a transaction action makes no difference, the catch clause alone decides. Lucee 6/7 and Adobe run the finally either way, so **local Lucee and Adobe green do NOT cover this**. Keep must-run cleanup (a lock release, the rollback of a transaction on abort) in a catch-free `try/finally`; to still tell a normal throw from an abort, nest a `try/catch` that sets a flag inside it:
+    ```cfm
+    var exitState = {completed = false, threw = false};
+    try {
+        try {
+            doWork();
+            exitState.completed = true;
+        } catch (any e) {
+            exitState.threw = true;
+            rethrow;
+        }
+    } finally {
+        if (!exitState.completed && !exitState.threw) {
+            // only an abort gets here: run the must-run cleanup
+        }
+    }
+    ```
+    Hit twice: the session-lock release in `withAdvisoryLock(transaction = true)` ([#4330](https://github.com/wheels-dev/wheels/pull/4330)), and `invokeWithTransaction()`, whose rollback lived in the finally of a try with a catch, so on BoxLang an abort inside it kept the writes made before the abort (`$invokeTransactionMethod()` in `vendor/wheels/model/transactions.cfm`).
+
 Verify Adobe CF fixes locally before pushing — don't iterate via CI:
 ```bash
 curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
@@ -363,7 +382,7 @@ For new migrator helpers or anywhere you accept a column-name argument: declare 
 
 Association foreign-key defaults resolve **either** convention: the default derivation checks which column actually exists on whichever side owns the foreign key, rather than reading the setting ([#3337](https://github.com/wheels-dev/wheels/issues/3337) — before that fix the model layer derived `<modelName><key>` unconditionally and a stock `wheels new` app threw `key [<name>id] doesn't exist` on any `include=`). It is schema-driven on purpose: the migrator reads the flag per call, but the model-side default is memoized for the application lifetime, so honouring the flag there would let a runtime flip change migrations without changing models. Apps holding a mix of both shapes work for the same reason.
 
-**Polymorphic associations are not covered.** `belongsTo(polymorphic=true)` and `hasMany`/`hasOne` with `as=` fix their foreign key to `<name>id` at *registration* time (`vendor/wheels/model/associations.cfm:30`, `:81`, `:134`), before the schema is available, so the join-time resolution never sees a blank to fill. Against an underscore-shaped schema those still need an explicit `foreignKey="<name>_id"`.
+**Polymorphic associations resolve the same way** ([#4457](https://github.com/wheels-dev/wheels/pull/4457)). `belongsTo(polymorphic=true)` and `hasMany`/`hasOne` with `as=` record which of `foreignKey` / `foreignType` they *derived* at registration (`$derivedPolymorphicColumns`). On first use, `$resolvePolymorphicColumns()` (`vendor/wheels/model/associations.cfm`) checks the derived names against the child's table: `<name>id` / `<name>type` when they exist, otherwise `<name>_id` / `<name>_type`. The forms without an underscore win when both exist. Names passed explicitly are kept as given, and `foreignType=` ([#4398](https://github.com/wheels-dev/wheels/pull/4398)) names a type column that matches neither convention.
 
 ## Wheels Conventions
 
@@ -404,7 +423,11 @@ component extends="wheels.WheelsTest" {
 
 - **Test infra scope**: Wheels internals (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files included from plain CFCs like `TestRunner.cfc`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
 - **`#` escape**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiter. In string literals, escape: `&##111;`. Comments (`//`) are fine. Unescaped `#` in strings crashes the **entire** test suite, not just that file.
-- **`$clearRoutes()` in test specs**: NOT inherited from `wheels.WheelsTest`. Copy from `linksSpec.cfc` if your spec manipulates routes.
+- **Route-state save/restore in test specs**: `wheels.WheelsTest` provides `$snapshotRoutes()`, `$restoreRoutes(snapshot)`, and `$clearRoutes()` ([#4194](https://github.com/wheels-dev/wheels/issues/4194)). Any spec that redefines the route table MUST snapshot in `beforeEach` and restore in `afterEach`, or it leaks stale state into later specs (routes, staticRoutes, namedRoutePositions, the urlFor caches, and #4183's index are all separate — a partial restore is the #4192 bug class). Use the helpers rather than hand-rolling the save/restore:
+  ```cfm
+  beforeEach(() => { variables._routes = $snapshotRoutes(); $clearRoutes(); g.mapper()...end(); g.$setNamedRoutePositions(); });
+  afterEach(() => $restoreRoutes(variables._routes));
+  ```
 
 ### Running tests locally
 
@@ -493,7 +516,7 @@ User-facing `fix`/`feat` PRs add a **fragment file**, never a direct `CHANGELOG.
 Run `wheels setup agents` to write `.mcp.json` and `.opencode.json` in the current project (it merges, preserving any other servers you already list). It is `setup agents`, not `setup mcp`: LuCLI intercepts the literal token `mcp` in **any** argument position
 (`wheels info mcp` is intercepted too), so no argument may be spelled `mcp`. `setup agents` avoids the token entirely — see the MCP integration guide for OpenCode/Cursor variants.
 
-Tools are auto-discovered from `cli/lucli/Module.cfc` public functions. Names in `tools/list` are the bare function names — NOT `wheels_*`-prefixed (verified by a stdio `tools/list` against the source module): `analyze`, `db`, `destroy`, `doctor`, `generate`, `info`, `migrate`, `notes`, `packages`, `reload`, `routes`, `seed`, `stats`, `test`, `upgrade`, `validate` (16 tools; the `wheels` server entry in `.mcp.json` namespaces them per client). CLI-only, stateful, and side-effecting commands (`main`, `mcp`, `setup`, `d`, `g`, `new`, `create`, `console`, `start`, `stop`, `engines`, `browser`, `jobs`, `coverage`, `docs`, `deploy`, …) are hidden via `mcpHiddenTools()`, which also auto-hides every public `$`-prefixed helper — read that function for the current list.
+Tools are auto-discovered from `cli/lucli/Module.cfc` public functions. Names in `tools/list` are the bare function names — NOT `wheels_*`-prefixed (verified by a stdio `tools/list` against the source module): `analyze`, `db`, `destroy`, `doctor`, `generate`, `info`, `lookup`, `migrate`, `notes`, `packages`, `reload`, `routes`, `seed`, `stats`, `test`, `upgrade`, `validate` (17 tools; the `wheels` server entry in `.mcp.json` namespaces them per client). CLI-only, stateful, and side-effecting commands (`main`, `mcp`, `setup`, `d`, `g`, `new`, `create`, `console`, `start`, `stop`, `engines`, `browser`, `jobs`, `coverage`, `docs`, `deploy`, …) are hidden via `mcpHiddenTools()`, which also auto-hides every public `$`-prefixed helper — read that function for the current list.
 
 **Deprecated:** the in-dev-server HTTP endpoint at `/wheels/mcp`. Emits a deprecation notice on first request. Migrate to the stdio surface.
 

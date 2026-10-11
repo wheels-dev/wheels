@@ -1,0 +1,1 @@
+- `wheels test --core` now reports the runner's own error (for example a missing core-test datasource) instead of "no test bundles ran for this scope", and the `--db`-on-app-suite warning names the real `--test-db` flag instead of a non-existent `--useTestDB` (#4408)

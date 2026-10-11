@@ -592,6 +592,17 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. Answers a `/wheels/jobs/tick` request through JobTickEndpoint: sets the
+	 * status and content type, and returns the body.
+	 */
+	public string function $respondToJobsTick(required any endpoint, required struct urlScope) {
+		local.response = arguments.endpoint.respond(urlScope = arguments.urlScope);
+		cfheader(statuscode = local.response.status);
+		cfcontent(type = local.response.contentType);
+		return local.response.body;
+	}
+
+	/**
 	 * Parse incoming params, create controller object, call an action on it and return the response.
 	 * Called from index.cfm in the root so what we return here is the final result of the request processing.
 	 * This currently needs to be public as it's called from elsewhere
@@ -606,6 +617,16 @@ component output="false" extends="wheels.Global"{
 		// This is used for maintenance mode content.
 		if (StructKeyExists(request, "$wheelsAbortContent")) {
 			return request.$wheelsAbortContent;
+		}
+
+		// The jobs tick route (`/wheels/jobs/tick`, #4482): token-gated, answered before routing and
+		// before the public-component gate, so it works with enablePublicComponent = false and
+		// doesn't depend on the app's routes or middleware. 404 unless jobsRunnerToken is set.
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "jobsRunnerToken") && Len(application.wheels.jobsRunnerToken)) {
+			local.tickEndpoint = new wheels.JobTickEndpoint();
+			if (local.tickEndpoint.isTickPath(arguments.pathInfo)) {
+				return $respondToJobsTick(local.tickEndpoint, arguments.urlScope);
+			}
 		}
 
 		if ($get("showDebugInformation")) {
@@ -711,6 +732,27 @@ component output="false" extends="wheels.Global"{
 				method = $getRequestMethod(),
 				cgi = $buildMiddlewareCgiScope()
 			};
+
+			// F23: in the isolated test context (development/testing only), honour a test-supplied
+			// client address so RateLimiter / IP rules can be exercised per client. The override
+			// reaches middleware through the request context's `remoteAddr` field — the field
+			// RateLimiter already reads — and never mutates the cgi scope. The header-present guard
+			// keeps every normal request off this path; the TestContext gate (isolated AND
+			// development/testing) means it is impossible to honour outside the isolated test app.
+			if (StructKeyExists(local.requestContext.cgi, "http_x_wheels_test_remote_addr")) {
+				local.testContext = new wheels.events.TestContext();
+				// Pass the REAL socket peer (raw cgi.remote_addr, never a forwarded header): the override
+				// is honoured only from a loopback peer, so it cannot be set by an outside client.
+				local.rawPeer = (StructKeyExists(cgi, "remote_addr") ? ToString(cgi.remote_addr) : "");
+				local.testRemoteAddr = local.testContext.$testClientRemoteAddr(
+					cgiScope = local.requestContext.cgi,
+					isolated = local.testContext.currentRequestIsIsolated(),
+					remoteAddr = local.rawPeer
+				);
+				if (Len(local.testRemoteAddr)) {
+					local.requestContext.remoteAddr = local.testRemoteAddr;
+				}
+			}
 
 			// The core handler that middleware wraps around.
 			local.coreHandler = function(required struct request) {

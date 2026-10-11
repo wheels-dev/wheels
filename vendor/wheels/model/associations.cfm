@@ -12,6 +12,7 @@
 	 * @joinKey Column name to join to if not the primary key (usually not needed if you follow Wheels conventions since the join key will be the table's primary key/keys).
 	 * @joinType Use to set the join type when joining associated tables. Possible values are `inner` (for `INNER JOIN`) and `outer` (for `LEFT OUTER JOIN`).
 	 * @polymorphic Set to `true` to declare a polymorphic `belongsTo` association. The foreign key defaults to `{name}Id` and a `{name}Type` column is used to store the owning model name at runtime.
+	 * @foreignType The column that stores the owning model's name in a polymorphic association. Defaults to `{name}Type`. Pass it, with `foreignKey`, when the columns are named differently, e.g. `notable_type` / `notable_id` as `t.references(polymorphic = true)` writes them when `useUnderscoreReferenceColumns` is on.
 	 */
 	public void function belongsTo(
 		required string name,
@@ -19,18 +20,25 @@
 		string foreignKey = "",
 		string joinKey = "",
 		string joinType,
-		boolean polymorphic = false
+		boolean polymorphic = false,
+		string foreignType = ""
 	) {
 		$args(name = "belongsTo", args = arguments);
 		arguments.type = "belongsTo";
 
 		// Polymorphic belongsTo: the name is the interface name (e.g. "commentable").
-		// foreignKey defaults to {name}Id, and we add a foreignType column {name}Type.
+		// foreignKey defaults to {name}Id and foreignType to {name}Type; both can be passed.
 		if (arguments.polymorphic) {
+			// Derived names are checked against the schema on first use ($resolvePolymorphicColumns).
+			arguments.$derivedPolymorphicColumns = "";
 			if (!Len(arguments.foreignKey)) {
 				arguments.foreignKey = "#arguments.name#id";
+				arguments.$derivedPolymorphicColumns = ListAppend(arguments.$derivedPolymorphicColumns, "foreignKey");
 			}
-			arguments.foreignType = "#arguments.name#type";
+			if (!Len(arguments.foreignType)) {
+				arguments.foreignType = "#arguments.name#type";
+				arguments.$derivedPolymorphicColumns = ListAppend(arguments.$derivedPolymorphicColumns, "foreignType");
+			}
 			// Don't infer modelName — it's resolved at runtime from the type column.
 			arguments.modelName = "";
 		}
@@ -58,6 +66,7 @@
 	 * @shortcut Set this argument to create an additional dynamic method that gets the object(s) from the other side of a many-to-many association.
 	 * @through Set this argument if you need to override Wheels conventions when using the `shortcut` argument. Accepts a list of two association names representing the chain from the opposite side of the many-to-many relationship to this model.
 	 * @as Set this argument to declare a polymorphic `hasMany` association. The child model stores the parent type in a `{as}Type` column alongside the foreign key `{as}Id`.
+	 * @foreignType The child's column that stores the parent type in a polymorphic (`as`) association. Defaults to `{as}Type`. [see:belongsTo].
 	 */
 	public void function hasMany(
 		required string name,
@@ -68,20 +77,30 @@
 		string dependent,
 		string shortcut = "",
 		string through = "#singularize(arguments.shortcut)#,#arguments.name#",
-		string as = ""
+		string as = "",
+		string foreignType = ""
 	) {
 		$args(name = "hasMany", args = arguments);
+		if (StructKeyExists(arguments, "dependent")) {
+			$validateDependent(arguments.dependent);
+		}
 		local.singularizedName = capitalize(singularize(arguments.name));
 		local.capitalizedName = capitalize(arguments.name);
 		arguments.type = "hasMany";
 
 		// Polymorphic hasMany: `as` is the polymorphic interface name on the child side.
-		// foreignKey defaults to {as}Id, and foreignType is {as}Type.
+		// foreignKey defaults to {as}Id and foreignType to {as}Type; both can be passed.
 		if (Len(arguments.as)) {
+			// Derived names are checked against the schema on first use ($resolvePolymorphicColumns).
+			arguments.$derivedPolymorphicColumns = "";
 			if (!Len(arguments.foreignKey)) {
 				arguments.foreignKey = "#arguments.as#id";
+				arguments.$derivedPolymorphicColumns = ListAppend(arguments.$derivedPolymorphicColumns, "foreignKey");
 			}
-			arguments.foreignType = "#arguments.as#type";
+			if (!Len(arguments.foreignType)) {
+				arguments.foreignType = "#arguments.as#type";
+				arguments.$derivedPolymorphicColumns = ListAppend(arguments.$derivedPolymorphicColumns, "foreignType");
+			}
 		}
 
 		// The dynamic shortcut methods to add to this class (e.g. "comment", "commentCount", "addComment" etc).
@@ -114,6 +133,7 @@
 	 * @joinType [see:belongsTo].
 	 * @dependent [see:hasMany].
 	 * @as Set this argument to declare a polymorphic `hasOne` association. The child model stores the parent type in a `{as}Type` column alongside the foreign key `{as}Id`.
+	 * @foreignType The child's column that stores the parent type in a polymorphic (`as`) association. Defaults to `{as}Type`. [see:belongsTo].
 	 */
 	public void function hasOne(
 		required string name,
@@ -122,19 +142,29 @@
 		string joinKey = "",
 		string joinType,
 		string dependent,
-		string as = ""
+		string as = "",
+		string foreignType = ""
 	) {
 		$args(name = "hasOne", args = arguments);
+		if (StructKeyExists(arguments, "dependent")) {
+			$validateDependent(arguments.dependent);
+		}
 		local.capitalizedName = capitalize(arguments.name);
 		arguments.type = "hasOne";
 
 		// Polymorphic hasOne: `as` is the polymorphic interface name on the child side.
-		// foreignKey defaults to {as}Id, and foreignType is {as}Type.
+		// foreignKey defaults to {as}Id and foreignType to {as}Type; both can be passed.
 		if (Len(arguments.as)) {
+			// Derived names are checked against the schema on first use ($resolvePolymorphicColumns).
+			arguments.$derivedPolymorphicColumns = "";
 			if (!Len(arguments.foreignKey)) {
 				arguments.foreignKey = "#arguments.as#id";
+				arguments.$derivedPolymorphicColumns = ListAppend(arguments.$derivedPolymorphicColumns, "foreignKey");
 			}
-			arguments.foreignType = "#arguments.as#type";
+			if (!Len(arguments.foreignType)) {
+				arguments.foreignType = "#arguments.as#type";
+				arguments.$derivedPolymorphicColumns = ListAppend(arguments.$derivedPolymorphicColumns, "foreignType");
+			}
 		}
 
 		// The dynamic shortcut methods to add to this class (e.g. "profile", "createProfile", "deleteProfile" etc).
@@ -240,14 +270,100 @@
 		variables.wheels.class.associations[local.associationName] = arguments;
 	}
 
+	/**
+	 * Internal function. Resolves a polymorphic association's DERIVED column names against the child's
+	 * real columns on first use, the way the non-polymorphic defaults are (#3337): `<name>id` /
+	 * `<name>type` when the child has them, else `<name>_id` / `<name>_type`, which
+	 * `t.references(polymorphic = true)` writes with useUnderscoreReferenceColumns. When both shapes
+	 * exist the legacy one wins; when neither does, or the schema can't be read, the legacy default
+	 * stays. Names passed as foreignKey / foreignType are never changed. Memoized per association.
+	 */
+	public void function $resolvePolymorphicColumns(required string associationName) {
+		if (!StructKeyExists(variables.wheels.class.associations, arguments.associationName)) {
+			return;
+		}
+		local.association = variables.wheels.class.associations[arguments.associationName];
+		if (!StructKeyExists(local.association, "$derivedPolymorphicColumns") || !Len(local.association.$derivedPolymorphicColumns)) {
+			return;
+		}
+		lock name="wheelsPolymorphicColumns#application.applicationName#" type="exclusive" timeout="10" {
+			if (Len(local.association.$derivedPolymorphicColumns)) {
+				$applyPolymorphicColumnShapes(associationName = arguments.associationName, association = local.association);
+				local.association.$derivedPolymorphicColumns = "";
+			}
+		}
+	}
+
+	/**
+	 * Internal function. The schema read behind [see:$resolvePolymorphicColumns]: the child is this
+	 * model for a polymorphic belongsTo, and the associated model for hasMany / hasOne with `as`. A
+	 * failure to read it keeps the legacy names.
+	 */
+	public void function $applyPolymorphicColumnShapes(required string associationName, required struct association) {
+		try {
+			if (arguments.association.type == "belongsTo") {
+				local.base = arguments.associationName;
+				local.childProperties = variables.wheels.class.properties;
+			} else {
+				local.base = arguments.association.as;
+				local.childProperties = model(arguments.association.modelName).$classData().properties;
+			}
+			for (local.column in ListToArray(arguments.association.$derivedPolymorphicColumns)) {
+				local.suffix = local.column == "foreignKey" ? "id" : "type";
+				if (
+					!StructKeyExists(local.childProperties, local.base & local.suffix)
+					&& StructKeyExists(local.childProperties, local.base & "_" & local.suffix)
+				) {
+					arguments.association[local.column] = local.base & "_" & local.suffix;
+				}
+			}
+		} catch (any e) {
+			writeLog(
+				file = "wheels",
+				type = "warning",
+				text = "Wheels: couldn't read the columns for the polymorphic association `#arguments.associationName#`; using its default column names. #e.message#"
+			);
+		}
+	}
+
+	/**
+	 * Internal function. Throws Wheels.InvalidArgument for a `dependent` value hasMany() and hasOne()
+	 * don't support, so the mistake surfaces when the association is declared, not at the first delete.
+	 */
+	public void function $validateDependent(required any dependent) {
+		if (IsBoolean(arguments.dependent) && !arguments.dependent) {
+			return;
+		}
+		if (IsSimpleValue(arguments.dependent) && ListFindNoCase("delete,deleteAll,remove,removeAll", arguments.dependent)) {
+			return;
+		}
+		Throw(
+			type = "Wheels.InvalidArgument",
+			message = "'#IsSimpleValue(arguments.dependent) ? arguments.dependent : "(complex value)"#' is not a valid dependency.",
+			extendedInfo = "Use `delete`, `deleteAll`, `remove`, `removeAll` or `false`."
+		);
+	}
+
 	/*
 	 * Called when a model object is deleted (e.g. post.delete()).
-	 * Deletes all associated records (or sets their foreign key values to NULL).
+	 * Deletes all associated records (or sets their foreign key values to NULL). When the object itself
+	 * was soft-deleted (`parentSoftDeleted`), nothing a restore would need is destroyed or unlinked:
+	 * dependents that can be soft-deleted are, and every other dependent is left alone. With
+	 * `callbacks = false` the instantiated dependents skip their callbacks too.
 	 */
-	public void function $deleteDependents(boolean softDelete = true, boolean includeSoftDeletes = false) {
+	public void function $deleteDependents(
+		boolean softDelete = true,
+		boolean includeSoftDeletes = false,
+		boolean callbacks = true,
+		boolean parentSoftDeleted = false
+	) {
 		for (local.key in variables.wheels.class.associations) {
 			local.association = variables.wheels.class.associations[local.key];
-			if (ListFindNoCase("hasMany,hasOne", local.association.type) && local.association.dependent != false) {
+			if (
+				ListFindNoCase("hasMany,hasOne", local.association.type)
+				&& local.association.dependent != false
+				&& !$dependentKeptBySoftDelete(association = local.association, parentSoftDeleted = arguments.parentSoftDeleted)
+			) {
 				local.all = "";
 				if (local.association.type == "hasMany") {
 					local.all = "All";
@@ -256,6 +372,7 @@
 					case "delete":
 						local.invokeArgs = {};
 						local.invokeArgs.instantiate = true;
+						local.invokeArgs.callbacks = arguments.callbacks;
 						local.invokeArgs.softDelete = arguments.softDelete;
 						local.invokeArgs.includeSoftDeletes = arguments.includeSoftDeletes;
 						$invoke(componentReference = this, method = "delete#local.all##local.key#", invokeArgs = local.invokeArgs);
@@ -263,16 +380,21 @@
 					case "remove":
 						local.invokeArgs = {};
 						local.invokeArgs.instantiate = true;
+						local.invokeArgs.callbacks = arguments.callbacks;
 						$invoke(componentReference = this, method = "remove#local.all##local.key#", invokeArgs = local.invokeArgs);
 						break;
 					case "deleteAll":
+						// a hasOne's deleteAll still instantiates (deleteOne), so it needs callbacks too
 						local.invokeArgs = {};
+						local.invokeArgs.callbacks = arguments.callbacks;
 						local.invokeArgs.softDelete = arguments.softDelete;
 						local.invokeArgs.includeSoftDeletes = arguments.includeSoftDeletes;
 						$invoke(componentReference = this, method = "delete#local.all##local.key#", invokeArgs = local.invokeArgs);
 						break;
 					case "removeAll":
-						$invoke(componentReference = this, method = "remove#local.all##local.key#");
+						local.invokeArgs = {};
+						local.invokeArgs.callbacks = arguments.callbacks;
+						$invoke(componentReference = this, method = "remove#local.all##local.key#", invokeArgs = local.invokeArgs);
 						break;
 					default:
 						Throw(
@@ -283,6 +405,21 @@
 				}
 			}
 		}
+	}
+
+	/**
+	 * Internal function. True when a soft-deleted parent leaves this dependent association alone:
+	 * `remove` / `removeAll` would unlink the children, and `delete` / `deleteAll` would destroy children
+	 * whose model has no soft-delete column.
+	 */
+	public boolean function $dependentKeptBySoftDelete(required struct association, required boolean parentSoftDeleted) {
+		if (!arguments.parentSoftDeleted) {
+			return false;
+		}
+		if (ListFindNoCase("remove,removeAll", arguments.association.dependent)) {
+			return true;
+		}
+		return !model(arguments.association.modelName).$softDeletion();
 	}
 
 	/**

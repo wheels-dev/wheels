@@ -52,41 +52,20 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("parses a 5000-key whereIn", () => {
-				// SQL Server binds at most about 2100 parameters per statement, so the query
-				// is refused with a clear error before it runs (#3906). Oracle splits the list
-				// into groups of 1000 and runs it.
-				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
-					expectTooManyParameters(() => {
-						g.model("author").whereIn("id", keys).count();
-					});
-					return;
-				}
+				// Oracle splits the list into groups of 1000 (#3906); SQL Server binds it as
+				// one STRING_SPLIT parameter (#4103). Both run it.
 				expect(g.model("author").whereIn("id", keys).count()).toBe(g.model("author").count());
 			})
 
 			it("parses a 5000-key whereNotIn", () => {
-				// SQL Server binds at most about 2100 parameters per statement, so the query
-				// is refused with a clear error before it runs (#3906). Oracle splits the list
-				// into groups of 1000 and runs it.
-				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
-					expectTooManyParameters(() => {
-						g.model("author").whereNotIn("id", keys).count();
-					});
-					return;
-				}
+				// Oracle splits the list into groups of 1000 (#3906); SQL Server binds it as
+				// one STRING_SPLIT parameter (#4103). Both run it.
 				expect(g.model("author").whereNotIn("id", keys).count()).toBe(0);
 			})
 
 			it("parses a 5000-key IN list in a hand-written where string", () => {
-				// SQL Server binds at most about 2100 parameters per statement, so the query
-				// is refused with a clear error before it runs (#3906). Oracle splits the list
-				// into groups of 1000 and runs it.
-				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
-					expectTooManyParameters(() => {
-						g.model("author").findAll(where = "id IN (#ArrayToList(keys)#)", returnAs = "query");
-					});
-					return;
-				}
+				// Oracle splits the list into groups of 1000 (#3906); SQL Server binds it as
+				// one STRING_SPLIT parameter (#4103). Both run it.
 				var rows = g.model("author").findAll(where = "id IN (#ArrayToList(keys)#)", returnAs = "query");
 				expect(rows.recordCount).toBe(g.model("author").count());
 			})
@@ -101,21 +80,6 @@ component extends="wheels.WheelsTest" {
 
 		});
 
-	}
-
-	// Runs the call and expects Wheels.TooManyParameters, with the limit and the count named.
-	private void function expectTooManyParameters(required any callback) {
-		var state = {type = "", message = ""};
-		try {
-			arguments.callback();
-		} catch (any e) {
-			state.type = e.type;
-			state.message = e.message;
-		}
-		expect(state.type).toBe("Wheels.TooManyParameters");
-		var adapter = g.model("author").$classData().adapter;
-		expect(state.message).toInclude("#adapter.$maxBoundParameters()#");
-		expect(state.message).toInclude("5000");
 	}
 
 }

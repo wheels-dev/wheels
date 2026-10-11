@@ -9,7 +9,7 @@ sidebar:
 
 Host-level operations that don't fit in the app/proxy/accessory model.
 
-From the shell, use the **flat aliases** `wheels deploy exec` and `wheels deploy bootstrap`. The nested `wheels deploy server <verb>` form is shadowed by the CLI's own top-level `server` command (Lucee instance management) and prints that command's help instead ([#2677](https://github.com/wheels-dev/wheels/issues/2677), [#2690](https://github.com/wheels-dev/wheels/pull/2690)). The nested form remains for direct callers that bypass the shell, such as MCP.
+The documented shell forms are the **flat aliases** `wheels deploy exec` and `wheels deploy bootstrap`. Older CLI runtimes intercepted the nested `wheels deploy server <verb>` form in the top-level `server` command ([#2677](https://github.com/wheels-dev/wheels/issues/2677)), which is why the flat aliases exist ([#2690](https://github.com/wheels-dev/wheels/pull/2690)). On the current runtime the nested form also reaches deploy dispatch.
 
 ## Verbs
 

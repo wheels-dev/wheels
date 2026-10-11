@@ -287,21 +287,26 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	private void function $assertSymlinkResolutionAvailable() {
 		var probe = {dir = "", resolved = false};
 		probe.dir = $normalizeDir(GetTempDirectory()) & "/wheels-localdisk-symlinkprobe-" & CreateUUID();
+		// Outer catch-free try/finally so the probe-dir cleanup runs on every exit — including an
+		// abort — because BoxLang skips a finally whose try has a catch clause (invariant 22). The
+		// inner try keeps the existing catch that turns a probe failure into resolved = false.
 		try {
-			local.insideDir = probe.dir & "/inside";
-			local.outsideDir = probe.dir & "/outside";
-			CreateObject("java", "java.io.File").init(local.insideDir).mkdirs();
-			CreateObject("java", "java.io.File").init(local.outsideDir).mkdirs();
-			local.linkFile = local.insideDir & "/lnk";
-			$createProbeSymlink(target = local.outsideDir, link = local.linkFile);
-			// Resolved iff canonicalising the link lands inside the (sibling) target.
-			// Exact (case-sensitive) compare, like the strict check it gates.
-			probe.resolved = $pathWithinExact(
-				root = $canonicalPath(local.outsideDir),
-				candidate = $canonicalPath(local.linkFile)
-			);
-		} catch (any e) {
-			probe.resolved = false;
+			try {
+				local.insideDir = probe.dir & "/inside";
+				local.outsideDir = probe.dir & "/outside";
+				CreateObject("java", "java.io.File").init(local.insideDir).mkdirs();
+				CreateObject("java", "java.io.File").init(local.outsideDir).mkdirs();
+				local.linkFile = local.insideDir & "/lnk";
+				$createProbeSymlink(target = local.outsideDir, link = local.linkFile);
+				// Resolved iff canonicalising the link lands inside the (sibling) target.
+				// Exact (case-sensitive) compare, like the strict check it gates.
+				probe.resolved = $pathWithinExact(
+					root = $canonicalPath(local.outsideDir),
+					candidate = $canonicalPath(local.linkFile)
+				);
+			} catch (any e) {
+				probe.resolved = false;
+			}
 		} finally {
 			// Delete the probe's symlink BEFORE the recursive temp-dir delete: a recursive
 			// DirectoryDelete over a directory that still contains a symlink errors on Adobe

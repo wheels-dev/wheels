@@ -42,7 +42,7 @@ component extends="wheels.WheelsTest" {
 
 			beforeEach(function() {
 				// Clean up any test jobs
-				try { queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_%'", {}, {datasource = application.wheels.dataSourceName}); }
+				try { jobsQuery("DELETE FROM wheels_jobs WHERE queue LIKE 'test_%'", {}, {datasource = application.wheels.dataSourceName}); }
 				catch (any e) { /* table may not exist */ }
 			});
 
@@ -132,15 +132,15 @@ component extends="wheels.WheelsTest" {
 				local.bootstrap.$ensureJobTable();
 
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("s", -1800, Now());  // well past the grace window (timeout + max(60,timeout))
-				queryExecute(
+				local.oldTime = jobsNow() - 1800;  // well past the grace window (timeout + max(60,timeout))
+				jobsQuery(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'test_timeout', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
 					{
 						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-						runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
-						createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
-						updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+						runAt = {value = local.oldTime, cfsqltype = "wheels_epoch"},
+						createdAt = {value = local.oldTime, cfsqltype = "wheels_epoch"},
+						updatedAt = {value = local.oldTime, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -149,7 +149,7 @@ component extends="wheels.WheelsTest" {
 				local.recovered = local.worker.checkTimeouts(timeout = 300);
 				expect(local.recovered).toBeGTE(1);
 
-				local.job = queryExecute(
+				local.job = jobsQuery(
 					"SELECT status FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -162,15 +162,15 @@ component extends="wheels.WheelsTest" {
 				local.bootstrap.$ensureJobTable();
 
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("s", -1800, Now());  // well past the grace window (timeout + max(60,timeout))
-				queryExecute(
+				local.oldTime = jobsNow() - 1800;  // well past the grace window (timeout + max(60,timeout))
+				jobsQuery(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'test_reaper_3888', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
 					{
 						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-						runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
-						createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
-						updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+						runAt = {value = local.oldTime, cfsqltype = "wheels_epoch"},
+						createdAt = {value = local.oldTime, cfsqltype = "wheels_epoch"},
+						updatedAt = {value = local.oldTime, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -181,7 +181,7 @@ component extends="wheels.WheelsTest" {
 				// row stayed 'processing' forever (#3888).
 				local.worker.processNext(queues = "test_reaper_3888", timeout = 300);
 
-				local.job = queryExecute(
+				local.job = jobsQuery(
 					"SELECT status FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -197,15 +197,15 @@ component extends="wheels.WheelsTest" {
 				// blanket reap would catch it, a poll scoped to queue X must leave it alone —
 				// otherwise a short-timeout worker reaps another worker's live job (#3888).
 				local.idY = CreateUUID();
-				local.oldTime = DateAdd("s", -1800, Now());
-				queryExecute(
+				local.oldTime = jobsNow() - 1800;
+				jobsQuery(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'reap_scope_Y_3888', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
 					{
 						id = {value = local.idY, cfsqltype = "cf_sql_varchar"},
-						runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
-						createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
-						updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+						runAt = {value = local.oldTime, cfsqltype = "wheels_epoch"},
+						createdAt = {value = local.oldTime, cfsqltype = "wheels_epoch"},
+						updatedAt = {value = local.oldTime, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -213,14 +213,14 @@ component extends="wheels.WheelsTest" {
 				local.worker = new wheels.JobWorker();
 				local.worker.checkTimeouts(timeout = 300, queues = "reap_scope_X_3888");
 
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT status FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.idY, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
 				);
 				expect(local.row.status).toBe("processing", "a reap scoped to queue X must not touch queue Y's live job");
 
-				queryExecute(
+				jobsQuery(
 					"DELETE FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.idY, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -235,15 +235,15 @@ component extends="wheels.WheelsTest" {
 				// (status='processing' AND attempts=1) lets exactly one win; the loser matches
 				// 0 rows, so attempts is bumped once, not twice, and the count stays honest.
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("s", -1800, Now());
-				queryExecute(
+				local.oldTime = jobsNow() - 1800;
+				jobsQuery(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'reap_race_3888', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
 					{
 						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-						runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
-						createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
-						updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+						runAt = {value = local.oldTime, cfsqltype = "wheels_epoch"},
+						createdAt = {value = local.oldTime, cfsqltype = "wheels_epoch"},
+						updatedAt = {value = local.oldTime, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -257,7 +257,7 @@ component extends="wheels.WheelsTest" {
 				local.secondWon = local.worker.$scheduleRetry(local.id, 1, "wheels.Job", 3, "stale", 1);
 				expect(local.secondWon).toBe(0, "the second reaper must not double-requeue the now-pending row");
 
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT status, attempts FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -265,7 +265,7 @@ component extends="wheels.WheelsTest" {
 				expect(local.row.status).toBe("pending");
 				expect(Val(local.row.attempts)).toBe(1, "attempts must not be bumped twice by concurrent reapers");
 
-				queryExecute(
+				jobsQuery(
 					"DELETE FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -281,15 +281,15 @@ component extends="wheels.WheelsTest" {
 				// requeue and the live claim is left untouched — this is why attempts (bumped
 				// on every claim) is a safer version token than a round-tripped timestamp.
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("s", -1800, Now());
-				queryExecute(
+				local.oldTime = jobsNow() - 1800;
+				jobsQuery(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'reap_token_3888', '{}', 0, 'processing', 2, 3, :runAt, :createdAt, :updatedAt)",
 					{
 						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-						runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
-						createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
-						updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+						runAt = {value = local.oldTime, cfsqltype = "wheels_epoch"},
+						createdAt = {value = local.oldTime, cfsqltype = "wheels_epoch"},
+						updatedAt = {value = local.oldTime, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -300,7 +300,7 @@ component extends="wheels.WheelsTest" {
 				local.won = local.worker.$scheduleRetry(local.id, 1, "wheels.Job", 3, "stale", 1);
 				expect(local.won).toBe(0, "a stale attempts read must not win against a re-claim");
 
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT status, attempts FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -308,7 +308,7 @@ component extends="wheels.WheelsTest" {
 				expect(local.row.status).toBe("processing", "the live re-claim must be left untouched");
 				expect(Val(local.row.attempts)).toBe(2);
 
-				queryExecute(
+				jobsQuery(
 					"DELETE FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -323,15 +323,15 @@ component extends="wheels.WheelsTest" {
 				// window. A bridge call with timeout=0 must normalise to 300 (grace 600s),
 				// not collapse the grace window to 60s and reap this live job.
 				local.id = CreateUUID();
-				local.recentTime = DateAdd("s", -90, Now());
-				queryExecute(
+				local.recentTime = jobsNow() - 90;
+				jobsQuery(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'reap_zero_3984', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
 					{
 						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-						runAt = {value = local.recentTime, cfsqltype = "cf_sql_timestamp"},
-						createdAt = {value = local.recentTime, cfsqltype = "cf_sql_timestamp"},
-						updatedAt = {value = local.recentTime, cfsqltype = "cf_sql_timestamp"}
+						runAt = {value = local.recentTime, cfsqltype = "wheels_epoch"},
+						createdAt = {value = local.recentTime, cfsqltype = "wheels_epoch"},
+						updatedAt = {value = local.recentTime, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -339,14 +339,14 @@ component extends="wheels.WheelsTest" {
 				local.worker = new wheels.JobWorker();
 				local.recovered = local.worker.checkTimeouts(timeout = 0, queues = "reap_zero_3984");
 
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT status FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
 				);
 				expect(local.row.status).toBe("processing", "timeout=0 must normalise to 300s, not reap a 90s-old live job");
 
-				queryExecute(
+				jobsQuery(
 					"DELETE FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -358,15 +358,15 @@ component extends="wheels.WheelsTest" {
 				local.bootstrap.$ensureJobTable();
 
 				local.id = CreateUUID();
-				local.t = Now();
-				queryExecute(
+				local.t = jobsNow();
+				jobsQuery(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'claimts_3989', '{}', 0, 'pending', 0, 3, :runAt, :createdAt, :updatedAt)",
 					{
 						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-						runAt = {value = local.t, cfsqltype = "cf_sql_timestamp"},
-						createdAt = {value = local.t, cfsqltype = "cf_sql_timestamp"},
-						updatedAt = {value = local.t, cfsqltype = "cf_sql_timestamp"}
+						runAt = {value = local.t, cfsqltype = "wheels_epoch"},
+						createdAt = {value = local.t, cfsqltype = "wheels_epoch"},
+						updatedAt = {value = local.t, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -374,14 +374,14 @@ component extends="wheels.WheelsTest" {
 				local.worker = new wheels.JobWorker();
 				expect(local.worker.$claimJob(jobId = local.id, timeout = 450)).toBeTrue();
 
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT claimTimeout FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
 				);
 				expect(Val(local.row.claimTimeout)).toBe(450, "the claiming worker's timeout must be recorded on the row");
 
-				queryExecute(
+				jobsQuery(
 					"DELETE FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -396,15 +396,15 @@ component extends="wheels.WheelsTest" {
 				// A short poller (timeout 60 -> grace 120s) would reap it under the old #3888 rule,
 				// but must honour the OWNER's recorded timeout and leave it running.
 				local.id = CreateUUID();
-				local.idle = DateAdd("s", -300, Now());
-				queryExecute(
+				local.idle = jobsNow() - 300;
+				jobsQuery(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, claimTimeout, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'claimlong_3989', '{}', 0, 'processing', 1, 3, 600, :runAt, :createdAt, :updatedAt)",
 					{
 						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-						runAt = {value = local.idle, cfsqltype = "cf_sql_timestamp"},
-						createdAt = {value = local.idle, cfsqltype = "cf_sql_timestamp"},
-						updatedAt = {value = local.idle, cfsqltype = "cf_sql_timestamp"}
+						runAt = {value = local.idle, cfsqltype = "wheels_epoch"},
+						createdAt = {value = local.idle, cfsqltype = "wheels_epoch"},
+						updatedAt = {value = local.idle, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -412,14 +412,14 @@ component extends="wheels.WheelsTest" {
 				local.worker = new wheels.JobWorker();
 				local.worker.checkTimeouts(timeout = 60, queues = "claimlong_3989");
 
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT status FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
 				);
 				expect(local.row.status).toBe("processing", "a short poller must not reap a job owned by a longer-timeout worker");
 
-				queryExecute(
+				jobsQuery(
 					"DELETE FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -433,15 +433,15 @@ component extends="wheels.WheelsTest" {
 				// A pre-#3989 / column-less row (claimTimeout NULL), idle 1800s. The reaper must
 				// fall back to the poller's timeout (300 -> grace 600s) and recover it.
 				local.id = CreateUUID();
-				local.idle = DateAdd("s", -1800, Now());
-				queryExecute(
+				local.idle = jobsNow() - 1800;
+				jobsQuery(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'claimnull_3989', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
 					{
 						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-						runAt = {value = local.idle, cfsqltype = "cf_sql_timestamp"},
-						createdAt = {value = local.idle, cfsqltype = "cf_sql_timestamp"},
-						updatedAt = {value = local.idle, cfsqltype = "cf_sql_timestamp"}
+						runAt = {value = local.idle, cfsqltype = "wheels_epoch"},
+						createdAt = {value = local.idle, cfsqltype = "wheels_epoch"},
+						updatedAt = {value = local.idle, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -449,14 +449,14 @@ component extends="wheels.WheelsTest" {
 				local.worker = new wheels.JobWorker();
 				local.worker.checkTimeouts(timeout = 300, queues = "claimnull_3989");
 
-				local.row = queryExecute(
+				local.row = jobsQuery(
 					"SELECT status FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
 				);
 				expect(local.row.status).notToBe("processing", "a NULL-claimTimeout stale row must be recovered via the poller's timeout");
 
-				queryExecute(
+				jobsQuery(
 					"DELETE FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -472,7 +472,7 @@ component extends="wheels.WheelsTest" {
 				// COLUMN isn't supported everywhere, so degrade gracefully where it isn't.
 				local.dropped = false;
 				try {
-					queryExecute("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
 					local.dropped = true;
 				} catch (any e) {
 					// engine/DB without DROP COLUMN support — skip the round-trip
@@ -492,7 +492,7 @@ component extends="wheels.WheelsTest" {
 				// normal poll add it back — without calling $ensureJobTable directly.
 				local.dropped = false;
 				try {
-					queryExecute("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
 					local.dropped = true;
 				} catch (any e) {
 					// engine/DB without DROP COLUMN support — skip
@@ -510,7 +510,7 @@ component extends="wheels.WheelsTest" {
 				local.job.$ensureJobTable();
 				local.dropped = false;
 				try {
-					queryExecute("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
 					local.dropped = true;
 				} catch (any e) {
 					// engine/DB without DROP COLUMN support — skip
@@ -520,7 +520,7 @@ component extends="wheels.WheelsTest" {
 						// Memoise a just-now ALTER failure; CliBridge builds a fresh JobWorker per poll,
 						// so without a back-off the DDL would re-run every poll. During the window the
 						// ALTER must be skipped, leaving the column absent even though the DB would allow it.
-						application.wheels.$claimTimeoutAlterFailedAt = Now();
+						application.wheels.$claimTimeoutAlterFailedAt = jobsNow();
 						local.job.$ensureClaimTimeoutColumn();
 						expect(local.job.$jobTableHasClaimTimeout()).toBeFalse("ALTER must be skipped during the back-off window");
 						// Clearing the memo lets the next ensure() re-attempt and add the column.
@@ -538,7 +538,7 @@ component extends="wheels.WheelsTest" {
 				local.job.$ensureJobTable();
 				local.dropped = false;
 				try {
-					queryExecute("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
 					local.dropped = true;
 				} catch (any e) {
 					// engine/DB without DROP COLUMN support — skip
@@ -546,7 +546,7 @@ component extends="wheels.WheelsTest" {
 				if (local.dropped) {
 					try {
 						// A failure older than any reasonable window must not suppress a retry.
-						application.wheels.$claimTimeoutAlterFailedAt = DateAdd("s", -3600, Now());
+						application.wheels.$claimTimeoutAlterFailedAt = jobsNow() - 3600;
 						local.job.$ensureClaimTimeoutColumn();
 						expect(local.job.$jobTableHasClaimTimeout()).toBeTrue("a stale failure memo must not block the retry");
 					} finally {
@@ -559,12 +559,48 @@ component extends="wheels.WheelsTest" {
 				local.job = new wheels.Job();
 				local.job.$ensureJobTable();
 				try {
-					application.wheels.$claimTimeoutAlterFailedAt = Now();
+					application.wheels.$claimTimeoutAlterFailedAt = jobsNow();
 					local.job.$ensureClaimTimeoutColumn();
 					expect(StructKeyExists(application.wheels, "$claimTimeoutAlterFailedAt")).toBeFalse("a present column must clear any stale failure memo");
 				} finally {
 					StructDelete(application.wheels, "$claimTimeoutAlterFailedAt");
 				}
+			});
+
+			// Kept here, after the claimTimeout drop/re-add specs and with no claims after it: on
+			// PostgreSQL/CockroachDB a column drop invalidates the pool's cached plans ("cached plan
+			// must not change result type"), which errors any later spec that claims or reaps.
+			it("adds the claimToken and claimedBy columns through the normal worker path", function() {
+				var job = new wheels.Job();
+				job.$ensureJobTable();
+				expect(job.$jobTableHasClaimToken()).toBeTrue("the columns should exist after $ensureJobTable");
+
+				// Simulate a table from before fencing. DROP COLUMN isn't supported everywhere, so
+				// degrade gracefully where it isn't.
+				var state = {dropped = false};
+				try {
+					jobsQuery("ALTER TABLE wheels_jobs DROP COLUMN claimToken", {}, {datasource = application.wheels.dataSourceName});
+					jobsQuery("ALTER TABLE wheels_jobs DROP COLUMN claimedBy", {}, {datasource = application.wheels.dataSourceName});
+					state.dropped = true;
+				} catch (any e) {
+					// engine/DB without DROP COLUMN support — skip the round-trip
+				}
+				if (state.dropped) {
+					expect(job.$jobTableHasClaimToken()).toBeFalse("columns should be gone after DROP");
+					// Never added inside a transaction: DDL there commits the caller's work on MySQL/Oracle.
+					application.wo.model("jobTxnProbe").invokeWithTransaction(method = "ensureJobTable", transaction = "commit", marker = "test_fence_txn");
+					expect(job.$jobTableHasClaimToken()).toBeFalse("no DDL may run inside the caller's transaction");
+					var worker = new wheels.JobWorker();
+					worker.processNext(queues = "test_fence_no_such_queue", timeout = 300);
+					expect(job.$jobTableHasClaimToken()).toBeTrue("the normal worker path must add the columns back");
+				}
+				// The drop/re-add specs above leave re-added columns at the end of the table. Put the
+				// CREATE TABLE layout back so a later run on the same database starts from the layout
+				// a fresh one has: on PostgreSQL/CockroachDB a layout change under a statement the
+				// driver has already server-prepared fails it ("cached plan must not change result
+				// type"), and the jobs specs drop and recreate this table mid-run.
+				jobsQuery("DROP TABLE wheels_jobs", {}, {datasource = application.wheels.dataSourceName});
+				expect(new wheels.Job().$ensureJobTable()).toBeTrue();
 			});
 		});
 
@@ -662,13 +698,13 @@ component extends="wheels.WheelsTest" {
 				local.bootstrap.$ensureJobTable();
 
 				local.id = CreateUUID();
-				local.now = Now();
-				queryExecute(
+				local.now = jobsNow();
+				jobsQuery(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, lastError, runAt, failedAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'test_retry', '{}', 0, 'failed', 3, 3, 'Test error', :now, :now, :now, :now)",
 					{
 						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-						now = {value = local.now, cfsqltype = "cf_sql_timestamp"}
+						now = {value = local.now, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -677,7 +713,7 @@ component extends="wheels.WheelsTest" {
 				local.count = local.worker.retryFailed(queue = "test_retry");
 				expect(local.count).toBeGTE(1);
 
-				local.job = queryExecute(
+				local.job = jobsQuery(
 					"SELECT status, attempts FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -719,13 +755,13 @@ component extends="wheels.WheelsTest" {
 				local.bootstrap.$ensureJobTable();
 
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("d", -30, Now());
-				queryExecute(
+				local.oldTime = jobsNow() - 30 * 86400;
+				jobsQuery(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, completedAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'test_purge', '{}', 0, 'completed', 1, 3, :oldTime, :oldTime, :oldTime, :oldTime)",
 					{
 						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-						oldTime = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+						oldTime = {value = local.oldTime, cfsqltype = "wheels_epoch"}
 					},
 					{datasource = application.wheels.dataSourceName}
 				);
@@ -734,7 +770,7 @@ component extends="wheels.WheelsTest" {
 				local.count = local.worker.purge(status = "completed", days = 7, queue = "test_purge");
 				expect(local.count).toBeGTE(1);
 
-				local.remaining = queryExecute(
+				local.remaining = jobsQuery(
 					"SELECT COUNT(*) as cnt FROM wheels_jobs WHERE id = :id",
 					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 					{datasource = application.wheels.dataSourceName}
@@ -784,6 +820,249 @@ component extends="wheels.WheelsTest" {
 				expect(local.job.maxDelay).toBe(600);
 			});
 		});
+
+		// Kept last: these specs drop and recreate wheels_jobs. On PostgreSQL/CockroachDB a table
+		// layout change under a statement the driver has already server-prepared fails it ("cached
+		// plan must not change result type"), so nothing that claims or reaps may run after them,
+		// and the final spec puts the CREATE TABLE layout back for the next run on the same database.
+		describe("uniqueKey on a table created before it existed", function() {
+
+			afterEach(function() {
+				StructDelete(application.wheels, "$uniqueKeyAlterFailedAt");
+			});
+
+			it("enqueues keyless jobs but refuses a uniqueKey while the column can't be added", function() {
+				$createLegacyJobTable();
+				// A just-failed ALTER puts the upgrade in its back-off window, as when the database
+				// user can't ALTER the table.
+				application.wheels.$uniqueKeyAlterFailedAt = jobsNow();
+				var job = new wheels.tests._assets.jobs.ProcessOrdersJob();
+				var plain = job.enqueue(queue = "test_unique_legacy");
+				expect(plain.enqueued).toBeTrue("a job without a key must still enqueue on a table without the column");
+				expect(function() {
+					var keyed = new wheels.tests._assets.jobs.ProcessOrdersJob();
+					keyed.enqueue(queue = "test_unique_legacy", uniqueKey = "legacy:1");
+				}).toThrow("Wheels.Job.UniqueKeyUnavailable");
+			});
+
+			it("skips the upgrade while another instance holds the migration lock", function() {
+				$createLegacyJobTable();
+				var migrator = application.wheels.migrator;
+				var lockDataSource = migrator.$migratorDataSource();
+				if (!migrator.$migrationLockAvailable(lockDataSource)) {
+					return;
+				}
+				var held = {key = lockDataSource & "|spec-holder", dataSource = lockDataSource, active = true, reentered = false, depth = 1, owner = Replace(CreateUUID(), "-", "", "all")};
+				expect(migrator.$tryTakeMigrationLock(held)).toBeTrue();
+				try {
+					var job = new wheels.Job();
+					job.$ensureJobTable();
+					expect(job.$jobTableHasUniqueKey()).toBeFalse("the upgrade must not run, or wait, while another instance holds the lock");
+				} finally {
+					migrator.$releaseMigrationLock(held);
+				}
+				var upgraded = new wheels.Job();
+				upgraded.$ensureJobTable();
+				expect(upgraded.$jobTableHasUniqueKey()).toBeTrue("the next ensure upgrades the table once the lock is free");
+			});
+
+			it("never runs the upgrade DDL inside a transaction", function() {
+				$createLegacyJobTable();
+				// MySQL and Oracle commit an open transaction on DDL, so a keyed enqueue inside one
+				// must not upgrade the table itself: it refuses, and the table is left as it was.
+				var state = {type = ""};
+				try {
+					application.wo.model("jobTxnProbe").invokeWithTransaction(
+						method = "enqueueKeyed",
+						transaction = "commit",
+						marker = "test_unique_legacy",
+						uniqueKey = "in-transaction:1"
+					);
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Wheels.Job.UniqueKeyUnavailable");
+				var probeJob = new wheels.Job();
+				expect(probeJob.$jobTableHasUniqueKey()).toBeFalse("no DDL may run inside the caller's transaction");
+			});
+
+			it("never runs the upgrade DDL from a table-ensure inside a transaction", function() {
+				$createLegacyJobTable();
+				// The ensure a failed INSERT triggers runs inside the caller's transaction too.
+				application.wo.model("jobTxnProbe").invokeWithTransaction(
+					method = "ensureJobTable",
+					transaction = "commit",
+					marker = "test_unique_legacy"
+				);
+				var probeJob = new wheels.Job();
+				expect(probeJob.$jobTableHasUniqueKey()).toBeFalse("no DDL may run inside the caller's transaction");
+			});
+
+			it("keeps a heartbeating job alive through updatedAt when heartbeatAt can't be added", function() {
+				$createLegacyJobTable();
+				application.wheels.$heartbeatAlterFailedAt = jobsNow();
+				try {
+					var id = CreateUUID();
+					jobsQuery(
+						"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+						VALUES (:id, 'wheels.tests._assets.jobs.ProcessOrdersJob', 'test_unique_legacy', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
+						{
+							id = {value = id, cfsqltype = "cf_sql_varchar"},
+							runAt = {value = jobsNow() - 2 * 3600, cfsqltype = "wheels_epoch"},
+							createdAt = {value = jobsNow() - 2 * 3600, cfsqltype = "wheels_epoch"},
+							updatedAt = {value = jobsNow() - 2 * 3600, cfsqltype = "wheels_epoch"}
+						},
+						{datasource = application.wheels.dataSourceName}
+					);
+					var running = new wheels.tests._assets.jobs.ProcessOrdersJob();
+					running.$setClaimContext(jobId = id);
+					running.heartbeat();
+					var reaper = new wheels.JobWorker();
+					expect(reaper.checkTimeouts(timeout = 300, queues = "test_unique_legacy")).toBe(0, "the heartbeat must renew updatedAt when there is no heartbeatAt column");
+				} finally {
+					StructDelete(application.wheels, "$heartbeatAlterFailedAt");
+				}
+			});
+
+			it("adds the column, backfills it from id and builds the unique index", function() {
+				$createLegacyJobTable();
+				var legacyIds = [CreateUUID(), CreateUUID()];
+				$insertLegacyJobRow(legacyIds[1]);
+				$insertLegacyJobRow(legacyIds[2]);
+
+				var job = new wheels.Job();
+				job.$ensureJobTable();
+				expect(job.$jobTableHasUniqueKey()).toBeTrue();
+				expect(job.$jobTableHasUniqueKeyIndex()).toBeTrue("the upgrade must build the unique index");
+				expect(job.$jobTableHasColumn("heartbeatAt")).toBeTrue("the ensure must add heartbeatAt too");
+				var backfilled = jobsQuery(
+					"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE uniqueKey = id",
+					{},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(Val(backfilled.cnt)).toBe(2, "existing rows must take their id as their key");
+
+				// A host still on the previous version inserts without a key: NULL keys never
+				// collide, including on SQL Server's filtered index.
+				$insertLegacyJobRow(CreateUUID());
+				$insertLegacyJobRow(CreateUUID());
+
+				var keyed = new wheels.tests._assets.jobs.ProcessOrdersJob();
+				var first = keyed.enqueue(queue = "test_unique_legacy", uniqueKey = "upgraded:1");
+				var second = keyed.enqueue(queue = "test_unique_legacy", uniqueKey = "upgraded:1");
+				expect(first.enqueued).toBeTrue();
+				expect(second.duplicate).toBeTrue();
+
+				var state = {rejected = false};
+				try {
+					jobsQuery(
+						"UPDATE wheels_jobs SET uniqueKey = 'upgraded:1' WHERE id = :id",
+						{id = {value = legacyIds[1], cfsqltype = "cf_sql_varchar"}},
+						{datasource = application.wheels.dataSourceName}
+					);
+				} catch (any e) {
+					state.rejected = true;
+				}
+				expect(state.rejected).toBeTrue("the index must reject a second row with the same key");
+
+				// After an application restart nothing remembers the index was verified: a keyed
+				// enqueue must find the existing index rather than refuse with UniqueKeyUnavailable.
+				$clearUniqueKeyMemos();
+				var afterRestart = new wheels.tests._assets.jobs.ProcessOrdersJob();
+				var third = afterRestart.enqueue(queue = "test_unique_legacy", uniqueKey = "upgraded:2");
+				expect(third.enqueued).toBeTrue("an upgraded table's index must be recognised after a restart");
+			});
+
+			it("restores the CREATE TABLE layout for the next run", function() {
+				jobsQuery("DROP TABLE wheels_jobs", {}, {datasource = application.wheels.dataSourceName});
+				var job = new wheels.Job();
+				expect(job.$ensureJobTable()).toBeTrue();
+				expect(job.$jobTableHasUniqueKey()).toBeTrue();
+				expect(job.$jobTableHasUniqueKeyIndex()).toBeTrue();
+			});
+		});
+	}
+
+	/**
+	 * Replace wheels_jobs with the shape it had before uniqueKey (claimTimeout included, so only
+	 * the uniqueKey upgrade is pending).
+	 */
+	private void function $createLegacyJobTable() {
+		var job = new wheels.Job();
+		var dbType = job.$detectDatabaseType();
+		var types = {varchar = "VARCHAR", text = "TEXT", stamp = "DATETIME"};
+		if (dbType == "oracle") {
+			types = {varchar = "VARCHAR2", text = "CLOB", stamp = "TIMESTAMP"};
+		} else if (dbType == "postgresql") {
+			types = {varchar = "VARCHAR", text = "TEXT", stamp = "TIMESTAMP"};
+		} else if (dbType == "h2") {
+			types = {varchar = "VARCHAR", text = "CLOB", stamp = "TIMESTAMP"};
+		}
+		try {
+			jobsQuery("DROP TABLE wheels_jobs", {}, {datasource = application.wheels.dataSourceName});
+		} catch (any e) {
+		}
+		jobsQuery(
+			"CREATE TABLE wheels_jobs (
+				id #types.varchar#(36) NOT NULL PRIMARY KEY,
+				jobClass #types.varchar#(255) NOT NULL,
+				queue #types.varchar#(100) DEFAULT 'default' NOT NULL,
+				data #types.text#,
+				priority INT DEFAULT 0 NOT NULL,
+				status #types.varchar#(20) DEFAULT 'pending' NOT NULL,
+				attempts INT DEFAULT 0 NOT NULL,
+				maxRetries INT DEFAULT 3 NOT NULL,
+				claimTimeout INT,
+				lastError #types.text#,
+				runAt #types.stamp#,
+				completedAt #types.stamp#,
+				failedAt #types.stamp#,
+				createdAt #types.stamp#,
+				updatedAt #types.stamp#
+			)",
+			{},
+			{datasource = application.wheels.dataSourceName}
+		);
+		$clearUniqueKeyMemos();
+	}
+
+	/**
+	 * A row written the way a host on the previous version writes it: no uniqueKey.
+	 */
+	private void function $insertLegacyJobRow(required string id) {
+		jobsQuery(
+			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+			VALUES (:id, 'wheels.tests._assets.jobs.ProcessOrdersJob', 'test_unique_legacy', '{}', 0, 'completed', 1, 3, :runAt, :createdAt, :updatedAt)",
+			{
+				id = {value = arguments.id, cfsqltype = "cf_sql_varchar"},
+				runAt = {value = jobsNow(), cfsqltype = "wheels_epoch"},
+				createdAt = {value = jobsNow(), cfsqltype = "wheels_epoch"},
+				updatedAt = {value = jobsNow(), cfsqltype = "wheels_epoch"}
+			},
+			{datasource = application.wheels.dataSourceName}
+		);
+	}
+
+	private void function $clearUniqueKeyMemos() {
+		StructDelete(application.wheels, "$jobsUniqueKeyIndexVerified");
+		StructDelete(application.wheels, "$uniqueKeyAlterFailedAt");
+		StructDelete(application.wheels, "$heartbeatAlterFailedAt");
+	}
+
+	/**
+	 * Now on the jobs clock (wheels.JobClock): UTC epoch seconds from the database's clock, which
+	 * job rows and memos are stamped with. A row stamped with the app's local Now() is hours out
+	 * on a server that isn't on UTC.
+	 */
+	private numeric function jobsNow() {
+		return new wheels.Job().$jobClock().nowEpoch();
+	}
+
+	/**
+	 * jobsQuery() with wheels_epoch timestamp parameters, as the jobs code binds them.
+	 */
+	private any function jobsQuery(required string sql, struct params = {}, struct options = {}) {
+		return new wheels.Job().$jobClock().query(arguments.sql, arguments.params, arguments.options);
 	}
 
 }

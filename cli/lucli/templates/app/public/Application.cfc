@@ -17,17 +17,23 @@ component output="false" {
 
 	this.bufferOutput = true;
 
+	// The project root, one level up from this public/ directory. Built from this file's own
+	// path, not expandPath("../"): that resolves against the REQUESTED page's directory on
+	// some engines, so for a page under public/sub/ every mapping below pointed inside
+	// public/ and the request failed (#4470).
+	this.wheels.projectRoot = REReplace(this.wheels.rootPath, "[^/\\]+[/\\]$", "");
+
 	// Set up the application paths.
-	this.appDir     = expandPath("../app/");
-	this.vendorDir  = expandPath("../vendor/");
+	this.appDir     = this.wheels.projectRoot & "app/";
+	this.vendorDir  = this.wheels.projectRoot & "vendor/";
 	this.wheelsDir  = this.vendorDir & "wheels/";
 	// Set up the mappings for the application.
 	this.mappings["/app"]     = this.appDir;
 	this.mappings["/vendor"]  = this.vendorDir;
 	this.mappings["/wheels"]  = this.wheelsDir;
-	this.mappings["/tests"] = expandPath("../tests");
-	this.mappings["/config"] = expandPath("../config");
-	this.mappings["/plugins"] = expandPath("../plugins");
+	this.mappings["/tests"] = this.wheels.projectRoot & "tests";
+	this.mappings["/config"] = this.wheels.projectRoot & "config";
+	this.mappings["/plugins"] = this.wheels.projectRoot & "plugins";
 
 	// We turn on "sessionManagement" by default since the Flash uses it.
 	this.sessionManagement = true;

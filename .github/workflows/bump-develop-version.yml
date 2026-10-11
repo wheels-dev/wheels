@@ -46,7 +46,7 @@ permissions:
 
 jobs:
   bump:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # repository_dispatch carries the version in client_payload.version
       # (set by release.yml's dispatch step). workflow_dispatch supplies it
@@ -102,7 +102,7 @@ jobs:
           jq '.version' wheels.json
 
       - name: Open bump PR
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8.1.1
         with:
           branch: "auto-bump/develop-${{ env.NEW_VERSION }}"
           title: "chore: bump develop snapshot target to ${{ env.NEW_VERSION }}"

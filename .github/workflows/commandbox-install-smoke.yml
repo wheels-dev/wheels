@@ -65,7 +65,7 @@ permissions:
 jobs:
   commandbox-install-smoke:
     name: "box install -> serve (CommandBox)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     # CommandBox is the runtime on the ForgeBox install path. Run the whole job
     # inside the official image so `box` is on PATH exactly as a real CommandBox

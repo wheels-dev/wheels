@@ -71,6 +71,10 @@ function buildSidebarForVersion(version) {
 }
 
 const config = defineConfig({
+	// Astro 7 changed the compressHTML default to 'jsx', which drops the space
+	// between text and an element on the next line ("Install with<code>").
+	// true keeps Astro 6's HTML-aware compression.
+	compressHTML: true,
 	site: 'https://guides.wheels.dev',
 	// The local docs bundle that ships with the framework is served from
 	// /wheels/guides/ rather than a domain root, and every asset URL Astro
@@ -209,6 +213,7 @@ const config = defineConfig({
 				'@wheels-dev/ui/styles/starlight-theme.css',
 			],
 			components: {
+				Head: '@wheels-dev/ui/components/starlight/Head.astro',
 				Header: '@wheels-dev/ui/components/starlight/Header.astro',
 				Footer: '@wheels-dev/ui/components/starlight/Footer.astro',
 				SocialIcons: '@wheels-dev/ui/components/starlight/SocialIcons.astro',

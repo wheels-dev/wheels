@@ -1,0 +1,1 @@
+- `escapeForLike()`, a global string helper that escapes the `LIKE` wildcards (`%`, `_`, `[`) and the `\` escape character in a search term, so a user's input is matched literally in a `LIKE '...' ESCAPE '\'` comparison instead of being read as wildcards (#4355)

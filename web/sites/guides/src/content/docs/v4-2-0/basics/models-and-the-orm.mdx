@@ -198,6 +198,21 @@ component extends="Controller" {
 
 For a key-only delete without loading the record, use `model("Post").deleteByKey(params.key)`. For bulk deletes, `deleteAll(where="...")` runs a single statement and returns the row count; like `updateAll`, it skips callbacks by default.
 
+### Soft delete
+
+A table with a `deletedAt` column (`t.timestamps()` adds one) is soft-deleted: `delete()` sets `deletedAt` instead of removing the row, and finders skip such rows unless you pass `includeSoftDeletes=true`. A soft delete is meant to be reversible, so:
+
+- After `post.delete()`, `post.deletedAt` holds the timestamp written. A second `delete()` on the same object returns `false`.
+- `dependent=` children whose model also has a `deletedAt` column are soft-deleted with the parent. Other children are left alone, neither deleted nor unlinked: `dependent=` applies to them only on a real delete.
+- `post.reload()` reloads a soft-deleted row. It throws `Wheels.RecordNotFound` if the row no longer exists at all.
+- Restoring is an update: `model("Post").updateByKey(key = id, deletedAt = "", includeSoftDeletes = true)`. It doesn't restore the children that were soft-deleted with the parent.
+
+Pass `softDelete=false` for a real `DELETE`. It removes rows that are already soft-deleted too, and runs `dependent=` on every child:
+
+```cfm
+model("Post").deleteAll(where = "deletedAt < '#cutoff#'", softDelete = false);  // purge old soft-deleted posts
+```
+
 ## Lifecycle callbacks
 
 Callbacks register a method to run at a specific point in the record's lifecycle. For the write-cycle callbacks the method takes no arguments (the record is `this`), returns nothing, and can mutate any property on `this` before the write happens. Return `false` from a `before*` callback to cancel the operation. (`afterFind` is the exception — see below.)
@@ -292,6 +307,41 @@ component extends="Model" {
 - On RustCFML, the raw block can't be detected, so what fires is up to the engine and isn't guaranteed.
 
 Keep writes that have these callbacks out of raw `transaction {}` blocks.
+
+### What a save changed: `savedChanges()`
+
+`hasChanged()`, `changedFrom()`, `changedProperties()` and `allChanges()` describe changes that are *not yet* saved, so a successful save resets them. From Wheels 4.2, four counterparts describe what the last successful save *wrote*:
+
+| Before the save | After the save |
+|---|---|
+| `allChanges()` | `savedChanges()`: `{property: {changedFrom, changedTo}}` |
+| `hasChanged(property)` | `hasSavedChange(property)`; any property when omitted |
+| `changedFrom(property)` | `savedChangeFrom(property)` |
+| `changedProperties()` | `savedChangedProperties()` |
+
+They're set as soon as the row is written, so `afterCreate`, `afterUpdate`, `afterSave`, `afterCommit` and the code after `save()` all see the same thing.
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        afterCommit(methods="announceIfPublished", on="create,update");
+    }
+
+    private void function announceIfPublished() {
+        // Announce a book each time it ends up published, never twice for one publication.
+        if (hasSavedChange("published") && this.published) {
+            enqueueAnnouncement(this.id);
+        }
+    }
+}
+```
+
+- **Each `afterCommit` sees the save that queued it.** When one object is saved twice in a transaction, each of the two `afterCommit` calls reports its own save's changes, while the object's properties hold the committed, final values. A book published and unpublished in one transaction is therefore not announced.
+- **An `afterRollback` sees the save that was rolled back.** Once the rollback is done, `savedChanges()` reports what it did before that save.
+- **On a create**, every property the insert wrote is listed, from an empty value, including the generated key.
+- **A save that changed nothing** reports nothing. **A save that fails** keeps what the previous save reported.
+- **`reload()` and `clearChangeInformation()` clear it.** `save(reload=true)` keeps it.
+- **A save inside one of the object's own callbacks** (say, an `afterSave` that sets a property and calls `save()` again) replaces it with that inner save's changes. Because the outer save hasn't reset its baseline yet when the inner one runs, the inner save's changes include the outer save's too: after `title` is saved and an `afterSave` then sets and saves `slug`, `savedChanges()` lists both `title` and `slug`.
 </Aside>
 
 ## Custom methods

@@ -100,7 +100,7 @@ component extends="wheels.WheelsTest" {
 				expect(g.$tenantDataSource()).toBe(application.wheels.dataSourceName);
 			})
 
-			it("clears only its own model's cache, leaving sibling models untouched", () => {
+			it("clears every model's cache, not just its own, so cross-model include= results can't go stale", () => {
 				application.wheels.cacheQueriesDuringRequest = true;
 				model("author").findAll(where = "lastName = 'Djurner'");
 				model("Tenant").findAll(where = "lastName = 'Djurner'");
@@ -108,8 +108,10 @@ component extends="wheels.WheelsTest" {
 
 				model("Tenant").$clearRequestCache();
 
-				expect(StructCount(request.wheels["$queryCache"]["Tenant"])).toBe(0);
-				expect(StructCount(request.wheels["$queryCache"]["author"])).toBe(1);
+				// #4429: $clearRequestCache now empties the whole request cache, siblings included — a query
+				// that joins another model via include= is cached under the base model, so a write to one
+				// model has to clear the others or they keep serving its pre-write rows.
+				expect(StructIsEmpty(request.wheels["$queryCache"])).toBeTrue();
 			})
 
 		})

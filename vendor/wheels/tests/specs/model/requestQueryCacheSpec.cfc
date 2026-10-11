@@ -36,7 +36,11 @@ component extends="wheels.WheelsTest" {
 			it("does not store query results when cacheQueriesDuringRequest is disabled", () => {
 				application.wheels.cacheQueriesDuringRequest = false;
 				model("author").findAll(where = "lastName = 'Djurner'");
-				expect(StructCount(request.wheels["$queryCache"]["author"])).toBe(0);
+				// beforeEach's $clearRequestCache now empties the whole $queryCache (#4429), so with the
+				// cache disabled the author slot may be absent rather than present-but-empty; either way
+				// nothing was cached for author.
+				var cache = request.wheels["$queryCache"];
+				expect(StructKeyExists(cache, "author") ? StructCount(cache["author"]) : 0).toBe(0);
 			})
 
 			it("findEach does not accumulate per-batch queries in the request cache", () => {

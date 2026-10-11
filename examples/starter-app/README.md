@@ -2,9 +2,9 @@
 
 ## What This Is
 
-This repository contains a **user management and authentication web application** built with the [Wheels](https://wheels.dev/) framework (version 3.0), a modern MVC framework inspired by Ruby on Rails. The app demonstrates best practices for Wheels 3.0, including security, conventions, and a modern UI using Bootstrap.
+This directory contains a **user management and authentication web application** built with the [Wheels](https://wheels.dev/) framework (Wheels 4.x), an MVC framework inspired by Ruby on Rails. The app demonstrates Wheels conventions, security practices, and a Bootstrap UI.
 
-**Important**: This is **not a complete, full-featured app**, but rather a **starter/example app** built with Wheels 3.0. It is designed to help you get started and to showcase best practices in authentication, authorization, auditing, and modern web UI using Wheels.
+**Important**: This is **not a complete, full-featured app**, but rather a **starter/example app** built with Wheels 4.x. It is designed to help you get started and to showcase best practices in authentication, authorization, auditing, and modern web UI using Wheels.
 
 ## Installation
 
@@ -73,14 +73,14 @@ Admin users have access to comprehensive management features:
 
 ### Modern UI
 
-- **Bootstrap 4** for clean, responsive design
+- **Bootstrap 5** for clean, responsive design
 - All forms and navigation use Wheels helpers for consistency and security
 - Mobile-responsive interface
 - Consistent styling across all pages
 
 ## Intended Audience
 
-- **Developers** looking for a reference or starter app for Wheels 3.x
+- **Developers** looking for a reference or starter app for Wheels 4.x
 - **Teams** wanting to learn or demonstrate best practices in Wheels MVC development
 - **Students** learning modern CFML web development
 - **Organizations** evaluating Wheels framework for their projects
@@ -108,7 +108,7 @@ app/
 |── global/             # application-wide globally accessible functions
 ├── views/              # Presentation layer
 ├── mailers/            # Email templates
-plugins/            # Third-party plugins
+plugins/            # Legacy plugins the app still uses (authenticateThis, FlashMessagesBootstrap, jsconfirm)
 ```
 
 ### Key Design Principles
@@ -122,14 +122,14 @@ plugins/            # Third-party plugins
 
 ### Backend
 
-- **3.1.0-snapshot** - MVC Framework
-- **Lucee 5,6,7, Adobe 2018-2025, Boxlang** - CFML Engine
-- **Database** - MySQL, PostgreSQL, Microsoft SQL Server, Oracle, SQLite, H2
+- **Wheels 4.x** - MVC framework, included in `vendor/wheels/`
+- **Lucee 7** - CFML engine under `wheels start` (`lucee.json`); CommandBox's Lucee also works (see below)
+- **Database** - embedded SQLite by default (H2 under CommandBox); MySQL, PostgreSQL, Microsoft SQL Server and Oracle by swapping the datasource
 - **WheelsTest** - Testing framework (vendored with Wheels)
 
 ### Frontend
 
-- **Bootstrap 4** - UI Framework
+- **Bootstrap 5** - UI Framework
 - **jQuery** - JavaScript utilities
 - **Font Awesome** - Icons
 
@@ -360,8 +360,8 @@ migrates before every run, so they never touch the development database.
 
 ### Documentation
 
-- [Wheels Guides](https://wheels.dev/guides)
-- [Wheels Api Reference](https://wheels.dev/api/v3.1.0)
+- [Wheels Guides](https://guides.wheels.dev/)
+- [Wheels API Reference](https://api.wheels.dev/)
 
 ### Community
 
