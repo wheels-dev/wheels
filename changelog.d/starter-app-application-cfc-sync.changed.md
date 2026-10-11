@@ -1,1 +1,0 @@
-- The starter app's `public/Application.cfc` is synced with the app template, picking up the template's current request, error-page and session-cookie handling and the jBCrypt load path.

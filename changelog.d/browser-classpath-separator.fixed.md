@@ -1,1 +1,0 @@
-- `wheels browser setup` joins the Playwright jars with the platform's path separator, so the classpath it passes to Java works on Windows (`;`) as well as macOS and Linux (`:`).

@@ -1,1 +1,0 @@
-- The starter app's migrations create their schema again: nine `default=''` options on string and text columns, rejected since 4.1.0, are gone, and the migration header examples and the `create-table` snippet no longer teach the pattern.

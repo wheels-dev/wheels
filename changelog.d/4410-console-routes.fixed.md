@@ -1,1 +1,0 @@
-- The console's `/routes` command no longer fails with a syntax error; it lists routes as `pattern -> controller#action` (#4410)

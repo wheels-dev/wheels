@@ -1,1 +1,0 @@
-- `wheels setup --help` shows the setup command's own help again, instead of the general command list.

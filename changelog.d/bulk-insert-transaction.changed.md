@@ -1,1 +1,0 @@
-- `insertAll()` and `upsertAll()` now honour their `transaction` argument like `save()`. With the default (`commit`), all of a call's batches run in one transaction, so a large import is all-or-nothing and a failing batch no longer leaves the earlier batches behind. Pass `transaction="none"` for the previous per-batch commits; `rollback` keeps nothing
