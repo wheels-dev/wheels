@@ -15,6 +15,7 @@ excerpt: >-
   and what we fixed in Wheels as a result.
 coverImage: null
 announcement:
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/4571'
   title: "We ran a dozen AI coding agents at real Wheels features. Here's what happened."
   body: |
     New post: **[We ran a dozen AI coding agents at real Wheels features. Here's what happened.](https://blog.wheels.dev/posts/ai-coding-agents-on-wheels/)** — we ran a set of AI coding agents at real feature work in a Wheels app, scored by hidden acceptance checks, and published every number: across 790 scored trials the agents passed 88.6% (83.5% raw). Here's what we measured, and what we fixed in Wheels as a result.
