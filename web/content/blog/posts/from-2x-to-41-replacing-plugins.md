@@ -25,6 +25,7 @@ excerpt: >-
   upgraded our own apps.
 coverImage: null
 announcement:
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/4582'
   title: "From 2.x to 4.x, part 6: replacing your 2.x plugins"
   body: |
     New post: **[Replacing your 2.x plugins: packages, `super<name>`, and app helpers](https://blog.wheels.dev/posts/from-2x-to-41-replacing-plugins/)** — porting three legacy plugins off the deprecated plugins/ directory to packages, `super<name>` and app helpers, and what 4.1.2 logs while plugins are still present.
