@@ -35,8 +35,12 @@
   ],
   "versions": [
     {
+      "tag": "v4.2.0",
+      "description": "Current release (the 4.2 line)"
+    },
+    {
       "tag": "v4.1.2",
-      "description": "Current release (the 4.1 line)"
+      "description": "Last release of the 4.1 line"
     },
     {
       "tag": "v4.0.6",
