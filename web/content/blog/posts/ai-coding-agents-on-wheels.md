@@ -14,6 +14,10 @@ excerpt: >-
   scored trials the agents passed 88.6% (83.5% raw). Here's what we measured,
   and what we fixed in Wheels as a result.
 coverImage: null
+announcement:
+  title: "We ran a dozen AI coding agents at real Wheels features. Here's what happened."
+  body: |
+    New post: **[We ran a dozen AI coding agents at real Wheels features. Here's what happened.](https://blog.wheels.dev/posts/ai-coding-agents-on-wheels/)** — we ran a set of AI coding agents at real feature work in a Wheels app, scored by hidden acceptance checks, and published every number: across 790 scored trials the agents passed 88.6% (83.5% raw). Here's what we measured, and what we fixed in Wheels as a result.
 ---
 
 We wanted an honest answer to a simple question: **can today's AI coding agents
