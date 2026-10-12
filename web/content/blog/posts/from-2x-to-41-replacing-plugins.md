@@ -24,6 +24,10 @@ excerpt: >-
   BCrypt.class. A sidebar covers the five regressions #3520 fixed when we
   upgraded our own apps.
 coverImage: null
+announcement:
+  title: "From 2.x to 4.x, part 6: replacing your 2.x plugins"
+  body: |
+    New post: **[Replacing your 2.x plugins: packages, `super<name>`, and app helpers](https://blog.wheels.dev/posts/from-2x-to-41-replacing-plugins/)** — porting three legacy plugins off the deprecated plugins/ directory to packages, `super<name>` and app helpers, and what 4.1.2 logs while plugins are still present.
 ---
 
 The example app shipped three plugin zips in `plugins/`: jsconfirm, FlashMessagesBootstrap and authenticateThis. [Pass 2](https://blog.wheels.dev/blog/from-2x-to-41-pass-2-upgrade-check) removed all three in three commits so the upgrade could move on. This post goes back over them properly. It explains why 2.x plugins "just worked", what Wheels 4.x does with them, and how each one ports. For jsconfirm it takes the route [@mikegrogan](https://github.com/mikegrogan) tried in [D#3323](https://github.com/wheels-dev/wheels/discussions/3323): an override of `linkTo()` that calls the framework original through `superLinkTo()`. The work is on branch `series/post6`, three commits on top of pass 2.
