@@ -20,6 +20,7 @@ excerpt: >-
   need small edits, listed in the post.
 coverImage: null
 announcement:
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/4562'
   title: "Wheels 4.2.0 is out"
   body: |
     New post: **[Wheels 4.2.0 is out](https://blog.wheels.dev/posts/wheels-4-2-0-released/)** — background jobs built for several servers (schedules, heartbeats, unique and exclusive jobs, drain for deploys), afterCommit and afterRollback callbacks with savepoints, exact wide numbers and long IN lists on more databases, new helpers and test assertions, faster requests, and fixes for six security advisories. Upgrading is recommended; some apps need small edits, listed in the post.
