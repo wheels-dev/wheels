@@ -13,6 +13,10 @@ html,
 body {
 	margin: 0;
 	padding: 0;
+	/* Clip horizontal overflow so the off-canvas mobile nav drawer (and any
+	   stray wide child) can't add a phantom horizontal scrollbar. `clip` is
+	   used over `hidden` because it does not break `position: sticky`. */
+	overflow-x: clip;
 	background: var(--color-bg);
 	color: var(--color-fg);
 	font-family: var(--font-sans);
