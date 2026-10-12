@@ -19,6 +19,12 @@ excerpt: >-
   and fixes for six security advisories. Upgrading is recommended; some apps
   need small edits, listed in the post.
 coverImage: null
+announcement:
+  title: "Wheels 4.2.0 is out"
+  body: |
+    New post: **[Wheels 4.2.0 is out](https://blog.wheels.dev/posts/wheels-4-2-0-released/)** — background jobs built for several servers (schedules, heartbeats, unique and exclusive jobs, drain for deploys), afterCommit and afterRollback callbacks with savepoints, exact wide numbers and long IN lists on more databases, new helpers and test assertions, faster requests, and fixes for six security advisories. Upgrading is recommended; some apps need small edits, listed in the post.
+
+    Full notes: [GitHub Release v4.2.0](https://github.com/wheels-dev/wheels/releases/tag/v4.2.0)
 ---
 
 Wheels 4.2.0 is out. It's a minor release on the 4.x line: **background jobs you can run across several servers, with schedules, heartbeats, unique and exclusive jobs, and a drain for deploys; `afterCommit` and `afterRollback` callbacks with savepoints and transaction-scoped locks; exact numbers and long IN lists on more databases; new helpers and test assertions; faster requests; and fixes for six security advisories.** It's available on Homebrew, Scoop, apt, yum/dnf and ForgeBox now, and we recommend upgrading.
@@ -26,8 +32,6 @@ Wheels 4.2.0 is out. It's a minor release on the 4.x line: **background jobs you
 Full notes: [GitHub Release v4.2.0](https://github.com/wheels-dev/wheels/releases/tag/v4.2.0) · [CHANGELOG](https://github.com/wheels-dev/wheels/blob/main/CHANGELOG.md)
 
 ## Security fixes
-
-<!-- PRIVATE until the advisories publish: do not share this section before then. -->
 
 4.2.0 includes fixes for six advisories:
 
