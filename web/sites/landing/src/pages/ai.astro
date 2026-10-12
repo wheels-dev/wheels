@@ -54,7 +54,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 				<strong>Frozen tasks with hidden checks.</strong> Each task is a plain-English feature request.
 				The agent gets the prompt and nothing else; a hidden spec decides pass/fail. A task scores 1 only
 				if the app's own test suite is green <strong>and</strong> every hidden check passes. Tasks and
-				their checks were frozen and reviewed before any model ran, and never changed after we saw results.
+				their checks were frozen and independently reviewed before any model ran. The only changes after
+				any model ran were the two over-strict check corrections disclosed in section 5, each reported
+				with both the before and after figures.
 			</li>
 			<li>
 				<strong>Two arms.</strong> Each model ran twice where possible: <strong>bare</strong> (a stock
@@ -85,7 +87,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 			</p>
 		</blockquote>
 
-		<h2 id="2-round-4-results">2. Round 4 results</h2>
+		<h2 id="2-latest-results-october-2026">2. Latest results (October 2026)</h2>
 		<p>
 			Overall, across the ten tasks, the agents passed <strong
 				>700 of 790 scored trials (88.6%)</strong
@@ -167,7 +169,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 						><td>89</td></tr
 					>
 					<tr
-						><td>Qwen3.8-27B</td><td>Alibaba</td><td>lemans</td><td>docs</td><td>30/32 (30)</td><td
+						><td>Qwen3.8-27B</td><td>Alibaba</td><td>lemans</td><td>docs</td><td>30/32</td><td
 							>$28.41</td
 						><td>88</td></tr
 					>
@@ -240,8 +242,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 				(section 5); on the like-for-like pattern each cell would be 32/33.
 			</li>
 			<li>
-				<strong>Spend</strong> was well within budget on every cell; the per-trial cost guard never bound
-				(the most expensive single trial was $12.27 against a $20 guard).
+				<strong>Spend</strong> was well within budget on every cell; no single trial reached the per-trial
+				cost limit (the most expensive single trial was $12.27, under the $20 cap).
 			</li>
 		</ul>
 
@@ -356,12 +358,14 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 		<p><strong>What failed, and why:</strong></p>
 		<ul>
 			<li>
-				<strong>ar-erase-account</strong> (the hardest Rails-counterpart task) asks for an atomic, hard
-				delete of an account and everything only it owns, through a soft-delete model where the default
-				delete hides rows rather than removing them. The genuine misses were real model mistakes: a soft-delete-only
-				erase that leaves rows behind, calling object methods on raw query rows, a missing datasource,
-				and one route-constraint escaping bug (below). Two weaker models (GPT-5.6 Luna, Haiku 4.5) account
-				for most of them.
+				<strong>ar-erase-account</strong> asks for an atomic, hard delete of an account and everything
+				only it owns, through a soft-delete model where the default delete hides rows rather than removing
+				them. Most of the genuine misses were real model mistakes: a soft-delete-only erase that leaves
+				rows behind, calling object methods on raw query rows, a missing datasource, and one route-constraint
+				escaping bug (below). Two more were a documentation gap, not a model error — a raw SQL subquery
+				with a literal inside <code>where=</code> threw an unhelpful error, since addressed (<a
+					href="https://github.com/wheels-dev/wheels/pull/4531">#4531</a
+				>). Two weaker models (GPT-5.6 Luna, Haiku 4.5) account for most of them.
 			</li>
 			<li>
 				<strong>hw-scoped-broadcast</strong> asks the agent to add per-listener authorization to a live-update
@@ -396,14 +400,18 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 						<strong>wn-literal-route</strong> demanded every section's <em>title</em> in the print view,
 						when the task asks for each section's <em>content</em> (and the app's own view renders a section
 						by its text). Re-scored with that one assertion relaxed and everything else unchanged, the
-						task went from 27/72 to 60/72. Six genuine failures remain.
+						task went from 27/72 to 60/72. Of the twelve trials that don't reach that figure, six are
+						genuine failures (an HTTP 301 on the print route) and six are Claude Code trials that couldn't
+						be re-scored (see below).
 					</li>
 					<li>
 						<strong>ar-erase-account</strong> treated a book as "edited by nobody else," but a fixture
 						user was an administrator and the app lets administrators edit every book — so "nobody else
 						can edit" was ambiguous against the app's own rule. Re-scored with that fixture user demoted
-						(every other check unchanged), the task went from 53/72 to 60/72; eight trials that kept the
-						book because an admin exists now pass, and no passing trial became a failure.
+						(every other check unchanged), the task went from 53/72 to 60/72; seven trials that kept the
+						book because an administrator exists now pass, and no passing trial became a failure. An eighth
+						trial of the same kind — a Claude Code trial — couldn't be re-scored because its diff wasn't
+						captured, so it stays as originally scored.
 					</li>
 				</ol>
 				Each correction changed exactly one thing; every other check stayed as frozen.
@@ -476,10 +484,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 					href="https://github.com/wheels-dev/wheels/pull/4238">#4238</a
 				>); date comparisons in the query builder match correctly on SQLite (<a
 					href="https://github.com/wheels-dev/wheels/pull/4281">#4281</a
-				>); background jobs enqueued across datasources behave predictably (<a
+				>); a failed background-job enqueue now raises instead of being silently dropped (<a
 					href="https://github.com/wheels-dev/wheels/pull/4266">#4266</a
-				>,
-				<a href="https://github.com/wheels-dev/wheels/pull/4282">#4282</a>).
+				>), and a job enqueued inside a datasource transaction is deferred to its commit so it runs
+				predictably (<a href="https://github.com/wheels-dev/wheels/pull/4282">#4282</a>).
 			</li>
 			<li>
 				<strong>Dozens of smaller docs, CLI, and upgrade-path fixes</strong> — a fresh-VM install-and-upgrade
@@ -498,8 +506,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 		<ul>
 			<li>
 				<strong>Frozen before any model ran.</strong> Tasks and their hidden checks were fixed and independently
-				reviewed before the first run. Nothing changed after we saw results; the two corrections above
-				relaxed over-strict checks and are reported with both figures.
+				reviewed before the first run. The only post-run changes were the two over-strict check corrections
+				above, which relaxed over-strict checks and are reported with both figures.
 			</li>
 			<li>
 				<strong>Every run recorded.</strong> Passes, failures, refusals, and infrastructure errors are
