@@ -54,9 +54,23 @@ jobs:
       - name: Open bump PR
         # Only from develop: a branch dispatch that happens to go green must not
         # open a bump PR built on a feature branch.
+        #
+        # add-paths: the suite run leaves logs and caches in the working tree
+        # (public/logs/, tools/ci/__pycache__/), and create-pull-request stages
+        # every change by default, so commit only the files bump-pin.sh and
+        # --write-baseline produce (#4577).
+        #
+        # CI: a PR opened with GITHUB_TOKEN does not trigger workflows. Whoever
+        # handles the bump PR pushes a commit (an empty one is fine) to its
+        # branch to start CI, as for the develop version bump.
         if: env.RUSTCFML_LATEST != '' && github.ref == 'refs/heads/develop'
         uses: peter-evans/create-pull-request@v8.1.1
         with:
+          add-paths: |
+            tools/rustcfml/ENGINE_VERSION
+            tools/rustcfml/ENGINE_SHA256
+            tools/rustcfml/baseline.json
+            cli/lucli/services/rustcfml/RustCFMLEngine.cfc
           branch: "auto-bump/rustcfml-${{ env.RUSTCFML_LATEST }}"
           title: "chore(rustcfml): bump engine pin to ${{ env.RUSTCFML_LATEST }}"
           body: |
