@@ -104,6 +104,11 @@ const links = [
 		padding: 0 var(--space-5);
 		height: var(--header-height);
 		background: var(--color-bg);
+		/* Clip the off-canvas drawer horizontally so it never adds page-level
+		   horizontal scroll. overflow-y stays visible, so the open drawer, which
+		   drops below the header, is unaffected. Scoped here (not on body) so
+		   wide page content like blog tables stays reachable. */
+		overflow-x: clip;
 		border-bottom: 1px solid transparent;
 		font-family: var(--font-sans);
 		transition:

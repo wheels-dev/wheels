@@ -13,10 +13,6 @@ html,
 body {
 	margin: 0;
 	padding: 0;
-	/* Clip horizontal overflow so the off-canvas mobile nav drawer (and any
-	   stray wide child) can't add a phantom horizontal scrollbar. `clip` is
-	   used over `hidden` because it does not break `position: sticky`. */
-	overflow-x: clip;
 	background: var(--color-bg);
 	color: var(--color-fg);
 	font-family: var(--font-sans);
@@ -207,6 +203,14 @@ video {
 
 .prose li + li {
 	margin-top: var(--space-2);
+}
+
+/* Markdown tables have no wrapper, so let a table wider than the viewport
+   scroll inside its own box rather than pushing the whole page wide. */
+.prose table {
+	display: block;
+	max-width: 100%;
+	overflow-x: auto;
 }
 
 .prose img {
