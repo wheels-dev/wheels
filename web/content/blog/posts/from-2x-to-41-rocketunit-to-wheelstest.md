@@ -22,6 +22,10 @@ excerpt: >-
   by bcrypt, so a model-instantiation micro-benchmark compares 3.0, 4.0.5 and
   4.1.2 instead, with links to the full #3213 performance story.
 coverImage: null
+announcement:
+  title: "From 2.x to 4.x, part 7: from RocketUnit to WheelsTest"
+  body: |
+    New post: **[From RocketUnit to WheelsTest, and why your suite is faster again](https://blog.wheels.dev/posts/from-2x-to-41-rocketunit-to-wheelstest/)** — converting a model's RocketUnit tests to a WheelsTest BDD spec with both suites side by side on 4.1.2, the one-time deprecation warning, and why the suite gets faster. This is the last post in the series.
 ---
 
 Wheels 4 still runs your RocketUnit tests, but `wheels.Test` is deprecated, and its removal is planned for Wheels 5.0. [Pass 2](https://blog.wheels.dev/blog/from-2x-to-41-pass-2-upgrade-check) converted one file in the example app. This post converts the User model tests, runs that one spec from the CLI, and checks how fast the suite is now.
