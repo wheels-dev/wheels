@@ -23,6 +23,7 @@ excerpt: >-
   4.1.2 instead, with links to the full #3213 performance story.
 coverImage: null
 announcement:
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/4588'
   title: "From 2.x to 4.x, part 7: from RocketUnit to WheelsTest"
   body: |
     New post: **[From RocketUnit to WheelsTest, and why your suite is faster again](https://blog.wheels.dev/posts/from-2x-to-41-rocketunit-to-wheelstest/)** — converting a model's RocketUnit tests to a WheelsTest BDD spec with both suites side by side on 4.1.2, the one-time deprecation warning, and why the suite gets faster. This is the last post in the series.
