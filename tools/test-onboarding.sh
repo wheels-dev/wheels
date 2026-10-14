@@ -161,6 +161,14 @@ file_size() {
     echo "${n:-0}"
 }
 
+# The Lucee version a lucee.json pins: the first "version" inside its "lucee" block.
+lucee_pinned_version() {
+    awk '/"lucee"[[:space:]]*:/ { inLucee = 1 }
+         inLucee && /"version"[[:space:]]*:/ {
+             sub(/.*"version"[[:space:]]*:[[:space:]]*"/, ""); sub(/".*/, ""); print; exit
+         }' "$1" 2>/dev/null
+}
+
 http_get() {
     local url="http://localhost:$PORT$1"
     local body_var=$2
@@ -334,16 +342,27 @@ if phase 1 "Setup isolated LUCLI_HOME"; then
         export WHEELS_FRAMEWORK_PATH="$PROJECT_ROOT/vendor/wheels"
         pass "WHEELS_FRAMEWORK_PATH set to worktree vendor/wheels"
 
-        # Reuse the user's existing Lucee Express install if available so we don't
-        # re-download ~74MB on every harness run. This is the only piece of state
-        # we share with the user's daily wheels — read-only via symlink.
-        for src in "$HOME/.wheels/express" "$HOME/.lucli/express"; do
-            if [ -d "$src" ]; then
-                ln -s "$src" "$LUCLI_HOME/express"
-                pass "Lucee Express linked from $src"
-                break
-            fi
-        done
+        # Lucee Express lives in the sandbox too. Linking the user's ~/.wheels/express
+        # made LuCLI download a newly pinned Lucee version INTO the user's install.
+        # To skip the ~75MB download, copy just the version the template pins from
+        # an existing install when there is one; the source is only read.
+        mkdir -p "$LUCLI_HOME/express"
+        PINNED_LUCEE="$(lucee_pinned_version "$PROJECT_ROOT/cli/lucli/templates/app/lucee.json")"
+        EXPRESS_SEEDED=false
+        if [ -n "$PINNED_LUCEE" ]; then
+            for src in "$HOME/.wheels/express" "$HOME/.lucli/express"; do
+                if [ -d "$src/$PINNED_LUCEE/lib/ext" ]; then
+                    cp -Rc "$src/$PINNED_LUCEE" "$LUCLI_HOME/express/" 2>/dev/null \
+                        || cp -R "$src/$PINNED_LUCEE" "$LUCLI_HOME/express/"
+                    pass "Lucee Express $PINNED_LUCEE copied into the sandbox from $src"
+                    EXPRESS_SEEDED=true
+                    break
+                fi
+            done
+        fi
+        if [ "$EXPRESS_SEEDED" = "false" ]; then
+            skip "no local Lucee Express ${PINNED_LUCEE:-install} to copy; the server downloads it into the sandbox"
+        fi
     fi
 
     pass "tmp dir created: $TMPDIR"
@@ -488,53 +507,64 @@ if phase 3 "Server boot + sqlite-jdbc shim (formula simulation)"; then
     stop_port_listeners
     sleep 1
 
+    # Drop sqlite-jdbc.jar into the lib/ext of the Lucee Express version the app
+    # pins (this is what the formula SHOULD do; we simulate it here so the
+    # migration can actually run). Tomcat reads lib/ext only when the JVM starts,
+    # so the driver must be there before the server boots. When the server itself
+    # downloads that version, the driver goes in afterwards and the server restarts.
+    APP_LUCEE="$(lucee_pinned_version "$APP_DIR/lucee.json")"
+    # BASELINE=1 runs the user's own CLI, whose home is ~/.wheels.
+    LUCEE_LIB="${LUCLI_HOME:-$HOME/.wheels}/express/${APP_LUCEE:-unknown}/lib/ext"
+
+    # 0 = the driver is in $LUCEE_LIB (or was just put there), 1 = no lib/ext yet,
+    # 2 = the download failed.
+    stage_sqlite_driver() {
+        [ -d "$LUCEE_LIB" ] || return 1
+        if ls "$LUCEE_LIB"/sqlite-jdbc*.jar 1>/dev/null 2>&1; then
+            pass "sqlite-jdbc already present in $LUCEE_LIB"
+            return 0
+        fi
+        echo "  Downloading sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar -> $LUCEE_LIB/"
+        if curl -fsSL "$SQLITE_JDBC_URL" -o "$LUCEE_LIB/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"; then
+            pass "sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar dropped into $LUCEE_LIB"
+            return 0
+        fi
+        rm -f "$LUCEE_LIB/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"
+        fail "sqlite-jdbc download failed (no internet?)"
+        return 2
+    }
+
     # Start the server in the background. Use `lucli server run` directly rather
     # than `wheels start` because the latter has a 30-second internal timeout
     # that consistently fires before Lucee finishes booting on first run.
-    echo "  Starting Lucee server on port $PORT (via 'lucli server run')..."
-    nohup "$WHEELS_CMD" server run --port="$PORT" --force > "$SERVER_LOG" 2>&1 &
-    SERVER_PID=$!
-    SERVER_STARTED=true
+    start_onboarding_server() {
+        echo "  Starting Lucee server on port $PORT (via 'lucli server run')..."
+        nohup "$WHEELS_CMD" server run --port="$PORT" --force > "$SERVER_LOG" 2>&1 &
+        SERVER_PID=$!
+        SERVER_STARTED=true
 
-    # Wait briefly so Lucee Express has a chance to download (~74MB on first run).
-    if wait_for_server 120; then
-        pass "server responded on port $PORT"
-    else
-        fail "server failed to start within 120s"
-        echo "  Cannot proceed without server — aborting remaining phases"
-        exit 1
-    fi
-
-    # Drop sqlite-jdbc.jar into Lucee Express lib/ext (this is what the formula
-    # SHOULD do; we simulate it here so the migration can actually run).
-    LUCEE_LIB=""
-    for candidate in \
-        "${LUCLI_HOME:-$HOME/.lucli}/express"/*/lib/ext \
-        "$HOME/.lucli/express"/*/lib/ext \
-        "$HOME/.wheels/express"/*/lib/ext; do
-        if [ -d "$candidate" ]; then
-            LUCEE_LIB="$candidate"
-            break
-        fi
-    done
-
-    if [ -n "$LUCEE_LIB" ]; then
-        if ls "$LUCEE_LIB"/sqlite-jdbc*.jar 1>/dev/null 2>&1; then
-            pass "sqlite-jdbc already present in $LUCEE_LIB"
+        # Wait so Lucee Express has a chance to download (~75MB on first run).
+        if wait_for_server 120; then
+            pass "server responded on port $PORT"
         else
-            echo "  Downloading sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar -> $LUCEE_LIB/"
-            if curl -fsSL "$SQLITE_JDBC_URL" -o "$LUCEE_LIB/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"; then
-                pass "sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar dropped into $LUCEE_LIB"
-                # Reload the app so Lucee picks up the new bundle.
-                local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
-                curl -s -o /dev/null --max-time 60 "http://localhost:$PORT/?reload=true&password=$local_password" || true
-                sleep 3
-            else
-                fail "sqlite-jdbc download failed (no internet?)"
-            fi
+            fail "server failed to start within 120s"
+            echo "  Cannot proceed without server — aborting remaining phases"
+            exit 1
         fi
-    else
-        fail "could not locate Lucee Express lib/ext directory"
+    }
+
+    STAGED_BEFORE_START=0
+    stage_sqlite_driver || STAGED_BEFORE_START=$?
+    start_onboarding_server
+    if [ "$STAGED_BEFORE_START" = "1" ]; then
+        if stage_sqlite_driver; then
+            echo "  Restarting so Tomcat loads the driver from lib/ext..."
+            kill "$SERVER_PID" 2>/dev/null || true
+            stop_port_listeners
+            start_onboarding_server
+        elif [ ! -d "$LUCEE_LIB" ]; then
+            fail "could not locate Lucee Express lib/ext for ${APP_LUCEE:-the pinned version}: $LUCEE_LIB"
+        fi
     fi
 
     # Sanity: homepage should now load without a BundleException.
