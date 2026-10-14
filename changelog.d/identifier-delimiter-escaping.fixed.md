@@ -1,0 +1,1 @@
+- Identifier quoting in the SQLite, PostgreSQL, CockroachDB, Oracle, MySQL and SQL Server model adapters now doubles a closing delimiter that appears inside a table or column name (`"` becomes `""`, a backtick becomes two, `]` becomes `]]`), so such a name stays a single identifier. Names without those characters are quoted exactly as before.

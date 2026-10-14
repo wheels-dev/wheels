@@ -141,6 +141,26 @@ component extends="wheels.WheelsTest" {
                     expect(mysql.$quoteIdentifier(name = "Users")).toInclude("Users");
                 });
 
+                it("$quoteIdentifier doubles the closing delimiter inside a name, per adapter", () => {
+                    var sqlite = CreateObject("component", "wheels.databaseAdapters.SQLite.SQLiteModel");
+                    expect(sqlite.$quoteIdentifier(name = "users")).toBe('"users"');
+                    expect(sqlite.$quoteIdentifier(name = 'we"ird')).toBe('"we""ird"');
+                    var pg = CreateObject("component", "wheels.databaseAdapters.PostgreSQL.PostgreSQLModel");
+                    expect(pg.$quoteIdentifier(name = 'We"ird')).toBe('"we""ird"');
+                    var crdb = CreateObject("component", "wheels.databaseAdapters.CockroachDB.CockroachDBModel");
+                    expect(crdb.$quoteIdentifier(name = 'We"ird')).toBe('"we""ird"');
+                    var oracle = CreateObject("component", "wheels.databaseAdapters.Oracle.OracleModel");
+                    expect(oracle.$quoteIdentifier(name = "users")).toBe('"USERS"');
+                    expect(oracle.$quoteIdentifier(name = 'we"ird')).toBe('"WE""IRD"');
+                    var mysql = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLModel");
+                    expect(mysql.$quoteIdentifier(name = "users")).toBe("`users`");
+                    expect(mysql.$quoteIdentifier(name = "we`ird")).toBe("`we``ird`");
+                    var mssql = CreateObject("component", "wheels.databaseAdapters.MicrosoftSQLServer.MicrosoftSQLServerModel");
+                    expect(mssql.$quoteIdentifier(name = "users")).toBe("[users]");
+                    expect(mssql.$quoteIdentifier(name = "we]ird")).toBe("[we]]ird]");
+                    expect(mssql.$quoteIdentifier(name = "we[ird")).toBe("[we[ird]");
+                });
+
                 it("Oracle $tableAlias joins table and alias", () => {
                     var oracle = CreateObject("component", "wheels.databaseAdapters.Oracle.OracleModel");
                     expect(oracle.$tableAlias(table = "users", alias = "u")).toBe("users u");

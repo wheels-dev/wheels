@@ -410,10 +410,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Override Base adapter's function.
-	 * MySQL uses backticks to quote identifiers.
+	 * MySQL uses backticks to quote identifiers; an embedded backtick is doubled.
 	 */
 	public string function $quoteIdentifier(required string name) {
-		return "`#arguments.name#`";
+		return "`" & Replace(arguments.name, "`", "``", "all") & "`";
 	}
 
 	/**

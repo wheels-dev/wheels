@@ -312,8 +312,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public string function $quoteIdentifier(required string name) {
 		// PostgreSQL folds unquoted identifiers to lowercase, so we must lowercase
-		// before quoting to match the actual stored name
-		return """#LCase(arguments.name)#""";
+		// before quoting to match the actual stored name; an embedded double quote is doubled
+		return """" & Replace(LCase(arguments.name), """", """""", "all") & """";
 	}
 
 	/**
