@@ -47,8 +47,15 @@ set -uo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${PORT:-9988}"
 APP_NAME="onboarding-test"
+# The SQLite JDBC driver `wheels start` stages, fetched by tools/ci/fetch-sqlite-jdbc.sh
+# and checked against its SHA-256. Another version needs its SHA-256 too.
 SQLITE_JDBC_VERSION="${SQLITE_JDBC_VERSION:-3.49.1.0}"
-SQLITE_JDBC_URL="https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/${SQLITE_JDBC_VERSION}/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"
+if [ "$SQLITE_JDBC_VERSION" = "3.49.1.0" ]; then
+    SQLITE_JDBC_SHA256="${SQLITE_JDBC_SHA256:-5c8609d2ca341deb8c6f71778974b5ba4995c7d32d7c7c89d9392a3e72c39291}"
+elif [ -z "${SQLITE_JDBC_SHA256:-}" ]; then
+    echo "SQLITE_JDBC_VERSION=${SQLITE_JDBC_VERSION} needs SQLITE_JDBC_SHA256 (the jar's SHA-256) as well." >&2
+    exit 2
+fi
 
 PASS=0
 FAIL=0
@@ -525,12 +532,13 @@ if phase 3 "Server boot + sqlite-jdbc shim (formula simulation)"; then
             return 0
         fi
         echo "  Downloading sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar -> $LUCEE_LIB/"
-        if curl -fsSL "$SQLITE_JDBC_URL" -o "$LUCEE_LIB/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"; then
+        if bash "$PROJECT_ROOT/tools/ci/fetch-sqlite-jdbc.sh" "$LUCEE_LIB/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar" \
+            "$SQLITE_JDBC_VERSION" "$SQLITE_JDBC_SHA256"; then
             pass "sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar dropped into $LUCEE_LIB"
             return 0
         fi
         rm -f "$LUCEE_LIB/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"
-        fail "sqlite-jdbc download failed (no internet?)"
+        fail "sqlite-jdbc download failed or did not match its SHA-256 (no internet?)"
         return 2
     }
 
