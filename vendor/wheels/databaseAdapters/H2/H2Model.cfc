@@ -148,12 +148,40 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Override Base adapter's function.
-	 * H2 uses double-quotes to quote identifiers in every compatibility mode.
+	 * Only identifiers that can't be written unquoted (H2 keywords, or names with characters
+	 * outside letters, digits and underscores) are quoted. Every other name stays unquoted, so
+	 * it keeps resolving through H2's own case folding, including with DATABASE_TO_UPPER=FALSE.
+	 * A quoted name is upper-cased to match how H2 stores unquoted names by default, and an
+	 * embedded double quote is doubled so the name stays one identifier.
 	 */
 	public string function $quoteIdentifier(required string name) {
-		// H2 folds unquoted identifiers to uppercase, so we must uppercase
-		// before quoting to match the actual stored name
-		return """#UCase(arguments.name)#""";
+		if (REFind("^[A-Za-z_][A-Za-z0-9_]*$", arguments.name) && !StructKeyExists($h2Keywords(), UCase(arguments.name))) {
+			return arguments.name;
+		}
+		return """" & Replace(UCase(arguments.name), """", """""", "all") & """";
+	}
+
+	/**
+	 * Internal function.
+	 * Keywords H2 (1.3.x and 2.x) rejects as unquoted identifiers, as a struct for lookups.
+	 */
+	public struct function $h2Keywords() {
+		if (!StructKeyExists(variables, "$h2KeywordSet")) {
+			local.set = {};
+			local.words = "ALL,AND,ANY,ARRAY,AS,ASYMMETRIC,AUTHORIZATION,BETWEEN,BOTH,CASE,CAST,CHECK,CONSTRAINT,CROSS,"
+				& "CURRENT_CATALOG,CURRENT_DATE,CURRENT_PATH,CURRENT_ROLE,CURRENT_SCHEMA,CURRENT_TIME,CURRENT_TIMESTAMP,"
+				& "CURRENT_USER,DAY,DEFAULT,DISTINCT,ELSE,END,EXCEPT,EXISTS,FALSE,FETCH,FOR,FOREIGN,FROM,FULL,GROUP,GROUPS,"
+				& "HAVING,HOUR,IF,ILIKE,IN,INNER,INTERSECT,INTERVAL,IS,JOIN,KEY,LEADING,LEFT,LIKE,LIMIT,LOCALTIME,"
+				& "LOCALTIMESTAMP,MINUS,MINUTE,MONTH,NATURAL,NOT,NULL,OFFSET,ON,OR,ORDER,OVER,PARTITION,PRIMARY,QUALIFY,"
+				& "RANGE,REGEXP,RIGHT,ROW,ROWNUM,ROWS,SECOND,SELECT,SESSION_USER,SET,SOME,SYMMETRIC,SYSDATE,SYSTEM_USER,"
+				& "SYSTIME,SYSTIMESTAMP,TABLE,TO,TODAY,TOP,TRAILING,TRUE,UESCAPE,UNION,UNIQUE,UNKNOWN,USER,USING,VALUE,"
+				& "VALUES,WHEN,WHERE,WINDOW,WITH,YEAR,_ROWID_";
+			for (local.word in ListToArray(local.words)) {
+				local.set[local.word] = true;
+			}
+			variables.$h2KeywordSet = local.set;
+		}
+		return variables.$h2KeywordSet;
 	}
 
 	/**

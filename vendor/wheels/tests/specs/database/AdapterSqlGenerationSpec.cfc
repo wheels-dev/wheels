@@ -141,6 +141,24 @@ component extends="wheels.WheelsTest" {
                     expect(mysql.$quoteIdentifier(name = "Users")).toInclude("Users");
                 });
 
+                it("H2 $quoteIdentifier leaves plain names unquoted, so H2's own case folding still applies", () => {
+                    var h2 = CreateObject("component", "wheels.databaseAdapters.H2.H2Model");
+                    expect(h2.$quoteIdentifier(name = "users")).toBe("users");
+                    expect(h2.$quoteIdentifier(name = "firstName")).toBe("firstName");
+                    expect(h2.$quoteIdentifier(name = "c_o_r_e_posts")).toBe("c_o_r_e_posts");
+                    expect(h2.$quoteIdentifier(name = "_id2")).toBe("_id2");
+                });
+
+                it("H2 $quoteIdentifier quotes keywords and non-simple names, upper-cased, with quotes doubled", () => {
+                    var h2 = CreateObject("component", "wheels.databaseAdapters.H2.H2Model");
+                    expect(h2.$quoteIdentifier(name = "order")).toBe('"ORDER"');
+                    expect(h2.$quoteIdentifier(name = "Group")).toBe('"GROUP"');
+                    expect(h2.$quoteIdentifier(name = "value")).toBe('"VALUE"');
+                    expect(h2.$quoteIdentifier(name = "first name")).toBe('"FIRST NAME"');
+                    expect(h2.$quoteIdentifier(name = "2fa")).toBe('"2FA"');
+                    expect(h2.$quoteIdentifier(name = 'we"ird')).toBe('"WE""IRD"');
+                });
+
                 it("Oracle $tableAlias joins table and alias", () => {
                     var oracle = CreateObject("component", "wheels.databaseAdapters.Oracle.OracleModel");
                     expect(oracle.$tableAlias(table = "users", alias = "u")).toBe("users u");
