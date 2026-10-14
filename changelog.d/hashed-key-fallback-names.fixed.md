@@ -1,0 +1,1 @@
+- Cache keys for values the canonical cache-key encoder cannot represent (nested deeper than 64 levels, or holding objects it cannot serialize) now include argument names, so two calls that pass the same value under different argument names no longer share a key. On RustCFML, which has no `cfwddx`, such values now get a key instead of throwing.

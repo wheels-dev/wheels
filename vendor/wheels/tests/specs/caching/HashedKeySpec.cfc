@@ -47,6 +47,21 @@ component extends="wheels.WheelsTest" {
 				expect(g.$hashedKey(rows = first)).notToBe(g.$hashedKey(rows = second));
 			});
 
+			it("distinguishes whole query rows swapped", function() {
+				var first = QueryNew("id,name", "integer,varchar", [[1, "alice"], [2, "bob"]]);
+				var second = QueryNew("id,name", "integer,varchar", [[2, "bob"], [1, "alice"]]);
+				expect(g.$hashedKey(rows = first)).notToBe(g.$hashedKey(rows = second));
+			});
+
+			it("distinguishes null, an empty string, an empty array and an empty struct", function() {
+				var keys = {};
+				keys[g.$hashedKey(value = JavaCast("null", ""))] = "null";
+				keys[g.$hashedKey(value = "")] = "empty string";
+				keys[g.$hashedKey(value = [])] = "empty array";
+				keys[g.$hashedKey(value = {})] = "empty struct";
+				expect(StructCount(keys)).toBe(4);
+			});
+
 			it("distinguishes nested struct values swapped between keys", function() {
 				var first = {user = {id = 313}, viewer = {id = 414}};
 				var second = {user = {id = 414}, viewer = {id = 313}};
@@ -57,6 +72,26 @@ component extends="wheels.WheelsTest" {
 				var first = g.model("author").new(firstName = "Per", lastName = "Djurner");
 				var second = g.model("author").new(firstName = "Djurner", lastName = "Per");
 				expect(g.$hashedKey(object = first)).notToBe(g.$hashedKey(object = second));
+			});
+
+		});
+
+		describe("$hashedKey() for values the canonical encoder cannot represent", function() {
+
+			it("takes the fallback for a deeply nested value", function() {
+				var deep = $deepStruct();
+				expect(function() {
+					g.$canonicalCacheStruct({a = deep}, ["a"], 0);
+				}).toThrow("Wheels.CacheKeyTooDeep");
+			});
+
+			it("keeps argument names in the fallback", function() {
+				var deep = $deepStruct();
+				expect(g.$hashedKey(a = deep)).notToBe(g.$hashedKey(z = deep));
+			});
+
+			it("gives equal inputs equal keys in the fallback", function() {
+				expect(g.$hashedKey(a = $deepStruct())).toBe(g.$hashedKey(a = $deepStruct()));
 			});
 
 		});
@@ -143,6 +178,20 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+	}
+
+	/**
+	 * A struct nested deeper than the canonical encoder allows, so `$hashedKey()` falls back on cfwddx.
+	 */
+	private struct function $deepStruct() {
+		var root = {};
+		var node = root;
+		for (var i = 1; i <= 70; i++) {
+			node.child = {};
+			node = node.child;
+		}
+		node.leaf = 1;
+		return root;
 	}
 
 }
