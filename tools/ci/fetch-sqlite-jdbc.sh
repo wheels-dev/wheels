@@ -8,13 +8,24 @@
 # `curl --fail` and the SHA-256 check; a mismatch is downloaded again, up to
 # three attempts.
 #
-# Usage: bash tools/ci/fetch-sqlite-jdbc.sh [output-path]   (default /tmp/sqlite-jdbc.jar)
+# Usage: bash tools/ci/fetch-sqlite-jdbc.sh [output-path [version sha256]]
+#   output-path defaults to /tmp/sqlite-jdbc.jar. Without a version, it fetches the
+#   3.50.3.0 jar CI installs. A different version must come with its SHA-256.
 set -euo pipefail
 
 OUT="${1:-/tmp/sqlite-jdbc.jar}"
-VERSION="3.50.3.0"
-# Maven Central's published sqlite-jdbc-3.50.3.0.jar.sha256.
-SHA256="a3f53a2aa15ae9425a9e793bbe9c8e5288febeb4b65ef5c1a4e80d4c2045cf08"
+if [ "$#" -ge 2 ]; then
+  if [ "$#" -ne 3 ] || [ -z "$2" ] || [ -z "$3" ]; then
+    echo "::error::Usage: $0 [output-path [version sha256]]" >&2
+    exit 2
+  fi
+  VERSION="$2"
+  SHA256="$3"
+else
+  VERSION="3.50.3.0"
+  # Maven Central's published sqlite-jdbc-3.50.3.0.jar.sha256.
+  SHA256="a3f53a2aa15ae9425a9e793bbe9c8e5288febeb4b65ef5c1a4e80d4c2045cf08"
+fi
 URL="https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/${VERSION}/sqlite-jdbc-${VERSION}.jar"
 
 sha256_of() {

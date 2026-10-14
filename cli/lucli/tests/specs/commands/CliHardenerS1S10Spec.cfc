@@ -145,11 +145,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("wheels start stages 3.49.1.0; test-cli-local.sh downloads 3.49.1.0; CI pr.yml uses 3.50.3.0", () => {
 				expect(moduleSrc).toInclude("sqlite-jdbc-3.49.1.0");
 				expect(find("3.50.3.0", moduleSrc)).toBe(0);
+				// Both download through tools/ci/fetch-sqlite-jdbc.sh, which defaults to the CI
+				// version; test-cli-local.sh passes 3.49.1.0 and its SHA-256 explicitly.
+				var fetcher = fileRead(variables.repoRoot & "tools/ci/fetch-sqlite-jdbc.sh");
+				expect(fetcher).toInclude('VERSION="3.50.3.0"');
+				expect(find("3.49.1.0", fetcher)).toBe(0);
 				var sh = fileRead(cliLocalScript);
-				expect(sh).toInclude("sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar");
+				expect(sh).toInclude("tools/ci/fetch-sqlite-jdbc.sh");
+				expect(sh).toInclude("sqlite-jdbc-3.49.1.0.jar");
+				expect(reFind("fetch-sqlite-jdbc\.sh""[^\n]*\\\n\s*3\.49\.1\.0 [0-9a-f]{64}", sh)).toBeGT(0);
 				expect(find("3.50.3.0", sh)).toBe(0);
 				var pr = fileRead(prYml);
-				expect(pr).toInclude("sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar");
+				expect(reFind("bash tools/ci/fetch-sqlite-jdbc\.sh /tmp/sqlite-jdbc\.jar\s*\n", pr)).toBeGT(0);
 				expect(find("3.49.1.0", pr)).toBe(0);
 			});
 

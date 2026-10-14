@@ -381,6 +381,7 @@ stop_test_server() {
 # pins, in the CLI home, not whichever install `find` lists first.
 EXPRESS_ROOT="$CLI_HOME/express"
 SQLITE_JDBC_VERSION="3.49.1.0"
+SQLITE_JDBC_SHA256="5c8609d2ca341deb8c6f71778974b5ba4995c7d32d7c7c89d9392a3e72c39291"
 
 # The Lucee version a lucee.json pins: the first "version" inside its "lucee" block.
 pinned_lucee_version() {
@@ -398,10 +399,8 @@ stage_sqlite_driver() {
   [ -n "$1" ] && [ -d "$lib" ] || return 1
   ls "$lib"/sqlite-jdbc*.jar 1>/dev/null 2>&1 && return 1
   echo "Downloading SQLite JDBC driver into Lucee Express $1..."
-  if ! curl -fsSL --retry 3 --retry-delay 2 \
-    "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/${SQLITE_JDBC_VERSION}/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar" \
-    -o "$lib/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"; then
-    rm -f "$lib/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"
+  if ! bash "$PROJECT_ROOT/tools/ci/fetch-sqlite-jdbc.sh" "$lib/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar" \
+    "$SQLITE_JDBC_VERSION" "$SQLITE_JDBC_SHA256"; then
     echo "::warning::Could not download the SQLite JDBC driver into $lib" >&2
     return 2
   fi
