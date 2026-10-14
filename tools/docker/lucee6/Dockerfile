@@ -6,6 +6,8 @@ LABEL maintainer "Wheels Core Team"
 # layer to reduce image size and improve cache efficiency.
 # Each download retries: ext.lucee.org and Maven Central intermittently answer
 # 5xx or 429, and one failed fetch fails the whole image build.
+# The SQLite JDBC jar is checked against Maven Central's published SHA-256, so a
+# damaged or substituted download fails the build instead of the tests.
 RUN mkdir -p /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy \
  && wget -q --tries=5 --waitretry=3 --retry-connrefused --retry-on-http-error=429,500,502,503,504 -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex \
       https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex \
@@ -13,7 +15,8 @@ RUN mkdir -p /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy \
       https://ext.lucee.org/org.lucee.oracle-21.8.0.0-ojdbc11.lex \
  && mkdir -p /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib \
  && wget -q --tries=5 --waitretry=3 --retry-connrefused --retry-on-http-error=429,500,502,503,504 -O /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib/sqlite-jdbc.jar \
-      https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar
+      https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar \
+ && echo "a3f53a2aa15ae9425a9e793bbe9c8e5288febeb4b65ef5c1a4e80d4c2045cf08  /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib/sqlite-jdbc.jar" | sha256sum -c -
 
 # Install SQLite and create test database
 RUN apt-get update -y && apt-get install -y --no-install-recommends sqlite3 libsqlite3-dev \
