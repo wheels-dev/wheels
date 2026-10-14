@@ -118,33 +118,48 @@ RUN_LOCK="$PROJECT_ROOT/.wheels-test-local.lock"
 CHECKOUT_KEY="$(cd "$PROJECT_ROOT" && pwd -P | shasum | cut -c1-12)"
 TEST_SERVER_NAME="wheels-test-${CHECKOUT_KEY}"
 # The CLI keeps servers and Lucee Express installs in its home: $LUCLI_HOME when
-# it is set (an isolated CLI), otherwise ~/.wheels. A launcher can set its own
-# LUCLI_HOME, so once the server is up, resolve_cli_home() settles it from the
-# CATALINA_HOME Tomcat logs (<home>/express/<version>), or from where the
-# server registered.
+# it is set (an isolated CLI), otherwise ~/.wheels. A launcher can re-export its
+# own LUCLI_HOME (the Homebrew `wheels` sets ~/.wheels); -Dlucli.home outranks
+# the variable, so a caller's LUCLI_HOME is passed that way too.
 CLI_HOME="${LUCLI_HOME:-$HOME/.wheels}"
 TEST_SERVER_DIR="$CLI_HOME/servers/$TEST_SERVER_NAME"
+if [ -n "${LUCLI_HOME:-}" ]; then
+  export LUCLI_JAVA_ARGS="${LUCLI_JAVA_ARGS:-} -Dlucli.home=$LUCLI_HOME"
+fi
+# Cleared when the server turns out to run from a home other than the caller's
+# LUCLI_HOME: this run then writes nothing into that home.
+STAGING_ALLOWED=true
 
+canonical_dir() {
+  (cd "$1" 2>/dev/null && pwd -P) || printf '%s\n' "$1"
+}
+
+# Once the server is up, settle the home it really uses: from the CATALINA_HOME
+# Tomcat logs (<home>/express/<version>), or from where the server registered.
+# With LUCLI_HOME set, a different home is never adopted.
 resolve_cli_home() {
-  local home catalina
+  local home="" candidate catalina
   catalina="$(sed -n 's/.*CATALINA_HOME:[[:space:]]*\([^[:space:]]*\).*/\1/p' "$SERVER_LOG" 2>/dev/null | tail -1)"
   case "$catalina" in
-    */express/*)
-      CLI_HOME="${catalina%/express/*}"
-      TEST_SERVER_DIR="$CLI_HOME/servers/$TEST_SERVER_NAME"
-      EXPRESS_ROOT="$CLI_HOME/express"
-      return 0
-      ;;
+    */express/*) home="${catalina%/express/*}" ;;
   esac
-  for home in ${LUCLI_HOME:+"$LUCLI_HOME"} "$HOME/.wheels"; do
-    if [ -d "$home/servers/$TEST_SERVER_NAME" ]; then
-      CLI_HOME="$home"
-      TEST_SERVER_DIR="$CLI_HOME/servers/$TEST_SERVER_NAME"
-      EXPRESS_ROOT="$CLI_HOME/express"
-      return 0
-    fi
-  done
-  return 0
+  if [ -z "$home" ]; then
+    for candidate in ${LUCLI_HOME:+"$LUCLI_HOME"} "$HOME/.wheels"; do
+      if [ -d "$candidate/servers/$TEST_SERVER_NAME" ]; then
+        home="$candidate"
+        break
+      fi
+    done
+  fi
+  [ -n "$home" ] || return 0
+  if [ -n "${LUCLI_HOME:-}" ] && [ "$(canonical_dir "$home")" != "$(canonical_dir "$LUCLI_HOME")" ]; then
+    echo "::warning::The server runs from ${home}, not LUCLI_HOME (${LUCLI_HOME}); not installing the SQLite driver or cleaning up there." >&2
+    STAGING_ALLOWED=false
+    return 0
+  fi
+  CLI_HOME="$home"
+  TEST_SERVER_DIR="$CLI_HOME/servers/$TEST_SERVER_NAME"
+  EXPRESS_ROOT="$CLI_HOME/express"
 }
 SERVER_LOG="/tmp/wheels-test-server-${CHECKOUT_KEY}.log"
 
@@ -379,6 +394,7 @@ pinned_lucee_version() {
 # version is not installed yet or already has a driver, 2 when the download failed.
 stage_sqlite_driver() {
   local lib="$EXPRESS_ROOT/$1/lib/ext"
+  [ "$STAGING_ALLOWED" = "true" ] || return 1
   [ -n "$1" ] && [ -d "$lib" ] || return 1
   ls "$lib"/sqlite-jdbc*.jar 1>/dev/null 2>&1 && return 1
   echo "Downloading SQLite JDBC driver into Lucee Express $1..."
