@@ -1,0 +1,1 @@
+- On H2, models now quote table and column identifiers, so a column whose name is a reserved word (`order`, `group`, `value`, ...) can be queried and ordered by. Identifiers are upper-cased before quoting, matching how H2 stores unquoted names, so existing H2 schemas resolve as before (#4440)

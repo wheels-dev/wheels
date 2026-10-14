@@ -148,6 +148,16 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Override Base adapter's function.
+	 * H2 uses double-quotes to quote identifiers in every compatibility mode.
+	 */
+	public string function $quoteIdentifier(required string name) {
+		// H2 folds unquoted identifiers to uppercase, so we must uppercase
+		// before quoting to match the actual stored name
+		return """#UCase(arguments.name)#""";
+	}
+
+	/**
+	 * Override Base adapter's function.
 	 * When using H2, cfdbinfo incorrectly returns information_schema tables.
 	 * To fix we create a new query result that excludes these tables.
 	 * Yes, it should actually be "table_schem" below, not a typo.
