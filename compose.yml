@@ -115,7 +115,7 @@ services:
     build:
       context: ./
       dockerfile: ./tools/docker/lucee7/Dockerfile
-    image: wheels-test-lucee7:v1.0.0
+    image: wheels-test-lucee7:v1.0.1
     environment:
       # The constructor test-context gate honours WHEELS_ENV;
       # the core suite runs in development (config/environment.cfm). Default to

@@ -2,6 +2,8 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		enc = new wheels.tests._assets.view.HtmlEncoding()
+
 		g = application.wo
 
 		describe("Tests that dateSelect with encoding options", () => {
@@ -27,7 +29,8 @@ component extends="wheels.WheelsTest" {
 				actual = _controller.dateSelect(argumentcollection = args)
 				expected = '<label for="user-birthday-month">lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;<select data-auto-id="user_birthday_month" id="user-birthday-month" name="user&##x5b;birthday&##x5d;&##x28;&##x24;month&##x29;"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option selected="selected" value="11">November</option><option value="12">December</option>'
 				
-				expect(actual).toInclude(expected.left(expected.len() - 10))
+				expect(enc.normalize(actual)).toInclude(enc.normalize(expected.left(expected.len() - 10)))
+				expect(enc.textProblem(enc.innerText(actual, "label"), args.label)).toBe("")
 			})
 			
 			it("does not encode HTML in label when encode=false", () => {
@@ -57,7 +60,8 @@ component extends="wheels.WheelsTest" {
 				actual = _controller.dateSelect(argumentcollection = args)
 				expected = '<label for="user-birthday-month">Label with &lt;strong&gt;bold&lt;&##x2f;strong&gt; and &lt;script&gt;alert&##x28;&quot;XSS&quot;&##x29;&lt;&##x2f;script&gt;'
 
-				expect(actual).toInclude(expected)
+				expect(enc.normalize(actual)).toInclude(enc.normalize(expected))
+				expect(enc.textProblem(enc.innerText(actual, "label"), args.label)).toBe("")
 			})
 			
 			it("works with different label placements with encode=true", () => {
@@ -67,7 +71,7 @@ component extends="wheels.WheelsTest" {
 				
 				actual = _controller.dateSelect(argumentcollection = args)
 				
-				expect(actual).toInclude('<label for="user-birthday-year">lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;</label>')
+				expect(enc.normalize(actual)).toInclude(enc.normalize('<label for="user-birthday-year">lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;</label>'))
 			})
 		})
 		
@@ -92,7 +96,8 @@ component extends="wheels.WheelsTest" {
 				actual = _controller.dateSelectTags(argumentcollection = args)
 				expected = '<label for="date-month">lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;'
 				
-				expect(actual).toInclude(expected)
+				expect(enc.normalize(actual)).toInclude(enc.normalize(expected))
+				expect(enc.textProblem(enc.innerText(actual, "label"), args.label)).toBe("")
 			})
 			
 			it("does not encode HTML in label when encode=false", () => {
@@ -122,7 +127,8 @@ component extends="wheels.WheelsTest" {
 				actual = _controller.dateSelectTags(argumentcollection = args)
 				expected = '<label for="date-month">Label with &lt;strong&gt;bold&lt;&##x2f;strong&gt; and &lt;script&gt;alert&##x28;&quot;XSS&quot;&##x29;&lt;&##x2f;script&gt;'
 
-				expect(actual).toInclude(expected)
+				expect(enc.normalize(actual)).toInclude(enc.normalize(expected))
+				expect(enc.textProblem(enc.innerText(actual, "label"), args.label)).toBe("")
 			})
 		})
 	}

@@ -2,6 +2,8 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		enc = new wheels.tests._assets.view.HtmlEncoding()
+
 		g = application.wo
 
 		describe("Tests that buttonTo", () => {
@@ -39,7 +41,7 @@ component extends="wheels.WheelsTest" {
 				)
 				expected = '<form action="#application.wheels.webpath#" class="form-class" confirm="confirm-value" disable="disable-value" method="post"><button class="input&##x20;class" type="submit" value="save">' & '&lt;Click&gt;' & '</button>' & _controller.authenticityTokenField() & '</form>';
 				
-				expect(actual).toBe(expected)
+				expect(enc.normalize(actual)).toBe(enc.normalize(expected))
 			})
 
 			it("works with inner icon", () => {
@@ -54,7 +56,7 @@ component extends="wheels.WheelsTest" {
 				)
 				expected = '<form action="#application.wheels.webpath#" class="form-class" confirm="confirm-value" disable="disable-value" method="post" value="customvalue"><button class="input&##x20;class" type="submit" value="save">' & '<i class=''fa fa-icon'' /> Edit' & '</button>' & _controller.authenticityTokenField() & '</form>'
 				
-				expect(actual).toBe(expected)
+				expect(enc.normalize(actual)).toBe(enc.normalize(expected))
 			})
 
 			it("works with attributes", () => {
@@ -158,7 +160,7 @@ component extends="wheels.WheelsTest" {
 				r = _controller.linkTo(class = "we're", text = "x", controller = "we're", action = "x", params = "x=1&y=2 3")
 				g.set(functionName = "linkTo", encode = false)
 
-				expect(e).toBe(r)
+				expect(enc.normalize(r)).toBe(enc.normalize(e))
 			})
 
 			it("does not encode dash", () => {

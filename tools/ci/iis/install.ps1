@@ -28,8 +28,8 @@ if ($p.ExitCode -notin 0, 3010) { throw "URL Rewrite install failed: $($p.ExitCo
 
 # 3. Lucee Express (Tomcat). The AJP connector on 8009 is enabled in its server.xml.
 $luceeZip = Join-Path $work 'lucee-express.zip'
-Get-Pinned 'https://cdn.lucee.org/lucee-express-7.0.1.100.zip' `
-	'e2f995d8993747dc782a1c50899aeca40db3cf8993eaf025f8adc61c7dce87e9' $luceeZip
+Get-Pinned 'https://cdn.lucee.org/lucee-express-7.0.5.41.zip' `
+	'30d79340bbefeb36e162530ad1cd6c9d88ff6d29e7c517ebc60fbab06a90bf44' $luceeZip
 Expand-Archive -Path $luceeZip -DestinationPath 'C:\lucee' -Force
 $serverXml = 'C:\lucee\conf\server.xml'
 $xml = Get-Content $serverXml -Raw

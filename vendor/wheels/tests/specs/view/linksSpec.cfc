@@ -247,7 +247,8 @@ component extends="wheels.WheelsTest" {
 
 				expect(result).notToInclude("<script>")
 				expect(result).notToInclude("</script>")
-				expect(result).notToInclude("alert(1)")
+				// Present as encoded text, whichever characters the engine's encoder escapes.
+				expect(new wheels.tests._assets.view.HtmlEncoding().normalize(result)).toInclude("&lt;script>alert(1)&lt;/script>")
 			})
 
 			it("strips event handler XSS from appendToPage", () => {

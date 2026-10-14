@@ -282,8 +282,9 @@ component extends="wheels.WheelsTest" {
 					value = 'test@example.com" onclick="alert(1)',
 					encode = true
 				);
-				// Should NOT contain raw double quotes in value attribute
-				expect(local.result).notToInclude('onclick=');
+				// The quote must not end the value attribute: no onclick attribute, and the value
+				// decodes back to the input.
+				expect(new wheels.tests._assets.view.HtmlEncoding().attributeProblem(local.result, "value", 'test@example.com" onclick="alert(1)')).toBe("");
 			});
 
 			it("numberFieldTag preserves numeric values", function() {

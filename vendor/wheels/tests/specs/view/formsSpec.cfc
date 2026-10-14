@@ -30,6 +30,8 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		enc = new wheels.tests._assets.view.HtmlEncoding()
+
 		g = application.wo
 
 		describe("Tests that $objectName", () => {
@@ -127,7 +129,8 @@ component extends="wheels.WheelsTest" {
 				r = _controller.buttonTag(content = "Button with <strong>bold</strong> text", encode = true)
 				e = '<button type="submit" value="save">Button with &lt;strong&gt;bold&lt;&##x2f;strong&gt; text</button>'
 				
-				expect(e).toBe(r)
+				expect(enc.normalize(r)).toBe(enc.normalize(e))
+				expect(enc.textProblem(enc.innerText(r, "button"), "Button with <strong>bold</strong> text")).toBe("")
 			})
 			
 			it("does not encode HTML content when encode=false", () => {
@@ -140,12 +143,13 @@ component extends="wheels.WheelsTest" {
 			it("encodes HTML attributes when encode=true", () => {
 				r = _controller.buttonTag(
 					content = "Click me", 
-					class = 'btn btn-danger" onclick="alert(\"xss\")',
+					class = 'btn btn-danger" onclick="alert("xss")',
 					encode = true
 				)
 				e = '<button class="btn&##x20;btn-danger&quot;&##x20;onclick&##x3d;&quot;alert&##x28;&quot;xss&quot;&##x29;" type="submit" value="save">Click me</button>'
 				
-				expect(e).toBe(r)
+				expect(enc.normalize(r)).toBe(enc.normalize(e))
+				expect(enc.attributeProblem(r, "class", 'btn btn-danger" onclick="alert("xss")')).toBe("")
 			})
 			
 			it("handles complex HTML content with encode=true", () => {
@@ -153,18 +157,20 @@ component extends="wheels.WheelsTest" {
 				r = _controller.buttonTag(content = htmlContent, encode = true)
 				e = '<button type="submit" value="save">Button with &lt;strong&gt;bold&lt;&##x2f;strong&gt; and &lt;script&gt;alert&##x28;&quot;XSS&quot;&##x29;&lt;&##x2f;script&gt;</button>'
 				
-				expect(e).toBe(r)
+				expect(enc.normalize(r)).toBe(enc.normalize(e))
+				expect(enc.textProblem(enc.innerText(r, "button"), htmlContent)).toBe("")
 			})
 			
 			it("handles both attributes and content correctly when encode=attributes", () => {
 				r = _controller.buttonTag(
 					content = "Button with <strong>bold</strong> text",
-					class = 'button" onclick="alert(\"xss\")',
+					class = 'button" onclick="alert("xss")',
 					encode = "attributes"
 				)
 				e = '<button class="button&quot;&##x20;onclick&##x3d;&quot;alert&##x28;&quot;xss&quot;&##x29;" type="submit" value="save">Button with <strong>bold</strong> text</button>'
 				
-				expect(e).toBe(r)
+				expect(enc.normalize(r)).toBe(enc.normalize(e))
+				expect(enc.attributeProblem(r, "class", 'button" onclick="alert("xss")')).toBe("")
 			})
 			
 			it("supports HTML entities in content with encode=false", () => {
@@ -259,7 +265,7 @@ component extends="wheels.WheelsTest" {
 				e = _controller.checkBoxTag(name = "gender", value = "", checked = false, uncheckedvalue = 1, encode = "attributes")
 				r = '<input id="gender" name="gender" type="checkbox" value=""><input id="gender-checkbox" name="gender&##x28;&##x24;checkbox&##x29;" type="hidden" value="1">'
 
-				expect(e).toBe(r)
+				expect(enc.normalize(e)).toBe(enc.normalize(r))
 			})
 		})
 
@@ -281,7 +287,7 @@ component extends="wheels.WheelsTest" {
 				e = _controller.fileField(objectName = "user", property = "firstname")
 				r = '<label for="user-firstname">Firstname<input data-auto-id="user_firstname" id="user-firstname" name="user&##x5b;firstname&##x5d;" type="file"></label>'
 
-				expect(e).toBe(r)
+				expect(enc.normalize(e)).toBe(enc.normalize(r))
 			})
 		})
 
@@ -305,7 +311,7 @@ component extends="wheels.WheelsTest" {
 				e = _controller.hiddenField(objectName = "user", property = "firstname")
 				r = '<input data-auto-id="user_firstname" id="user-firstname" name="user&##x5b;firstname&##x5d;" type="hidden" value="Tony">'
 
-				expect(e).toBe(r)
+				expect(enc.normalize(e)).toBe(enc.normalize(r))
 			})
 
 			it("encodes HTML in value when encode=false", () => {
@@ -335,7 +341,8 @@ component extends="wheels.WheelsTest" {
 				e = _controller.hiddenFieldTag(name = "userId", value = "tony with <strong>bold</strong> text", encode = "true")
 				r = '<input id="userId" name="userId" type="hidden" value="tony&##x20;with&##x20;&lt;strong&gt;bold&lt;&##x2f;strong&gt;&##x20;text">'
 
-				expect(e).toBe(r)
+				expect(enc.normalize(e)).toBe(enc.normalize(r))
+				expect(enc.attributeProblem(e, "value", "tony with <strong>bold</strong> text")).toBe("")
 			})
 			
 			it("encodes HTML in value when encode=false", () => {
@@ -574,7 +581,7 @@ component extends="wheels.WheelsTest" {
 				e = _controller.passwordField(objectName = "User", property = "password")
 				r = '<label for="User-password">Password<input data-auto-id="User_password" id="User-password" maxlength="50" name="User&##x5b;password&##x5d;" type="password" value="tonyp123"></label>'
 
-				expect(e).toBe(r)
+				expect(enc.normalize(e)).toBe(enc.normalize(r))
 			})
 		})
 
@@ -596,7 +603,7 @@ component extends="wheels.WheelsTest" {
 				e = _controller.radioButton(objectName = "user", property = "gender", tagValue = "m", label = "Male")
 				r = '<label for="user-gender-m">Male<input data-auto-id="user_gender_m" id="user-gender-m" name="user&##x5b;gender&##x5d;" type="radio" value="m"></label>'
 
-				expect(e).toBe(r)
+				expect(enc.normalize(e)).toBe(enc.normalize(r))
 			})
 		})
 
@@ -769,7 +776,9 @@ component extends="wheels.WheelsTest" {
 				result = g.controller("dummy").selectTag(name = "x", options = "<t e s t>,<2>,3", selected = "<2>")
 				expected = '<select id="x" name="x"><option value="&lt;t&##x20;e&##x20;s&##x20;t&gt;">&lt;t e s t&gt;</option><option selected="selected" value="&lt;2&gt;">&lt;2&gt;</option><option value="3">3</option></select>'
 
-				expect(result).toBe(expected)
+				expect(enc.normalize(result)).toBe(enc.normalize(expected))
+				expect(enc.attributeProblem(enc.tags(result, "option")[1], "value", "<t e s t>")).toBe("")
+				expect(enc.textProblem(enc.innerText(result, "option"), "<t e s t>")).toBe("")
 			})
 
 			it("works with list for option values", () => {
@@ -1149,7 +1158,7 @@ component extends="wheels.WheelsTest" {
 				e = _controller.textArea(objectName = "user", property = "firstname")
 				r = '<label for="user-firstname">Firstname<textarea data-auto-id="user_firstname" id="user-firstname" maxlength="50" name="user&##x5b;firstname&##x5d;">Tony</textarea></label>'
 
-				expect(e).toBe(r)
+				expect(enc.normalize(e)).toBe(enc.normalize(r))
 			})
 		})
 
@@ -1178,7 +1187,7 @@ component extends="wheels.WheelsTest" {
 				)
 				expected = "<label for=""x"">Per&##x27;s Label<textarea class=""x&##x20;x"" id=""x"" name=""x"">Per&##x27;s Test</textarea></label>"
 
-				expect(result).toBe(expected)
+				expect(enc.normalize(result)).toBe(enc.normalize(expected))
 			})
 
 			it("is encoding only attributes", () => {
@@ -1191,7 +1200,7 @@ component extends="wheels.WheelsTest" {
 				)
 				expected = "<label for=""x"">Per's Label<textarea class=""x&##x20;x"" id=""x"" name=""x"">Per's Test</textarea></label>"
 
-				expect(result).toBe(expected)
+				expect(enc.normalize(result)).toBe(enc.normalize(expected))
 			})
 		})
 
@@ -1383,7 +1392,7 @@ component extends="wheels.WheelsTest" {
 				expect(result).toInclude('class="error-message"')
 				expect(result).toInclude('role="alert"')
 				// encode=true turns the colon into a hex entity (S18 / encodeHtmlTags).
-				expect(result).toInclude("Error&##x3a;")
+				expect(enc.normalize(result)).toInclude("Error:")
 				expect(result).toInclude("firstname error1")
 				expect(FindNoCase('type="text"', result)).toBeLT(FindNoCase("error-message", result))
 				expect(result).notToInclude("includeErrorMessage")
