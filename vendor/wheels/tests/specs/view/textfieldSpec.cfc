@@ -144,7 +144,23 @@ component extends="wheels.WheelsTest" {
 				expect(enc.attributeProblem(result, "class", 'form-control" onclick="alert("xss")')).toBe("")
 				expect(enc.attributeProblem(result, "value", "Input with <strong>bold</strong> text")).toBe("")
 			})
-			
+
+			it("keeps a backslash before a quote inside the encoded attribute", () => {
+				// ESAPI 2.x canonicalization drops the backslash in \", 3.x (Lucee 7.0.5+) keeps it.
+				// Either way the quote must stay inside the value and inject nothing.
+				var input = 'form-control" onclick="alert(\"xss\")'
+				var withoutBackslashes = Replace(input, '\"', '"', "all")
+				result = _controller.textFieldTag(name = "firstname", class = input, encode = "attributes")
+				var raw = enc.attributeValue(result, "class")
+				var decoded = enc.decode(raw)
+
+				expect(enc.hasAttribute(result, "onclick")).toBeFalse(result)
+				expect(enc.isSafeAttributeValue(raw)).toBeTrue(raw)
+				expect(Compare(decoded, input) == 0 || Compare(decoded, withoutBackslashes) == 0).toBeTrue(
+					"class decodes to [#decoded#]"
+				)
+			})
+
 			it("handles complex HTML content with encode=true", () => {
 				htmlLabel = 'Label with <strong>bold</strong> and <script>alert("XSS")</script>'
 				htmlValue = 'Value with <strong>bold</strong> and <script>alert("XSS")</script>'
