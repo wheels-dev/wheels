@@ -74,6 +74,75 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe(".env value types beyond the numeric-1 case", () => {
+
+			it("pins the parser's current coercion for each value shape", () => {
+				// Same host-Application pattern as the numeric-1 spec above:
+				// exercise public/Application.cfc's real loadEnvFile() against a
+				// fixture that ships with the suite.
+				var hostApp = CreateObject("component", "Application");
+				prepareMock(hostApp);
+				makePublic(hostApp, "loadEnvFile");
+				var parsedEnv = {};
+				var fixture = ExpandPath("/wheels/tests/_assets/env/value-types.env");
+				expect(FileExists(fixture), "fixture missing").toBeTrue();
+				hostApp.loadEnvFile(fixture, parsedEnv);
+
+				// TRUE / False in any case become booleans.
+				expect(IsBoolean(parsedEnv["WHEELS_SPEC_TRUE_UPPER"]), "TRUE must coerce to a boolean").toBeTrue();
+				expect(parsedEnv["WHEELS_SPEC_TRUE_UPPER"]).toBeTrue();
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_TRUE_UPPER"]), "TRUE") != 0, "TRUE must not survive as the string TRUE").toBeTrue();
+				expect(IsBoolean(parsedEnv["WHEELS_SPEC_FALSE_MIXED"]), "False must coerce to a boolean").toBeTrue();
+				expect(parsedEnv["WHEELS_SPEC_FALSE_MIXED"]).toBeFalse();
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_FALSE_MIXED"]), "False") != 0, "False must not survive as the string False").toBeTrue();
+
+				// 0 is the NUMBER zero, never the boolean false. IsBoolean() is TRUE
+				// for any number on these engines, so "not coerced" is proved by the
+				// STRING value: a coerced boolean stringifies as true/false (Adobe:
+				// YES/NO), never as "0".
+				expect(IsNumeric(parsedEnv["WHEELS_SPEC_ZERO"]), "0 must stay numeric").toBeTrue();
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_ZERO"]), "0"), "0 must stay the number zero, not the boolean false").toBe(0);
+				expect(parsedEnv["WHEELS_SPEC_ZERO"]).toBe(0);
+
+				// 42 becomes a number.
+				expect(IsNumeric(parsedEnv["WHEELS_SPEC_INT"]), "42 must stay numeric").toBeTrue();
+				expect(parsedEnv["WHEELS_SPEC_INT"]).toBe(42);
+
+				// Decimals are deliberately left as strings. Again, prove "not
+				// coerced" by the string value, not by IsBoolean().
+				expect(IsNumeric(parsedEnv["WHEELS_SPEC_DECIMAL"]), "1.5 still reads as numeric").toBeTrue();
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_DECIMAL"]), "1.5"), "1.5 must survive as the string 1.5").toBe(0);
+
+				// yes / no stay strings, never booleans. Compare() to the original
+				// text is the proof; IsBoolean("yes"/"no") is TRUE on these engines.
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_YES"]), "yes"), "yes must survive verbatim").toBe(0);
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_NO"]), "no"), "no must survive verbatim").toBe(0);
+
+				// Double quotes are stripped BEFORE coercion, so a quoted "True"
+				// becomes a boolean — the capital T proves it was converted, not
+				// merely kept as the string it was written as.
+				expect(IsBoolean(parsedEnv["WHEELS_SPEC_DQUOTED_TRUE"]), 'a quoted "True" must coerce to a boolean').toBeTrue();
+				expect(parsedEnv["WHEELS_SPEC_DQUOTED_TRUE"]).toBeTrue();
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_DQUOTED_TRUE"]), "True") != 0, 'a quoted "True" must be converted, not kept as the string True').toBeTrue();
+
+				// Single quotes are stripped and the inner text survives verbatim.
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_SQUOTED_SPACE"]), "hello world"), "single quotes must be stripped").toBe(0);
+
+				// Only the FIRST = splits key and value.
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_EQUALS"]), "a=b"), "everything after the first = is the value").toBe(0);
+
+				// An empty value is an empty string, not a boolean and not a missing key.
+				expect(StructKeyExists(parsedEnv, "WHEELS_SPEC_EMPTY"), "an empty value still creates the key").toBeTrue();
+				expect(IsBoolean(parsedEnv["WHEELS_SPEC_EMPTY"]), "an empty value must not coerce to a boolean").toBeFalse();
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_EMPTY"]), ""), "an empty value must stay empty").toBe(0);
+
+				// Comment lines and lines without = are ignored entirely.
+				expect(StructKeyExists(parsedEnv, "WHEELS_SPEC_COMMENT"), "comment lines must be ignored").toBeFalse();
+				expect(StructKeyExists(parsedEnv, "WHEELS_SPEC_NO_EQUALS"), "lines without = must be ignored").toBeFalse();
+			});
+
+		});
+
 		describe("No copy of the parser may reintroduce the coercing test", () => {
 
 			it("every .env/settings parser compares booleans as strings", () => {
