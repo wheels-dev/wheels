@@ -143,6 +143,40 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe(".env edge values: lone quotes and integer-only coercion", () => {
+
+			it("keeps plain-integer coercion and survives lone quotes", () => {
+				// Same host-Application pattern as the blocks above.
+				var hostApp = CreateObject("component", "Application");
+				prepareMock(hostApp);
+				makePublic(hostApp, "loadEnvFile");
+				var parsedEnv = {};
+				var fixture = ExpandPath("/wheels/tests/_assets/env/edge-values.env");
+				expect(FileExists(fixture), "fixture missing").toBeTrue();
+				hostApp.loadEnvFile(fixture, parsedEnv);
+
+				// Only plain integers coerce: a leading zero, scientific notation
+				// and a leading plus all stay strings.
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_LEADING_ZERO"]), "007"), "007 must survive as the string 007").toBe(0);
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_SCI"]), "1e3"), "1e3 must survive as the string 1e3").toBe(0);
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_PLUS"]), "+5"), "+5 must survive as the string +5").toBe(0);
+
+				// A plain negative integer still becomes a number.
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_NEGATIVE"]), "-5"), "-5 must survive as the string -5").toBe(0);
+				expect(parsedEnv["WHEELS_SPEC_NEGATIVE"]).toBe(-5);
+
+				// A lone quote is a 1-character string and must not be sliced away.
+				expect(Len(parsedEnv["WHEELS_SPEC_LONE_SQUOTE"])).toBe(1);
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_LONE_SQUOTE"]), "'"), "a lone single quote must survive").toBe(0);
+				expect(Len(parsedEnv["WHEELS_SPEC_LONE_DQUOTE"])).toBe(1);
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_LONE_DQUOTE"]), Chr(34)), "a lone double quote must survive").toBe(0);
+
+				// Parsing continues after the lone-quote lines.
+				expect(Compare(ToString(parsedEnv["WHEELS_SPEC_AFTER_LONE"]), "still-parsed"), "parsing must continue after a lone quote").toBe(0);
+			});
+
+		});
+
 		describe("No copy of the parser may reintroduce the coercing test", () => {
 
 			it("every .env/settings parser compares booleans as strings", () => {
@@ -187,6 +221,38 @@ component extends="wheels.WheelsTest" {
 						source,
 						"'#relativePath#' compares booleans with ==, which these engines evaluate numerically"
 					).notToInclude('local.value == "false"');
+				}
+			});
+
+			it("every Application.cfc parses numbers with the integer-only regex", () => {
+				$requireRepoPath("cli/lucli/templates/app/public/Application.cfc");
+				// Same path resolution as the guard above.
+				var specPath = Replace(GetCurrentTemplatePath(), "\", "/", "all");
+				var marker = "/vendor/wheels/tests/specs/global/";
+				var markerPos = Find(marker, specPath);
+				expect(markerPos, "this spec must live under #marker# for the parser paths to resolve").toBeGT(0);
+				var root = Left(specPath, markerPos) & "/";
+
+				// The four `public/Application.cfc` entries of the parsers array above.
+				var parsers = [
+					"public/Application.cfc",
+					"cli/lucli/templates/app/public/Application.cfc",
+					"examples/starter-app/public/Application.cfc",
+					"examples/tweet/public/Application.cfc"
+				];
+
+				for (var relativePath in parsers) {
+					var parserPath = root & relativePath;
+					expect(FileExists(parserPath), "parser '#relativePath#' must exist — move it in this spec too").toBeTrue();
+					var source = FileRead(parserPath, "utf-8");
+					expect(
+						source,
+						"'#relativePath#' must coerce only plain integers (^-?(0|[1-9][0-9]*)$)"
+					).toInclude("^-?(0|[1-9][0-9]*)$");
+					expect(
+						source,
+						"'#relativePath#' still uses the old isNumeric/find('.') check, which mangles 007 and 1e3"
+					).notToInclude('isNumeric(local.value) && !find(".", local.value)');
 				}
 			});
 
