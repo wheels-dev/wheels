@@ -196,6 +196,13 @@ video {
 	font-size: inherit;
 }
 
+/* Long inline code (identifiers, URLs) must break inside the column rather
+   than push the page sideways at phone width. Scoped away from `pre`, so
+   fenced blocks keep their own horizontal scroll (#4609). */
+.prose :not(pre) > code {
+	overflow-wrap: anywhere;
+}
+
 .prose ul,
 .prose ol {
 	padding-left: var(--space-5);
