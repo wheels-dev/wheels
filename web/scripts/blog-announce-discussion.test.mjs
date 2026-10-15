@@ -40,6 +40,26 @@ test('extractAnnouncement returns null when the block is missing', () => {
 	assert.equal(extractAnnouncement('title: hello\n'), null);
 });
 
+test("extractAnnouncement unescapes doubled single quotes inside a single-quoted scalar", () => {
+	const fm = `announcement:\n  title: 'the upgrade doesn''t touch'\n  body: |\n    body text\n`;
+	assert.equal(extractAnnouncement(fm).title, "the upgrade doesn't touch");
+});
+
+test('extractAnnouncement unescapes backslash escapes in a double-quoted scalar', () => {
+	const fm = `announcement:\n  title: "say \\"hi\\" and back\\\\slash"\n  body: |\n    body text\n`;
+	assert.equal(extractAnnouncement(fm).title, 'say "hi" and back\\slash');
+});
+
+test('extractAnnouncement strips a single-quoted scalar only once', () => {
+	const fm = `announcement:\n  title: '"x"'\n  body: |\n    body text\n`;
+	assert.equal(extractAnnouncement(fm).title, '"x"');
+});
+
+test('extractAnnouncement leaves a plain unquoted scalar unchanged', () => {
+	const fm = `announcement:\n  title: Plain title\n  body: |\n    body text\n`;
+	assert.equal(extractAnnouncement(fm).title, 'Plain title');
+});
+
 test('extractSlug reads an unquoted slug', () => {
 	assert.equal(extractSlug(SAMPLE_FM), 'pretty-urls-with-route-bindby');
 });

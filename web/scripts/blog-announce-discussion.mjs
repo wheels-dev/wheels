@@ -54,6 +54,22 @@ export function splitFrontmatter(content) {
 }
 
 /**
+ * Strip one layer of YAML quoting from a scalar and unescape that style.
+ * Single quotes double an apostrophe (`''` -> `'`); double quotes use `\"`
+ * and `\\`. The style is decided once, so a value like `'"x"'` is stripped
+ * exactly one layer rather than twice.
+ */
+function unquoteScalar(raw) {
+	if (raw.length >= 2 && raw.startsWith("'") && raw.endsWith("'")) {
+		return raw.slice(1, -1).replace(/''/g, "'");
+	}
+	if (raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"')) {
+		return raw.slice(1, -1).replace(/\\(["\\])/g, '$1');
+	}
+	return raw;
+}
+
+/**
  * Extract { title, body, category, discussionUrl } from an `announcement:`
  * block, or return null when the post has none.
  *
@@ -99,7 +115,7 @@ export function extractAnnouncement(fm) {
 		}
 
 		if (raw !== '') {
-			out[key] = raw.replace(/^'(.*)'$/, '$1').replace(/^"(.*)"$/, '$1');
+			out[key] = unquoteScalar(raw);
 		}
 		i++;
 	}
