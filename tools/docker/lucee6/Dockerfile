@@ -5,16 +5,21 @@ LABEL maintainer "Wheels Core Team"
 # Install Lucee extensions (H2, Oracle) and SQLite JDBC driver in a single
 # layer to reduce image size and improve cache efficiency.
 # Each download retries: ext.lucee.org and Maven Central intermittently answer
-# 5xx or 429, and one failed fetch fails the whole image build.
+# 5xx or 429, and one failed fetch fails the whole image build. ext.lucee.org is
+# S3 behind CloudFront, which answers 403 (not 404) on an edge error as well as
+# for a missing object, so 403 is retried too; these pinned URLs do exist.
+# `wget -nv -S` logs each URL with the response status and headers on every attempt,
+# so a failed build names the download and its status. (Without -S, wget does not
+# print the status of an attempt it is going to retry.)
 # The SQLite JDBC jar is checked against Maven Central's published SHA-256, so a
 # damaged or substituted download fails the build instead of the tests.
 RUN mkdir -p /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy \
- && wget -q --tries=5 --waitretry=3 --retry-connrefused --retry-on-http-error=429,500,502,503,504 -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex \
+ && wget -nv -S --tries=5 --waitretry=3 --retry-connrefused --retry-on-http-error=403,429,500,502,503,504 -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex \
       https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex \
- && wget -q --tries=5 --waitretry=3 --retry-connrefused --retry-on-http-error=429,500,502,503,504 -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.oracle-21.8.0.0-ojdbc11.lex \
+ && wget -nv -S --tries=5 --waitretry=3 --retry-connrefused --retry-on-http-error=403,429,500,502,503,504 -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.oracle-21.8.0.0-ojdbc11.lex \
       https://ext.lucee.org/org.lucee.oracle-21.8.0.0-ojdbc11.lex \
  && mkdir -p /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib \
- && wget -q --tries=5 --waitretry=3 --retry-connrefused --retry-on-http-error=429,500,502,503,504 -O /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib/sqlite-jdbc.jar \
+ && wget -nv -S --tries=5 --waitretry=3 --retry-connrefused --retry-on-http-error=403,429,500,502,503,504 -O /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib/sqlite-jdbc.jar \
       https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar \
  && echo "a3f53a2aa15ae9425a9e793bbe9c8e5288febeb4b65ef5c1a4e80d4c2045cf08  /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib/sqlite-jdbc.jar" | sha256sum -c -
 
