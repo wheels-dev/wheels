@@ -45,6 +45,19 @@ describe('renderMarkdown', () => {
     expect(html).toContain('<td>1</td>');
   });
 
+  it('wraps GFM tables in the accessible table-scroll region (#4575)', async () => {
+    const { renderMarkdown } = await import('./markdown');
+    const html = await renderMarkdown('| a | b |\n|---|---|\n| 1 | 2 |');
+    // Canonical hast properties serialize to their HTML names:
+    // className -> class, ariaLabel -> aria-label, tabIndex -> tabindex.
+    expect(html).toContain('class="table-scroll"');
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-label="Table"');
+    expect(html).toContain('tabindex="0"');
+    // The wrapper must enclose the table, not sit beside it.
+    expect(html).toMatch(/<div class="table-scroll"[^>]*>\s*<table>/);
+  });
+
   it('highlights fenced code blocks via shiki', async () => {
     const { renderMarkdown } = await import('./markdown');
     const html = await renderMarkdown('```js\nconst x = 1;\n```');

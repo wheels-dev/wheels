@@ -212,12 +212,17 @@ video {
 	margin-top: var(--space-2);
 }
 
-/* Markdown tables have no wrapper, so let a table wider than the viewport
-   scroll inside its own box rather than pushing the whole page wide. */
-.prose table {
-	display: block;
+/* Markdown tables are wrapped by rehype-table-scroll.mjs in a
+   `.table-scroll` region, which owns the horizontal scroll. The table itself
+   keeps native table display so it keeps its role for assistive tech (#4575). */
+.table-scroll {
 	max-width: 100%;
 	overflow-x: auto;
+}
+
+.table-scroll:focus-visible {
+	outline: 2px solid var(--color-brand);
+	outline-offset: 2px;
 }
 
 .prose img {
