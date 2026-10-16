@@ -1,1 +1,0 @@
-- `wheels jobs work --stop-when-empty` exits once a poll finds no job ready to run, so one-shot batches from cron or CI finish. `--max-jobs=N` alone still waits for N jobs; combine the two to cap a batch.

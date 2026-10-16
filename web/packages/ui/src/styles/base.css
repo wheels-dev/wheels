@@ -196,6 +196,13 @@ video {
 	font-size: inherit;
 }
 
+/* Long inline code (identifiers, URLs) must break inside the column rather
+   than push the page sideways at phone width. Scoped away from `pre`, so
+   fenced blocks keep their own horizontal scroll (#4609). */
+.prose :not(pre) > code {
+	overflow-wrap: anywhere;
+}
+
 .prose ul,
 .prose ol {
 	padding-left: var(--space-5);
@@ -203,6 +210,14 @@ video {
 
 .prose li + li {
 	margin-top: var(--space-2);
+}
+
+/* Markdown tables have no wrapper, so let a table wider than the viewport
+   scroll inside its own box rather than pushing the whole page wide. */
+.prose table {
+	display: block;
+	max-width: 100%;
+	overflow-x: auto;
 }
 
 .prose img {

@@ -271,8 +271,9 @@ else
   fi
   if [ -n "$LUCEE_LIB" ] && ! ls "$LUCEE_LIB"/sqlite-jdbc*.jar 1>/dev/null 2>&1; then
     echo "Downloading SQLite JDBC driver to $LUCEE_LIB..."
-    curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar" \
-      -o "$LUCEE_LIB/sqlite-jdbc-3.49.1.0.jar"
+    # The CLI stages 3.49.1.0 (`wheels start`); pinned by SHA-256 like the release packages.
+    bash "$PROJECT_ROOT/tools/ci/fetch-sqlite-jdbc.sh" "$LUCEE_LIB/sqlite-jdbc-3.49.1.0.jar" \
+      3.49.1.0 5c8609d2ca341deb8c6f71778974b5ba4995c7d32d7c7c89d9392a3e72c39291
     echo "Restarting ${CLI_BIN} server to pick up new JAR..."
     kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true

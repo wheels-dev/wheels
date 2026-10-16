@@ -1,1 +1,0 @@
-- `wheels upgrade check` names the file it checked when it reports missing code, for example `public/Application.cfc (no occurrences found)`, instead of a bare `(no occurrences found)`.

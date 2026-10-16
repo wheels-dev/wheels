@@ -2,6 +2,8 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		enc = new wheels.tests._assets.view.HtmlEncoding()
+
 		g = application.wo
 
 		describe("Tests for stripLinks", () => {
@@ -36,7 +38,8 @@ component extends="wheels.WheelsTest" {
 				actual = _controller.stripLinks(html = htmlText, encode = true)
 				expected = 'Here is a Wheels link with &lt;strong&gt;bold&lt;&##x2f;strong&gt; text'
 				
-				expect(actual).toBe(expected)
+				expect(enc.normalize(actual)).toBe(enc.normalize(expected))
+				expect(enc.textProblem(actual, "Here is a Wheels link with <strong>bold</strong> text")).toBe("")
 			})
 			
 			it("handles nested tags correctly when encode=false", () => {
@@ -52,7 +55,8 @@ component extends="wheels.WheelsTest" {
 				actual = _controller.stripLinks(html = htmlText, encode = true)
 				expected = 'Check out &lt;strong&gt;Wheels&lt;&##x2f;strong&gt; framework for CFML'
 				
-				expect(actual).toBe(expected)
+				expect(enc.normalize(actual)).toBe(enc.normalize(expected))
+				expect(enc.textProblem(actual, "Check out <strong>Wheels</strong> framework for CFML")).toBe("")
 			})
 			
 			it("handles malformed HTML correctly", () => {

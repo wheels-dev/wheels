@@ -564,8 +564,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public string function $quoteIdentifier(required string name) {
 		// Oracle folds unquoted identifiers to uppercase, so we must uppercase
-		// before quoting to match the actual stored name
-		return """#UCase(arguments.name)#""";
+		// before quoting to match the actual stored name; an embedded double quote is doubled
+		return """" & Replace(UCase(arguments.name), """", """""", "all") & """";
 	}
 
 	/**

@@ -75,7 +75,7 @@ strategy:
 |--------|----------------|------|--------------|
 | Lucee 5 | `wheels-lucee5-1` | 60005 | `wheels-test-lucee5:v1.0.2` |
 | Lucee 6 | `wheels-lucee6-1` | 60006 | `wheels-test-lucee6:v1.0.2` |
-| Lucee 7 | `wheels-lucee7-1` | 60007 | `wheels-test-lucee7:v1.0.0` |
+| Lucee 7 | `wheels-lucee7-1` | 60007 | `wheels-test-lucee7:v1.0.1` |
 | Adobe 2018 | `wheels-adobe2018-1` | 62018 | `wheels-test-adobe2018:v1.0.2` |
 | Adobe 2021 | `wheels-adobe2021-1` | 62021 | `wheels-test-adobe2021:v1.0.2` |
 | Adobe 2023 | `wheels-adobe2023-1` | 62023 | `wheels-test-adobe2023:v1.0.1` |

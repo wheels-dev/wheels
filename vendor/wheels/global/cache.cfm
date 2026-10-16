@@ -30,15 +30,24 @@
 		try {
 			local.rv = SerializeJSON($canonicalCacheStruct(arguments, local.keyArray, 0));
 		} catch (any e) {
-			// values the canonical encoder cannot represent (e.g. driver-specific Java objects) fall back on cfwddx
+			// values the canonical encoder cannot represent (e.g. driver-specific Java objects) fall back on cfwddx;
+			// each argument is encoded as a [name, value] pair so the key still depends on argument names
 			local.values = [];
 			local.iEnd = ArrayLen(local.keyArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				local.name = LCase(local.keyArray[local.i]);
 				if (StructKeyExists(arguments, local.keyArray[local.i])) {
-					ArrayAppend(local.values, arguments[local.keyArray[local.i]]);
+					ArrayAppend(local.values, [local.name, arguments[local.keyArray[local.i]]]);
+				} else {
+					ArrayAppend(local.values, [local.name]);
 				}
 			}
-			local.rv = $wddx(input = local.values);
+			try {
+				local.rv = $wddx(input = local.values);
+			} catch (any wddxError) {
+				// engines without cfwddx (RustCFML) encode the same pairs as JSON
+				local.rv = SerializeJSON(local.values);
+			}
 		}
 		return Hash(local.rv);
 	}

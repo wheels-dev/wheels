@@ -105,6 +105,42 @@ component extends="wheels.WheelsTest" {
 				expect(_controller.$isCsrfCookiePayload('{"authenticityToken":"x"}')).toBeTrue();
 			});
 
+			it("treats JSON that isn't the payload struct as not-the-payload", function() {
+				var _controller = application.wo.controller("dummy");
+
+				// A wrong-algorithm decrypt can return garbage that happens to parse as JSON.
+				for (var garbage in ["123", "-7", "1.5", "[1,2]", '"text"', "true", "{}", '{"sessionId":"x"}', '{"authenticityToken":""}', '{"authenticityToken":[1]}']) {
+					expect(_controller.$isCsrfCookiePayload(garbage)).toBeFalse(garbage);
+				}
+				var payload = SerializeJSON({sessionId = CreateUUID(), authenticityToken = "currentToken"});
+				expect(_controller.$isCsrfCookiePayload(payload)).toBeTrue("the payload $generateCookieAuthenticityToken() writes");
+			});
+
+			it("reads no token when the cookie decrypts to JSON that isn't the payload struct", function() {
+				var _controller = application.wo.controller("dummy");
+				var key = application.wheels.csrfCookieEncryptionSecretKey;
+				// A real cookie whose encrypted value is numeric JSON, written the way the cookie is.
+				var cipherText = Encrypt("123", key, application.wheels.csrfCookieEncryptionAlgorithm, application.wheels.csrfCookieEncryptionEncoding);
+				var cookieName = application.wheels.csrfCookieName;
+				var hadCookie = StructKeyExists(cookie, cookieName);
+				var savedCookie = hadCookie ? cookie[cookieName] : "";
+				cookie[cookieName] = _controller.$csrfCookieTransportValue(cipherText);
+				expect(_controller.$decryptCsrfCookieValue(_controller.$csrfCookieTransportValue(cipherText), key)).toBe("123", "the cookie decrypts to numeric JSON");
+				var state = {token = "unset", error = ""};
+				try {
+					state.token = _controller.$readAuthenticityTokenFromCookie();
+				} catch (any e) {
+					state.error = e.message;
+				}
+				if (hadCookie) {
+					cookie[cookieName] = savedCookie;
+				} else {
+					StructDelete(cookie, cookieName);
+				}
+				expect(state.error).toBe("");
+				expect(state.token).toBe("");
+			});
+
 			it("returns an empty string for an undecryptable value", function() {
 				var _controller = application.wo.controller("dummy");
 				var key = application.wheels.csrfCookieEncryptionSecretKey;

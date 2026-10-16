@@ -12,6 +12,8 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		enc = new wheels.tests._assets.view.HtmlEncoding()
+
 		describe("Tests that flashMessages", () => {
 
 			beforeEach(() => {
@@ -28,7 +30,8 @@ component extends="wheels.WheelsTest" {
 				actual = _controller.flashMessages(encode = true)
 				expected = '<div class="flash-messages"><p class="error-message">Error with &lt;strong&gt;bold&lt;&##x2f;strong&gt; text</p></div>'
 				
-				expect(actual).toBe(expected)
+				expect(enc.normalize(actual)).toBe(enc.normalize(expected))
+				expect(enc.textProblem(enc.innerText(actual, "p"), "Error with <strong>bold</strong> text")).toBe("")
 			})
 			
 			it("does not encode HTML in flashMessages when encode=false", () => {
@@ -48,8 +51,8 @@ component extends="wheels.WheelsTest" {
 				// Test with encode=true
 				actual = _controller.flashMessages(encode = true)
 
-				expect(actual).toInclude('Error with &lt;strong&gt;bold&lt;&##x2f;strong&gt; text')
-				expect(actual).toInclude('Another error with &lt;em&gt;emphasis&lt;&##x2f;em&gt;')
+				expect(enc.normalize(actual)).toInclude(enc.normalize('Error with &lt;strong&gt;bold&lt;&##x2f;strong&gt; text'))
+				expect(enc.normalize(actual)).toInclude(enc.normalize('Another error with &lt;em&gt;emphasis&lt;&##x2f;em&gt;'))
 				
 				// Test with encode=false
 				_controller.flashClear()

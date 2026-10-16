@@ -2,6 +2,8 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		enc = new wheels.tests._assets.view.HtmlEncoding()
+
 		g = application.wo
 
 		describe("Tests that checkBox with encoding options", () => {
@@ -20,7 +22,8 @@ component extends="wheels.WheelsTest" {
 				actual = _controller.checkBox(argumentcollection = args)
 				expected = '<label for="user-firstname">lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;<input data-auto-id="user_firstname" id="user-firstname" name="user&##x5b;firstname&##x5d;" type="checkbox" value="1"><input data-auto-id="user_firstname_checkbox" id="user-firstname-checkbox" name="user&##x5b;firstname&##x5d;&##x28;&##x24;checkbox&##x29;" type="hidden" value="0"></label>'
 				
-				expect(actual).toBe(expected)
+				expect(enc.normalize(actual)).toBe(enc.normalize(expected))
+				expect(enc.textProblem(enc.innerText(actual, "label"), args.label)).toBe("")
 			})
 			
 			it("does not encode HTML in label when encode=false", () => {
@@ -43,7 +46,8 @@ component extends="wheels.WheelsTest" {
 				actual = _controller.checkBox(argumentcollection = args)
 				expected = '<label for="user-firstname">lastname error with <strong>bold</strong><input class="form-check&quot;&##x20;onclick&##x3d;&quot;alert&##x28;&quot;xss&quot;&##x29;" data-auto-id="user_firstname" id="user-firstname" name="user&##x5b;firstname&##x5d;" type="checkbox" value="1"><input data-auto-id="user_firstname_checkbox" id="user-firstname-checkbox" name="user&##x5b;firstname&##x5d;&##x28;&##x24;checkbox&##x29;" type="hidden" value="0"></label>'
 					
-				expect(actual).toBe(expected)
+				expect(enc.normalize(actual)).toBe(enc.normalize(expected))
+				expect(enc.attributeProblem(actual, "class", args.class)).toBe("")
 			})
 			
 			it("handles complex HTML content with encode=true", () => {
@@ -54,7 +58,8 @@ component extends="wheels.WheelsTest" {
 				actual = _controller.checkBox(argumentcollection = args)
 				expected = '<label for="user-firstname">Label with &lt;strong&gt;bold&lt;&##x2f;strong&gt; and &lt;script&gt;alert&##x28;&quot;XSS&quot;&##x29;&lt;&##x2f;script&gt;<input data-auto-id="user_firstname" id="user-firstname" name="user&##x5b;firstname&##x5d;" type="checkbox" value="1"><input data-auto-id="user_firstname_checkbox" id="user-firstname-checkbox" name="user&##x5b;firstname&##x5d;&##x28;&##x24;checkbox&##x29;" type="hidden" value="0"></label>'
 				
-				expect(actual).toBe(expected)
+				expect(enc.normalize(actual)).toBe(enc.normalize(expected))
+				expect(enc.textProblem(enc.innerText(actual, "label"), args.label)).toBe("")
 			})
 		})
 		
@@ -73,7 +78,8 @@ component extends="wheels.WheelsTest" {
 				)
 				e = '<label for="subscribe-1">lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;<input id="subscribe-1" name="subscribe" type="checkbox" value="1"></label>'
 				
-				expect(e).toBe(r)
+				expect(enc.normalize(r)).toBe(enc.normalize(e))
+				expect(enc.textProblem(enc.innerText(r, "label"), "lastname error with <strong>bold</strong>")).toBe("")
 			})
 			
 			it("does not encode HTML in label when encode=false", () => {
@@ -98,7 +104,8 @@ component extends="wheels.WheelsTest" {
 				)
 				e = '<label for="subscribe-1">lastname error with <strong>bold</strong><input class="form-check&quot;&##x20;onclick&##x3d;&quot;alert&##x28;&quot;xss&quot;&##x29;" id="subscribe-1" name="subscribe" type="checkbox" value="1"></label>'
 				
-				expect(e).toBe(r)
+				expect(enc.normalize(r)).toBe(enc.normalize(e))
+				expect(enc.attributeProblem(r, "class", 'form-check" onclick="alert("xss")')).toBe("")
 			})
 			
 			it("encodes HTML in uncheckedvalue when encode=true", () => {
@@ -111,7 +118,8 @@ component extends="wheels.WheelsTest" {
 				)
 				e = '<label for="subscribe-1">Subscribe<input id="subscribe-1" name="subscribe" type="checkbox" value="1"><input id="subscribe-1-checkbox" name="subscribe&##x28;&##x24;checkbox&##x29;" type="hidden" value="&lt;script&gt;alert&##x28;&##x27;xss&##x27;&##x29;&lt;&##x2f;script&gt;"></label>'
 				
-				expect(e).toBe(r)
+				expect(enc.normalize(r)).toBe(enc.normalize(e))
+				expect(enc.attributeProblem(enc.tags(r, "input")[2], "value", "<script>alert('xss')</script>")).toBe("")
 			})
 			
 			it("handles complex HTML content with encode=true", () => {
@@ -124,7 +132,8 @@ component extends="wheels.WheelsTest" {
 				)
 				e = '<label for="subscribe-1">Label with &lt;strong&gt;bold&lt;&##x2f;strong&gt; and &lt;script&gt;alert&##x28;&quot;XSS&quot;&##x29;&lt;&##x2f;script&gt;<input id="subscribe-1" name="subscribe" type="checkbox" value="1"></label>'
 				
-				expect(e).toBe(r)
+				expect(enc.normalize(r)).toBe(enc.normalize(e))
+				expect(enc.textProblem(enc.innerText(r, "label"), htmlLabel)).toBe("")
 			})
 		})
 	}

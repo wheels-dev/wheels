@@ -141,6 +141,73 @@ component extends="wheels.WheelsTest" {
                     expect(mysql.$quoteIdentifier(name = "Users")).toInclude("Users");
                 });
 
+                it("$quoteIdentifier doubles the closing delimiter inside a name, per adapter", () => {
+                    var sqlite = CreateObject("component", "wheels.databaseAdapters.SQLite.SQLiteModel");
+                    expect(sqlite.$quoteIdentifier(name = "users")).toBe('"users"');
+                    expect(sqlite.$quoteIdentifier(name = 'we"ird')).toBe('"we""ird"');
+                    var pg = CreateObject("component", "wheels.databaseAdapters.PostgreSQL.PostgreSQLModel");
+                    expect(pg.$quoteIdentifier(name = 'We"ird')).toBe('"we""ird"');
+                    var crdb = CreateObject("component", "wheels.databaseAdapters.CockroachDB.CockroachDBModel");
+                    expect(crdb.$quoteIdentifier(name = 'We"ird')).toBe('"we""ird"');
+                    var oracle = CreateObject("component", "wheels.databaseAdapters.Oracle.OracleModel");
+                    expect(oracle.$quoteIdentifier(name = "users")).toBe('"USERS"');
+                    expect(oracle.$quoteIdentifier(name = 'we"ird')).toBe('"WE""IRD"');
+                    var mysql = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLModel");
+                    expect(mysql.$quoteIdentifier(name = "users")).toBe("`users`");
+                    expect(mysql.$quoteIdentifier(name = "we`ird")).toBe("`we``ird`");
+                    var mssql = CreateObject("component", "wheels.databaseAdapters.MicrosoftSQLServer.MicrosoftSQLServerModel");
+                    expect(mssql.$quoteIdentifier(name = "users")).toBe("[users]");
+                    expect(mssql.$quoteIdentifier(name = "we]ird")).toBe("[we]]ird]");
+                    expect(mssql.$quoteIdentifier(name = "we[ird")).toBe("[we[ird]");
+                });
+
+                it("$quoteIdentifier doubles each of several consecutive delimiters", () => {
+                    var sqlite = CreateObject("component", "wheels.databaseAdapters.SQLite.SQLiteModel");
+                    expect(sqlite.$quoteIdentifier(name = 'a""b')).toBe('"a""""b"');
+                    var pg = CreateObject("component", "wheels.databaseAdapters.PostgreSQL.PostgreSQLModel");
+                    expect(pg.$quoteIdentifier(name = 'A""b')).toBe('"a""""b"');
+                    var oracle = CreateObject("component", "wheels.databaseAdapters.Oracle.OracleModel");
+                    expect(oracle.$quoteIdentifier(name = 'a""b')).toBe('"A""""B"');
+                    var mysql = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLModel");
+                    expect(mysql.$quoteIdentifier(name = "a``b")).toBe("`a````b`");
+                    var mssql = CreateObject("component", "wheels.databaseAdapters.MicrosoftSQLServer.MicrosoftSQLServerModel");
+                    expect(mssql.$quoteIdentifier(name = "a]]b")).toBe("[a]]]]b]");
+                });
+
+                it("migrator quoteTableName/quoteColumnName double the closing delimiter, per adapter", () => {
+                    // lower-case inputs, so the output does not depend on migratorObjectCase
+                    var sqlite = CreateObject("component", "wheels.databaseAdapters.SQLite.SQLiteMigrator");
+                    expect(sqlite.quoteTableName(name = "users")).toBe('"users"');
+                    expect(sqlite.quoteTableName(name = "main.users")).toBe('"main"."users"');
+                    expect(sqlite.quoteTableName(name = 'main.we"ird')).toBe('"main"."we""ird"');
+                    expect(sqlite.quoteColumnName(name = "title")).toBe('"title"');
+                    expect(sqlite.quoteColumnName(name = 'we"ird')).toBe('"we""ird"');
+                    var mysql = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLMigrator");
+                    expect(mysql.quoteTableName(name = "users")).toBe("`users`");
+                    expect(mysql.quoteTableName(name = "app.users")).toBe("`app`.`users`");
+                    expect(mysql.quoteTableName(name = "app.we`ird")).toBe("`app`.`we``ird`");
+                    expect(mysql.quoteColumnName(name = "title")).toBe("`title`");
+                    expect(mysql.quoteColumnName(name = "we`ird")).toBe("`we``ird`");
+                    var mssql = CreateObject("component", "wheels.databaseAdapters.MicrosoftSQLServer.MicrosoftSQLServerMigrator");
+                    expect(mssql.quoteTableName(name = "users")).toBe("[users]");
+                    expect(mssql.quoteTableName(name = "dbo.users")).toBe("[dbo].[users]");
+                    expect(mssql.quoteTableName(name = "dbo.we]ird")).toBe("[dbo].[we]]ird]");
+                    expect(mssql.quoteColumnName(name = "title")).toBe("[title]");
+                    expect(mssql.quoteColumnName(name = "we]ird")).toBe("[we]]ird]");
+                });
+
+                it("migrator quoting escapes consecutive delimiters and both parts of a dotted name", () => {
+                    var sqlite = CreateObject("component", "wheels.databaseAdapters.SQLite.SQLiteMigrator");
+                    expect(sqlite.quoteColumnName(name = 'a""b')).toBe('"a""""b"');
+                    expect(sqlite.quoteTableName(name = 'we"a.we"b')).toBe('"we""a"."we""b"');
+                    var mysql = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLMigrator");
+                    expect(mysql.quoteColumnName(name = "a``b")).toBe("`a````b`");
+                    expect(mysql.quoteTableName(name = "we`a.we`b")).toBe("`we``a`.`we``b`");
+                    var mssql = CreateObject("component", "wheels.databaseAdapters.MicrosoftSQLServer.MicrosoftSQLServerMigrator");
+                    expect(mssql.quoteColumnName(name = "a]]b")).toBe("[a]]]]b]");
+                    expect(mssql.quoteTableName(name = "we]a.we]b")).toBe("[we]]a].[we]]b]");
+                });
+
                 it("Oracle $tableAlias joins table and alias", () => {
                     var oracle = CreateObject("component", "wheels.databaseAdapters.Oracle.OracleModel");
                     expect(oracle.$tableAlias(table = "users", alias = "u")).toBe("users u");

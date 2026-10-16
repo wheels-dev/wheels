@@ -123,14 +123,15 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * surrounds table or index names with backticks
 	 */
 	public string function quoteTableName(required string name) {
-		return "`#Replace(objectCase(arguments.name), ".", "`.`", "ALL")#`";
+		// an embedded backtick is doubled before a dotted name is split into its parts
+		return "`" & Replace(Replace(objectCase(arguments.name), "`", "``", "ALL"), ".", "`.`", "ALL") & "`";
 	}
 
 	/**
 	 * surrounds column names with backticks
 	 */
 	public string function quoteColumnName(required string name) {
-		return "`#objectCase(arguments.name)#`";
+		return "`" & Replace(objectCase(arguments.name), "`", "``", "ALL") & "`";
 	}
 
 	/**

@@ -82,14 +82,15 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * Surround table or index names with double quotes (SQLite standard).
 	 */
 	public string function quoteTableName(required string name) {
-		return """#Replace(objectCase(arguments.name), ".", """.""", "ALL")#""";
+		// an embedded double quote is doubled before a dotted name is split into its parts
+		return """" & Replace(Replace(objectCase(arguments.name), """", """""", "ALL"), ".", """.""", "ALL") & """";
 	}
 
 	/**
 	 * Surround column names with double quotes.
 	 */
 	public string function quoteColumnName(required string name) {
-		return """#objectCase(arguments.name)#""";
+		return """" & Replace(objectCase(arguments.name), """", """""", "ALL") & """";
 	}
 
 	/**

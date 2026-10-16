@@ -15,6 +15,8 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		enc = new wheels.tests._assets.view.HtmlEncoding()
+
 		g = application.wo
 
 		describe("Tests that assetDomain", () => {
@@ -352,7 +354,7 @@ component extends="wheels.WheelsTest" {
 				result = _controller.styleSheetLinkTag(argumentcollection = args)
 				expected = '<link href="#webPath#stylesheets&##x2f;test.css" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#<link href="#webPath#stylesheets&##x2f;test.css" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#<link href="#webPath#stylesheets&##x2f;jquery.dataTables.min.css" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#<link href="#webPath#stylesheets&##x2f;jquery.dataTables.min.css" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#'
 
-				expect(result).toBe(expected)
+				expect(enc.normalize(result)).toBe(enc.normalize(expected))
 			})
 
 			it("no automatic extension when cfm", () => {
@@ -360,7 +362,7 @@ component extends="wheels.WheelsTest" {
 				result = _controller.styleSheetLinkTag(argumentcollection = args)
 				expected = '<link href="http&##x3a;&##x2f;&##x2f;ajax.googleapis.com&##x2f;ajax&##x2f;libs&##x2f;jqueryui&##x2f;1.7.2&##x2f;themes&##x2f;start&##x2f;jquery-ui.css" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#<link href="#webPath#stylesheets&##x2f;test.css" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#<link href="https&##x3a;&##x2f;&##x2f;ajax.googleapis.com&##x2f;ajax&##x2f;libs&##x2f;jqueryui&##x2f;1.7.2&##x2f;themes&##x2f;start&##x2f;jquery-ui.css" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#'
 
-				expect(result).toBe(expected)
+				expect(enc.normalize(result)).toBe(enc.normalize(expected))
 			})
 
 			it("supports external links", () => {
@@ -368,7 +370,7 @@ component extends="wheels.WheelsTest" {
 				result = _controller.styleSheetLinkTag(argumentcollection = args)
 				expected = '<link href="http&##x3a;&##x2f;&##x2f;ajax.googleapis.com&##x2f;ajax&##x2f;libs&##x2f;jqueryui&##x2f;1.7.2&##x2f;themes&##x2f;start&##x2f;jquery-ui.css" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#<link href="#webPath#stylesheets&##x2f;test.css" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#<link href="https&##x3a;&##x2f;&##x2f;ajax.googleapis.com&##x2f;ajax&##x2f;libs&##x2f;jqueryui&##x2f;1.7.2&##x2f;themes&##x2f;start&##x2f;jquery-ui.css" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#'
 
-				expect(result).toBe(expected)
+				expect(enc.normalize(result)).toBe(enc.normalize(expected))
 			})
 
 			it("allows specification of delimeter", () => {
@@ -377,7 +379,7 @@ component extends="wheels.WheelsTest" {
 				result = _controller.styleSheetLinkTag(argumentcollection = args)
 				expected = '<link href="#webPath#stylesheets&##x2f;test.css" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#<link href="#webPath#stylesheets&##x2f;test.css" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#<link href="http&##x3a;&##x2f;&##x2f;fonts.googleapis.com&##x2f;css&##x3f;family&##x3d;Istok&##x2b;Web&##x3a;400,700" media="all" rel="stylesheet" type="text&##x2f;css">#Chr(10)#'
 
-				expect(result).toBe(expected)
+				expect(enc.normalize(result)).toBe(enc.normalize(expected))
 			})
 
 			it("type media arguments", () => {
@@ -387,7 +389,7 @@ component extends="wheels.WheelsTest" {
 				result = _controller.styleSheetLinkTag(argumentcollection = args)
 				expected = '<link href="#webPath#stylesheets&##x2f;test.css" rel="stylesheet">#Chr(10)#'
 
-				expect(result).toBe(expected)
+				expect(enc.normalize(result)).toBe(enc.normalize(expected))
 			})
 
 			it("no encoding", () => {

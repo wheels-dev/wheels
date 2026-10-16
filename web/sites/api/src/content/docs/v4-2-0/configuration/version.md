@@ -1,0 +1,79 @@
+---
+title: version()
+description: "Scope routes under a version prefix within an API group. Creates a URL path prefix of <code>v{number}</code> (e.g., <code>/api/v1/users</code>) and a name prefi"
+sidebar:
+  label: version()
+  order: 0
+---
+
+## Signature
+
+`version()` — returns `struct`
+
+**Available in:** `mapper`
+**Category:** Routing
+
+## Description
+
+Scope routes under a version prefix within an API group. Creates a URL path prefix of <code>v{number}</code> (e.g., <code>/api/v1/users</code>) and a name prefix of <code>v{number}</code> for named route generation.
+
+
+
+## Parameters
+
+<div class="wd-params-table">
+
+| Name | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `number` | `numeric` | yes | — | The version number (e.g., `1` creates path prefix `v1`). |
+| `path` | `string` | no | `[runtime expression]` | Override the path prefix. Defaults to `v{number}`. |
+| `name` | `string` | no | `[runtime expression]` | Override the name prefix. Defaults to `v{number}`. |
+| `callback` | `any` | no | — | A callback function to define nested routes within this version scope. |
+
+</div>
+
+## Examples
+
+<pre><code class='javascript'>&lt;cfscript&gt;
+
+// 1. Basic versioned API routes using api() and version() together
+mapper()
+    .api()
+        .version(number=1)
+            // Route name:  apiV1Users
+            // Example URL: /api/v1/users
+            .resources(&quot;users&quot;)
+        .end()
+
+        .version(number=2)
+            // Route name:  apiV2Users
+            // Example URL: /api/v2/users
+            .resources(&quot;users&quot;)
+        .end()
+    .end()
+.end();
+
+// 2. Using a callback to define routes within the version scope
+mapper()
+    .api(callback=function(r) {
+        r.version(number=1, callback=function(r) {
+            // Route name:  apiV1Products
+            // Example URL: /api/v1/products
+            r.resources(&quot;products&quot;);
+        });
+    })
+.end();
+
+// 3. Overriding the path and name prefixes
+mapper()
+    .api()
+        .version(number=1, path=&quot;version-one&quot;, name=&quot;versionOne&quot;)
+            // Route name:  apiVersionOneOrders
+            // Example URL: /api/version-one/orders
+            .resources(&quot;orders&quot;)
+        .end()
+    .end()
+.end();
+
+&lt;/cfscript&gt;
+</code></pre>

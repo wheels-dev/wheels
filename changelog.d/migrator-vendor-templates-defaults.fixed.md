@@ -1,1 +1,0 @@
-- The migration templates under `vendor/wheels/migrator/templates/` no longer show `default=''`, which the migrator has rejected on string, text and char columns since 4.1.0.

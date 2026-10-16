@@ -89,9 +89,13 @@ jobs:
                 disable: true
           YAML
           cat "$OVERRIDE"
-          echo "COMPOSE_FILE=compose.yml:$OVERRIDE" >> "$GITHUB_ENV"
+          # compose.ci.yml re-binds each engine's .engine/<engine> home to the
+          # host, reversing the named volume in compose.yml, so the log-collection
+          # step can read ./.engine/<engine> on the host. (No-op for engines not
+          # in the override, e.g. lucee7.)
+          echo "COMPOSE_FILE=compose.yml:compose.ci.yml:$OVERRIDE" >> "$GITHUB_ENV"
           echo "SMOKE_OUT_DIR=$RUNNER_TEMP/cold-start-artifacts" >> "$GITHUB_ENV"
-          COMPOSE_FILE="compose.yml:$OVERRIDE" docker compose config "${{ matrix.engine }}" | grep -A2 'healthcheck:' || true
+          COMPOSE_FILE="compose.yml:compose.ci.yml:$OVERRIDE" docker compose config "${{ matrix.engine }}" | grep -A2 'healthcheck:' || true
 
       # The probes run in development (config/environment.cfm as checked in):
       # `/` renders the welcome page and /wheels/core/tests is available. Point

@@ -16,6 +16,15 @@
 #   tools/test-matrix.sh --down                # Tear down all containers
 #   tools/test-matrix.sh --keep lucee7 sqlite  # Default — leave containers up
 #
+# --rebuild rebuilds the engine IMAGE; it does not reset the engine's server
+# home. Adobe and BoxLang keep that home (.engine/<engine>) on a per-engine
+# named volume, keyed to this checkout (wheels_engine_<key>_<engine>, where
+# <key> is a hash of the repo root — see WHEELS_ENGINE_KEY below) so worktrees
+# and clones don't share one. The volume survives --down; removing it is opt-in.
+# For a truly fresh engine home, remove this checkout's volume:
+#   docker volume ls --filter name=wheels_engine   # find them
+#   docker volume rm wheels_engine_<key>_<engine>
+#
 # Time zone (mirrors the compat-matrix TZ lanes; lucee7, adobe2025, boxlang):
 #   ENGINE_TZ=America/New_York tools/test-matrix.sh lucee7 sqlite
 #   compose.yml passes it to the engine container as TZ, so its JVM runs in that zone instead
@@ -38,6 +47,14 @@ cd "$PROJECT_ROOT"
 
 # Force CI-equivalent container names (wheels-<service>-1).
 export COMPOSE_PROJECT_NAME="wheels"
+
+# Key the per-engine named volumes (compose.yml) to THIS checkout. Because
+# COMPOSE_PROJECT_NAME is forced to "wheels" above, every clone and worktree
+# would otherwise share one engine_<engine> volume, and Adobe could serve
+# classes compiled from another checkout's source. A short hash of the repo
+# root keeps each checkout's engine home separate. Plain `docker compose`
+# (without this script) leaves WHEELS_ENGINE_KEY unset and gets "default".
+export WHEELS_ENGINE_KEY="$(printf '%s' "$PROJECT_ROOT" | { shasum 2>/dev/null || sha1sum; } | cut -c1-8)"
 
 # Engine → port mapping (mirrors compat-matrix.yml env: PORT_<engine>).
 # Using a function instead of an associative array so this works under macOS's

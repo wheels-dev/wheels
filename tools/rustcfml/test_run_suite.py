@@ -135,5 +135,84 @@ class RunSuiteParserTest(unittest.TestCase):
         self.assertIsNone(verdict)
 
 
+CI_ENV = {"GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "wheels-dev/wheels",
+          "GITHUB_RUN_ID": "38287218547", "GITHUB_SHA": "9fcc17c5d0123456789abcdef0123456789abcd"}
+LEGACY_NOTE = ("Linux baseline from this PR run: https://github.com/wheels-dev/wheels/actions/runs/1/job/2"
+               " (1bd2eef95, v0.693.0): 5850 pass / 0 fail / 0 error / 29 skipped."
+               " totalSpecs is the sum of those reported categories.")
+ISSUE_NOTE = "RustCFML#431 (an included template lost its exception type) is fixed in v0.693.0."
+
+
+class WriteBaselineTest(unittest.TestCase):
+    """--write-baseline rewrites the provenance note in _notes, so a regenerated
+    baseline (e.g. an auto-bump PR) never carries the previous run's numbers."""
+
+    def write(self, notes=None, env=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "out.json")
+            base = os.path.join(tmp, "baseline.json")
+            with open(out, "w") as fh:
+                json.dump(_result(nested_failure=False), fh)
+            existing = dict(BASELINE)
+            if notes is not None:
+                existing["_notes"] = notes
+            with open(base, "w") as fh:
+                json.dump(existing, fh)
+            run_env = {k: v for k, v in os.environ.items() if not k.startswith("GITHUB_")}
+            run_env.update(env or {})
+            proc = subprocess.run(
+                [sys.executable, "-", out, base, "write", "v0.732.0", REPO_ROOT],
+                input=_parser_source(), capture_output=True, text=True, env=run_env)
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            with open(base) as fh:
+                return json.load(fh)["_notes"]
+
+    def test_ci_run_note_names_the_run_commit_version_and_totals(self):
+        note = self.write(notes=[ISSUE_NOTE], env=CI_ENV)[0]
+        self.assertIn("https://github.com/wheels-dev/wheels/actions/runs/38287218547", note)
+        self.assertIn("9fcc17c5d", note)
+        self.assertNotIn("9fcc17c5d0", note)
+        self.assertIn("v0.732.0", note)
+        self.assertIn("2 pass / 1 fail / 0 error / 0 skipped", note)
+
+    def test_previous_provenance_note_is_replaced_not_kept(self):
+        notes = self.write(notes=[LEGACY_NOTE, ISSUE_NOTE], env=CI_ENV)
+        self.assertEqual(len(notes), 2, notes)
+        self.assertNotIn("5850 pass", " ".join(notes))
+        self.assertEqual(notes[1], ISSUE_NOTE)
+
+    def test_hand_written_note_from_a_bump_pr_is_replaced(self):
+        # The wording a person used on #4577 when fixing the note by hand.
+        by_hand = ("Linux baseline from the version-check run that opened this bump: "
+                   "https://github.com/wheels-dev/wheels/actions/runs/38287218547/job/114938368850"
+                   " (9fcc17c5d, v0.732.0): 7273 pass / 0 fail / 0 error / 177 skipped.")
+        notes = self.write(notes=[by_hand, ISSUE_NOTE], env=CI_ENV)
+        self.assertEqual(len(notes), 2, notes)
+        self.assertNotIn("7273 pass", " ".join(notes))
+
+    def test_rewriting_twice_keeps_one_provenance_note(self):
+        first = self.write(notes=[LEGACY_NOTE, ISSUE_NOTE], env=CI_ENV)
+        again = self.write(notes=first, env=dict(CI_ENV, GITHUB_RUN_ID="99"))
+        self.assertEqual(len(again), 2, again)
+        self.assertIn("/actions/runs/99", again[0])
+        self.assertEqual(again[1], ISSUE_NOTE)
+
+    def test_human_notes_keep_their_order(self):
+        other = "SystemUtilSpec: a null Java-version placeholder is not an engine defect."
+        notes = self.write(notes=[ISSUE_NOTE, LEGACY_NOTE, other], env=CI_ENV)
+        self.assertEqual(notes[1:], [ISSUE_NOTE, other])
+
+    def test_local_run_says_so_and_links_no_run(self):
+        note = self.write(notes=[ISSUE_NOTE])[0]
+        self.assertIn("a local run", note)
+        self.assertNotIn("actions/runs", note)
+        self.assertIn("v0.732.0", note)
+
+    def test_baseline_without_notes_gets_the_provenance_note(self):
+        notes = self.write(notes=None, env=CI_ENV)
+        self.assertEqual(len(notes), 1)
+        self.assertIn("/actions/runs/38287218547", notes[0])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

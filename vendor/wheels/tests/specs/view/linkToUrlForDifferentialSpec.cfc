@@ -71,12 +71,15 @@ component extends="wheels.WheelsTest" {
 					if (StructKeyExists(application[appKey], "urlForCache")) { StructClear(application[appKey].urlForCache); }
 				};
 
+				// The goldens were captured on an engine whose encoder escapes "/" and ":"; compare them
+				// encoder-agnostically, and keep cached against uncached byte-identical.
+				var enc = new wheels.tests._assets.view.HtmlEncoding();
 				for (var name in cases) {
 					clearCache();
 					var uncached = cases[name]();
 					var cached = cases[name]();
-					expect(uncached).toBe(golden[name], "#name# uncached diverged");
-					expect(cached).toBe(golden[name], "#name# cached diverged");
+					expect(enc.normalize(uncached)).toBe(enc.normalize(golden[name]), "#name# uncached diverged");
+					expect(cached).toBe(uncached, "#name# cached diverged from uncached");
 					// W1 guard: the internal $argsResolved sentinel must never leak into output.
 					expect(uncached).notToInclude("$argsResolved", "#name#: $argsResolved leaked into output");
 				}

@@ -1,0 +1,1 @@
+- The Wheels CLI's runtime is LuCLI 0.6.2.4, which updates the CLI's bundled dependencies (Jackson, JLine, and the Tomcat and Commons Lang libraries it ships on its classpath). No behaviour change.

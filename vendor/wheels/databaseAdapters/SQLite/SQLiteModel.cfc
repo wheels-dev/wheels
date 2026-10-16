@@ -191,10 +191,11 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Override Base adapter's function.
-	 * SQLite uses double-quotes to quote identifiers (ANSI SQL standard).
+	 * SQLite uses double-quotes to quote identifiers (ANSI SQL standard); an embedded double
+	 * quote is doubled.
 	 */
 	public string function $quoteIdentifier(required string name) {
-		return """#arguments.name#""";
+		return """" & Replace(arguments.name, """", """""", "all") & """";
 	}
 
 	/**
