@@ -51,6 +51,9 @@
 #   the home is ~/.wheels (or that LUCLI_HOME) and the runtime is `wheels`.
 #   The exception: a default-home LUCLI_HOME with WHEELS_HOME set elsewhere
 #   uses WHEELS_HOME as the override, with a note on stderr.
+#   In override mode the per-checkout results JSON and the test-server log live
+#   under ${TMPDIR:-/tmp} rather than the shared /tmp; default mode keeps /tmp.
+#   An explicit WHEELS_TEST_RESULT_FILE still wins over the result path.
 #
 set -euo pipefail
 
@@ -61,11 +64,6 @@ DB="${DB:-sqlite}"
 # Must match set(reloadPassword=...) in config/settings.cfm — a mismatch never
 # reloads and, since #3062, counts against the per-IP reload rate limit.
 PASSWORD="wheels-dev"
-# Per-checkout results file. A single fixed /tmp path is shared by every checkout on
-# the machine, so two working copies running the suite overwrite each other's results —
-# and a develop-vs-branch comparison silently becomes two copies of the same run
-# (issue #3352). Keyed on the project root so concurrent checkouts stay separate.
-RESULT_FILE="${WHEELS_TEST_RESULT_FILE:-/tmp/wheels-local-test-results-$(echo "$PROJECT_ROOT" | shasum | cut -c1-12).json}"
 
 # Browser specs call back into the local Wheels CLI server — point Playwright
 # at the right port. CI sets this explicitly before invoking the script;
@@ -203,6 +201,18 @@ if [ -n "$CLI_HOME_OVERRIDE" ]; then
   export WHEELS_BROWSER_HOME="${WHEELS_BROWSER_HOME:-$CLI_HOME_OVERRIDE/browser}"
   echo "CLI home override: ${CLI_HOME_OVERRIDE} (not using ~/.wheels)"
 fi
+# Per-checkout results file and server log. A single fixed /tmp path would be
+# shared by every checkout on the machine, so two working copies running the
+# suite would overwrite each other's results (#3352); both names are keyed on
+# the checkout. Default mode keeps the historical /tmp location. An isolated
+# (override) run keeps its state in ${TMPDIR:-/tmp} instead, out of the shared
+# /tmp. WHEELS_TEST_RESULT_FILE still wins over the result path.
+STATE_DIR="/tmp"
+if [ -n "$CLI_HOME_OVERRIDE" ]; then
+  STATE_DIR="${TMPDIR:-/tmp}"
+fi
+RESULT_FILE="${WHEELS_TEST_RESULT_FILE:-$STATE_DIR/wheels-local-test-results-$(echo "$PROJECT_ROOT" | shasum | cut -c1-12).json}"
+SERVER_LOG="$STATE_DIR/wheels-test-server-${CHECKOUT_KEY}.log"
 # Cleared when the server turns out to run from a home other than the pinned
 # one: this run then writes nothing into that home.
 STAGING_ALLOWED=true
@@ -242,7 +252,6 @@ resolve_cli_home() {
   TEST_SERVER_DIR="$CLI_HOME/servers/$TEST_SERVER_NAME"
   EXPRESS_ROOT="$CLI_HOME/express"
 }
-SERVER_LOG="/tmp/wheels-test-server-${CHECKOUT_KEY}.log"
 
 # ── Server ownership helpers ────────────────────────
 #
