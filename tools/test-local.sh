@@ -46,7 +46,9 @@
 #   kept. A launcher that writes into the real ~/.wheels (the Homebrew `wheels`
 #   wrapper) is refused: set LUCLI_BIN to the runtime it launches. If the server
 #   still runs from another home, nothing is installed or cleaned up there.
-#   Unset, nothing changes: the home is ~/.wheels and the runtime is `wheels`.
+#   Unset, or set to the real ~/.wheels or ~/.lucli (e.g. an exported
+#   LUCLI_HOME=$HOME/.wheels), nothing changes from before these variables:
+#   the home is ~/.wheels (or that LUCLI_HOME) and the runtime is `wheels`.
 #
 set -euo pipefail
 
@@ -154,9 +156,29 @@ refuse_home_writing_launcher() {
     exit 2
   fi
 }
+# An override that resolves to a real default home (~/.wheels or ~/.lucli), such
+# as an exported LUCLI_HOME=$HOME/.wheels, isn't an isolated home: the run then
+# behaves exactly as it did before overrides existed.
+is_default_cli_home() {
+  local real d
+  real="$(cd "$1" 2>/dev/null && pwd -P || printf '%s' "${1%/}")"
+  for d in "$HOME/.wheels" "$HOME/.lucli"; do
+    [ "$real" = "$(cd "$d" 2>/dev/null && pwd -P || printf '%s' "$d")" ] && return 0
+  done
+  return 1
+}
 CLI_HOME_OVERRIDE="${LUCLI_HOME:-${WHEELS_HOME:-}}"
-CLI_HOME="${CLI_HOME_OVERRIDE:-$HOME/.wheels}"
+if [ -n "$CLI_HOME_OVERRIDE" ] && is_default_cli_home "$CLI_HOME_OVERRIDE"; then
+  CLI_HOME_OVERRIDE=""
+fi
+# The home this run must not swap for another: the override, or a caller's
+# LUCLI_HOME that names a default home.
+PINNED_HOME="${CLI_HOME_OVERRIDE:-${LUCLI_HOME:-}}"
+CLI_HOME="${PINNED_HOME:-$HOME/.wheels}"
 TEST_SERVER_DIR="$CLI_HOME/servers/$TEST_SERVER_NAME"
+if [ -z "$CLI_HOME_OVERRIDE" ] && [ -n "$PINNED_HOME" ]; then
+  export LUCLI_JAVA_ARGS="${LUCLI_JAVA_ARGS:-} -Dlucli.home=$PINNED_HOME"
+fi
 if [ -n "$CLI_HOME_OVERRIDE" ]; then
   export LUCLI_JAVA_ARGS="${LUCLI_JAVA_ARGS:-} -Dlucli.home=$CLI_HOME_OVERRIDE"
   # user.home goes through JAVA_TOOL_OPTIONS, which every JVM reads, so it reaches
@@ -171,8 +193,8 @@ if [ -n "$CLI_HOME_OVERRIDE" ]; then
   export WHEELS_BROWSER_HOME="${WHEELS_BROWSER_HOME:-$CLI_HOME_OVERRIDE/browser}"
   echo "CLI home override: ${CLI_HOME_OVERRIDE} (not using ~/.wheels)"
 fi
-# Cleared when the server turns out to run from a home other than the
-# override: this run then writes nothing into that home.
+# Cleared when the server turns out to run from a home other than the pinned
+# one: this run then writes nothing into that home.
 STAGING_ALLOWED=true
 
 canonical_dir() {
@@ -181,7 +203,7 @@ canonical_dir() {
 
 # Once the server is up, settle the home it really uses: from the CATALINA_HOME
 # Tomcat logs (<home>/express/<version>), or from where the server registered.
-# With an override set, a different home is never adopted.
+# With a pinned home, a different home is never adopted.
 resolve_cli_home() {
   local home="" candidate catalina
   catalina="$(sed -n 's/.*CATALINA_HOME:[[:space:]]*\([^[:space:]]*\).*/\1/p' "$SERVER_LOG" 2>/dev/null | tail -1)"
@@ -189,7 +211,11 @@ resolve_cli_home() {
     */express/*) home="${catalina%/express/*}" ;;
   esac
   if [ -z "$home" ]; then
-    for candidate in "${CLI_HOME_OVERRIDE:-$HOME/.wheels}"; do
+    # An isolated override is the only candidate; otherwise as before.
+    local candidates=()
+    [ -n "$PINNED_HOME" ] && candidates+=("$PINNED_HOME")
+    [ -z "$CLI_HOME_OVERRIDE" ] && candidates+=("$HOME/.wheels")
+    for candidate in "${candidates[@]}"; do
       if [ -d "$candidate/servers/$TEST_SERVER_NAME" ]; then
         home="$candidate"
         break
@@ -197,8 +223,8 @@ resolve_cli_home() {
     done
   fi
   [ -n "$home" ] || return 0
-  if [ -n "$CLI_HOME_OVERRIDE" ] && [ "$(canonical_dir "$home")" != "$(canonical_dir "$CLI_HOME_OVERRIDE")" ]; then
-    echo "::warning::The server runs from ${home}, not the CLI home override (${CLI_HOME_OVERRIDE}); not installing the SQLite driver or cleaning up there." >&2
+  if [ -n "$PINNED_HOME" ] && [ "$(canonical_dir "$home")" != "$(canonical_dir "$PINNED_HOME")" ]; then
+    echo "::warning::The server runs from ${home}, not ${PINNED_HOME}; not installing the SQLite driver or cleaning up there." >&2
     STAGING_ALLOWED=false
     return 0
   fi

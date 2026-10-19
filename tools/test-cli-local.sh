@@ -42,8 +42,10 @@
 #   kept. A launcher that writes into the real ~/.wheels (the Homebrew `wheels`
 #   wrapper) is refused: set LUCLI_BIN to the runtime it launches. If the
 #   server still runs from a Lucee Express outside the override home, the
-#   SQLite driver is not installed there and the run stops. Unset, nothing
-#   changes: ~/.wheels and ~/.lucli are searched as before.
+#   SQLite driver is not installed there and the run stops. Unset, or set to
+#   the real ~/.wheels or ~/.lucli (e.g. an exported LUCLI_HOME=$HOME/.wheels),
+#   nothing changes from before these variables: ~/.wheels and ~/.lucli are
+#   searched as before.
 #
 set -euo pipefail
 
@@ -102,11 +104,26 @@ refuse_home_writing_launcher() {
     exit 2
   fi
 }
+# An override that resolves to a real default home (~/.wheels or ~/.lucli), such
+# as an exported LUCLI_HOME=$HOME/.wheels, isn't an isolated home: the run then
+# behaves exactly as it did before overrides existed.
+is_default_cli_home() {
+  local real d
+  real="$(cd "$1" 2>/dev/null && pwd -P || printf '%s' "${1%/}")"
+  for d in "$HOME/.wheels" "$HOME/.lucli"; do
+    [ "$real" = "$(cd "$d" 2>/dev/null && pwd -P || printf '%s' "$d")" ] && return 0
+  done
+  return 1
+}
 # CLI_HOMES: every home this run may read or write, in search order.
 CLI_HOME_OVERRIDE="${LUCLI_HOME:-${WHEELS_HOME:-}}"
+if [ -n "$CLI_HOME_OVERRIDE" ] && is_default_cli_home "$CLI_HOME_OVERRIDE"; then
+  CLI_HOME_OVERRIDE=""
+fi
 if [ -n "$CLI_HOME_OVERRIDE" ]; then
   CLI_HOMES=("$CLI_HOME_OVERRIDE")
-  if [ -n "${WHEELS_HOME:-}" ] && [ "$WHEELS_HOME" != "$CLI_HOME_OVERRIDE" ]; then
+  if [ -n "${WHEELS_HOME:-}" ] && [ "$WHEELS_HOME" != "$CLI_HOME_OVERRIDE" ] \
+    && ! is_default_cli_home "$WHEELS_HOME"; then
     CLI_HOMES+=("$WHEELS_HOME")
   fi
   export LUCLI_JAVA_ARGS="${LUCLI_JAVA_ARGS:-} -Dlucli.home=$CLI_HOME_OVERRIDE"
@@ -121,7 +138,7 @@ if [ -n "$CLI_HOME_OVERRIDE" ]; then
   refuse_home_writing_launcher
   echo "CLI home override: ${CLI_HOMES[*]} (not searching ~/.wheels or ~/.lucli)"
 else
-  CLI_HOMES=("$HOME/.wheels" "$HOME/.lucli")
+  CLI_HOMES=(${LUCLI_HOME:+"$LUCLI_HOME"} "$HOME/.wheels" "$HOME/.lucli")
 fi
 EXPRESS_HOMES=()
 for cli_home in "${CLI_HOMES[@]}"; do
