@@ -72,6 +72,13 @@
 .sl-markdown-content pre {
 	border-radius: var(--radius-lg);
 	box-shadow: var(--shadow-sm);
+	/*
+	 * Raw <pre> containment (#4616): the API generator emits examples as raw
+	 * <pre><code> (renderExtended(), generate-api-docs.mjs), so Expressive Code
+	 * never wraps them and ec.css — the only pre containment here — never loads;
+	 * base.css only covers `.prose pre`. (#4620, literal \n, is a separate bug.)
+	 */
+	overflow-x: auto;
 }
 
 /* ── Sidebar (Phase 3 Slice 1) ────────────────────────────────────
