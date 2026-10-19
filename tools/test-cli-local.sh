@@ -45,7 +45,9 @@
 #   SQLite driver is not installed there and the run stops. Unset, or set to
 #   the real ~/.wheels or ~/.lucli (e.g. an exported LUCLI_HOME=$HOME/.wheels),
 #   nothing changes from before these variables: ~/.wheels and ~/.lucli are
-#   searched as before.
+#   searched as before. The exception: a default-home LUCLI_HOME with
+#   WHEELS_HOME set elsewhere uses WHEELS_HOME as the override, with a note
+#   on stderr.
 #
 set -euo pipefail
 
@@ -119,6 +121,14 @@ is_default_cli_home() {
 CLI_HOME_OVERRIDE="${LUCLI_HOME:-${WHEELS_HOME:-}}"
 if [ -n "$CLI_HOME_OVERRIDE" ] && is_default_cli_home "$CLI_HOME_OVERRIDE"; then
   CLI_HOME_OVERRIDE=""
+  # A default-home LUCLI_HOME (e.g. exported from a shell profile) must not mask
+  # an isolated WHEELS_HOME: fall through to WHEELS_HOME, and export it as
+  # LUCLI_HOME so processes the run starts don't inherit the real home.
+  if [ -n "${LUCLI_HOME:-}" ] && [ -n "${WHEELS_HOME:-}" ] && ! is_default_cli_home "$WHEELS_HOME"; then
+    echo "Note: LUCLI_HOME (${LUCLI_HOME}) is a default CLI home; using WHEELS_HOME (${WHEELS_HOME}) instead." >&2
+    CLI_HOME_OVERRIDE="$WHEELS_HOME"
+    export LUCLI_HOME="$WHEELS_HOME"
+  fi
 fi
 if [ -n "$CLI_HOME_OVERRIDE" ]; then
   CLI_HOMES=("$CLI_HOME_OVERRIDE")
