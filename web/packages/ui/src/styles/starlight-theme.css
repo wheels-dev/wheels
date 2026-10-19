@@ -53,6 +53,10 @@
 	padding: 0.1em 0.35em;
 	font-family: var(--font-mono);
 	font-size: 0.875em;
+	/* Long inline code (identifiers, paths) must break inside the column
+	 * rather than push the page sideways at phone width (#4608). Scoped
+	 * away from `pre`, so fenced blocks keep their own scroll. */
+	overflow-wrap: anywhere;
 }
 
 /*
@@ -197,6 +201,17 @@ starlight-toc a[aria-current='true'] {
 .sl-markdown-content .wd-params-table td:nth-child(5) {
 	width: auto;
 	word-break: break-word;
+}
+
+/* Markdown tables are wrapped in a .table-scroll region by
+ * rehype-table-scroll.mjs (guides) or hand-written markup (api index). The
+ * scroll/focus styles come from base.css. Starlight's layered rule sets
+ * `display: block` on markdown tables, which drops the native table role for
+ * assistive tech (#4608); restore native display here, unlayered so it beats
+ * @layer starlight.content. */
+.sl-markdown-content .table-scroll > table {
+	display: table;
+	overflow: visible;
 }
 
 /* ── Prev/Next page footer ─────────────────────────────────────────
