@@ -44,4 +44,16 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 
 ## Examples
 
-<pre><code class='javascript'>&lt;!--- Provide a `label` and the required `objectName` and `property` ---&gt;\n#telField(label=&quot;Phone Number&quot;, objectName=&quot;contact&quot;, property=&quot;phone&quot;)#\n\n&lt;!--- Add a CSS class and a placeholder for formatting guidance ---&gt;\n#telField(label=&quot;Mobile&quot;, objectName=&quot;user&quot;, property=&quot;mobile&quot;, class=&quot;tel-input&quot;, placeholder=&quot;+1-555-000-0000&quot;)#\n\n&lt;!--- Render telephone fields for each phone number in a nested association ---&gt;\n&lt;fieldset&gt;\n\t&lt;legend&gt;Phone Numbers&lt;/legend&gt;\n\t&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(contact.phoneNumbers)#&quot; index=&quot;i&quot;&gt;\n\t\t#telField(label=&quot;Phone ##i#&quot;, objectName=&quot;contact&quot;, association=&quot;phoneNumbers&quot;, position=i, property=&quot;number&quot;)#\n\t&lt;/cfloop&gt;\n&lt;/fieldset&gt;</code></pre>
+<pre><code class='javascript'>&lt;!--- Provide a `label` and the required `objectName` and `property` ---&gt;
+#telField(label=&quot;Phone Number&quot;, objectName=&quot;contact&quot;, property=&quot;phone&quot;)#
+
+&lt;!--- Add a CSS class and a placeholder for formatting guidance ---&gt;
+#telField(label=&quot;Mobile&quot;, objectName=&quot;user&quot;, property=&quot;mobile&quot;, class=&quot;tel-input&quot;, placeholder=&quot;+1-555-000-0000&quot;)#
+
+&lt;!--- Render telephone fields for each phone number in a nested association ---&gt;
+&lt;fieldset&gt;
+	&lt;legend&gt;Phone Numbers&lt;/legend&gt;
+	&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(contact.phoneNumbers)#&quot; index=&quot;i&quot;&gt;
+		#telField(label=&quot;Phone ##i#&quot;, objectName=&quot;contact&quot;, association=&quot;phoneNumbers&quot;, position=i, property=&quot;number&quot;)#
+	&lt;/cfloop&gt;
+&lt;/fieldset&gt;</code></pre>
