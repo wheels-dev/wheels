@@ -7,7 +7,7 @@
 #     `wheels` brand. There is no separate `lucli` binary on a normal install.
 #   - Java 21+ installed
 #   - SQLite JDBC driver in the lib/ext/ of the Lucee Express version lucee.json
-#     pins, under $LUCLI_HOME (or ~/.wheels). This script installs it there.
+#     pins, under the CLI home (below). This script installs it there.
 #
 # Usage:
 #   bash tools/test-local.sh                          # run all core tests
@@ -18,6 +18,7 @@
 #   bash tools/test-local.sh wheels.tests.specs.model # the dotted TestBox form
 #   bash tools/test-local.sh dispatch/TestScopeVisibilitySpec  # one spec file
 #   PORT=9090 bash tools/test-local.sh                # use custom port
+#   LUCLI_BIN=/path/to/runtime bash tools/test-local.sh   # pick the runtime (default: wheels)
 #
 # An area that is neither a directory nor a spec file under
 # vendor/wheels/tests/specs/ exits 2
@@ -30,6 +31,22 @@
 #   WHEELS_BROWSER_TEST_BASE_URL is auto-set to match the local PORT so
 #   specs hit the right server; CI sets its own override before invoking
 #   this script so the ${VAR:-default} preserves it.
+#
+# CLI home overrides (for sandboxed or isolated callers):
+#   LUCLI_HOME=/path   the CLI home: servers, Lucee Express installs and lib/ext.
+#   WHEELS_HOME=/path  the same, under the Wheels name; LUCLI_HOME wins if both are set.
+#   With either set, the script uses only that home: it never falls back to
+#   ~/.wheels, and passes -Dlucli.home=<home> to the runtime (that outranks the
+#   LUCLI_HOME a launcher such as the Homebrew `wheels` wrapper re-exports). It
+#   also sets -Duser.home=<home> in JAVA_TOOL_OPTIONS, because LuCLI, Lucee and
+#   the specs resolve paths from every JVM's user.home, not $HOME (the test
+#   server's JVM included; LUCLI_JAVA_ARGS reaches only the launcher), and
+#   defaults WHEELS_BROWSER_HOME to <home>/browser. A user.home the caller
+#   already set (LUCLI_JAVA_ARGS, JAVA_TOOL_OPTIONS or JDK_JAVA_OPTIONS) is
+#   kept. A launcher that writes into the real ~/.wheels (the Homebrew `wheels`
+#   wrapper) is refused: set LUCLI_BIN to the runtime it launches. If the server
+#   still runs from another home, nothing is installed or cleaned up there.
+#   Unset, nothing changes: the home is ~/.wheels and the runtime is `wheels`.
 #
 set -euo pipefail
 
@@ -117,17 +134,45 @@ RUN_LOCK="$PROJECT_ROOT/.wheels-test-local.lock"
 # ran, and --force deleted another checkout's stopped registration (#3810).
 CHECKOUT_KEY="$(cd "$PROJECT_ROOT" && pwd -P | shasum | cut -c1-12)"
 TEST_SERVER_NAME="wheels-test-${CHECKOUT_KEY}"
-# The CLI keeps servers and Lucee Express installs in its home: $LUCLI_HOME when
-# it is set (an isolated CLI), otherwise ~/.wheels. A launcher can re-export its
-# own LUCLI_HOME (the Homebrew `wheels` sets ~/.wheels); -Dlucli.home outranks
-# the variable, so a caller's LUCLI_HOME is passed that way too.
-CLI_HOME="${LUCLI_HOME:-$HOME/.wheels}"
+# The CLI keeps servers and Lucee Express installs in its home: the caller's
+# LUCLI_HOME or WHEELS_HOME when one is set (an isolated CLI), otherwise
+# ~/.wheels. A launcher can re-export its own LUCLI_HOME (the Homebrew `wheels`
+# sets ~/.wheels); -Dlucli.home outranks the variable, so an override is passed
+# that way too, with user.home so nothing the JVM resolves from it lands in
+# the real home.
+# The runtime: LUCLI_BIN when set, otherwise the `wheels` on PATH.
+CLI_BIN="${LUCLI_BIN:-wheels}"
+# With a home override, a launcher that writes into the real ~/.wheels can't be
+# the runtime. The Homebrew `wheels` wrapper syncs its module, docs and SQLite
+# driver there and resets LUCLI_HOME before it execs the raw runtime.
+refuse_home_writing_launcher() {
+  local path
+  path="$(command -v "$CLI_BIN" 2>/dev/null || printf '%s' "$CLI_BIN")"
+  if [ -f "$path" ] && [ "$(head -c 2 "$path" 2>/dev/null)" = "#!" ] && grep -q 'HOME/\.wheels' "$path" 2>/dev/null; then
+    echo "::error::${path} writes into the real ~/.wheels, so it can't run with a CLI home override." >&2
+    echo "  Point LUCLI_BIN at the runtime it launches (e.g. \$(brew --prefix wheels)/libexec/wheels) or a raw lucli." >&2
+    exit 2
+  fi
+}
+CLI_HOME_OVERRIDE="${LUCLI_HOME:-${WHEELS_HOME:-}}"
+CLI_HOME="${CLI_HOME_OVERRIDE:-$HOME/.wheels}"
 TEST_SERVER_DIR="$CLI_HOME/servers/$TEST_SERVER_NAME"
-if [ -n "${LUCLI_HOME:-}" ]; then
-  export LUCLI_JAVA_ARGS="${LUCLI_JAVA_ARGS:-} -Dlucli.home=$LUCLI_HOME"
+if [ -n "$CLI_HOME_OVERRIDE" ]; then
+  export LUCLI_JAVA_ARGS="${LUCLI_JAVA_ARGS:-} -Dlucli.home=$CLI_HOME_OVERRIDE"
+  # user.home goes through JAVA_TOOL_OPTIONS, which every JVM reads, so it reaches
+  # the test server's own JVM and any JVM a spec starts; LUCLI_JAVA_ARGS reaches
+  # only the launcher. A caller that already chose a user.home (LUCLI_JAVA_ARGS,
+  # JAVA_TOOL_OPTIONS or JDK_JAVA_OPTIONS) keeps it.
+  case "$LUCLI_JAVA_ARGS ${JAVA_TOOL_OPTIONS:-} ${JDK_JAVA_OPTIONS:-}" in
+    *-Duser.home=*) ;;
+    *) export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Duser.home=$CLI_HOME_OVERRIDE" ;;
+  esac
+  refuse_home_writing_launcher
+  export WHEELS_BROWSER_HOME="${WHEELS_BROWSER_HOME:-$CLI_HOME_OVERRIDE/browser}"
+  echo "CLI home override: ${CLI_HOME_OVERRIDE} (not using ~/.wheels)"
 fi
-# Cleared when the server turns out to run from a home other than the caller's
-# LUCLI_HOME: this run then writes nothing into that home.
+# Cleared when the server turns out to run from a home other than the
+# override: this run then writes nothing into that home.
 STAGING_ALLOWED=true
 
 canonical_dir() {
@@ -136,7 +181,7 @@ canonical_dir() {
 
 # Once the server is up, settle the home it really uses: from the CATALINA_HOME
 # Tomcat logs (<home>/express/<version>), or from where the server registered.
-# With LUCLI_HOME set, a different home is never adopted.
+# With an override set, a different home is never adopted.
 resolve_cli_home() {
   local home="" candidate catalina
   catalina="$(sed -n 's/.*CATALINA_HOME:[[:space:]]*\([^[:space:]]*\).*/\1/p' "$SERVER_LOG" 2>/dev/null | tail -1)"
@@ -144,7 +189,7 @@ resolve_cli_home() {
     */express/*) home="${catalina%/express/*}" ;;
   esac
   if [ -z "$home" ]; then
-    for candidate in ${LUCLI_HOME:+"$LUCLI_HOME"} "$HOME/.wheels"; do
+    for candidate in "${CLI_HOME_OVERRIDE:-$HOME/.wheels}"; do
       if [ -d "$candidate/servers/$TEST_SERVER_NAME" ]; then
         home="$candidate"
         break
@@ -152,8 +197,8 @@ resolve_cli_home() {
     done
   fi
   [ -n "$home" ] || return 0
-  if [ -n "${LUCLI_HOME:-}" ] && [ "$(canonical_dir "$home")" != "$(canonical_dir "$LUCLI_HOME")" ]; then
-    echo "::warning::The server runs from ${home}, not LUCLI_HOME (${LUCLI_HOME}); not installing the SQLite driver or cleaning up there." >&2
+  if [ -n "$CLI_HOME_OVERRIDE" ] && [ "$(canonical_dir "$home")" != "$(canonical_dir "$CLI_HOME_OVERRIDE")" ]; then
+    echo "::warning::The server runs from ${home}, not the CLI home override (${CLI_HOME_OVERRIDE}); not installing the SQLite driver or cleaning up there." >&2
     STAGING_ALLOWED=false
     return 0
   fi
@@ -354,7 +399,7 @@ stop_orphaned_test_server() {
 }
 
 stop_test_server() {
-  ( cd "$PROJECT_ROOT" && wheels server stop --name="$TEST_SERVER_NAME" >/dev/null 2>&1 ) || true
+  ( cd "$PROJECT_ROOT" && "$CLI_BIN" server stop --name="$TEST_SERVER_NAME" >/dev/null 2>&1 ) || true
   # `kill $SERVER_PID` only kills the launcher: the JVM survives it and keeps
   # holding the port, so whichever project wants that port next silently gets
   # THIS app's responses. Stop the JVMs this run recorded (the registry's, and
@@ -409,7 +454,7 @@ stage_sqlite_driver() {
 
 start_test_server() {
   STARTED_PORT_PID=""
-  nohup wheels server run --port="$PORT" --name="$TEST_SERVER_NAME" --force > "$SERVER_LOG" 2>&1 &
+  nohup "$CLI_BIN" server run --port="$PORT" --name="$TEST_SERVER_NAME" --force > "$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
   STARTED_SERVER=true
 
@@ -499,7 +544,7 @@ fi
 # Check if lucee.json has {project} and the runtime version is too old to
 # resolve the placeholder.
 if grep -q '{project}' lucee.json 2>/dev/null; then
-  WHEELS_VER=$(wheels --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")
+  WHEELS_VER=$("$CLI_BIN" --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")
   # For safety, always create a resolved copy for the server
   cp lucee.json "$LUCEE_BAK"
   sed -i '' "s|{project}|${PROJECT_ROOT}|g" lucee.json
