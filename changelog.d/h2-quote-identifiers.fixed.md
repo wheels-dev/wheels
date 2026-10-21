@@ -1,0 +1,1 @@
+- H2 now quotes table and column names in the datasource's own fold case (upper by default, lower with `DATABASE_TO_LOWER=TRUE`), so reserved-word columns such as `order` and `group` work in queries and `order=` clauses. Datasources with case folding disabled (`DATABASE_TO_UPPER=FALSE`) keep today's unquoted SQL unchanged (#4440)

@@ -174,6 +174,34 @@ component extends="wheels.WheelsTest" {
                     expect(mssql.$quoteIdentifier(name = "a]]b")).toBe("[a]]]]b]");
                 });
 
+                it("H2 $quoteIdentifier quotes in the datasource's own fold case (##4440)", () => {
+                    var upper = CreateObject("component", "wheels.tests._assets.adapters.H2CaseProbe");
+                    upper.identifierCase = "upper";
+                    expect(upper.$quoteIdentifier(name = "users")).toBe('"USERS"');
+                    expect(upper.$quoteIdentifier(name = "order")).toBe('"ORDER"');
+                    expect(upper.$quoteIdentifier(name = 'we"ird')).toBe('"WE""IRD"');
+                    expect(upper.$quoteIdentifier(name = 'a""b')).toBe('"A""""B"');
+
+                    var lower = CreateObject("component", "wheels.tests._assets.adapters.H2CaseProbe");
+                    lower.identifierCase = "lower";
+                    expect(lower.$quoteIdentifier(name = "USERS")).toBe('"users"');
+                    expect(lower.$quoteIdentifier(name = "ORDER")).toBe('"order"');
+                    expect(lower.$quoteIdentifier(name = 'We"ird')).toBe('"we""ird"');
+                    expect(lower.$quoteIdentifier(name = 'a""b')).toBe('"a""""b"');
+
+                    var none = CreateObject("component", "wheels.tests._assets.adapters.H2CaseProbe");
+                    none.identifierCase = "none";
+                    expect(none.$quoteIdentifier(name = "users")).toBe("users");
+                    expect(none.$quoteIdentifier(name = "order")).toBe("order");
+                    expect(none.$quoteIdentifier(name = 'we"ird')).toBe('we"ird');
+                });
+
+                it("H2 without a datasource reports no folding and leaves identifiers unquoted", () => {
+                    var h2 = CreateObject("component", "wheels.databaseAdapters.H2.H2Model");
+                    expect(h2.$identifierCase()).toBe("none");
+                    expect(h2.$quoteIdentifier(name = "users")).toBe("users");
+                });
+
                 it("migrator quoteTableName/quoteColumnName double the closing delimiter, per adapter", () => {
                     // lower-case inputs, so the output does not depend on migratorObjectCase
                     var sqlite = CreateObject("component", "wheels.databaseAdapters.SQLite.SQLiteMigrator");

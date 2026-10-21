@@ -10,6 +10,135 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * The case this H2 datasource folds unquoted identifiers to: `upper` (H2's
+	 * default), `lower` (`DATABASE_TO_LOWER=TRUE`) or `none` (case folding
+	 * disabled with `DATABASE_TO_UPPER=FALSE`, no datasource, or an unreadable
+	 * settings table). Probed once per datasource per application lifetime and
+	 * cached in the application's Wheels settings beside `schemaColumnCache`, so
+	 * a tenant datasource gets its own value, a reload re-probes, and the probe
+	 * never runs per identifier. A failed probe degrades to `none`, which is the
+	 * unquoted SQL H2 received before #4440.
+	 */
+	public string function $identifierCase() {
+		if (!StructKeyExists(variables, "dataSource") || !Len(variables.dataSource)) {
+			// A bare adapter (unit tests) has no datasource: leave identifiers alone.
+			return "none";
+		}
+		local.dataSource = $effectiveDataSource();
+		local.appKey = $appKey();
+		try {
+			if (
+				StructKeyExists(application, local.appKey)
+				&& StructKeyExists(application[local.appKey], "h2IdentifierCase")
+				&& StructKeyExists(application[local.appKey].h2IdentifierCase, local.dataSource)
+			) {
+				return application[local.appKey].h2IdentifierCase[local.dataSource];
+			}
+		} catch (any e) {
+			// fall through to a fresh probe
+		}
+		local.identifierCase = $readIdentifierCase(dataSource = local.dataSource);
+		try {
+			if (StructKeyExists(application, local.appKey)) {
+				lock name="wheels.h2IdentifierCase" type="exclusive" timeout="10" {
+					if (!StructKeyExists(application[local.appKey], "h2IdentifierCase")) {
+						application[local.appKey].h2IdentifierCase = {};
+					}
+					application[local.appKey].h2IdentifierCase[local.dataSource] = local.identifierCase;
+				}
+			}
+		} catch (any e) {
+			// Caching is best-effort; the probed value is still correct for this call.
+		}
+		return local.identifierCase;
+	}
+
+	/**
+	 * Internal function. Reads H2's identifier folding settings. H2 2.x exposes
+	 * `SETTING_NAME` / `SETTING_VALUE`; H2 1.3.x exposes `NAME` / `VALUE`, and
+	 * has no `DATABASE_TO_LOWER` row at all. `NON_KEYWORDS` is read for the log
+	 * line only — it never changes the classification.
+	 */
+	public string function $readIdentifierCase(required string dataSource) {
+		local.options = {datasource = arguments.dataSource};
+		if (StructKeyExists(variables, "username") && Len(variables.username)) {
+			local.options.username = variables.username;
+		}
+		if (StructKeyExists(variables, "password") && Len(variables.password)) {
+			local.options.password = variables.password;
+		}
+
+		local.settings = {};
+		local.rows = "";
+		try {
+			local.rows = QueryExecute(
+				"SELECT SETTING_NAME, SETTING_VALUE FROM INFORMATION_SCHEMA.SETTINGS WHERE SETTING_NAME IN ('DATABASE_TO_UPPER', 'DATABASE_TO_LOWER', 'NON_KEYWORDS')",
+				[],
+				local.options
+			);
+		} catch (any e) {
+			try {
+				local.rows = QueryExecute(
+					"SELECT NAME, VALUE FROM INFORMATION_SCHEMA.SETTINGS WHERE NAME IN ('DATABASE_TO_UPPER', 'DATABASE_TO_LOWER', 'NON_KEYWORDS')",
+					[],
+					local.options
+				);
+			} catch (any e2) {
+				writeLog(
+					type = "warning",
+					file = "wheels_h2_identifier_case",
+					text = "Could not read identifier folding settings for H2 datasource `#arguments.dataSource#`; identifiers will not be quoted. #e2.message#"
+				);
+				return "none";
+			}
+		}
+
+		local.nameColumn = ListFindNoCase(local.rows.columnList, "SETTING_NAME") ? "SETTING_NAME" : "NAME";
+		local.valueColumn = ListFindNoCase(local.rows.columnList, "SETTING_VALUE") ? "SETTING_VALUE" : "VALUE";
+		for (local.i = 1; local.i <= local.rows.recordCount; local.i++) {
+			local.settings[UCase(Trim(local.rows[local.nameColumn][local.i]))] = UCase(Trim(local.rows[local.valueColumn][local.i]));
+		}
+
+		if (!StructKeyExists(local.settings, "DATABASE_TO_LOWER")) {
+			// H2 1.3.x: no DATABASE_TO_LOWER setting, and quoted identifiers there are
+			// case-insensitive, so the default upper folding is always safe.
+			local.identifierCase = "upper";
+		} else if (local.settings.DATABASE_TO_LOWER == "TRUE") {
+			local.identifierCase = "lower";
+		} else if (StructKeyExists(local.settings, "DATABASE_TO_UPPER") && local.settings.DATABASE_TO_UPPER == "FALSE") {
+			local.identifierCase = "none";
+		} else {
+			local.identifierCase = "upper";
+		}
+
+		local.nonKeywords = StructKeyExists(local.settings, "NON_KEYWORDS") ? local.settings.NON_KEYWORDS : "";
+		writeLog(
+			type = "information",
+			file = "wheels_h2_identifier_case",
+			text = "H2 datasource `#arguments.dataSource#` folds identifiers to #local.identifierCase#; NON_KEYWORDS=#local.nonKeywords#"
+		);
+		return local.identifierCase;
+	}
+
+	/**
+	 * Quote a table or column name when H2 folds it, so reserved words such as
+	 * `order` and `group` are usable. The name is quoted in the datasource's own
+	 * fold case and embedded double quotes are doubled. With folding off the name
+	 * is returned unchanged — byte-for-byte the unquoted SQL H2 got before #4440,
+	 * which also keeps duplicate-by-case schemas (only possible with folding off)
+	 * unambiguous. Aliases are never quoted: table aliases stay bare and the
+	 * select-list aliases read back by $lowerCaseColumnNames() are unchanged.
+	 */
+	public string function $quoteIdentifier(required string name) {
+		local.identifierCase = $identifierCase();
+		if (local.identifierCase == "none") {
+			return arguments.name;
+		}
+		local.folded = (local.identifierCase == "upper") ? UCase(arguments.name) : LCase(arguments.name);
+		return """" & Replace(local.folded, """", """""", "all") & """";
+	}
+
+	/**
 	 * H2 1.3.172 (the driver Lucee bundles) returns rows in the wrong order once
 	 * LIMIT + OFFSET exceeds the 32-bit maximum (#3684), and the query builder's
 	 * offset() without limit() passes exactly that maximum as "no limit" (#3665).
