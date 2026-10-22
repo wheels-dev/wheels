@@ -247,7 +247,7 @@
 	public string function $normalizeOrderItem(required string item) {
 		local.text = Trim(ReReplace(arguments.item, "\s+", " ", "all"));
 		local.last = ListLast(local.text, " ");
-		if (ListLen(local.text, " ") > 1 && ListFindNoCase("ASC,DESC", local.last)) {
+		if (ListLen(local.text, " ") > 1 && (CompareNoCase(local.last, "ASC") == 0 || CompareNoCase(local.last, "DESC") == 0)) {
 			return Left(local.text, Len(local.text) - Len(local.last) - 1) & " " & UCase(local.last);
 		}
 		return local.text & " ASC";
@@ -513,8 +513,24 @@
 	}
 
 	/**
+	 * Internal function. Counts how many times `item` has already been registered and registers it
+	 * once more, case-insensitively — the O(1) replacement for counting a growing list with
+	 * ListValueCountNoCase() and appending with ListAppend(). Those two could only ever match a
+	 * whole list element: an empty item never matches, and an item containing a comma is split by
+	 * the list, so neither can match and both return 0 here without being registered.
+	 */
+	public numeric function $registerAddedProperty(required struct counts, required string item) {
+		if (!Len(arguments.item) || Find(",", arguments.item)) {
+			return 0;
+		}
+		local.key = LCase(arguments.item);
+		local.count = StructKeyExists(arguments.counts, local.key) ? arguments.counts[local.key] : 0;
+		arguments.counts[local.key] = local.count + 1;
+		return local.count;
+	}
+
+	/**
 	 * Internal function.
-	 * Builds the default select list (all columns plus select-enabled calculated
 	 * properties) for the given set of classes. Extracted from $createSQLFieldList
 	 * to keep that function's cyclomatic complexity down.
 	 */
@@ -613,7 +629,7 @@
 		*/
 		// if (!Find(".", arguments.list) && !Find(" AS ", arguments.list)) {
 			local.rv = "";
-			local.addedProperties = "";
+			local.addedPropertyCounts = {};
 			local.addedPropertiesByModel = {};
 			local.selectArray = $splitOutsideFunctions(arguments.list, ",");
 			local.iEnd = arrayLen(local.selectArray);
@@ -621,8 +637,7 @@
 				local.iItem = Trim(local.selectArray[i]);
 
 				// look for duplicates
-				local.duplicateCount = ListValueCountNoCase(local.addedProperties, local.iItem);
-				local.addedProperties = ListAppend(local.addedProperties, local.iItem);
+				local.duplicateCount = $registerAddedProperty(counts = local.addedPropertyCounts, item = local.iItem);
 
 				/* To fix the issue below:
 					https://github.com/wheels-dev/wheels/issues/1048
@@ -663,7 +678,7 @@
 					Added an exception in case the column specified in the select or group argument does not exist in the database.
 					This will only be in case when not using "table.column" or "column AS something" since in those cases Wheels passes through the select clause unchanged.
 				*/
-				if (!Len(local.toAppend) && arguments.clause == "select" && ListFindNoCase(local.addedPropertiesByModel[local.cell.associationKey], local.iItem) EQ 0) {
+				if (!Len(local.toAppend) && arguments.clause == "select" && !StructKeyExists(local.addedPropertiesByModel[local.cell.associationKey], LCase(local.iItem))) {
 					if (application.wheels.throwOnColumnNotFound) {
 						Throw(
 							type = "Wheels.ColumnNotFound",
@@ -692,7 +707,7 @@
 
 			if (Len(arguments.include) && arguments.clause == "select") {
 				local.newSelect = "";
-				local.addedProperties = "";
+				local.addedPropertiesSet = {};
 				local.filteredArray = ListToArray(local.rv);
 				local.iEnd = ArrayLen(local.filteredArray);
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
@@ -747,9 +762,9 @@
 							}
 						}
 					}
-					if (!ListFindNoCase(local.addedProperties, local.newProperty)) {
+					if (!StructKeyExists(local.addedPropertiesSet, LCase(local.newProperty))) {
 						local.newSelect = ListAppend(local.newSelect, local.newItem);
-						local.addedProperties = ListAppend(local.addedProperties, local.newProperty);
+						local.addedPropertiesSet[LCase(local.newProperty)] = true;
 					}
 				}
 				local.rv = local.newSelect;
@@ -797,9 +812,9 @@
 				local.associationKey &= "_" & local.classData.pluralizedName;
 			}
 
-			// Init the tracking list for this association
+			// Init the tracking set for this association
 			if (!structKeyExists(arguments.addedPropertiesByModel, local.associationKey)) {
-				arguments.addedPropertiesByModel[local.associationKey] = "";
+				arguments.addedPropertiesByModel[local.associationKey] = {};
 			}
 
 			// if we find the property in this model and it's not already added we go ahead and add it to the select clause
@@ -809,7 +824,7 @@
 					|| StructKeyExists(local.classData.calculatedProperties, arguments.item)
 					|| ListFindNoCase(local.classData.aliasedPropertyList, arguments.item)
 				)
-				&& !ListFindNoCase(arguments.addedPropertiesByModel[local.associationKey], arguments.item)
+				&& !StructKeyExists(arguments.addedPropertiesByModel[local.associationKey], LCase(arguments.item))
 			) {
 				// if expanded column aliases is enabled then mark all columns from included classes as duplicates in order to prepend them with their class name
 				local.flagAsDuplicate = false;
@@ -866,10 +881,7 @@
 						}
 					}
 				}
-				arguments.addedPropertiesByModel[local.associationKey] = ListAppend(
-					arguments.addedPropertiesByModel[local.associationKey],
-					arguments.item
-				);
+				arguments.addedPropertiesByModel[local.associationKey][LCase(arguments.item)] = true;
 				break;
 			}
 		}
@@ -885,7 +897,7 @@
 	 */
 	public string function $createSQLFieldListDuplicatePrefix(required array classes, required string rv) {
 		local.newSelect = "";
-		local.addedProperties = "";
+		local.addedPropertiesSet = {};
 		local.filteredArray = ListToArray(arguments.rv);
 		local.iEnd = ArrayLen(local.filteredArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
@@ -940,9 +952,9 @@
 					}
 				}
 			}
-			if (!ListFindNoCase(local.addedProperties, local.newProperty)) {
+			if (!StructKeyExists(local.addedPropertiesSet, LCase(local.newProperty))) {
 				local.newSelect = ListAppend(local.newSelect, local.newItem);
-				local.addedProperties = ListAppend(local.addedProperties, local.newProperty);
+				local.addedPropertiesSet[LCase(local.newProperty)] = true;
 			}
 		}
 		return local.newSelect;

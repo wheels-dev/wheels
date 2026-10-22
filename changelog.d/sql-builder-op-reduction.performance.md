@@ -1,0 +1,1 @@
+- Query building does less list work per select and order-by field; generated SQL is unchanged

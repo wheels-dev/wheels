@@ -1,5 +1,22 @@
 component output=false extends="wheels.Global"{
 
+	/**
+	 * Builder-only arguments of $performQuery(): never forwarded as cfquery attributes.
+	 * A static struct set (case-insensitive StructKeyExists, like the previous
+	 * ListFindNoCase) so the per-query copy loop does one O(1) lookup per argument.
+	 * Kept in the component body, not only in $init(), because unit specs instantiate
+	 * bare adapters that never call $init().
+	 */
+	variables.$performQueryExcluded = {
+		sql = true,
+		parameterize = true,
+		$debugName = true,
+		limit = true,
+		offset = true,
+		$primaryKey = true,
+		$captureResult = true
+	};
+
 	public struct function $executeQuery(
 		required struct queryAttributes,
 		required array  sql,
@@ -848,7 +865,7 @@ component output=false extends="wheels.Global"{
 	 */
 	public void function $applyWideDecimalBind(required struct param) {
 		if (
-			!ListFindNoCase("cf_sql_decimal,cf_sql_numeric", arguments.param.cfsqltype)
+			(CompareNoCase(arguments.param.cfsqltype, "cf_sql_decimal") != 0 && CompareNoCase(arguments.param.cfsqltype, "cf_sql_numeric") != 0)
 			|| (StructKeyExists(arguments.param, "null") && arguments.param.null)
 		) {
 			return;
@@ -1520,7 +1537,7 @@ component output=false extends="wheels.Global"{
 		// Copy only the non-excluded keys by reference — Duplicate(arguments) would
 		// deep-clone the entire SQL fragment array (including param structs) per query.
 		for (local.key in arguments) {
-			if (!ListFindNoCase("sql,parameterize,$debugName,limit,offset,$primaryKey,$captureResult", local.key)) {
+			if (!StructKeyExists(variables.$performQueryExcluded, local.key)) {
 				local.queryAttributes[local.key] = arguments[local.key];
 			}
 		}

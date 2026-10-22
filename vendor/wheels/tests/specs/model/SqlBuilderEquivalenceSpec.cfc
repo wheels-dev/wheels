@@ -18,6 +18,23 @@ component extends="wheels.WheelsTest" {
 
 		describe("SQL builder equivalence (performance slice B)", () => {
 
+			describe("$registerAddedProperty", () => {
+
+				it("counts exactly like the reference ListValueCountNoCase list scan", () => {
+					var model = g.model("author");
+					var items = ["id", "id", "ID", "author.id", "author.id AS x", "concat(a,b)", "concat(a,b)", "", "a,a", "a,,b"];
+					var counts = {};
+					var referenceList = "";
+					for (var item in items) {
+						var expected = ListValueCountNoCase(referenceList, item);
+						var actual = model.$registerAddedProperty(counts = counts, item = item);
+						expect(actual).toBe(expected, "item [#item#] diverged from the reference list scan");
+						referenceList = ListAppend(referenceList, item);
+					}
+				});
+
+			});
+
 			describe("golden SQL is byte-identical on the recorded base", () => {
 
 				it("keeps every select-clause byte", () => {
