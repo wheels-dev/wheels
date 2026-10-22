@@ -329,6 +329,12 @@
 	public struct function properties(boolean returnIncluded = true) {
 		local.rv = {};
 		local.propNames = propertyNames();
+		// Read the setting once per call, not once per property: a set() between two
+		// properties() calls still decides the casing of the next call's keys. The flag
+		// lives in the variables scope rather than a new local because a local assigned
+		// before `for (local.key in this)` measured slower on RustCFML; this slot is
+		// overwritten on every call and never read across calls.
+		variables.$resetPropertyKeyCase = $get("resetPropertiesStructKeyCase");
 		// loop through all properties and functions in the this scope
 		for (local.key in this) {
 			// don't return nested properties if returnIncluded is false
@@ -339,7 +345,7 @@
 			if (IsCustomFunction(this[local.key])) {
 				continue;
 			}
-			if ($get("resetPropertiesStructKeyCase")) {
+			if (variables.$resetPropertyKeyCase) {
 				// try to get the property name from the list set on the object, this is just to avoid returning everything in ugly upper case which Adobe ColdFusion does by default
 				local.listPosition = ListFindNoCase(local.propNames, local.key);
 				if (local.listPosition) {
