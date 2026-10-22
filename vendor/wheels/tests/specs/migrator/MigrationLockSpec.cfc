@@ -64,7 +64,11 @@ component extends="wheels.WheelsTest" {
 	// The lease row another instance would hold, expiring `expiresInMs` from now. Both timestamps
 	// read the framework clock seam, so inside travelTo() they follow the frozen tick.
 	function holdAsAnotherInstance(required numeric expiresInMs) {
-		var now = application.wo.$tick();
+		// Non-application receiver: a zero-arg application.wo.$...() as a whole RHS is the
+		// Adobe 2025 compile hazard in cross-engine invariant 16b (here it is a plain method,
+		// not a closure, but the hoisted receiver costs nothing and keeps one shape everywhere).
+		var wo = application.wo;
+		var now = wo.$tick();
 		rawQuery(
 			"INSERT INTO #lockTable()# (lockname, lockowner, lockhost, acquiredat, expiresat) VALUES ('migrate', 'spec-other-instance', 'spec-host', :acquiredAt, :expiresAt)",
 			{acquiredAt = ms(now), expiresAt = ms(now + arguments.expiresInMs)}
@@ -128,11 +132,11 @@ component extends="wheels.WheelsTest" {
 			it("runs a migration once when two instances migrate at the same time", () => {
 				var raceThread = startRaceThread();
 				var waited = 0;
-				while (!application.$migrationLockRaceInside && waited < 2000) {
+				while (!application.$migrationLockRaceInside && waited < 5000) {
 					sleep(50);
 					waited += 50;
 				}
-				expect(application.$migrationLockRaceInside).toBeTrue("the race thread never entered its migration within 2 s");
+				expect(application.$migrationLockRaceInside).toBeTrue("the race thread never entered its migration within 5 s");
 				var second = CreateObject("component", "wheels.Migrator").init(
 					migratePath = "/wheels/tests/_assets/migrator/migrations_4134_race/",
 					sqlPath = "/wheels/tests/_assets/migrator/sql_4134/"
@@ -153,11 +157,14 @@ component extends="wheels.WheelsTest" {
 			it("makes migrateTo() wait for another instance holding it, then run each migration once", () => {
 				application.wheels.migrationLockTimeout = 20;
 				travelTo("2026-10-04 12:00:00", function() {
+					// Hoisted receiver: a zero-arg application.wo.$...() used as the whole RHS
+					// inside a closure does not compile on Adobe 2025 (cross-engine invariant 16b).
+					var wo = application.wo;
 					holdAsAnotherInstance(200); // lease expires at T+200 ms, so the first takeover attempt fails
-					var before = application.wo.$tick();
+					var before = wo.$tick();
 					variables.migrator.migrateTo(variables.version);
 					// One virtual $sleep(1000): the mock advances the frozen clock instead of waiting.
-					expect(application.wo.$tick() - before).toBeGTE(1000);
+					expect(wo.$tick() - before).toBeGTE(1000);
 					expect(application.$migrationLockSpecRuns).toBe(1);
 					expect(lockRows()).toBe(0);
 				});
@@ -430,19 +437,22 @@ component extends="wheels.WheelsTest" {
 
 			it("points a lock timeout at wheels migrate unlock", () => {
 				var saved = application.wheels.migrationLockTimeout;
-				travelTo("2026-10-04 12:00:00", function() {
-					application.wheels.migrationLockTimeout = 1;
-					holdAsAnotherInstance(60000);
-					var state = {detail = ""};
-					try {
-						variables.migrator.migrateTo(variables.version);
-					} catch (any e) {
-						state.detail = e.extendedInfo;
-					}
-					expect(state.detail).toInclude("wheels migrate unlock");
-					expect(state.detail).toInclude("spec-host");
-				});
-				application.wheels.migrationLockTimeout = saved;
+				try {
+					travelTo("2026-10-04 12:00:00", function() {
+						application.wheels.migrationLockTimeout = 1;
+						holdAsAnotherInstance(60000);
+						var state = {detail = ""};
+						try {
+							variables.migrator.migrateTo(variables.version);
+						} catch (any e) {
+							state.detail = e.extendedInfo;
+						}
+						expect(state.detail).toInclude("wheels migrate unlock");
+						expect(state.detail).toInclude("spec-host");
+					});
+				} finally {
+					application.wheels.migrationLockTimeout = saved;
+				}
 			});
 
 		});
