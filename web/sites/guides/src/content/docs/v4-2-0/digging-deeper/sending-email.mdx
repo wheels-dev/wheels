@@ -295,7 +295,7 @@ Use a `.html` or `.txt` extension and open the file in a browser or editor. To p
 
 ## Third-party services
 
-Postmark, SendGrid, AWS SES, Mailgun — they all expose an SMTP endpoint. The mailer code above doesn't change per-provider; only the `server`, `port`, `username`, `password` defaults do.
+Postmark, SendGrid, AWS SES, Mailgun, Groundmail — they all expose an SMTP endpoint. The mailer code above doesn't change per-provider; only the `server`, `port`, `username`, `password` defaults do.
 
 | Provider | Server | Port | Username | Password |
 |----------|--------|------|----------|----------|
@@ -305,9 +305,11 @@ Postmark, SendGrid, AWS SES, Mailgun — they all expose an SMTP endpoint. The m
 | **Mailgun** | `smtp.mailgun.org` | 587 | `postmaster@<domain>` | Mailgun SMTP password |
 | **Groundmail** | `smtp.groundmail.dev` | 587 (or 2525) | `groundmail` (literal) | an SMTP credential (`gmsmtp_…`) |
 
+*Disclosure: the Groundmail row was contributed by the Groundmail team.*
+
 Each provider has its own sender-verification and domain-setup flow (SPF, DKIM, DMARC). Follow their docs for that — the framework side is just SMTP.
 
-Until your sending domain is verified and a payment method is on file (the Free plan isn't charged), Groundmail only sends from `noreply@mail.groundmail.dev` to your own account email. See [Groundmail SMTP relay](https://docs.groundmail.dev/smtp).
+Groundmail's sandbox sends only from `noreply@mail.groundmail.dev` to your own account email until you verify a sending domain and add a payment method; other recipients get a 403. See [Groundmail's SMTP docs](https://docs.groundmail.dev/smtp).
 
 ## Related guides
 
