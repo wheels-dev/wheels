@@ -36,7 +36,6 @@ jobs:
       WHEELS_EXPECT_REPO: "true"
       WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:30007"
       WHEELS_BROWSER_CI_ENABLE: "true"
-      LUCEE_MAVEN_LOCAL_REPOSITORY: ${{ github.workspace }}/../.lucee-mvn
     steps:
       - uses: actions/checkout@v5
 
@@ -59,19 +58,19 @@ jobs:
             lucee-express-${{ runner.os }}-
 
       - name: Report Lucee Express cache
-        run: echo "Lucee Express cache hit=${{ steps.express-cache.outputs.cache-hit }}"
+        run: echo "Lucee Express cache hit=${{ steps.express-cache.outputs.cache-hit || 'false' }}"
 
       - name: Cache Lucee Maven repository
         id: maven-cache
         uses: actions/cache@v5
         with:
-          path: ${{ github.workspace }}/../.lucee-mvn
+          path: ${{ runner.temp }}/.lucee-mvn
           key: lucee-mvn-${{ runner.os }}-${{ hashFiles('.env', 'tools/ci/lucee.ci.json', 'lucee.json') }}
           restore-keys: |
             lucee-mvn-${{ runner.os }}-
 
       - name: Report Lucee Maven cache
-        run: echo "Lucee Maven cache hit=${{ steps.maven-cache.outputs.cache-hit }}"
+        run: echo "Lucee Maven cache hit=${{ steps.maven-cache.outputs.cache-hit || 'false' }}"
 
       - name: Create test databases
         run: |
@@ -120,6 +119,8 @@ jobs:
           bash tools/ci/fetch-sqlite-jdbc.sh /tmp/sqlite-jdbc.jar
 
       - name: Start Lucee server
+        env:
+          LUCEE_MAVEN_LOCAL_REPOSITORY: ${{ runner.temp }}/.lucee-mvn
         run: |
           cp tools/ci/lucee.ci.json lucee.json
 
@@ -142,6 +143,8 @@ jobs:
           done
 
       - name: Install SQLite JDBC into Lucee
+        env:
+          LUCEE_MAVEN_LOCAL_REPOSITORY: ${{ runner.temp }}/.lucee-mvn
         run: |
           # Find where LuCLI placed the Lucee Express lib directory
           LUCEE_LIB=$(find ~/.lucli/express -path "*/lib/ext" -type d 2>/dev/null | head -1)
@@ -238,8 +241,6 @@ jobs:
     name: "Tutorial E2E (new → scaffold → migrate → routes → .json → test)"
     if: github.event.action != 'edited'
     runs-on: ubuntu-24.04
-    env:
-      LUCEE_MAVEN_LOCAL_REPOSITORY: ${{ github.workspace }}/../.lucee-mvn
     steps:
       - uses: actions/checkout@v5
 
@@ -262,19 +263,21 @@ jobs:
             lucee-express-${{ runner.os }}-
 
       - name: Report Lucee Express cache
-        run: echo "Lucee Express cache hit=${{ steps.express-cache.outputs.cache-hit }}"
+        run: echo "Lucee Express cache hit=${{ steps.express-cache.outputs.cache-hit || 'false' }}"
 
       - name: Cache Lucee Maven repository
         id: maven-cache
         uses: actions/cache@v5
         with:
-          path: ${{ github.workspace }}/../.lucee-mvn
+          path: ${{ runner.temp }}/.lucee-mvn
           key: lucee-mvn-${{ runner.os }}-${{ hashFiles('.env', 'tools/ci/lucee.ci.json', 'lucee.json') }}
           restore-keys: |
             lucee-mvn-${{ runner.os }}-
 
       - name: Report Lucee Maven cache
-        run: echo "Lucee Maven cache hit=${{ steps.maven-cache.outputs.cache-hit }}"
+        run: echo "Lucee Maven cache hit=${{ steps.maven-cache.outputs.cache-hit || 'false' }}"
 
       - name: Run tutorial e2e
+        env:
+          LUCEE_MAVEN_LOCAL_REPOSITORY: ${{ runner.temp }}/.lucee-mvn
         run: bash tools/test-tutorial-e2e.sh

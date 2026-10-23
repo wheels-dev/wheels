@@ -44,20 +44,20 @@ runs:
 
     - name: Report Lucee Express cache
       shell: bash
-      run: echo "Lucee Express cache hit=${{ steps.express-cache.outputs.cache-hit }}"
+      run: echo "Lucee Express cache hit=${{ steps.express-cache.outputs.cache-hit || 'false' }}"
 
     - name: Cache Lucee Maven repository
       id: maven-cache
       uses: actions/cache@v5
       with:
-        path: ${{ github.workspace }}/../.lucee-mvn
+        path: ${{ runner.temp }}/.lucee-mvn
         key: lucee-mvn-${{ runner.os }}-${{ hashFiles('.env', 'tools/ci/lucee.ci.json', 'lucee.json') }}
         restore-keys: |
           lucee-mvn-${{ runner.os }}-
 
     - name: Report Lucee Maven cache
       shell: bash
-      run: echo "Lucee Maven cache hit=${{ steps.maven-cache.outputs.cache-hit }}"
+      run: echo "Lucee Maven cache hit=${{ steps.maven-cache.outputs.cache-hit || 'false' }}"
 
     - name: Create test databases
       shell: bash
@@ -113,7 +113,7 @@ runs:
       shell: bash
       env:
         WHEELS_PORT: ${{ inputs.port }}
-        LUCEE_MAVEN_LOCAL_REPOSITORY: ${{ github.workspace }}/../.lucee-mvn
+        LUCEE_MAVEN_LOCAL_REPOSITORY: ${{ runner.temp }}/.lucee-mvn
       run: |
         cp tools/ci/lucee.ci.json lucee.json
 
@@ -138,7 +138,7 @@ runs:
       shell: bash
       env:
         WHEELS_PORT: ${{ inputs.port }}
-        LUCEE_MAVEN_LOCAL_REPOSITORY: ${{ github.workspace }}/../.lucee-mvn
+        LUCEE_MAVEN_LOCAL_REPOSITORY: ${{ runner.temp }}/.lucee-mvn
       run: |
         LUCEE_LIB=$(find ~/.lucli/express -path "*/lib/ext" -type d 2>/dev/null | head -1)
         if [ -z "$LUCEE_LIB" ]; then
