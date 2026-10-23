@@ -1,0 +1,1 @@
+- `renderWith()` no longer throws a `NullPointerException` when JSON-rendered data contains null values, and the date/time form helpers no longer call `isInstanceOf()` on a null or non-object value (#4633)
