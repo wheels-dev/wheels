@@ -641,6 +641,18 @@ window.wdbMigrator = {
 
 <!--- ============ TESTS PANEL ============ --->
 <cfif $get("enablePublicComponent")>
+<!--- #4642: when the app allows tests against the primary datasource, the DebugBar
+	runners must ask for it explicitly or an omitted useTestDB would swap the app to
+	<datasource>_test mid-request. Otherwise the URLs stay exactly as before. --->
+<cfset local.allowPrimaryTests = StructKeyExists(application.wheels, "allowTestsAgainstPrimaryDatasource")
+	&& IsBoolean(application.wheels.allowTestsAgainstPrimaryDatasource)
+	&& application.wheels.allowTestsAgainstPrimaryDatasource>
+<cfset local.testRunnerHref = local.allowPrimaryTests
+	? urlFor(route = "testbox", params = "useTestDB=false")
+	: urlFor(route = "testbox")>
+<cfset local.testRunnerJsonUrl = local.allowPrimaryTests
+	? urlFor(route = "testbox", params = "format=json&useTestDB=false")
+	: urlFor(route = "testbox", params = "format=json")>
 <div class="wdb-panel" id="wdb-panel-tests">
 	<div class="wdb-panel-header">
 		<h3>Test Suite <span class="wdb-panel-note" id="wdb-tests-headline"></span></h3>
@@ -651,7 +663,7 @@ window.wdbMigrator = {
 		<div id="wdb-tests-result" class="wdb-mig-result" style="display:none;"></div>
 		<div class="wdb-mig-toolbar">
 			<button class="wdb-mig-btn" onclick="wdbTestsRerun()">Run again</button>
-			<a class="wdb-mig-btn" style="text-decoration:none;" href="#urlFor(route = 'testbox')#" target="_blank">Open full runner</a>
+			<a class="wdb-mig-btn" style="text-decoration:none;" href="#local.testRunnerHref#" target="_blank">Open full runner</a>
 		</div>
 	</div>
 </div>
@@ -659,7 +671,7 @@ window.wdbMigrator = {
 	TestBox result struct and suppresses the debug bar to avoid recursion. --->
 <script>
 window.wdbTests = {
-	runUrl: '#urlFor(route = "testbox", params = "format=json")#'
+	runUrl: '#local.testRunnerJsonUrl#'
 };
 </script>
 </cfif>
