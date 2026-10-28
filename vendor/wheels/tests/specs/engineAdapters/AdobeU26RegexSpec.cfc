@@ -103,20 +103,30 @@ component extends="wheels.WheelsTest" {
 			describe("call sites", () => {
 
 				it("converts controller names with the patch-26 shapes", () => {
-					expect(application.wheels.engineAdapter.controllerNameToUpperCamelCase("main")).toBeWithCase("Main")
-					expect(application.wheels.engineAdapter.controllerNameToUpperCamelCase("user-settings")).toBeWithCase("UserSettings")
-					expect(application.wheels.engineAdapter.controllerNameToUpperCamelCase("admin.user-settings")).toBeWithCase("admin.UserSettings")
+					var live = application.wheels.engineAdapter
+					expect(live.controllerNameToUpperCamelCase("main")).toBeWithCase("Main")
+					expect(live.controllerNameToUpperCamelCase("user-settings")).toBeWithCase("UserSettings")
+					// The BoxLang override works on the whole name (it preserves only leading dots);
+					// the other adapters keep the dot-delimited namespace unchanged.
+					if (live.isBoxLang()) {
+						expect(live.controllerNameToUpperCamelCase("admin.user-settings")).toBeWithCase("Admin.userSettings")
+					} else {
+						expect(live.controllerNameToUpperCamelCase("admin.user-settings")).toBeWithCase("admin.UserSettings")
+					}
 				})
 
-				it("converts dot-prefixed names through both the base and BoxLang adapters", () => {
+				it("converts dot-prefixed names through the base adapter, and the BoxLang override on BoxLang", () => {
 					var base = CreateObject("component", "wheels.engineAdapters.Base").init("")
-					var boxlang = CreateObject("component", "wheels.engineAdapters.BoxLang.BoxLangAdapter").init("")
-					// The base adapter keeps dot-delimited namespacing; the BoxLang override
-					// deliberately works on the whole name (it preserves only leading dots).
 					expect(base.controllerNameToUpperCamelCase("admin.user-settings")).toBeWithCase("admin.UserSettings")
-					for (var adapter in [base, boxlang]) {
-						expect(adapter.controllerNameToUpperCamelCase(".user")).toBeWithCase(".User")
-						expect(adapter.controllerNameToUpperCamelCase("..user")).toBeWithCase("..User")
+					// The BoxLang module is only compiled on the BoxLang engine (Adobe's compiler
+					// rejects its internal argument name), so instantiate it only there.
+					if (!application.wheels.engineAdapter.isBoxLang()) {
+						expect(base.controllerNameToUpperCamelCase(".user")).toBeWithCase(".User")
+						expect(base.controllerNameToUpperCamelCase("..user")).toBeWithCase("..User")
+					} else {
+						var boxlang = CreateObject("component", "wheels.engineAdapters.BoxLang.BoxLangAdapter").init("")
+						expect(boxlang.controllerNameToUpperCamelCase(".user")).toBeWithCase(".User")
+						expect(boxlang.controllerNameToUpperCamelCase("..user")).toBeWithCase("..User")
 					}
 				})
 
@@ -126,7 +136,10 @@ component extends="wheels.WheelsTest" {
 						params = {},
 						route = {controller = "admin.user-settings", action = "submit-form"}
 					)
-					expect(params.controller).toBeWithCase("admin.UserSettings")
+					var expectedController = application.wheels.engineAdapter.isBoxLang()
+						? "Admin.userSettings"
+						: "admin.UserSettings"
+					expect(params.controller).toBeWithCase(expectedController)
 					expect(params.action).toBeWithCase("submitForm")
 				})
 
