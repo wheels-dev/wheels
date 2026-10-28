@@ -99,7 +99,7 @@ component {
 					// Len > 5 mirrors the old pattern's required sixth character; the prefix
 					// comparison mirrors ReReplaceNoCase's case-insensitive ^flash.
 					if (Len(local.item) > 5 && CompareNoCase(Left(local.item, 5), "flash") == 0) {
-						local.key = LCase(Mid(local.item, 6, 1)) & Mid(local.item, 7);
+						local.key = LCase(Mid(local.item, 6, 1)) & Mid(local.item, 7, Len(local.item) - 6);
 					} else {
 						local.key = local.item;
 					}
