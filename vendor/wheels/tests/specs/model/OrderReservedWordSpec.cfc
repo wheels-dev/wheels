@@ -26,9 +26,25 @@ component extends="wheels.WheelsTest" {
 				{datasource = variables.ds}
 			);
 		}
+
+		// Stands in for a fixture row seeded before this spec runs: the scoped assertions
+		// below must leave it alone (a blanket DELETE would remove it).
+		var names = application.wo.model("CasePreservation").propertyNames();
+		var hidden = "";
+		for (var i = 1; i <= ListLen(names); i++) {
+			if (CompareNoCase(ListGetAt(names, i), "isHidden") == 0) {
+				hidden = ListGetAt(names, i);
+			}
+		}
+		var sentinelProps = {};
+		sentinelProps[hidden] = 0;
+		variables.sentinelId = application.wo.model("CasePreservation").create(properties = sentinelProps).id;
 	}
 
 	function afterAll() {
+		if (StructKeyExists(variables, "sentinelId")) {
+			$deleteRows([variables.sentinelId]);
+		}
 		$dropTable();
 	}
 
@@ -105,9 +121,8 @@ component extends="wheels.WheelsTest" {
 				}
 				expect(Len(hidden)).toBeGT(0);
 
-				// The fixture is not seeded, and only this spec writes to it.
-				QueryExecute("DELETE FROM c_o_r_e_casepreservation", [], {datasource = variables.ds});
-
+				// No blanket DELETE: the spec only reads/creates the rows it owns and scopes
+				// its assertions to them, so a future seeded fixture row survives this spec.
 				var created = [];
 				try {
 					var highProps = {};
@@ -120,14 +135,18 @@ component extends="wheels.WheelsTest" {
 					var low = model.create(properties = lowProps);
 					ArrayAppend(created, low.id);
 
-					var byOrder = model.findAll(order = "#hidden# DESC", returnAs = "query");
+					var ownedIds = "#high.id#,#low.id#";
+					var byOrder = model.findAll(order = "#hidden# DESC", where = "id IN (#ownedIds#)", returnAs = "query");
 					expect(byOrder.recordCount).toBe(2);
 					expect(byOrder.id[1]).toBe(high.id);
 					expect(byOrder.id[2]).toBe(low.id);
 
-					var filtered = model.findAll(where = "#hidden# = 0", returnAs = "query");
+					var filtered = model.findAll(where = "#hidden# = 0 AND id = #low.id#", returnAs = "query");
 					expect(filtered.recordCount).toBe(1);
 					expect(filtered.id[1]).toBe(low.id);
+
+					// The scoped read/delete path must leave rows this spec did not create alone.
+					expect(model.findByKey(variables.sentinelId).id).toBe(variables.sentinelId);
 
 					var target = model.findByKey(low.id);
 					target[hidden] = 1;
