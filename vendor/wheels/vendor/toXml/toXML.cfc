@@ -96,7 +96,11 @@
 			---><cfoutput><!---
 				---><#arguments.rootelement# type="array"#elementattributes#><!---
 					---><cfloop from="1" to="#ArrayLen(arguments.data)#" index="local.x"><!---
-						--->#toXML(data=arguments.data[local.x], rootelement=arguments.itemelement, elementattributes="order=""#local.x#""", addXMLHeader=false)#<!---
+						---><cfif isNull(arguments.data[local.x])><!---
+							---><#arguments.itemelement# type="null" order="#local.x#"/><!---
+						---><cfelse><!---
+							--->#toXML(data=arguments.data[local.x], rootelement=arguments.itemelement, elementattributes="order=""#local.x#""", addXMLHeader=false)#<!---
+						---></cfif><!---
 					---></cfloop><!---
 				---></#arguments.rootelement#><!---
 			---></cfoutput><!---
@@ -118,7 +122,11 @@
 					---><cfloop query="arguments.data"><!---
 						---><#arguments.itemelement# order="#arguments.data.currentrow#"><!---
 							---><cfloop list="#local.columns#" index="local.col"><!---
-								--->#toXML(data=arguments.data[local.col][arguments.data.currentRow], rootElement=local.col, addXMLHeader=false)#<!---
+								---><cfif isNull(arguments.data[local.col][arguments.data.currentRow])><!---
+									---><#local.col# type="null"/><!---
+								---><cfelse><!---
+									--->#toXML(data=arguments.data[local.col][arguments.data.currentRow], rootElement=local.col, addXMLHeader=false)#<!---
+								---></cfif><!---
 							---></cfloop><!---
 						---></#arguments.itemelement#><!---
 					---></cfloop><!---
@@ -139,7 +147,11 @@
 			---><cfoutput><!---
 				---><#arguments.rootelement# type="struct"#arguments.elementattributes#><!---
 					---><cfloop list="#local.keys#" index="local.key"><!---
-						--->#toXML(data=arguments.data[local.key], rootelement=local.key, addXMLHeader=false)#<!---
+						---><cfif isNull(arguments.data[local.key])><!---
+							---><#local.key# type="null"/><!---
+						---><cfelse><!---
+							--->#toXML(data=arguments.data[local.key], rootelement=local.key, addXMLHeader=false)#<!---
+						---></cfif><!---
 					---></cfloop><!---
 				---></#arguments.rootelement#><!---
 			---></cfoutput><!---
@@ -159,7 +171,9 @@
 			---><cfoutput><!---
 				---><#arguments.rootelement# type="component" name="#local.name#"#arguments.elementattributes#><!---
 					---><cfloop list="#local.keys#" index="local.key"><!---
-						---><cfif !IsCustomFunction(arguments.data[local.key])><!---
+						---><cfif isNull(arguments.data[local.key])><!---
+							---><#local.key# type="null"/><!---
+						---><cfelseif !IsCustomFunction(arguments.data[local.key])><!---
 							--->#toXML(data=arguments.data[local.key], rootelement=local.key, addXMLHeader=false)#<!---
 						---></cfif><!---
 					---></cfloop><!---
