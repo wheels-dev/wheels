@@ -455,9 +455,7 @@ component {
 
 		// Transform array into named route.
 		local.name = ArrayToList(local.nameStruct);
-		local.name = ReReplace(local.name, "^,+|,+$", "", "all");
-		local.name = ReReplace(local.name, ",+(\w)", "\U\1", "all");
-		local.name = ReReplace(local.name, ",", "", "all");
+		local.name = $upperCaseAfterComma(local.name);
 
 		// If we have a name, add it to arguments.
 		if (Len(local.name)) {
@@ -494,6 +492,39 @@ component {
 		}
 
 		return this;
+	}
+
+	/**
+	 * Internal function. Replaces the old comma-run replacement sequence without a
+	 * replacement-string case flag: leading/trailing comma runs are trimmed, each comma run
+	 * is removed, and the one character after it is upper-cased when it is a word character
+	 * (the same engine \w class the legacy pattern used). Adobe CF 2023 u26 / 2025 u14 emit
+	 * the case flag as a literal "U" (#4646).
+	 */
+	public string function $upperCaseAfterComma(required string name) {
+		local.trimmed = ReReplace(arguments.name, "^,+|,+$", "", "all");
+		local.rv = "";
+		local.i = 1;
+		local.n = Len(local.trimmed);
+		while (local.i <= local.n) {
+			local.ch = Mid(local.trimmed, local.i, 1);
+			if (local.ch == ",") {
+				// Skip the whole comma run; upper-case the character after it when it is a
+				// word character, exactly like the old comma-run pattern.
+				while (local.i <= local.n && Mid(local.trimmed, local.i, 1) == ",") {
+					local.i++;
+				}
+				if (local.i <= local.n) {
+					local.next = Mid(local.trimmed, local.i, 1);
+					local.rv &= (ReFind("^\w$", local.next) ? UCase(local.next) : local.next);
+					local.i++;
+				}
+			} else {
+				local.rv &= local.ch;
+				local.i++;
+			}
+		}
+		return local.rv;
 	}
 
 	// ---------------------------------------------------------------------------

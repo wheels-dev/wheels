@@ -94,7 +94,15 @@ component {
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				local.item = local.argumentNamesArray[local.i];
 				if (!ListFindNoCase(local.nonFlashArgumentNames, local.item)) {
-					local.key = ReReplaceNoCase(local.item, "^flash(.)", "\l\1");
+					// Manual replacement instead of the old ^flash(.) ReReplaceNoCase with its case flag:
+					// Adobe CF 2023 u26 / 2025 u14 emit the case flag as a literal "l" (#4646).
+					// Len > 5 mirrors the old pattern's required sixth character; the prefix
+					// comparison mirrors ReReplaceNoCase's case-insensitive ^flash.
+					if (Len(local.item) > 5 && CompareNoCase(Left(local.item, 5), "flash") == 0) {
+						local.key = LCase(Mid(local.item, 6, 1)) & Mid(local.item, 7);
+					} else {
+						local.key = local.item;
+					}
 					local.flashArguments = {};
 					local.flashArguments[local.key] = arguments[local.item];
 					flashInsert(argumentCollection = local.flashArguments);

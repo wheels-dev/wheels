@@ -352,8 +352,12 @@
 	 * @string The string to hyphenize.
 	 */
 	public string function hyphenize(required string string) {
-		local.rv = ReReplace(arguments.string, "([A-Z][a-z])", "-\l\1", "all");
-		local.rv = ReReplace(local.rv, "([a-z])([A-Z])", "\1-\l\2", "all");
+		// No replacement case flags: Adobe CF 2023 update 26 / 2025 update 14 emit them as
+		// literal letters (#4646). The final LCase already lower-cases both inserted
+		// letters, and the hyphen insertion means the second pass never depends on the
+		// first pass's letter case.
+		local.rv = ReReplace(arguments.string, "([A-Z][a-z])", "-\1", "all");
+		local.rv = ReReplace(local.rv, "([a-z])([A-Z])", "\1-\2", "all");
 		local.rv = ReReplace(local.rv, "^-", "", "one");
 		local.rv = LCase(local.rv);
 		return local.rv;
