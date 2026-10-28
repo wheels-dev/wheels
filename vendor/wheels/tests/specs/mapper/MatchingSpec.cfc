@@ -41,7 +41,8 @@ component extends="wheels.WheelsTest" {
                     return
                 }
                 var corpus = ["admin,posts", "admin,,posts", "admin,posts,show", "admin,1show", "admin,-show",
-                    ",admin,posts,", "a,b,c", "a,,bc", "a,_b", "", ",,,", "a,b,,c,", "admin,posts,"];
+                    ",admin,posts,", "a,b,c", "a,,bc", "a,_b", "", ",,,", "a,b,,c,", "admin,posts,",
+                    "admin,éshow", "é,É", "a,ñ"];
                 for (var input in corpus) {
                     var legacy = ReReplace(input, "^,+|,+$", "", "all");
                     legacy = ReReplace(legacy, ",+(\w)", "\U\1", "all");

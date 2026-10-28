@@ -65,6 +65,24 @@ component extends="wheels.WheelsTest" {
 				expect(_controller.flash("success")).toBeWithCase("Saved")
 			})
 
+			it("lowercases a digit captured by the flash prefix (##4646)", () => {
+				_controller.$setFlashStorage("session")
+				_controller.flashClear()
+				_controller.redirectTo(action = "test", flash1 = "One")
+
+				expect(_controller.flash("1")).toBeWithCase("One")
+			})
+
+			it("lowercases punctuation captured by the flash prefix (##4646)", () => {
+				_controller.$setFlashStorage("session")
+				_controller.flashClear()
+				// "flash-" is not a valid named-argument identifier, so pass it in a collection.
+				var dashArgs = {action = "test", "flash-" = "Dash"}
+				_controller.redirectTo(argumentCollection = dashArgs)
+
+				expect(_controller.flash("-")).toBeWithCase("Dash")
+			})
+
 			it("matches the flash prefix case-insensitively (##4646)", () => {
 				_controller.$setFlashStorage("session")
 				_controller.flashClear()
