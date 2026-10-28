@@ -1056,9 +1056,11 @@
 	 */
 	public xml function $toXml(required any data) {
 		// A null can only be inspected with isNull() (a direct read throws when the engine
-		// has null support off); render it as empty XML instead of failing the whole response.
+		// has null support off). An xml-typed function cannot return an empty string, so a
+		// root-level null renders as a well-formed null document, mirroring the nested null
+		// element the toXML recursion emits.
 		if (isNull(arguments.data)) {
-			return "";
+			return '<?xml version="1.0" encoding="UTF-8"?><data type="null"/>';
 		}
 		// only instantiate the toXml object once per request
 		if (!StructKeyExists(request.wheels, "toXml")) {

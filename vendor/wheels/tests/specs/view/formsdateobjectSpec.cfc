@@ -33,17 +33,27 @@ component extends="wheels.WheelsTest" {
 				expect(e).toBe(r)
 			})
 
-			it("renders the select when the bound date property is null", () => {
+			it("renders the select when the bound date property is null, matching an empty value", () => {
+				_controller.$injectIntoVariablesScope = this.$injectIntoVariablesScope
+				args = {objectName = "userWithNullBirthday", property = "birthday", order = "month", label = false}
+
 				user = g.model("user").new()
 				user.birthday = javaCast("null", "")
-				_controller.$injectIntoVariablesScope = this.$injectIntoVariablesScope
 				_controller.$injectIntoVariablesScope(name = "userWithNullBirthday", data = user)
+				nullRendered = _controller.dateSelect(argumentCollection = args)
 
-				args = {objectName = "userWithNullBirthday", property = "birthday", order = "month", label = false}
-				actual = _controller.dateSelect(argumentCollection = args)
+				// The coercion must make a null value render exactly like an empty one. On the
+				// engines that carry a real null this is what separates the coerced path from a
+				// null reaching the renderer; on Lucee-null-off/RustCFML both read as empty.
+				emptyUser = g.model("user").new()
+				emptyUser.birthday = ""
+				_controller.$injectIntoVariablesScope(name = "userWithNullBirthday", data = emptyUser)
+				emptyRendered = _controller.dateSelect(argumentCollection = args)
 
-				expect(actual).toBeString()
-				expect(actual).toInclude("<select")
+				expect(nullRendered).toBeString()
+				expect(nullRendered).toInclude("<select")
+				expect(ArrayLen(ReMatchNoCase("<option", nullRendered))).toBe(12)
+				expect(nullRendered).toBeWithCase(emptyRendered)
 			})
 
 			it("is parsing and passing year", () => {
