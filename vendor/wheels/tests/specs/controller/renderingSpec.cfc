@@ -399,6 +399,36 @@ component extends="wheels.WheelsTest" {
 				expect(data).toBeJSON()
 			})
 
+			it("renders null struct values as json without throwing", () => {
+				params.action = "test2"
+				params.format = "json"
+				_controller = application.wo.controller("test", params)
+				_controller.provides("json")
+				data = {}
+				data["success"] = true
+				data["data"] = javaCast("null", "")
+				data["error"] = javaCast("null", "")
+
+				result = _controller.renderWith(data = data, returnAs = "string")
+
+				expect(result).toBeJSON()
+				expect(result).toInclude('"success":true')
+			})
+
+			it("renders null struct values as xml without throwing", () => {
+				params.action = "test2"
+				params.format = "xml"
+				_controller = application.wo.controller("test", params)
+				_controller.provides("xml")
+				data = {}
+				data["data"] = javaCast("null", "")
+
+				result = _controller.renderWith(data = data, returnAs = "string")
+
+				expect(result).toBeXML()
+				expect(result).toInclude('<data type="null"/>')
+			})
+
 			it("throws error when rendering current action as pdf with template ", () => {
 				params.format = "pdf"
 				_controller = application.wo.controller("test", params)

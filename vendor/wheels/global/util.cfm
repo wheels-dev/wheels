@@ -1055,6 +1055,11 @@
 	 * Internal function.
 	 */
 	public xml function $toXml(required any data) {
+		// A null can only be inspected with isNull() (a direct read throws when the engine
+		// has null support off); render it as empty XML instead of failing the whole response.
+		if (isNull(arguments.data)) {
+			return "";
+		}
 		// only instantiate the toXml object once per request
 		if (!StructKeyExists(request.wheels, "toXml")) {
 			request.wheels.toXml = $createObjectFromRoot(

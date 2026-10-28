@@ -33,6 +33,19 @@ component extends="wheels.WheelsTest" {
 				expect(e).toBe(r)
 			})
 
+			it("renders the select when the bound date property is null", () => {
+				user = g.model("user").new()
+				user.birthday = javaCast("null", "")
+				_controller.$injectIntoVariablesScope = this.$injectIntoVariablesScope
+				_controller.$injectIntoVariablesScope(name = "userWithNullBirthday", data = user)
+
+				args = {objectName = "userWithNullBirthday", property = "birthday", order = "month", label = false}
+				actual = _controller.dateSelect(argumentCollection = args)
+
+				expect(actual).toBeString()
+				expect(actual).toInclude("<select")
+			})
+
 			it("is parsing and passing year", () => {
 				args.property = "birthday"
 				args.order = "year"
@@ -146,5 +159,9 @@ component extends="wheels.WheelsTest" {
 
 	function dateSelect_year_str(required string property) {
 		return '<select data-auto-id="user_#arguments.property#_year" id="user-#arguments.property#-year" name="user[#arguments.property#]($year)"><option value="1973">1973</option><option value="1974">1974</option><option selected="selected" value="1975">1975</option><option value="1976">1976</option></select>'
+	}
+
+	function $injectIntoVariablesScope(required string name, required any data) {
+		variables[arguments.name] = arguments.data
 	}
 }

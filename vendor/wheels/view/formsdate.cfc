@@ -120,6 +120,11 @@ component {
 		}
 
 		local.value = $dateOrTimeSelectNormalizeValue($formValue(argumentCollection = arguments));
+		// A null value must not reach the select renderers (direct reads throw on engines
+		// with null support off); render the empty-value select instead.
+		if (isNull(local.value)) {
+			local.value = "";
+		}
 		return $dateOrTimeSelectRender(attrs = arguments, value = local.value, combine = local.combine);
 	}
 
