@@ -54,6 +54,34 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * Internal function. Classifies the verified H2 identifier-folding settings.
+	 * `settings` holds uppercase keys/values (the reader normalises both); the
+	 * classifier still tolerates lowercase values for direct callers.
+	 *
+	 * H2 1.3.x has no DATABASE_TO_LOWER row. Unlike 2.x, H2 1.3 compares quoted
+	 * identifiers case-insensitively, so quoting in the default upper case still
+	 * resolves names created unquoted (and vice versa). Verified on 1.3.172;
+	 * 2.1.214, 2.2.224 and 2.3.232 all expose DATABASE_TO_LOWER, where quoted
+	 * identifiers are case-sensitive and the shortcut therefore does not apply.
+	 */
+	public string function $classifyIdentifierCase(required struct settings) {
+		if (!StructKeyExists(arguments.settings, "DATABASE_TO_LOWER")) {
+			return "upper";
+		}
+		local.lower = UCase(Trim(arguments.settings.DATABASE_TO_LOWER));
+		if (local.lower == "TRUE") {
+			return "lower";
+		}
+		local.upper = StructKeyExists(arguments.settings, "DATABASE_TO_UPPER")
+			? UCase(Trim(arguments.settings.DATABASE_TO_UPPER))
+			: "";
+		if (local.upper == "FALSE") {
+			return "none";
+		}
+		return "upper";
+	}
+
+	/**
 	 * Internal function. Reads H2's identifier folding settings. H2 2.x exposes
 	 * `SETTING_NAME` / `SETTING_VALUE`; H2 1.3.x exposes `NAME` / `VALUE`, and
 	 * has no `DATABASE_TO_LOWER` row at all. `NON_KEYWORDS` is read for the log
@@ -99,17 +127,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			local.settings[UCase(Trim(local.rows[local.nameColumn][local.i]))] = UCase(Trim(local.rows[local.valueColumn][local.i]));
 		}
 
-		if (!StructKeyExists(local.settings, "DATABASE_TO_LOWER")) {
-			// H2 1.3.x: no DATABASE_TO_LOWER setting, and quoted identifiers there are
-			// case-insensitive, so the default upper folding is always safe.
-			local.identifierCase = "upper";
-		} else if (local.settings.DATABASE_TO_LOWER == "TRUE") {
-			local.identifierCase = "lower";
-		} else if (StructKeyExists(local.settings, "DATABASE_TO_UPPER") && local.settings.DATABASE_TO_UPPER == "FALSE") {
-			local.identifierCase = "none";
-		} else {
-			local.identifierCase = "upper";
-		}
+		local.identifierCase = $classifyIdentifierCase(settings = local.settings);
 
 		local.nonKeywords = StructKeyExists(local.settings, "NON_KEYWORDS") ? local.settings.NON_KEYWORDS : "";
 		writeLog(

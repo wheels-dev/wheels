@@ -196,6 +196,36 @@ component extends="wheels.WheelsTest" {
                     expect(none.$quoteIdentifier(name = 'we"ird')).toBe('we"ird');
                 });
 
+                it("H2 classifies the verified identifier-folding settings shapes (##4629)", () => {
+                    var h2 = CreateObject("component", "wheels.databaseAdapters.H2.H2Model");
+                    var cases = [
+                        {settings = {}, expected = "upper"},
+                        {settings = {DATABASE_TO_UPPER = "TRUE"}, expected = "upper"},
+                        {settings = {DATABASE_TO_UPPER = "FALSE"}, expected = "upper"},
+                        {settings = {DATABASE_TO_LOWER = "FALSE", DATABASE_TO_UPPER = "TRUE"}, expected = "upper"},
+                        {settings = {DATABASE_TO_LOWER = "FALSE", DATABASE_TO_UPPER = "FALSE"}, expected = "none"},
+                        {settings = {DATABASE_TO_LOWER = "TRUE"}, expected = "lower"},
+                        {settings = {DATABASE_TO_LOWER = "TRUE", DATABASE_TO_UPPER = "FALSE"}, expected = "lower"},
+                        {settings = {DATABASE_TO_LOWER = "FALSE"}, expected = "upper"},
+                        {settings = {DATABASE_TO_LOWER = "true", DATABASE_TO_UPPER = "false"}, expected = "lower"},
+                        {settings = {DATABASE_TO_LOWER = "TRUE", NON_KEYWORDS = "ORDER,GROUP"}, expected = "lower"}
+                    ];
+                    for (var testCase in cases) {
+                        var label = SerializeJSON(testCase.settings);
+                        expect(h2.$classifyIdentifierCase(settings = testCase.settings)).toBe(
+                            testCase.expected,
+                            "classification for " & label
+                        );
+                    }
+                });
+
+                it("adapters without datasource-dependent quoting key as datasource-independent (##4629)", () => {
+                    var base = CreateObject("component", "wheels.databaseAdapters.Base");
+                    expect(base.$identifierCase()).toBe("");
+                    var sqlite = CreateObject("component", "wheels.databaseAdapters.SQLite.SQLiteModel");
+                    expect(sqlite.$identifierCase()).toBe("");
+                });
+
                 it("H2 without a datasource reports no folding and leaves identifiers unquoted", () => {
                     var h2 = CreateObject("component", "wheels.databaseAdapters.H2.H2Model");
                     expect(h2.$identifierCase()).toBe("none");

@@ -73,7 +73,35 @@ component extends="wheels.WheelsTest" {
 				var assoc = g.model("author").$classData().associations["posts"];
 				expect(StructKeyExists(assoc, "joinVariants")).toBeTrue();
 				expect(StructCount(assoc.joinVariants)).toBe(1);
-				expect(StructKeyExists(assoc.joinVariants, "sd0_alias0")).toBeTrue();
+				var adapter = g.model("author").$classData().adapter;
+				expect(StructKeyExists(assoc.joinVariants, "sd0_alias0_ic" & adapter.$identifierCase())).toBeTrue();
+			});
+
+			it("does not serve a JOIN built under another identifier case (##4629)", () => {
+				var post = g.model("post");
+				var postClassData = post.$classData();
+				var originalAdapter = postClassData.adapter;
+				var association = postClassData.associations["author"];
+				try {
+					var probe = CreateObject("component", "wheels.tests._assets.adapters.H2CaseProbe");
+					postClassData.adapter = probe;
+
+					probe.identifierCase = "upper";
+					post.$expandedAssociations(include = "author");
+					probe.identifierCase = "lower";
+					post.$expandedAssociations(include = "author");
+
+					expect(StructCount(association.joinVariants)).toBe(2);
+					var upperJoin = association.joinVariants["sd0_alias0_icupper"];
+					var lowerJoin = association.joinVariants["sd0_alias0_iclower"];
+					expect(upperJoin).toInclude('"C_O_R_E_AUTHORS"');
+					expect(lowerJoin).toInclude('"c_o_r_e_authors"');
+					// toBe() is case-insensitive; the fragments differ only by case, so compare case-sensitively.
+					expect(Find('"C_O_R_E_AUTHORS"', lowerJoin)).toBe(0);
+				} finally {
+					postClassData.adapter = originalAdapter;
+					$resetJoinMemo("post", "author");
+				}
 			});
 		});
 	}
