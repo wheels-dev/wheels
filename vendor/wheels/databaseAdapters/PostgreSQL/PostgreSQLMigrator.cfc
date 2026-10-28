@@ -100,17 +100,32 @@ component extends="wheels.databaseAdapters.Abstract" {
 	}
 
 	/**
-	 * Don't quote tables
+	 * Internal function. PostgreSQL/CockroachDB model adapters quote lowercase
+	 * unconditionally, so generated DDL does the same. No probe/cache needed.
 	 */
-	public string function quoteTableName(required string name) {
-		return objectCase(arguments.name);
+	public string function $ddlIdentifierCase() {
+		return "lower";
 	}
 
 	/**
-	 * Don't quote columns
+	 * Quotes table/index/view/constraint names lowercase, splitting schema-qualified
+	 * names on "." and quoting each part. Embedded double quotes are doubled by the
+	 * Base helper.
+	 */
+	public string function quoteTableName(required string name) {
+		local.parts = ListToArray(arguments.name, ".");
+		local.rv = "";
+		for (local.i = 1; local.i <= ArrayLen(local.parts); local.i++) {
+			local.rv &= (local.i > 1 ? "." : "") & $quoteDdlIdentifier(local.parts[local.i]);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Quotes a column name lowercase. Do not pass "table.column" here.
 	 */
 	public string function quoteColumnName(required string name) {
-		return objectCase(arguments.name);
+		return $quoteDdlIdentifier(arguments.name);
 	}
 
 	/**
@@ -126,7 +141,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * Rails adaptor appears to be applying default/nulls in separate queries
 	 */
 	public string function changeColumnInTable(required string name, required any column) {
-		local.sql = "ALTER TABLE #quoteTableName(objectCase(arguments.name))# ALTER COLUMN #quoteColumnName(arguments.column.name)# TYPE #arguments.column.sqlType()#";
+		local.sql = "ALTER TABLE #quoteTableName(arguments.name)# ALTER COLUMN #quoteColumnName(arguments.column.name)# TYPE #arguments.column.sqlType()#";
 		for (local.i in ["default", "allowNull", "afterColumn"]) {
 			if (StructKeyExists(arguments.column, local.i)) {
 				local.opts = {};
@@ -149,7 +164,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * generates sql to add a foreign key constraint to a table
 	 */
 	public string function dropForeignKeyFromTable(required string name, required any keyName) {
-		return "ALTER TABLE #quoteTableName(objectCase(arguments.name))# DROP CONSTRAINT #quoteTableName(arguments.keyname)#";
+		return "ALTER TABLE #quoteTableName(arguments.name)# DROP CONSTRAINT #quoteTableName(arguments.keyName)#";
 	}
 
 }
