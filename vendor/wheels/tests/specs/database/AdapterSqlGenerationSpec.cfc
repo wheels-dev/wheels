@@ -204,6 +204,10 @@ component extends="wheels.WheelsTest" {
                         {settings = {DATABASE_TO_UPPER = "FALSE"}, expected = "upper"},
                         {settings = {DATABASE_TO_LOWER = "FALSE", DATABASE_TO_UPPER = "TRUE"}, expected = "upper"},
                         {settings = {DATABASE_TO_LOWER = "FALSE", DATABASE_TO_UPPER = "FALSE"}, expected = "none"},
+                        // Lower-case values reach the none branch through UCase(Trim()) on
+                        // DATABASE_TO_UPPER (the LOWER branch returns before reading it).
+                        {settings = {DATABASE_TO_LOWER = "false", DATABASE_TO_UPPER = "false"}, expected = "none"},
+                        {settings = {DATABASE_TO_LOWER = " false ", DATABASE_TO_UPPER = " false "}, expected = "none"},
                         {settings = {DATABASE_TO_LOWER = "TRUE"}, expected = "lower"},
                         {settings = {DATABASE_TO_LOWER = "TRUE", DATABASE_TO_UPPER = "FALSE"}, expected = "lower"},
                         {settings = {DATABASE_TO_LOWER = "FALSE"}, expected = "upper"},
