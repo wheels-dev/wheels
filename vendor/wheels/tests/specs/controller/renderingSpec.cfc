@@ -426,7 +426,8 @@ component extends="wheels.WheelsTest" {
 				result = _controller.renderWith(data = data, returnAs = "string")
 
 				expect(result).toBeXML()
-				expect(result).toInclude('<data type="null"/>')
+				// Find() is whitespace/format agnostic; engines indent the null element differently.
+				expect(FindNoCase('type="null"', result)).toBeGT(0, "missing null element in [#result#]")
 			})
 
 			it("throws error when rendering current action as pdf with template ", () => {
