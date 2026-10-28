@@ -677,8 +677,13 @@ component extends="wheels.WheelsTest" {
 				col = CreateObject("component", "wheels.migrator.ColumnDefinition")
 					.init(adapter = adapter, name = "publishedAt", type = "datetime")
 				// toIncludeWithCase is case-sensitive — fails if the column
-				// name was folded to "publishedat" anywhere in the DDL.
-				expect(col.toSQL()).toIncludeWithCase("publishedAt")
+				// name was folded to "publishedat" anywhere in the DDL. The H2
+				// migrator quotes generated DDL in the datasource fold case (#4629).
+				if (FindNoCase("H2", adapter.adapterName())) {
+					expect(col.toSQL()).toIncludeWithCase('"PUBLISHEDAT"')
+				} else {
+					expect(col.toSQL()).toIncludeWithCase("publishedAt")
+				}
 			})
 		})
 
