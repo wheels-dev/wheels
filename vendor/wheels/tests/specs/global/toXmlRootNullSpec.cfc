@@ -13,14 +13,13 @@ component extends="wheels.WheelsTest" {
 		describe("$toXml root null (##4638)", () => {
 
 			it("renders a root-level null as a well-formed null document", () => {
-				var output = ""
-				try {
-					output = g.$toXml(javaCast("null", ""))
-				} catch (any e) {
-					// Engines without portable null arguments (Lucee null support off, RustCFML)
-					// throw "required but not passed" before the function body runs.
-					skip("engine cannot pass a null to a required argument")
+				// Probe null-argument support with an unrelated helper, never with $toXml: on a
+				// null-capable engine a regression in $toXml must fail this spec, not be caught
+				// and turned into a skip.
+				if (!$canPassNullArgument()) {
+					skip("engine cannot pass a null to a required argument (Lucee null support off, RustCFML)")
 				}
+				var output = g.$toXml(javaCast("null", ""))
 				expect(output).toBeXML()
 				expect(FindNoCase('type="null"', output)).toBeGT(0, "missing null element in [#output#]")
 			})
@@ -37,6 +36,21 @@ component extends="wheels.WheelsTest" {
 
 		})
 
+	}
+
+	/** True when the engine can pass a null to a required argument. */
+	private boolean function $canPassNullArgument() {
+		try {
+			$acceptsNullArg(javaCast("null", ""))
+		} catch (any e) {
+			return false
+		}
+		return true
+	}
+
+	/** Tiny probe target: only used to detect null-argument support. */
+	private boolean function $acceptsNullArg(required any value) {
+		return IsNull(arguments.value)
 	}
 
 }
