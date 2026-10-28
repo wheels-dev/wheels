@@ -565,6 +565,11 @@ component extends="wheels.WheelsTest" {
 
                 beforeEach(() => {
                     adapter = CreateObject("component", "wheels.databaseAdapters.PostgreSQL.PostgreSQLMigrator");
+                    variables.savedObjectCase = application.wheels.migratorObjectCase;
+                });
+
+                afterEach(() => {
+                    application.wheels.migratorObjectCase = variables.savedObjectCase;
                 });
 
                 it("adapterName()", () => {
@@ -575,11 +580,75 @@ component extends="wheels.WheelsTest" {
                     expect(adapter.addPrimaryKeyOptions(sql = "SERIAL")).toInclude("SERIAL");
                 });
 
-                it("renameTable()/dropForeignKeyFromTable()", () => {
+                it("reports the lower DDL identifier case", () => {
+                    expect(adapter.$ddlIdentifierCase()).toBe("lower");
+                });
+
+                it("quotes table/column identifiers lowercase, without double quoting (##4629)", () => {
+                    expect(adapter.quoteTableName(name = "users")).toBe('"users"');
+                    expect(adapter.quoteTableName(name = "public.users")).toBe('"public"."users"');
+                    expect(adapter.quoteTableName(name = 'public.we"ird')).toBe('"public"."we""ird"');
+                    expect(adapter.quoteColumnName(name = "title")).toBe('"title"');
+                    expect(adapter.quoteColumnName(name = 'we"ird')).toBe('"we""ird"');
+                });
+
+                it("ignores migratorObjectCase while quoting is active (##4629)", () => {
+                    application.wheels.migratorObjectCase = "lower";
+                    expect(adapter.quoteTableName(name = "users")).toBe('"users"');
+                    application.wheels.migratorObjectCase = "upper";
+                    expect(adapter.quoteTableName(name = "users")).toBe('"users"');
+                    expect(adapter.quoteColumnName(name = "title")).toBe('"title"');
+                });
+
+                it("builds quoted createTable DDL from ColumnDefinitions", () => {
+                    var pk = new wheels.migrator.ColumnDefinition(adapter = adapter, name = "id", type = "integer");
+                    var col = new wheels.migrator.ColumnDefinition(adapter = adapter, name = "title", type = "string");
+                    var sql = adapter.createTable(name = "pgunit", columns = [col], primaryKeys = [pk]);
+                    expect(sql).toInclude('CREATE TABLE "pgunit"');
+                    expect(sql).toInclude('"id" INTEGER PRIMARY KEY');
+                    expect(sql).toInclude('"title" VARCHAR(255)');
+                });
+
+                it("routes rename/change/drop/add column DDL through the quoted identifiers", () => {
+                    var col = new wheels.migrator.ColumnDefinition(adapter = adapter, name = "title", type = "string");
                     expect(adapter.renameTable(oldName = "users", newName = "people"))
-                        .toInclude("RENAME");
+                        .toBe('ALTER TABLE "users" RENAME TO "people"');
+                    expect(adapter.changeColumnInTable(name = "posts", column = col))
+                        .toInclude('ALTER TABLE "posts" ALTER COLUMN "title" TYPE VARCHAR(255)');
                     expect(adapter.dropForeignKeyFromTable(name = "posts", keyName = "FK_posts"))
-                        .toInclude("DROP CONSTRAINT");
+                        .toBe('ALTER TABLE "posts" DROP CONSTRAINT "fk_posts"');
+                    expect(adapter.dropTable(name = "users")).toBe('DROP TABLE IF EXISTS "users"');
+                    expect(adapter.addColumnToTable(name = "users", column = col))
+                        .toBe('ALTER TABLE "users" ADD COLUMN "title" VARCHAR(255)');
+                    expect(adapter.dropColumnFromTable(name = "users", columnName = "Title"))
+                        .toBe('ALTER TABLE "users" DROP COLUMN "title"');
+                });
+
+                it("routes index and view DDL through the quoted identifiers", () => {
+                    expect(adapter.addIndex(table = "posts", columnNames = "title"))
+                        .toBe('CREATE INDEX "posts_title" ON "posts"("title")');
+                    expect(adapter.removeIndex(table = "posts", indexName = "idx_posts_title"))
+                        .toBe('DROP INDEX "idx_posts_title"');
+                    expect(adapter.createView(name = "Published", sql = "SELECT 1")).toBe('CREATE VIEW "published" AS SELECT 1');
+                    expect(adapter.dropView(name = "Published")).toBe('DROP VIEW IF EXISTS "published"');
+                });
+
+            });
+
+            describe("CockroachDB migrator", () => {
+
+                beforeEach(() => {
+                    adapter = CreateObject("component", "wheels.databaseAdapters.CockroachDB.CockroachDBMigrator");
+                });
+
+                it("inherits the PostgreSQL lower-case DDL quoting (##4629)", () => {
+                    expect(adapter.adapterName()).toInclude("Cockroach");
+                    expect(adapter.$ddlIdentifierCase()).toBe("lower");
+                    expect(adapter.quoteTableName(name = "users")).toBe('"users"');
+                    expect(adapter.quoteTableName(name = "public.users")).toBe('"public"."users"');
+                    expect(adapter.quoteColumnName(name = 'we"ird')).toBe('"we""ird"');
+                    expect(adapter.renameTable(oldName = "users", newName = "people"))
+                        .toBe('ALTER TABLE "users" RENAME TO "people"');
                 });
 
             });

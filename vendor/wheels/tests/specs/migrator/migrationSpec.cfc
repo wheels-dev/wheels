@@ -681,6 +681,11 @@ component extends="wheels.WheelsTest" {
 				// migrator quotes generated DDL in the datasource fold case (#4629).
 				if (FindNoCase("H2", adapter.adapterName())) {
 					expect(col.toSQL()).toIncludeWithCase('"PUBLISHEDAT"')
+				} else if (
+					FindNoCase("PostgreSQL", adapter.adapterName())
+					|| FindNoCase("Cockroach", adapter.adapterName())
+				) {
+					expect(col.toSQL()).toIncludeWithCase('"publishedat"')
 				} else {
 					expect(col.toSQL()).toIncludeWithCase("publishedAt")
 				}
