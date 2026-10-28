@@ -1,0 +1,1 @@
+- Fixed association JOIN caching for H2 tenants whose datasources fold identifiers differently: a memoised JOIN built for one tenant could be reused for another. The JOIN memo key now includes the adapter's identifier-quoting mode, and H2's fold-case classifier is a separately tested pure function (#4629)

@@ -361,6 +361,16 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. Identifies the identifier-quoting mode for memo keys, so a
+	 * memoised SQL fragment is never shared across datasources that would quote it
+	 * differently (#4629). Adapters whose quoting depends on datasource settings
+	 * override this; an empty string means quoting is datasource-independent.
+	 */
+	public string function $identifierCase() {
+		return "";
+	}
+
+	/**
 	 * Strip all identifier quote characters from a string.
 	 * Used when parsing rendered SQL to compare column names without quoting artifacts.
 	 */

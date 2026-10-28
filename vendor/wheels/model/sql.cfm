@@ -2301,7 +2301,12 @@
 			// the JOIN string depends on the calling context (soft-delete handling and whether the
 			// table needs to be aliased), so memoize it per context variant instead of globally
 			local.aliasJoin = ListFindNoCase(local.tables, local.classAssociations[local.name].tableName) > 0;
-			local.joinVariantKey = "sd" & (arguments.includeSoftDeletes ? 1 : 0) & "_alias" & (local.aliasJoin ? 1 : 0);
+			// Identifier quoting can differ per datasource fold case (H2 tenants), so the
+			// variant key carries the adapter's quoting mode as well as the soft-delete and
+			// alias state; an empty mode keeps the key stable for datasource-independent adapters.
+			local.joinVariantKey = "sd" & (arguments.includeSoftDeletes ? 1 : 0)
+				& "_alias" & (local.aliasJoin ? 1 : 0)
+				& "_ic" & variables.wheels.class.adapter.$identifierCase();
 
 			// create the join string if it hasn't already been done for this context variant
 			$expandedAssociationsJoin(
