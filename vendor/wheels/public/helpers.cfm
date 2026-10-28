@@ -88,8 +88,28 @@ function httpVerbClass(string verb) {
 function outputSetting(array setting) {
 	local.rv = "";
 	for (var i = 1; i LTE ArrayLen(arguments.setting); i = i + 1) {
+		// Build the human-readable label without a regex replacement: Adobe CF 2023
+		// update 26 / 2025 update 14 parse the backslash-u case escape as a literal "u", which
+		// turned setting labels into "udataSourceName" (#4646). Same output as the previous pair of
+		// ReReplace calls: upper-case the first letter, then space every upper-case letter.
+		local.label = "";
+		local.settingName = arguments.setting[i];
+		local.nameLen = Len(local.settingName);
+		for (local.c = 1; local.c <= local.nameLen; local.c++) {
+			local.char = Mid(local.settingName, local.c, 1);
+			local.code = Asc(local.char);
+			if (local.c == 1 && local.code >= 97 && local.code <= 122) {
+				local.char = UCase(local.char);
+				local.code = Asc(local.char);
+			}
+			if (local.code >= 65 && local.code <= 90) {
+				local.label &= " " & local.char;
+			} else {
+				local.label &= local.char;
+			}
+		}
 		local.rv &= '<tr><td class="four wide">';
-		local.rv &= ReReplace(ReReplace(arguments.setting[i], "(^[a-z])", "\u\1"), "([A-Z])", " \1", "all");
+		local.rv &= local.label;
 		local.rv &= '</td><td class="eight wide">';
 		// Resolves on wheels.Public (outputSetting is only invoked from info.cfm
 		// inside Public.cfc::info()) and redacts secret-shaped settings.
