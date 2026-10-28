@@ -6,7 +6,8 @@
  * walking characters instead, with no replacement-string escapes at all.
  *
  * The CI images are pre-patch, so the patched engine cannot run here; correctness is
- * pinned by explicit expected output for the patch-26 shapes, a simulation of the
+ * pinned by case-sensitive expected output for the patch-26 shapes, a guarded
+ * differential against the legacy regex on healthy engines, a simulation of the
  * patched output, and a source guard that the replacement escapes never come back.
  */
 component extends="wheels.WheelsTest" {
@@ -32,11 +33,11 @@ component extends="wheels.WheelsTest" {
 						"a-B" = "A-B",
 						"a1-b2" = "A1B2",
 						"main-2" = "Main-2",
-						"café-über" = "café-über",
+						"café-über" = "Café-über",
 						"" = ""
 					}
 					for (var input in expected) {
-						expect(application.wheels.engineAdapter.$upperCaseAfterDash(input)).toBe(
+						expect(application.wheels.engineAdapter.$upperCaseAfterDash(input)).toBeWithCase(
 							expected[input],
 							"$upperCaseAfterDash('##input##')"
 						)
@@ -56,9 +57,34 @@ component extends="wheels.WheelsTest" {
 						"" = ""
 					}
 					for (var input in expected) {
-						expect(application.wheels.engineAdapter.$upperCaseAfterDash(value = input, uppercaseFirst = false)).toBe(
+						expect(application.wheels.engineAdapter.$upperCaseAfterDash(value = input, uppercaseFirst = false)).toBeWithCase(
 							expected[input],
 							"$upperCaseAfterDash('##input##', uppercaseFirst=false)"
+						)
+					}
+				})
+
+				it("matches the legacy regex replacement on engines where it still parses", () => {
+					// Gate: on patched Adobe builds the legacy case escape emits a literal "u" (the
+					// #4646 bug), so there is no legacy baseline to compare against there.
+					if (ReReplace("a", "(^a)", "\u\1", "all") != "A") {
+						return
+					}
+					var controllerCorpus = [
+						"main", "users", "user-settings", "admin-user-settings", "-main", "a--b", "a-",
+						"A-B", "a-B", "a1-b2", "main-2", "café-über", ""
+					]
+					for (var input in controllerCorpus) {
+						expect(application.wheels.engineAdapter.$upperCaseAfterDash(input)).toBeWithCase(
+							ReReplace(input, "(^|-)([a-z])", "\u\2", "all"),
+							"controller differential for '##input##'"
+						)
+					}
+					var actionCorpus = ["submit-form", "admin-user-settings", "-main", "submit--form", "a-", "a-B", "a1-b2", "main", ""]
+					for (var input in actionCorpus) {
+						expect(application.wheels.engineAdapter.$upperCaseAfterDash(value = input, uppercaseFirst = false)).toBeWithCase(
+							ReReplace(input, "-([a-z])", "\u\1", "all"),
+							"action differential for '##input##'"
 						)
 					}
 				})
@@ -68,8 +94,8 @@ component extends="wheels.WheelsTest" {
 					// that output (literal "u" + the backreference) so the assertion below documents
 					// the failure mode without needing a patched engine.
 					var simulatedPatchedOutput = "u" & ReReplace("main", "(^|-)([a-z])", "\2", "all")
-					expect(simulatedPatchedOutput).toBe("umain")
-					expect(application.wheels.engineAdapter.$upperCaseAfterDash("main")).toBe("Main")
+					expect(simulatedPatchedOutput).toBeWithCase("umain")
+					expect(application.wheels.engineAdapter.$upperCaseAfterDash("main")).toBeWithCase("Main")
 				})
 
 			})
@@ -77,9 +103,21 @@ component extends="wheels.WheelsTest" {
 			describe("call sites", () => {
 
 				it("converts controller names with the patch-26 shapes", () => {
-					expect(application.wheels.engineAdapter.controllerNameToUpperCamelCase("main")).toBe("Main")
-					expect(application.wheels.engineAdapter.controllerNameToUpperCamelCase("user-settings")).toBe("UserSettings")
-					expect(application.wheels.engineAdapter.controllerNameToUpperCamelCase("admin.user-settings")).toBe("admin.UserSettings")
+					expect(application.wheels.engineAdapter.controllerNameToUpperCamelCase("main")).toBeWithCase("Main")
+					expect(application.wheels.engineAdapter.controllerNameToUpperCamelCase("user-settings")).toBeWithCase("UserSettings")
+					expect(application.wheels.engineAdapter.controllerNameToUpperCamelCase("admin.user-settings")).toBeWithCase("admin.UserSettings")
+				})
+
+				it("converts dot-prefixed names through both the base and BoxLang adapters", () => {
+					var base = CreateObject("component", "wheels.engineAdapters.Base").init("")
+					var boxlang = CreateObject("component", "wheels.engineAdapters.BoxLang.BoxLangAdapter").init("")
+					// The base adapter keeps dot-delimited namespacing; the BoxLang override
+					// deliberately works on the whole name (it preserves only leading dots).
+					expect(base.controllerNameToUpperCamelCase("admin.user-settings")).toBeWithCase("admin.UserSettings")
+					for (var adapter in [base, boxlang]) {
+						expect(adapter.controllerNameToUpperCamelCase(".user")).toBeWithCase(".User")
+						expect(adapter.controllerNameToUpperCamelCase("..user")).toBeWithCase("..User")
+					}
 				})
 
 				it("camel-cases route actions through the same helper", () => {
@@ -88,8 +126,8 @@ component extends="wheels.WheelsTest" {
 						params = {},
 						route = {controller = "admin.user-settings", action = "submit-form"}
 					)
-					expect(params.controller).toBe("admin.UserSettings")
-					expect(params.action).toBe("submitForm")
+					expect(params.controller).toBeWithCase("admin.UserSettings")
+					expect(params.action).toBeWithCase("submitForm")
 				})
 
 				it("renders /wheels/info setting labels without a literal-u prefix", () => {
