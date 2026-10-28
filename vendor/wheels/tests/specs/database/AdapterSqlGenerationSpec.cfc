@@ -457,7 +457,12 @@ component extends="wheels.WheelsTest" {
             describe("H2 migrator", () => {
 
                 beforeEach(() => {
-                    adapter = CreateObject("component", "wheels.databaseAdapters.H2.H2Migrator");
+                    adapter = CreateObject("component", "wheels.tests._assets.adapters.H2MigratorCaseProbe");
+                    variables.savedObjectCase = application.wheels.migratorObjectCase;
+                });
+
+                afterEach(() => {
+                    application.wheels.migratorObjectCase = variables.savedObjectCase;
                 });
 
                 it("adapterName()", () => {
@@ -469,45 +474,89 @@ component extends="wheels.WheelsTest" {
                         .toBe("int NOT NULL AUTO_INCREMENT");
                 });
 
-                it("createTable() builds DDL from ColumnDefinitions", () => {
-                    var pk = new wheels.migrator.ColumnDefinition(
-                        adapter = adapter,
-                        name = "id",
-                        type = "integer"
-                    );
-                    var col = new wheels.migrator.ColumnDefinition(
-                        adapter = adapter,
-                        name = "title",
-                        type = "string"
-                    );
+                it("quotes table/column identifiers in the upper fold case", () => {
+                    adapter.identifierCase = "upper";
+                    expect(adapter.quoteTableName(name = "users")).toBe('"USERS"');
+                    expect(adapter.quoteTableName(name = "PUBLIC.users")).toBe('"PUBLIC"."USERS"');
+                    expect(adapter.quoteColumnName(name = "title")).toBe('"TITLE"');
+                    expect(adapter.quoteColumnName(name = 'we"ird')).toBe('"WE""IRD"');
+                });
+
+                it("quotes table/column identifiers in the lower fold case", () => {
+                    adapter.identifierCase = "lower";
+                    expect(adapter.quoteTableName(name = "USERS")).toBe('"users"');
+                    expect(adapter.quoteTableName(name = "PUBLIC.USERS")).toBe('"public"."users"');
+                    expect(adapter.quoteColumnName(name = "TITLE")).toBe('"title"');
+                    expect(adapter.quoteColumnName(name = 'We"ird')).toBe('"we""ird"');
+                });
+
+                it("keeps the unquoted objectCase path when folding is off", () => {
+                    adapter.identifierCase = "none";
+                    application.wheels.migratorObjectCase = "";
+                    expect(adapter.quoteTableName(name = "users")).toBe("users");
+                    expect(adapter.quoteTableName(name = "PUBLIC.users")).toBe("PUBLIC.users");
+                    application.wheels.migratorObjectCase = "lower";
+                    expect(adapter.quoteTableName(name = "USERS")).toBe("users");
+                    expect(adapter.quoteTableName(name = "PUBLIC.USERS")).toBe("public.users");
+                    application.wheels.migratorObjectCase = "upper";
+                    expect(adapter.quoteTableName(name = "users")).toBe("USERS");
+                    expect(adapter.quoteTableName(name = "public.users")).toBe("PUBLIC.USERS");
+                });
+
+                it("ignores migratorObjectCase while quoting is active (##4629)", () => {
+                    adapter.identifierCase = "upper";
+                    application.wheels.migratorObjectCase = "lower";
+                    expect(adapter.quoteTableName(name = "users")).toBe('"USERS"');
+                    adapter.identifierCase = "none";
+                    expect(adapter.quoteTableName(name = "users")).toBe("users");
+                });
+
+                it("createTable() builds quoted DDL from ColumnDefinitions", () => {
+                    adapter.identifierCase = "upper";
+                    var pk = new wheels.migrator.ColumnDefinition(adapter = adapter, name = "id", type = "integer");
+                    var col = new wheels.migrator.ColumnDefinition(adapter = adapter, name = "title", type = "string");
                     var sql = adapter.createTable(name = "h2unit", columns = [col], primaryKeys = [pk]);
-                    expect(sql).toInclude("CREATE TABLE");
-                    expect(sql).toInclude("h2unit");
-                    expect(sql).toInclude("title");
+                    expect(sql).toInclude('CREATE TABLE "H2UNIT"');
+                    expect(sql).toInclude('"ID" INTEGER');
+                    expect(sql).toInclude('PRIMARY KEY ("ID")');
+                    expect(sql).toInclude('"TITLE" VARCHAR');
                 });
 
-                it("quoteTableName()/quoteColumnName()", () => {
-                    expect(adapter.quoteTableName(name = "users")).toInclude("users");
-                    expect(adapter.quoteColumnName(name = "title")).toInclude("title");
-                });
-
-                it("renameTable()/renameColumnInTable()/dropForeignKeyFromTable()", () => {
+                it("routes rename/change/drop DDL through the quoted identifiers", () => {
+                    adapter.identifierCase = "upper";
+                    var col = new wheels.migrator.ColumnDefinition(adapter = adapter, name = "title", type = "string");
                     expect(adapter.renameTable(oldName = "users", newName = "people"))
-                        .toInclude("RENAME");
+                        .toBe('ALTER TABLE "USERS" RENAME TO "PEOPLE"');
                     expect(adapter.renameColumnInTable(name = "users", columnName = "name", newColumnName = "fullname"))
-                        .toInclude("RENAME");
+                        .toBe('ALTER TABLE "USERS" ALTER COLUMN "NAME" RENAME TO "FULLNAME"');
+                    expect(adapter.changeColumnInTable(name = "posts", column = col))
+                        .toInclude('ALTER TABLE "POSTS" ALTER COLUMN "TITLE"');
                     expect(adapter.dropForeignKeyFromTable(name = "posts", keyName = "FK_posts"))
-                        .toInclude("DROP CONSTRAINT");
+                        .toBe('ALTER TABLE "POSTS" DROP CONSTRAINT "FK_POSTS"');
+                    expect(adapter.dropTable(name = "users")).toBe('DROP TABLE IF EXISTS "USERS"');
+                    expect(adapter.addColumnToTable(name = "users", column = col))
+                        .toBe('ALTER TABLE "USERS" ADD COLUMN "TITLE" VARCHAR(255)');
+
+                    adapter.identifierCase = "lower";
+                    expect(adapter.renameTable(oldName = "USERS", newName = "PEOPLE"))
+                        .toBe('ALTER TABLE "users" RENAME TO "people"');
+                    expect(adapter.renameColumnInTable(name = "USERS", columnName = "NAME", newColumnName = "FULLNAME"))
+                        .toBe('ALTER TABLE "users" ALTER COLUMN "name" RENAME TO "fullname"');
                 });
 
-                it("changeColumnInTable()", () => {
-                    var col = new wheels.migrator.ColumnDefinition(
-                        adapter = adapter,
-                        name = "title",
-                        type = "string"
-                    );
-                    expect(adapter.changeColumnInTable(name = "posts", column = col))
-                        .toInclude("ALTER TABLE");
+                it("routes index and view DDL through the quoted identifiers", () => {
+                    adapter.identifierCase = "upper";
+                    expect(adapter.addIndex(table = "posts", columnNames = "authorid", indexName = "idx_posts_authorid"))
+                        .toBe('CREATE INDEX "IDX_POSTS_AUTHORID" ON "POSTS"("AUTHORID")');
+                    expect(adapter.removeIndex(table = "posts", indexName = "idx_posts_authorid"))
+                        .toBe('DROP INDEX "IDX_POSTS_AUTHORID"');
+                    expect(adapter.createView(name = "published", sql = "SELECT 1")).toBe('CREATE VIEW "PUBLISHED" AS SELECT 1');
+                    expect(adapter.dropView(name = "published")).toBe('DROP VIEW IF EXISTS "PUBLISHED"');
+
+                    adapter.identifierCase = "lower";
+                    expect(adapter.addIndex(table = "POSTS", columnNames = "AUTHORID", indexName = "idx_posts_authorid"))
+                        .toBe('CREATE INDEX "idx_posts_authorid" ON "posts"("authorid")');
+                    expect(adapter.createView(name = "PUBLISHED", sql = "SELECT 1")).toBe('CREATE VIEW "published" AS SELECT 1');
                 });
 
             });

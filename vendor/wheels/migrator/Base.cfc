@@ -440,6 +440,27 @@ component extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. Identifier case a folded-DDL migrator quotes generated DDL
+	 * in. Empty means "keep today's objectCase/unquoted path". H2 overrides.
+	 */
+	public string function $ddlIdentifierCase() {
+		return "";
+	}
+
+	/**
+	 * Internal function. Quotes one generated-DDL identifier in the adapter's model
+	 * case. Empty/none falls back to the legacy objectCase/unquoted output.
+	 */
+	public string function $quoteDdlIdentifier(required string name) {
+		local.identifierCase = $ddlIdentifierCase();
+		if (!Len(local.identifierCase) || local.identifierCase == "none") {
+			return objectCase(arguments.name);
+		}
+		local.folded = (local.identifierCase == "upper") ? UCase(arguments.name) : LCase(arguments.name);
+		return """" & Replace(local.folded, """", """""", "all") & """";
+	}
+
+	/**
 	 * Applies case to database objects according to settings
 	 * Note: some db engines use only lower case, TODO: perhaps add certain adapters to these conditions?
 	 */

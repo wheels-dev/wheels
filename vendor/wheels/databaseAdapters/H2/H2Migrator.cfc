@@ -88,24 +88,54 @@ component extends="wheels.databaseAdapters.Abstract" {
 	}
 
 	/**
-	 * surrounds table or index names with quotes (no quotes for H2)
+	 * Internal function. H2 quotes generated DDL in the datasource's own fold case, using
+	 * the model probe (and its per-datasource cache) rather than a second classifier. A
+	 * per-instance model object is cached per effective migrator datasource.
 	 */
-	public any function quoteTableName(required string name) {
-		return objectCase(arguments.name);
+	public string function $ddlIdentifierCase() {
+		local.dataSource = $migratorDataSource();
+		if (!StructKeyExists(variables, "h2Quoters")) {
+			variables.h2Quoters = {};
+		}
+		if (!StructKeyExists(variables.h2Quoters, local.dataSource)) {
+			local.credentials = $migratorDataSourceCredentials();
+			variables.h2Quoters[local.dataSource] = CreateObject(
+				"component", "wheels.databaseAdapters.H2.H2Model"
+			).$init(
+				dataSource = local.dataSource,
+				username = local.credentials.username,
+				password = local.credentials.password
+			);
+		}
+		return variables.h2Quoters[local.dataSource].$identifierCase();
 	}
 
 	/**
-	 * surrounds column names with quotes (no quotes for H2)
+	 * Quotes table/index/view/constraint names in the datasource's fold case, splitting
+	 * schema-qualified names on "." and quoting each part. With folding off this is the
+	 * legacy objectCase/unquoted path.
+	 */
+	public any function quoteTableName(required string name) {
+		local.parts = ListToArray(arguments.name, ".");
+		local.rv = "";
+		for (local.i = 1; local.i <= ArrayLen(local.parts); local.i++) {
+			local.rv &= (local.i > 1 ? "." : "") & $quoteDdlIdentifier(local.parts[local.i]);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Quotes a column name in the datasource's fold case. Do not pass "table.column" here.
 	 */
 	public any function quoteColumnName(required string name) {
-		return objectCase(arguments.name);
+		return $quoteDdlIdentifier(arguments.name);
 	}
 
 	/**
 	 * generates sql to rename a table
 	 */
 	public string function renameTable(required string oldName, required string newName) {
-		return "ALTER TABLE #objectCase(arguments.oldName)# RENAME TO #objectCase(arguments.newName)#";
+		return "ALTER TABLE #quoteTableName(arguments.oldName)# RENAME TO #quoteTableName(arguments.newName)#";
 	}
 
 	/**
@@ -116,21 +146,21 @@ component extends="wheels.databaseAdapters.Abstract" {
 		required string columnName,
 		required string newColumnName
 	) {
-		return "ALTER TABLE #objectCase(arguments.name)# ALTER COLUMN #objectCase(arguments.columnName)# RENAME TO #objectCase(arguments.newColumnName)#";
+		return "ALTER TABLE #quoteTableName(arguments.name)# ALTER COLUMN #quoteColumnName(arguments.columnName)# RENAME TO #quoteColumnName(arguments.newColumnName)#";
 	}
 
 	/**
 	 * generates sql to change an existing column in a table
 	 */
 	public string function changeColumnInTable(required string name, required any column) {
-		return "ALTER TABLE #quoteTableName(objectCase(arguments.name))# ALTER COLUMN #arguments.column.toSQL()#";
+		return "ALTER TABLE #quoteTableName(arguments.name)# ALTER COLUMN #arguments.column.toSQL()#";
 	}
 
 	/**
 	 * generates sql to drop a foreign key constraint from a table
 	 */
 	public string function dropForeignKeyFromTable(required string name, required string keyName) {
-		return "ALTER TABLE #quoteTableName(arguments.name)# DROP CONSTRAINT #objectCase(arguments.keyname)#";
+		return "ALTER TABLE #quoteTableName(arguments.name)# DROP CONSTRAINT #quoteTableName(arguments.keyName)#";
 	}
 
 }
