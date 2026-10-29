@@ -372,49 +372,81 @@ component extends="wheels.WheelsTest" {
 
                 beforeEach(() => {
                     adapter = CreateObject("component", "wheels.databaseAdapters.Oracle.OracleMigrator");
+                    variables.savedObjectCase = application.wheels.migratorObjectCase;
+                });
+
+                afterEach(() => {
+                    application.wheels.migratorObjectCase = variables.savedObjectCase;
                 });
 
                 it("adapterName()", () => {
                     expect(adapter.adapterName()).toInclude("Oracle");
                 });
 
-                it("addIndex() builds CREATE [UNIQUE] INDEX", () => {
-                    expect(adapter.addIndex(table = "posts", columnNames = "authorid"))
-                        .toInclude("CREATE INDEX");
-                    expect(adapter.addIndex(table = "posts", columnNames = "authorid", unique = true))
-                        .toInclude("CREATE UNIQUE INDEX");
+                it("reports the upper DDL identifier case (##4629)", () => {
+                    expect(adapter.$ddlIdentifierCase()).toBe("upper");
                 });
 
-                it("removeIndex()", () => {
-                    expect(adapter.removeIndex(table = "posts", indexName = "idx_posts_authorid"))
-                        .toInclude("DROP INDEX");
+                it("quotes table/column identifiers uppercase, without double quoting (##4629)", () => {
+                    expect(adapter.quoteTableName(name = "users")).toBe('"USERS"');
+                    expect(adapter.quoteTableName(name = "public.users")).toBe('"PUBLIC"."USERS"');
+                    expect(adapter.quoteTableName(name = 'public.we"ird')).toBe('"PUBLIC"."WE""IRD"');
+                    expect(adapter.quoteColumnName(name = "title")).toBe('"TITLE"');
+                    expect(adapter.quoteColumnName(name = 'we"ird')).toBe('"WE""IRD"');
                 });
 
-                it("addPrimaryKeyOptions()", () => {
-                    expect(adapter.addPrimaryKeyOptions(sql = "NUMBER(10)")).toInclude("NUMBER(10)");
+                it("ignores migratorObjectCase while quoting is active (##4629)", () => {
+                    application.wheels.migratorObjectCase = "lower";
+                    expect(adapter.quoteTableName(name = "users")).toBe('"USERS"');
+                    application.wheels.migratorObjectCase = "upper";
+                    expect(adapter.quoteTableName(name = "users")).toBe('"USERS"');
+                    expect(adapter.quoteColumnName(name = "title")).toBe('"TITLE"');
                 });
 
-                it("renameTable()/renameColumnInTable()", () => {
-                    expect(adapter.renameTable(oldName = "users", newName = "people")).toInclude("RENAME");
-                    expect(adapter.renameColumnInTable(name = "users", columnName = "name", newColumnName = "fullname"))
-                        .toInclude("RENAME");
-                });
+                it("createTable() quotes the table, columns and tablespace", () => {
+                    var pk = new wheels.migrator.ColumnDefinition(adapter = adapter, name = "id", type = "integer");
+                    var col = new wheels.migrator.ColumnDefinition(adapter = adapter, name = "title", type = "string");
+                    var sql = adapter.createTable(name = "oraunit", columns = [col], primaryKeys = [pk]);
+                    expect(sql).toInclude('CREATE TABLE "ORAUNIT"');
+                    expect(sql).toInclude('"ID" NUMBER(10) NOT NULL PRIMARY KEY');
+                    expect(sql).toInclude('"TITLE" VARCHAR2(255)');
 
-                it("dropForeignKeyFromTable()", () => {
-                    expect(adapter.dropForeignKeyFromTable(name = "posts", keyName = "FK_posts"))
-                        .toInclude("DROP CONSTRAINT");
-                });
-
-                it("addColumnToTable()/changeColumnInTable() use a ColumnDefinition", () => {
-                    var column = new wheels.migrator.ColumnDefinition(
-                        adapter = adapter,
-                        name = "title",
-                        type = "string"
+                    var withTablespace = adapter.createTable(
+                        name = "oraunit",
+                        columns = [col],
+                        primaryKeys = [pk],
+                        options = {tablespace = "users"}
                     );
-                    expect(adapter.addColumnToTable(name = "posts", column = column))
-                        .toInclude("ALTER TABLE");
-                    expect(adapter.changeColumnInTable(name = "posts", column = column))
-                        .toInclude("ALTER TABLE");
+                    expect(withTablespace).toInclude('TABLESPACE "USERS"');
+                });
+
+                it("routes rename/change/drop/add column and foreign-key DDL through the quoted identifiers", () => {
+                    var col = new wheels.migrator.ColumnDefinition(adapter = adapter, name = "title", type = "string");
+                    expect(adapter.renameTable(oldName = "users", newName = "people"))
+                        .toBe('ALTER TABLE "USERS" RENAME TO "PEOPLE"');
+                    expect(adapter.renameColumnInTable(name = "users", columnName = "name", newColumnName = "fullname"))
+                        .toBe('ALTER TABLE "USERS" RENAME COLUMN "NAME" TO "FULLNAME"');
+                    expect(adapter.addColumnToTable(name = "posts", column = col))
+                        .toBe('ALTER TABLE "POSTS" ADD "TITLE" VARCHAR2(255)');
+                    expect(adapter.changeColumnInTable(name = "posts", column = col))
+                        .toBe('ALTER TABLE "POSTS" MODIFY "TITLE" VARCHAR2(255)');
+                    expect(adapter.dropForeignKeyFromTable(name = "posts", keyName = "FK_posts"))
+                        .toBe('ALTER TABLE "POSTS" DROP CONSTRAINT "FK_POSTS"');
+                    expect(adapter.dropTable(name = "users")).toBe(
+                        "BEGIN EXECUTE IMMEDIATE 'DROP TABLE ""USERS"" CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;"
+                    );
+                    expect(adapter.dropView(name = "user_summaries")).toBe(
+                        "BEGIN EXECUTE IMMEDIATE 'DROP VIEW ""USER_SUMMARIES""'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;"
+                    );
+                });
+
+                it("routes index DDL through the quoted identifiers", () => {
+                    expect(adapter.addIndex(table = "posts", columnNames = "authorid"))
+                        .toBe('CREATE INDEX "POSTS_AUTHORID" ON "POSTS"("AUTHORID")');
+                    expect(adapter.addIndex(table = "posts", columnNames = "authorid", unique = true, indexName = "idx_pa"))
+                        .toBe('CREATE UNIQUE INDEX "IDX_PA" ON "POSTS"("AUTHORID")');
+                    expect(adapter.removeIndex(table = "posts", indexName = "idx_posts_authorid"))
+                        .toBe('DROP INDEX "IDX_POSTS_AUTHORID"');
                 });
 
             });

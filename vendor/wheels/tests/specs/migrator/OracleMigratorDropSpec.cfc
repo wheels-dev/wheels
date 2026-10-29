@@ -51,6 +51,13 @@ component extends="wheels.WheelsTest" {
 				expect(FindNoCase("-942", sql) > 0).toBeTrue();
 			});
 
+			it("quotes the dropped table/view identifiers uppercase (##4629)", () => {
+				var adapter = CreateObject("component", "wheels.databaseAdapters.Oracle.OracleMigrator");
+				expect(adapter.dropTable("users")).toInclude("DROP TABLE ""USERS"" CASCADE CONSTRAINTS");
+				expect(adapter.dropTable("users")).notToInclude('""USERS""');
+				expect(adapter.dropView("user_summaries")).toInclude("DROP VIEW ""USER_SUMMARIES""");
+			});
+
 		});
 	}
 
