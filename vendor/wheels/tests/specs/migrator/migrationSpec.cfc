@@ -686,6 +686,8 @@ component extends="wheels.WheelsTest" {
 					|| FindNoCase("Cockroach", adapter.adapterName())
 				) {
 					expect(col.toSQL()).toIncludeWithCase('"publishedat"')
+				} else if (FindNoCase("Oracle", adapter.adapterName())) {
+					expect(col.toSQL()).toIncludeWithCase('"PUBLISHEDAT"')
 				} else {
 					expect(col.toSQL()).toIncludeWithCase("publishedAt")
 				}

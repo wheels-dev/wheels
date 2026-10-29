@@ -425,9 +425,11 @@ component extends="wheels.WheelsTest" {
 					primaryKeys = [pk1, pk2],
 					foreignKeys = [fk]
 				);
-				expect(sql).toInclude("CREATE TABLE posts");
-				expect(sql).toInclude("title");
-				expect(sql).toInclude("firstId");
+				// Oracle generated DDL identifiers are quoted uppercase (#4629).
+				expect(sql).toInclude('CREATE TABLE "POSTS"');
+				expect(sql).toInclude('"TITLE"');
+				expect(sql).toInclude('"FIRSTID"');
+				expect(sql).toInclude('"USERID"');
 				expect(sql).toInclude("FOREIGN KEY");
 			});
 

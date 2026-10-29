@@ -98,14 +98,14 @@ component extends="wheels.databaseAdapters.Abstract" {
             arrayAppend(local.lines, local.fk.toForeignKeySQL());
         }
 
-        // 5. Join all lines and wrap in CREATE TABLE
-        local.sql = "CREATE TABLE #arguments.name# (" &
+        // 5. Join all lines and wrap in CREATE TABLE (identifiers quoted upper-case, #4629)
+        local.sql = "CREATE TABLE #quoteTableName(arguments.name)# (" &
                     ArrayToList(local.lines) &
                     ")";
 
-        // 6. Optional Oracle-specific options
+        // 6. Optional Oracle-specific options. TABLESPACE takes an identifier, quoted like the rest.
         if (StructKeyExists(arguments.options, "tablespace") && Len(arguments.options.tablespace)) {
-            local.sql &= " TABLESPACE " & arguments.options.tablespace;
+            local.sql &= " TABLESPACE " & quoteTableName(arguments.options.tablespace);
         }
 
         return local.sql;
@@ -130,7 +130,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * constraint) because the parent table's incoming FK survives the drop.
 	 */
     public string function dropTable(required string name) {
-		return "BEGIN EXECUTE IMMEDIATE 'DROP TABLE #objectCase(arguments.name)# CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;";
+		return "BEGIN EXECUTE IMMEDIATE 'DROP TABLE #quoteTableName(arguments.name)# CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;";
 	}
 
 	/**
@@ -142,21 +142,21 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * Oracle version. Views have no CASCADE CONSTRAINTS clause.
 	 */
 	public string function dropView(required string name) {
-		return "BEGIN EXECUTE IMMEDIATE 'DROP VIEW #objectCase(arguments.name)#'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;";
+		return "BEGIN EXECUTE IMMEDIATE 'DROP VIEW #quoteTableName(arguments.name)#'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;";
 	}
 
     /**
 	 * generates sql to add a new column to a table
 	 */
 	public string function addColumnToTable(required string name, required any column) {
-		return "ALTER TABLE #objectCase(arguments.name)# ADD #arguments.column.toSQL()#";
+		return "ALTER TABLE #quoteTableName(arguments.name)# ADD #arguments.column.toSQL()#";
 	}
 
     /**
 	 * generates sql to add a foreign key constraint to a table
 	 */
 	public string function addForeignKeyToTable(required string name, required any foreignKey) {
-		return "ALTER TABLE #objectCase(arguments.name)# ADD #arguments.foreignKey.toSQL()#";
+		return "ALTER TABLE #quoteTableName(arguments.name)# ADD #arguments.foreignKey.toSQL()#";
 	}
 
     /**
@@ -173,7 +173,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 		if (arguments.unique) {
 			sql = sql & "UNIQUE ";
 		}
-		sql = sql & "INDEX #arguments.indexName# ON #arguments.table#(";
+		sql = sql & "INDEX #quoteTableName(arguments.indexName)# ON #quoteTableName(arguments.table)#(";
 
 		local.columnNamesArray = ListToArray(arguments.columnNames);
 		local.iEnd = ArrayLen(local.columnNamesArray);
@@ -188,19 +188,32 @@ component extends="wheels.databaseAdapters.Abstract" {
 	}
 
     /**
-     * Surrounds table names with double‑quotes to preserve case
-     * and allow use of reserved words. Also handles dotted names
-     * (schema.table) by quoting each part.
+     * Internal function. Oracle model adapters quote uppercase unconditionally, so
+     * generated DDL does the same. No probe/cache needed (#4629).
      */
-    public string function quoteTableName(required string name) {
-        return objectCase(arguments.name);
+    public string function $ddlIdentifierCase() {
+        return "upper";
     }
 
     /**
-     * Surrounds column names with double‑quotes.
+     * Quotes table/index/view/constraint names uppercase, splitting schema-qualified
+     * names on "." and quoting each part. Embedded double quotes are doubled by the
+     * Base helper.
+     */
+    public string function quoteTableName(required string name) {
+        local.parts = ListToArray(arguments.name, ".");
+        local.rv = "";
+        for (local.i = 1; local.i <= ArrayLen(local.parts); local.i++) {
+            local.rv &= (local.i > 1 ? "." : "") & $quoteDdlIdentifier(local.parts[local.i]);
+        }
+        return local.rv;
+    }
+
+    /**
+     * Quotes a column name uppercase. Do not pass "table.column" here.
      */
     public string function quoteColumnName(required string name) {
-        return objectCase(arguments.name);
+        return $quoteDdlIdentifier(arguments.name);
     }
 
     /**
@@ -236,7 +249,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * generates sql to drop a foreign key constraint from a table
 	 */
 	public string function dropForeignKeyFromTable(required string name, required string keyName) {
-		return "ALTER TABLE #quoteTableName(objectCase(arguments.name))# DROP CONSTRAINT #quoteTableName(arguments.keyname)#";
+		return "ALTER TABLE #quoteTableName(arguments.name)# DROP CONSTRAINT #quoteTableName(arguments.keyName)#";
 	}
 
     /**
@@ -271,7 +284,7 @@ component extends="wheels.databaseAdapters.Abstract" {
         required string oldName,
         required string newName
     ) {
-        return "ALTER TABLE #quoteTableName(arguments.oldName)# RENAME TO #objectCase(arguments.newName)#";
+        return "ALTER TABLE #quoteTableName(arguments.oldName)# RENAME TO #quoteTableName(arguments.newName)#";
     }
 
     /**
@@ -359,8 +372,9 @@ component extends="wheels.databaseAdapters.Abstract" {
         if (Len(arguments.indexName)) {
             return "DROP INDEX #quoteTableName(arguments.indexName)#";
         } else {
-            // When an index name isn't provided Wheels builds it like {table}_{col}_idx
-            return "DROP INDEX #objectCase(arguments.table)#";
+            // When an index name isn't provided Wheels builds it like {table}_{col}_idx.
+            // Pre-existing naming mismatch kept as-is; only the emitted name is quoted (#4629).
+            return "DROP INDEX #quoteTableName(arguments.table)#";
         }
     }
 
