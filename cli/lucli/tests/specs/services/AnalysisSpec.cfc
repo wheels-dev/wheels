@@ -73,6 +73,93 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(results.executionTime).toBeGTE(0);
 				});
 
+				describe("todo-comment detection", () => {
+
+					it("flags TODO in a /* block comment", () => {
+						var path = $writeTodoModel(
+							"TodoBlockComment.cfc",
+							'component extends="Model" {' & chr(10) &
+							'    /* TODO: replace the placeholder */' & chr(10) &
+							'    function config() {}' & chr(10) &
+							'}'
+						);
+						var smells = $todoSmells("TodoBlockComment.cfc");
+						expect(arrayLen(smells)).toBe(1);
+						expect(smells[1].line).toBe(2);
+						fileDelete(path);
+					});
+
+					it("flags FIXME on a doc-comment continuation line", () => {
+						var path = $writeTodoModel(
+							"TodoDocComment.cfc",
+							'component extends="Model" {' & chr(10) &
+							'    /**' & chr(10) &
+							'     * FIXME: drop the legacy branch' & chr(10) &
+							'     */' & chr(10) &
+							'    function config() {}' & chr(10) &
+							'}'
+						);
+						var smells = $todoSmells("TodoDocComment.cfc");
+						expect(arrayLen(smells)).toBe(1);
+						expect(smells[1].line).toBe(3);
+						fileDelete(path);
+					});
+
+					it("still flags a // line comment", () => {
+						var path = $writeTodoModel(
+							"TodoLineComment.cfc",
+							'component extends="Model" {' & chr(10) &
+							'    // TODO: still detected' & chr(10) &
+							'    function config() {}' & chr(10) &
+							'}'
+						);
+						var smells = $todoSmells("TodoLineComment.cfc");
+						expect(arrayLen(smells)).toBe(1);
+						expect(smells[1].line).toBe(2);
+						fileDelete(path);
+					});
+
+					it("still flags a <!--- tag comment", () => {
+						var path = $writeTodoModel(
+							"TodoTagComment.cfc",
+							'component extends="Model" {' & chr(10) &
+							'    <!--- HACK: workaround --->' & chr(10) &
+							'    function config() {}' & chr(10) &
+							'}'
+						);
+						var smells = $todoSmells("TodoTagComment.cfc");
+						expect(arrayLen(smells)).toBe(1);
+						fileDelete(path);
+					});
+
+					it("does not flag a marker that is part of a longer word", () => {
+						var path = $writeTodoModel(
+							"TodoPluralWord.cfc",
+							'component extends="Model" {' & chr(10) &
+							'    // TODOS: not a marker' & chr(10) &
+							'    function config() {}' & chr(10) &
+							'}'
+						);
+						var smells = $todoSmells("TodoPluralWord.cfc");
+						expect(arrayLen(smells)).toBe(0);
+						fileDelete(path);
+					});
+
+					it("does not flag a marker inside a string literal", () => {
+						var path = $writeTodoModel(
+							"TodoStringLiteral.cfc",
+							'component extends="Model" {' & chr(10) &
+							'    var label = "TODO: just text";' & chr(10) &
+							'    function config() {}' & chr(10) &
+							'}'
+						);
+						var smells = $todoSmells("TodoStringLiteral.cfc");
+						expect(arrayLen(smells)).toBe(0);
+						fileDelete(path);
+					});
+
+				});
+
 			});
 
 			describe("validate()", () => {
@@ -262,6 +349,31 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+	}
+
+	/**
+	 * Write a CFC into the temp project's app/models directory and return its path.
+	 */
+	private string function $writeTodoModel(required string fileName, required string content) {
+		var modelDir = variables.tempRoot & "/app/models";
+		directoryCreate(modelDir, true, true);
+		var path = modelDir & "/" & arguments.fileName;
+		fileWrite(path, arguments.content);
+		return path;
+	}
+
+	/**
+	 * Return the todo-comment code smells reported for one temp-project file.
+	 */
+	private array function $todoSmells(required string fileName) {
+		var smells = [];
+		var results = variables.analysis.analyze("all");
+		for (var smell in results.codeSmells) {
+			if (smell.rule == "todo-comment" && findNoCase(arguments.fileName, smell.file)) {
+				arrayAppend(smells, smell);
+			}
+		}
+		return smells;
 	}
 
 }
