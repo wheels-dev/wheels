@@ -505,7 +505,7 @@ component {
 			evaluate: B & "evaluate" & S & "*" & LP,
 			funcDef: "function" & S & "+(" & W & "+)" & S & "*" & LP,
 			funcParams: "function" & S & "+" & W & "+" & S & "*" & LP & "([^)]+)" & RP,
-			todo: "(" & bs & "//" & "|<!---?)" & S & "*(TODO|FIXME|HACK|XXX|BUG):?",
+			todo: "(" & bs & "//" & "|<!---?)" & S & "*(TODO|FIXME|HACK|XXX|BUG)" & B & ":?",
 			resource: bs & ".resources" & S & "*" & LP,
 			complexity: [
 				B & "if" & S & "*" & LP,
