@@ -1,1 +1,0 @@
-- `select=` expressions that contain SQL functions with commas (`CONCAT`, `IF`, `COALESCE`, …) are no longer corrupted when used with `include=` or a distinct group-by query (#4634)

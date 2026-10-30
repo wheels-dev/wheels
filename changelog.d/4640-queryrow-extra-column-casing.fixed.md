@@ -1,1 +1,0 @@
-- Extra query columns (custom `select=` aliases, joined columns, driver metadata) now follow the same key-casing rule as model properties when rows are returned as structs or JSON: lowercased when `resetPropertiesStructKeyCase` is enabled (the default), raw casing when it is disabled. Camel-cased `select` aliases therefore serialize in lowercase by default (#4640)

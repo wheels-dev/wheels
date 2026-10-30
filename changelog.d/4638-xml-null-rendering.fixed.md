@@ -1,1 +1,0 @@
-- XML rendering no longer throws when the data contains a null value: null struct, array, query and component values are emitted as `type="null"` elements and a null top-level value renders as a well-formed `<data type="null"/>` document. The date/time form helpers also coerce a null bound value to the empty selection instead of passing it to the select renderers (#4638)
