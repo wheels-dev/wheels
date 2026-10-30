@@ -1,1 +1,0 @@
-- Adobe CF 2023 update 26 / 2025 update 14 also emit the `\l` / `\U` regex replacement case flags as literal letters: hyphenized route names, flash argument keys and named-route derivation now use engine-neutral equivalents and produce identical output on unpatched engines (#4646)
