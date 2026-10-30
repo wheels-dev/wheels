@@ -28,7 +28,7 @@ wheels analyze [target]
 
 #### Description
 
-`wheels analyze` delegates to the `analysis` service, which reads files under `app/models/`, `app/controllers/`, and `app/views/` (or a single directory if you pass a target). Each file is scanned for Wheels-specific anti-patterns — the kind listed in the top-10 at the root of this project — plus cyclomatic-complexity outliers and generic code smells. The command prints counts, a letter grade (A–F) backed by a 0–100 health score, and the individual findings with file name, line number, and severity.
+`wheels analyze` delegates to the `analysis` service, which reads files under `app/models/`, `app/controllers/`, and `app/views/` (or a single directory if you pass a target). Each file is scanned for Wheels-specific anti-patterns — mixed argument styles, query-vs-array confusion in views, public controller filters, missing `cfparam` declarations, and unsafe calls such as `preserveSingleQuotes()` and `evaluate()` — plus cyclomatic-complexity outliers and generic code smells. The command prints counts, a letter grade (A–F) backed by a 0–100 health score, and the individual findings with file name, line number, and severity.
 
 This command does not require a running server. It reads the project off disk and exits.
 
@@ -46,6 +46,25 @@ If you pass anything else, the command falls through to `all`.
 #### Flags
 
 None. `wheels analyze` takes a single positional target and no flags.
+
+#### What it checks
+
+The scanner reads `.cfc` and `.cfm` files in the selected directories and skips any path containing `vendor/`, `node_modules/`, `.git/`, `testbox/`, `tests/`, or `build/`. The rule ids below are the analyzer's internal names; the CLI prints the finding's message, not the id.
+
+| Rule id | Category | Severity | Trigger |
+|---|---|---|---|
+| `mixed-argument-styles` | Anti-pattern | Error | An association or validation call (`hasMany`, `hasOne`, `belongsTo`, `validatesPresenceOf`, `validatesUniquenessOf`, `validatesFormatOf`) mixes a positional quoted value with a named argument. |
+| `query-array-confusion` | Anti-pattern | Warning | A view uses `<cfloop array="...">` even though model finders return queries. |
+| `public-filter-function` | Anti-pattern | Warning | A `filters` / `beforeFilter` / `verifies` callback named with `through=` or `handler=` is not declared `private`. |
+| `missing-cfparam` | Anti-pattern | Warning | A non-partial view outputs `#...#` values but has no `cfparam`. |
+| `sql-injection` | Anti-pattern | Error | A file calls `preserveSingleQuotes()`. |
+| `no-evaluate` | Anti-pattern | Error | A file calls `evaluate()`. |
+| — | Complexity | Advisory | A function's cyclomatic complexity exceeds **10** (starts at 1; adds 1 for each `if`, `elseif`, `case`, `for`, `while`, `catch`, `&&`, `||`). |
+| `max-file-length` | Code smell | Advisory | A file is longer than **500 lines**. |
+| `long-parameter-list` | Code smell | Advisory | A function declares more than **5 parameters**. |
+| `todo-comment` | Code smell | Advisory | A `//` or `<!---` comment contains `TODO`, `FIXME`, `HACK`, `XXX`, or `BUG` (uppercase only; trailing colon optional). |
+
+Complex-function findings have no rule id; they appear under `Complex Functions` with the function name and measured complexity. Advisory findings are printed in yellow without an `[ERROR]` or `[WARNING]` prefix.
 
 #### Example
 
