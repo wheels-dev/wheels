@@ -327,9 +327,16 @@ component {
 		// TODO/FIXME comments
 		var todoMatches = reFindAll(variables.TODO_PATTERN, arguments.content, false);
 		for (var m in todoMatches) {
+			// A doc-comment continuation match includes the newline that anchors
+			// it to the start of its line; step onto that line before reporting,
+			// since listLen() ignores a trailing delimiter.
+			var matchPos = m.pos;
+			if (mid(arguments.content, matchPos, 1) == chr(10)) {
+				matchPos++;
+			}
 			arrayAppend(results.codeSmells, {
 				file: arguments.path,
-				line: getLineNumber(arguments.content, m.pos),
+				line: getLineNumber(arguments.content, matchPos),
 				rule: "todo-comment",
 				message: "TODO/FIXME found — technical debt"
 			});
@@ -495,6 +502,7 @@ component {
 		var B = bs & "b";
 		var LP = bs & "(";
 		var RP = bs & ")";
+		var HT = "[ " & bs & "t]";
 
 		var lt = chr(60);  // <
 		return {
@@ -505,7 +513,11 @@ component {
 			evaluate: B & "evaluate" & S & "*" & LP,
 			funcDef: "function" & S & "+(" & W & "+)" & S & "*" & LP,
 			funcParams: "function" & S & "+" & W & "+" & S & "*" & LP & "([^)]+)" & RP,
-			todo: "(" & bs & "//" & "|<!---?)" & S & "*(TODO|FIXME|HACK|XXX|BUG)" & B & ":?",
+			todo: "(" & bs & "//"
+				& "|<!---?"
+				& "|" & bs & "/" & bs & "*+"
+				& "|(^|" & bs & "n)" & HT & "*" & bs & "*" & HT & "+"
+				& ")" & S & "*(TODO|FIXME|HACK|XXX|BUG)" & B & ":?",
 			resource: bs & ".resources" & S & "*" & LP,
 			complexity: [
 				B & "if" & S & "*" & LP,

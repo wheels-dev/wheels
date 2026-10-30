@@ -62,7 +62,7 @@ The scanner reads `.cfc` and `.cfm` files in the selected directories and skips 
 | — | Complexity | Advisory | A function's cyclomatic complexity exceeds **10** (starts at 1; adds 1 for each `if`, `elseif`, `case`, `for`, `while`, `catch`, `&&`, `||`). |
 | `max-file-length` | Code smell | Advisory | A file is longer than **500 lines**. |
 | `long-parameter-list` | Code smell | Advisory | A function declares more than **5 parameters**. |
-| `todo-comment` | Code smell | Advisory | A `//` or `<!---` comment contains `TODO`, `FIXME`, `HACK`, `XXX`, or `BUG` (uppercase only; trailing colon optional). |
+| `todo-comment` | Code smell | Advisory | A comment opens with `TODO`, `FIXME`, `HACK`, `XXX`, or `BUG` as a whole word, uppercase only, trailing colon optional. Covers `//`, `<!---`, and `/*` comments and doc-comment lines that start with `*`. |
 
 Complex-function findings have no rule id; they appear under `Complex Functions` with the function name and measured complexity. Advisory findings are printed in yellow without an `[ERROR]` or `[WARNING]` prefix.
 
