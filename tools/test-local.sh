@@ -188,6 +188,11 @@ if [ -z "$CLI_HOME_OVERRIDE" ] && [ -n "$PINNED_HOME" ]; then
   export LUCLI_JAVA_ARGS="${LUCLI_JAVA_ARGS:-} -Dlucli.home=$PINNED_HOME"
 fi
 if [ -n "$CLI_HOME_OVERRIDE" ]; then
+  # Export the resolved override as LUCLI_HOME, so child processes (a nested
+  # wheels call, or a spec shelling out) don't fall back to their own default.
+  if [ "${LUCLI_HOME:-}" != "$CLI_HOME_OVERRIDE" ]; then
+    export LUCLI_HOME="$CLI_HOME_OVERRIDE"
+  fi
   export LUCLI_JAVA_ARGS="${LUCLI_JAVA_ARGS:-} -Dlucli.home=$CLI_HOME_OVERRIDE"
   # user.home goes through JAVA_TOOL_OPTIONS, which every JVM reads, so it reaches
   # the test server's own JVM and any JVM a spec starts; LUCLI_JAVA_ARGS reaches
