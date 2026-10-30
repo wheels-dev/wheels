@@ -75,6 +75,79 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("todo-comment word boundaries", () => {
+
+				it("flags each real marker form once with its line number", () => {
+					var modelDir = tempRoot & "/app/models";
+					directoryCreate(modelDir, true, true);
+					var fixturePath = modelDir & "/TodoWordBoundaryPositive.cfc";
+					fileWrite(
+						fixturePath,
+						'component extends="Model" {' & chr(10) &
+						'    // TODO: first item' & chr(10) &
+						'    // FIXME second item' & chr(10) &
+						'    <!--- HACK third item --->' & chr(10) &
+						'    // BUG: fourth item' & chr(10) &
+						'    //TODO' & chr(10) &
+						'    function config() {}' & chr(10) &
+						'}'
+					);
+
+					var results = analysis.analyze("all");
+					var smells = [];
+					for (var smell in results.codeSmells) {
+						if (findNoCase("TodoWordBoundaryPositive.cfc", smell.file)
+								&& Compare(smell.rule, "todo-comment") == 0) {
+							arrayAppend(smells, smell);
+						}
+					}
+
+					expect(arrayLen(smells)).toBe(5);
+
+					// One smell per real form, on the line the marker sits on.
+					var lineNumbers = [];
+					for (var smell in smells) {
+						arrayAppend(lineNumbers, smell.line);
+					}
+					arraySort(lineNumbers, "numeric");
+					expect(lineNumbers[1]).toBe(2);
+					expect(lineNumbers[2]).toBe(3);
+					expect(lineNumbers[3]).toBe(4);
+					expect(lineNumbers[4]).toBe(5);
+					expect(lineNumbers[5]).toBe(6);
+
+					fileDelete(fixturePath);
+				});
+
+				it("does not flag longer words that merely start with a marker", () => {
+					var modelDir = tempRoot & "/app/models";
+					directoryCreate(modelDir, true, true);
+					var fixturePath = modelDir & "/TodoWordBoundaryNegative.cfc";
+					fileWrite(
+						fixturePath,
+						'component extends="Model" {' & chr(10) &
+						'    // BUGGY path' & chr(10) &
+						'    // TODOS list' & chr(10) &
+						'    <!--- HACKATHON demo --->' & chr(10) &
+						'    // XXXL size' & chr(10) &
+						'    function config() {}' & chr(10) &
+						'}'
+					);
+
+					var results = analysis.analyze("all");
+					var count = 0;
+					for (var smell in results.codeSmells) {
+						if (findNoCase("TodoWordBoundaryNegative.cfc", smell.file)) {
+							count++;
+						}
+					}
+					expect(count).toBe(0);
+
+					fileDelete(fixturePath);
+				});
+
+			});
+
 			describe("validate()", () => {
 
 				it("returns struct with valid key", () => {

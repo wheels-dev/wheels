@@ -1,0 +1,1 @@
+- `wheels analyze` no longer reports ordinary comments whose word merely starts with a marker (`BUGGY`, `TODOS`, `HACKATHON`, `XXXL`) as `todo-comment` technical debt; TODO/FIXME/HACK/XXX/BUG now match only as whole words, and the optional trailing colon is still accepted
