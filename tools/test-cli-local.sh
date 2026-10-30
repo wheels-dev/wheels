@@ -131,6 +131,11 @@ if [ -n "$CLI_HOME_OVERRIDE" ] && is_default_cli_home "$CLI_HOME_OVERRIDE"; then
   fi
 fi
 if [ -n "$CLI_HOME_OVERRIDE" ]; then
+  # Export the resolved override as LUCLI_HOME, so child processes (a nested
+  # wheels call, or a spec shelling out) don't fall back to their own default.
+  if [ "${LUCLI_HOME:-}" != "$CLI_HOME_OVERRIDE" ]; then
+    export LUCLI_HOME="$CLI_HOME_OVERRIDE"
+  fi
   CLI_HOMES=("$CLI_HOME_OVERRIDE")
   if [ -n "${WHEELS_HOME:-}" ] && [ "$WHEELS_HOME" != "$CLI_HOME_OVERRIDE" ] \
     && ! is_default_cli_home "$WHEELS_HOME"; then
