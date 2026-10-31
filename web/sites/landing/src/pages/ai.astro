@@ -1,0 +1,648 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+// Results page for the AI coding-agent evaluation. Route: wheels.dev/ai
+// Primary figures are the rescored ones (two over-strict hidden checks were
+// corrected after the runs); raw figures are shown in parentheses throughout.
+// Open items for a later pass: cover/hero art, a results date, and a
+// "methods + raw data" link if the data files are published.
+---
+
+<BaseLayout
+	title="Building Wheels apps with AI coding agents"
+	description="We ran a set of coding agents at real feature work in a Wheels application and measured how often they finished the job. Every number, and what we changed in Wheels as a result."
+	current="ai"
+>
+	<section class="hero">
+		<div class="hero__inner">
+			<p class="hero__eyebrow">AI coding agents</p>
+			<h1 class="hero__title">Building Wheels apps with <span>AI coding agents</span></h1>
+			<p class="hero__subtitle">
+				We ran a set of coding agents at real feature work in a Wheels application and measured how
+				often they finished the job. This page reports what we measured, every number, and what we
+				changed in Wheels as a result.
+			</p>
+			<div class="stat">
+				<div class="stat__figure">700 <span>/ 790</span></div>
+				<div class="stat__label">
+					scored trials passed — <strong>88.6%</strong>
+					<span class="stat__sub">660 / 790 (83.5%) raw, before two hidden-check corrections</span>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<article class="prose report">
+		<p>
+			Our aim was a <strong>like-for-like</strong> comparison with the way Ruby on Rails' own
+			<a href="https://github.com/rails/ai-evals">ai-evals</a> measures agents: the same harness, the
+			same agent, a comparable sample app, and the same style of task with hidden acceptance checks. Where
+			we couldn't match Rails exactly, we say so.
+		</p>
+
+		<h2 id="1-what-we-measured-and-why">1. What we measured, and why</h2>
+		<ul>
+			<li>
+				<strong>Same harness and agent as Rails' ai-evals.</strong> We used Rails'
+				<code>lemans</code> harness and its <code>miniswen</code> agent unchanged, so a Wheels task is
+				run and scored the same way a Rails task is.
+			</li>
+			<li>
+				<strong>A comparable sample app.</strong> Tasks run against a Writebook-style content app built
+				in Wheels — the same kind of app Rails' Stage 1 uses — so the asks line up.
+			</li>
+			<li>
+				<strong>Frozen tasks with hidden checks.</strong> Each task is a plain-English feature request.
+				The agent gets the prompt and nothing else; a hidden spec decides pass/fail. A task scores 1 only
+				if the app's own test suite is green <strong>and</strong> every hidden check passes. Tasks and
+				their checks were frozen and independently reviewed before any model ran. The only changes after
+				any model ran were the two over-strict check corrections disclosed in section 5, each reported
+				with both the before and after figures.
+			</li>
+			<li>
+				<strong>Two arms.</strong> Each model ran twice where possible: <strong>bare</strong> (a stock
+				Wheels app) and <strong>shipped docs</strong> (the same app with the AI context Wheels now ships
+				— <code>.ai/</code> docs and a prebuilt <code>.mcp.json</code>). This isolates whether the
+				shipped context helps.
+			</li>
+			<li>
+				<strong>Agent-native rows reported separately.</strong> Alongside the like-for-like rows we ran
+				<a href="https://www.anthropic.com/claude-code">Claude Code</a> against the same frozen tasks,
+				via the "Harbor" setup. Those rows are a different agent and are always reported and labelled
+				separately — never pooled with the like-for-like numbers.
+			</li>
+		</ul>
+		<p>
+			Ten tasks (plus a hello-world control) × three attempts per cell. A "cell" is one model in one
+			arm. Twenty-four cells in all: nine models in both arms, four more in the shipped arm only,
+			and two Claude Code cells.
+		</p>
+		<blockquote>
+			<p>
+				<strong>Integrity first.</strong> The case we wanted to test honestly is simply whether Wheels
+				deserves a seat at the table. So: no benchmark-specific caching, no pre-generated answers, and
+				no app state an agent wouldn't have in normal use. Every improvement we made to help agents shipped
+				to <strong>every</strong> Wheels user — in <code>wheels new</code>, the docs, and the MCP
+				server — not just to the test. Every run was recorded, including failures and infrastructure
+				errors, and those are reported below.
+			</p>
+		</blockquote>
+
+		<h2 id="2-latest-results-october-2026">2. Latest results (October 2026)</h2>
+		<p>
+			Overall, across the ten tasks, the agents passed <strong
+				>700 of 790 scored trials (88.6%)</strong
+			> — raw, before two hidden-check corrections (section 5), <strong>660 of 790 (83.5%)</strong>.
+		</p>
+		<p>
+			Steps are the agent's tool-use turns (a guard stopped a trial at 150). Spend is the settled
+			provider cost for that cell. The "docs" arm is the shipped AI context; "bare" is a stock app.
+		</p>
+		<div class="table-wrap">
+			<table class="data">
+				<thead>
+					<tr>
+						<th>Model</th><th>Provider</th><th>Agent</th><th>Arm</th>
+						<th>Pass (raw)</th><th>Spend</th><th>Steps (mean)</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr
+						><td>GPT-5.6 Luna</td><td>OpenAI</td><td>lemans</td><td>bare</td><td>19/33 (18)</td><td
+							>$0.70</td
+						><td>15</td></tr
+					>
+					<tr
+						><td>GPT-5.6 Luna</td><td>OpenAI</td><td>lemans</td><td>docs</td><td>21/33 (20)</td><td
+							>$0.71</td
+						><td>16</td></tr
+					>
+					<tr
+						><td>DeepSeek V4.1 Flash</td><td>DeepSeek</td><td>lemans</td><td>bare</td><td
+							>32/33 (31)</td
+						><td>$2.02</td><td>81</td></tr
+					>
+					<tr
+						><td>DeepSeek V4.1 Flash</td><td>DeepSeek</td><td>lemans</td><td>docs</td><td>33/33</td
+						><td>$1.89</td><td>73</td></tr
+					>
+					<tr
+						><td>GPT-5.6 Sol</td><td>OpenAI</td><td>lemans</td><td>bare</td><td>32/33 (28)</td><td
+							>$10.26</td
+						><td>18</td></tr
+					>
+					<tr
+						><td>GPT-5.6 Sol</td><td>OpenAI</td><td>lemans</td><td>docs</td><td>32/33 (28)</td><td
+							>$11.44</td
+						><td>18</td></tr
+					>
+					<tr
+						><td>Sonnet 5.5</td><td>Anthropic</td><td>lemans</td><td>bare</td><td>33/33 (29)</td><td
+							>$10.61</td
+						><td>18</td></tr
+					>
+					<tr
+						><td>Sonnet 5.5</td><td>Anthropic</td><td>lemans</td><td>docs</td><td>33/33 (31)</td><td
+							>$10.72</td
+						><td>18</td></tr
+					>
+					<tr
+						><td>Haiku 4.5</td><td>Anthropic</td><td>lemans</td><td>bare</td><td>12/33 (10)</td><td
+							>$14.99</td
+						><td>82</td></tr
+					>
+					<tr
+						><td>Haiku 4.5</td><td>Anthropic</td><td>lemans</td><td>docs</td><td>9/33</td><td
+							>$13.15</td
+						><td>74</td></tr
+					>
+					<tr
+						><td>Gemini 3.8 Flash</td><td>Google</td><td>lemans</td><td>bare</td><td>31/33 (30)</td
+						><td>$33.62</td><td>98</td></tr
+					>
+					<tr
+						><td>Gemini 3.8 Flash</td><td>Google</td><td>lemans</td><td>docs</td><td>32/33 (31)</td
+						><td>$34.38</td><td>97</td></tr
+					>
+					<tr
+						><td>Qwen3.8-27B</td><td>Alibaba</td><td>lemans</td><td>bare</td><td>31/32 (29)</td><td
+							>$27.44</td
+						><td>89</td></tr
+					>
+					<tr
+						><td>Qwen3.8-27B</td><td>Alibaba</td><td>lemans</td><td>docs</td><td>30/32</td><td
+							>$28.41</td
+						><td>88</td></tr
+					>
+					<tr
+						><td>Opus 5.5</td><td>Anthropic</td><td>lemans</td><td>bare</td><td>33/33 (31)</td><td
+							>$21.39</td
+						><td>24</td></tr
+					>
+					<tr
+						><td>Opus 5.5</td><td>Anthropic</td><td>lemans</td><td>docs</td><td>32/33 (31)</td><td
+							>$23.56</td
+						><td>24</td></tr
+					>
+					<tr
+						><td>GPT-6 Astra</td><td>OpenAI</td><td>lemans</td><td>bare</td><td>33/33 (30)</td><td
+							>$33.59</td
+						><td>15</td></tr
+					>
+					<tr
+						><td>GPT-6 Astra</td><td>OpenAI</td><td>lemans</td><td>docs</td><td>33/33 (31)</td><td
+							>$35.47</td
+						><td>16</td></tr
+					>
+					<tr
+						><td>Kimi K3</td><td>Moonshot</td><td>lemans</td><td>docs</td><td>33/33 (30)</td><td
+							>$60.91</td
+						><td>64</td></tr
+					>
+					<tr
+						><td>GLM 5.3</td><td>Zhipu</td><td>lemans</td><td>docs</td><td>32/33 (29)</td><td
+							>$77.11</td
+						><td>95</td></tr
+					>
+					<tr
+						><td>Grok 4.7</td><td>xAI</td><td>lemans</td><td>docs</td><td>33/33 (32)</td><td
+							>$83.61</td
+						><td>50</td></tr
+					>
+					<tr
+						><td>Fable 5.1</td><td>Anthropic</td><td>lemans</td><td>docs</td><td>33/33 (31)</td><td
+							>$87.74</td
+						><td>42</td></tr
+					>
+					<tr
+						><td>Opus 5.5</td><td>Anthropic</td><td>Claude Code</td><td>docs</td><td>29/33</td><td
+							>$30.39</td
+						><td>—</td></tr
+					>
+					<tr
+						><td>Fable 5.1</td><td>Anthropic</td><td>Claude Code</td><td>docs</td><td>29/33</td><td
+							>$90.36</td
+						><td>—</td></tr
+					>
+				</tbody>
+			</table>
+		</div>
+		<p>Notes:</p>
+		<ul>
+			<li>
+				<strong>Pass counts scored trials</strong>, with the two check corrections of section 5
+				applied; the raw figure is in parentheses where it differs.
+			</li>
+			<li>
+				<strong>Qwen</strong> shows <code>/32</code>: one trial in each arm was refused by the
+				provider's content moderation and is out of the denominator (section 5).
+			</li>
+			<li>
+				<strong>Claude Code</strong> rows can't report a step count the same way (a different agent).
+				Both lost three trials of one task to a scoring artifact that couldn't be re-scored for that agent
+				(section 5); on the like-for-like pattern each cell would be 32/33.
+			</li>
+			<li>
+				<strong>Spend</strong> was well within budget on every cell; no single trial reached the per-trial
+				cost limit (the most expensive single trial was $12.27, under the $20 cap).
+			</li>
+		</ul>
+
+		<h2 id="3-did-the-shipped-ai-context-help">3. Did the shipped AI context help?</h2>
+		<p>For the nine models that ran in both arms, with both check corrections applied:</p>
+		<div class="table-wrap">
+			<table class="data">
+				<thead>
+					<tr><th></th><th>Bare (raw)</th><th>Shipped docs (raw)</th></tr>
+				</thead>
+				<tbody>
+					<tr><td>Total, 9 models</td><td>256/296 (236)</td><td>255/296 (244)</td></tr>
+				</tbody>
+			</table>
+		</div>
+		<p>
+			<strong>Honestly: the effect is within noise.</strong> After correcting the two over-strict hidden
+			checks (section 5), the shipped docs did not produce a measurable across-the-board lift — the pooled
+			difference is a single trial, in the noise at three attempts per cell. Most of the apparent raw
+			gain (+8 trials) came from one of the corrected checks, which the docs arm happened to pass more
+			often by chance.
+		</p>
+		<p>
+			Where the docs did help was narrower and more plausible: a model occasionally used a 4.2 API
+			it would otherwise have missed, and a couple of models took fewer steps with the docs present.
+			Cost and step counts barely moved with docs either way (within about ±10% on spend, under one
+			step for most models).
+		</p>
+		<p>
+			We read this as: the strong models already know how to build a Wheels app from the stock
+			conventions, and the shipped context mostly helps at the margins and on newer APIs. We'd
+			rather report that plainly than overstate it.
+		</p>
+		<blockquote>
+			<p>
+				The bare/docs totals here were recomputed from the rescored data plus the erase-account
+				per-trial flips, and confirmed by re-running the tally: bare 256/296, docs 255/296 (raw 236
+				vs 244).
+			</p>
+		</blockquote>
+
+		<h2 id="4-the-ten-tasks">4. The ten tasks</h2>
+		<p>
+			Seven tasks mirror a Rails ai-evals task; three are Wheels-native (no Rails counterpart). Pass
+			rate is across all 24 cells, rescored.
+		</p>
+		<div class="table-wrap">
+			<table class="data">
+				<thead>
+					<tr><th>Task</th><th>Rails counterpart</th><th>Difficulty</th><th>Pass</th></tr>
+				</thead>
+				<tbody>
+					<tr
+						><td
+							>ar-bulk-access-grants — grant a roster of readers in one insert, notify each once,
+							idempotent</td
+						><td>yes</td><td>medium</td><td>71/72 (99%)</td></tr
+					>
+					<tr
+						><td
+							>ar-release-recap — keep a cached "recap" matching exactly what a publish committed</td
+						><td>yes</td><td>medium</td><td>71/72 (99%)</td></tr
+					>
+					<tr
+						><td
+							>ar-compact-positions — compact hand-ordered items to a dense 1..n, trashed ones
+							included</td
+						><td>yes</td><td>medium</td><td>66/72 (92%)</td></tr
+					>
+					<tr
+						><td
+							>as-purge-embedded-images — free image files on delete, with reference counting and
+							rollback safety</td
+						><td>yes</td><td>hard</td><td>63/72 (88%)</td></tr
+					>
+					<tr
+						><td
+							>sup-legacy-conversions — find and fix every removed/changed 4.x API in an admin
+							report</td
+						><td>yes</td><td>medium</td><td>63/72 (88%)</td></tr
+					>
+					<tr
+						><td
+							>wn-query-not-array — a "recently edited" list, and the same list as a JSON array</td
+						><td>no (Wheels-native)</td><td>easy</td><td>63/72 (88%)</td></tr
+					>
+					<tr
+						><td>ar-erase-account — erase an account and everything only it owns, atomically</td><td
+							>yes</td
+						><td>hard</td><td>60/72 (83%)</td></tr
+					>
+					<tr
+						><td
+							>wn-literal-route — add print + archive pages without breaking legacy redirect links</td
+						><td>no (Wheels-native)</td><td>medium</td><td>60/72 (83%)</td></tr
+					>
+					<tr
+						><td
+							>wn-reversible-trash — soft-delete books to a trash with restore and a 30-day purge</td
+						><td>no (Wheels-native)</td><td>medium</td><td>57/72 (79%)</td></tr
+					>
+					<tr
+						><td
+							>hw-scoped-broadcast — live updates that reach exactly the people who can currently
+							read a book</td
+						><td>yes</td><td>hard</td><td>54/70 (77%)</td></tr
+					>
+				</tbody>
+			</table>
+		</div>
+		<p>(<code>hello-world</code> control: 72/72.)</p>
+		<p><strong>What failed, and why:</strong></p>
+		<ul>
+			<li>
+				<strong>ar-erase-account</strong> asks for an atomic, hard delete of an account and everything
+				only it owns, through a soft-delete model where the default delete hides rows rather than removing
+				them. Most of the genuine misses were real model mistakes: a soft-delete-only erase that leaves
+				rows behind, calling object methods on raw query rows, a missing datasource, and one route-constraint
+				escaping bug (below). Two more were a documentation gap, not a model error — a raw SQL subquery
+				with a literal inside <code>where=</code> threw an unhelpful error, since addressed (<a
+					href="https://github.com/wheels-dev/wheels/pull/4531">#4531</a
+				>). Two weaker models (GPT-5.6 Luna, Haiku 4.5) account for most of them.
+			</li>
+			<li>
+				<strong>hw-scoped-broadcast</strong> asks the agent to add per-listener authorization to a live-update
+				stream that originally had none. Excluding the two weakest models, it passes 93%; the rest is
+				almost entirely those two.
+			</li>
+			<li>
+				<strong>wn-reversible-trash</strong> and <strong>wn-literal-route</strong> are Wheels-native tasks
+				about soft deletes and route declaration order; the misses are again concentrated in the two weakest
+				models.
+			</li>
+			<li>
+				<strong>Haiku 4.5</strong> is the clear floor (12/33 bare, 9/33 docs) — its failures are spread
+				across most tasks, not one weakness.
+			</li>
+		</ul>
+		<p>
+			A recurring, framework-agnostic lesson showed up too: CFML strings have no backslash escapes,
+			so a digit route constraint must be written <code>"\d+"</code>, not <code>"\\d+"</code> — one agent
+			got this wrong and broke the app's reading URLs. (We've since made that explicit in the routing
+			guide.)
+		</p>
+
+		<h2 id="5-corrections-and-deviations-in-full">5. Corrections and deviations, in full</h2>
+		<p>We'd rather show the rough edges than hide them.</p>
+		<ul>
+			<li>
+				<strong>Two hidden checks were over-strict and were corrected after the runs.</strong> Both figures
+				are kept; the corrected ("rescored") one is primary.
+				<ol>
+					<li>
+						<strong>wn-literal-route</strong> demanded every section's <em>title</em> in the print view,
+						when the task asks for each section's <em>content</em> (and the app's own view renders a section
+						by its text). Re-scored with that one assertion relaxed and everything else unchanged, the
+						task went from 27/72 to 60/72. Of the twelve trials that don't reach that figure, six are
+						genuine failures (an HTTP 301 on the print route) and six are Claude Code trials that couldn't
+						be re-scored (see below).
+					</li>
+					<li>
+						<strong>ar-erase-account</strong> treated a book as "edited by nobody else," but a fixture
+						user was an administrator and the app lets administrators edit every book — so "nobody else
+						can edit" was ambiguous against the app's own rule. Re-scored with that fixture user demoted
+						(every other check unchanged), the task went from 53/72 to 60/72; seven trials that kept the
+						book because an administrator exists now pass, and no passing trial became a failure. An eighth
+						trial of the same kind — a Claude Code trial — couldn't be re-scored because its diff wasn't
+						captured, so it stays as originally scored.
+					</li>
+				</ol>
+				Each correction changed exactly one thing; every other check stayed as frozen.
+			</li>
+			<li>
+				<strong>Provider refusals.</strong> A provider's content moderation refused two Qwen3.8-27B trials
+				of one task (and its retry); those two trials are out of the denominator, reported as <code
+					>/32</code
+				>.
+			</li>
+			<li>
+				<strong>Infrastructure, not the model.</strong> A duplicate launch was discarded and re-run; a
+				pricing-metadata bug cost two trials at step one (fixed, re-run); a couple of transient provider
+				503s were retried. Eight re-runs in all ($4.74). None changed a scored result; the originals are
+				kept as evidence.
+			</li>
+			<li>
+				<strong>One agent-native web fetch.</strong> In one Claude Code trial, the agent fetched a public
+				Wheels upgrade guide page twice and solved the task. The Claude Code rows allow web access by
+				design (it's an agent-native setup), so this is within that row's definition — but it's the first
+				time it actually happened, so we flag it: that one task's Claude Code result isn't strictly comparable
+				to the like-for-like rows.
+			</li>
+			<li>
+				<strong>Three Claude Code trials per cell couldn't be re-scored</strong> for the corrected wn-literal-route
+				check, because that agent's diff wasn't captured. They stay as originally scored.
+			</li>
+		</ul>
+
+		<h2 id="6-what-changed-in-wheels-because-of-this">6. What changed in Wheels because of this</h2>
+		<p>
+			Per our integrity rule, everything the rounds surfaced was fixed for <strong>all</strong>
+			Wheels users, not just the test. Running real agents at real tasks turned out to be an excellent
+			way to find rough edges. A selection of the user-facing changes the rounds drove, each a public
+			PR:
+		</p>
+		<ul>
+			<li>
+				<strong><code>savedChanges()</code> and saved-change state after a save</strong>
+				(<a href="https://github.com/wheels-dev/wheels/pull/4349">#4349</a>) — so an
+				<code>afterCommit</code> can tell what the commit actually wrote, instead of apps hand-keeping
+				flags and getting the lifecycle wrong.
+			</li>
+			<li>
+				<strong><code>transaction="savepoint"</code></strong> for nested transaction units (<a
+					href="https://github.com/wheels-dev/wheels/pull/4040">#4040</a
+				>).
+			</li>
+			<li>
+				<strong>An application data cache</strong> — <code>appCacheFetch()</code> and friends (<a
+					href="https://github.com/wheels-dev/wheels/pull/4388">#4388</a
+				>).
+			</li>
+			<li>
+				<strong>Query assertions in specs</strong> — <code>assertQueries()</code> and friends (<a
+					href="https://github.com/wheels-dev/wheels/pull/4357">#4357</a
+				>).
+			</li>
+			<li>
+				<strong>A clock seam for tests</strong> — <code>travelTo()</code>
+				(<a href="https://github.com/wheels-dev/wheels/pull/4387">#4387</a>) — and a test client
+				that can set the request's client address (<a
+					href="https://github.com/wheels-dev/wheels/pull/4343">#4343</a
+				>).
+			</li>
+			<li>
+				<strong>Forms inside cached fragments</strong> work correctly (<a
+					href="https://github.com/wheels-dev/wheels/pull/4032">#4032</a
+				>); production error pages return the right HTTP status (<a
+					href="https://github.com/wheels-dev/wheels/pull/4238">#4238</a
+				>); date comparisons in the query builder match correctly on SQLite (<a
+					href="https://github.com/wheels-dev/wheels/pull/4281">#4281</a
+				>); a failed background-job enqueue now raises instead of being silently dropped (<a
+					href="https://github.com/wheels-dev/wheels/pull/4266">#4266</a
+				>), and a job enqueued inside a datasource transaction is deferred to its commit so it runs
+				predictably (<a href="https://github.com/wheels-dev/wheels/pull/4282">#4282</a>).
+			</li>
+			<li>
+				<strong>Dozens of smaller docs, CLI, and upgrade-path fixes</strong> — a fresh-VM install-and-upgrade
+				walkthrough, driven by watching agents (and new users) hit the same cliffs, produced a long run
+				of corrections to <code>wheels new</code>, the upgrade commands, and the guides.
+			</li>
+		</ul>
+		<blockquote>
+			<p>
+				Several of these — the application cache, query assertions, the clock seam — are new in 4.2
+				precisely because an agent needed them and we agreed every Wheels developer would too.
+			</p>
+		</blockquote>
+
+		<h2 id="7-how-we-kept-it-honest">7. How we kept it honest</h2>
+		<ul>
+			<li>
+				<strong>Frozen before any model ran.</strong> Tasks and their hidden checks were fixed and independently
+				reviewed before the first run. The only post-run changes were the two over-strict check corrections
+				above, which relaxed over-strict checks and are reported with both figures.
+			</li>
+			<li>
+				<strong>Every run recorded.</strong> Passes, failures, refusals, and infrastructure errors are
+				all kept. Infrastructure failures are reported separately from wrong answers, and re-runs are
+				accounted for.
+			</li>
+			<li>
+				<strong>No benchmark-specific caching or pre-seeded answers.</strong> The app is a normal Wheels
+				app; the shipped context is the context every Wheels user gets.
+			</li>
+			<li>
+				<strong>Same harness, agent, and task style as Rails' ai-evals</strong> for the like-for-like
+				rows; the agent-native rows are labelled and reported on their own.
+			</li>
+		</ul>
+
+		<h2 id="credits">Credits</h2>
+		<p>
+			Models and providers tested: OpenAI (GPT-5.6 Luna, GPT-5.6 Sol, GPT-6 Astra), Anthropic (Opus
+			5.5, Sonnet 5.5, Haiku 4.5, Fable 5.1), Google (Gemini 3.8 Flash), DeepSeek (V4.1 Flash),
+			Alibaba (Qwen3.8-27B), Moonshot (Kimi K3), Zhipu (GLM 5.3), xAI (Grok 4.7). Harness and agent:
+			Rails' <code>lemans</code> / <code>miniswen</code> (ai-evals) and Anthropic's Claude Code.
+		</p>
+	</article>
+</BaseLayout>
+
+<style>
+	.hero {
+		padding: 4rem 1.5rem 2.5rem;
+		text-align: center;
+		background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-brand-soft) 100%);
+	}
+	.hero__inner {
+		max-width: 820px;
+		margin: 0 auto;
+	}
+	.hero__eyebrow {
+		font-size: var(--text-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-brand);
+		margin: 0 0 var(--space-4);
+	}
+	.hero__title {
+		font-size: var(--text-4xl);
+		line-height: var(--leading-tight);
+		letter-spacing: var(--tracking-tight);
+		margin: 0 0 var(--space-4);
+	}
+	.hero__title span {
+		color: var(--color-brand);
+	}
+	.hero__subtitle {
+		font-size: var(--text-lg);
+		line-height: var(--leading-relaxed);
+		color: var(--color-fg-muted);
+		max-width: 640px;
+		margin: 0 auto var(--space-6);
+	}
+
+	.stat {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-4);
+		text-align: left;
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+		padding: var(--space-4) var(--space-5);
+		box-shadow: var(--shadow-sm);
+	}
+	.stat__figure {
+		font-family: var(--font-display);
+		font-size: var(--text-4xl);
+		font-weight: 700;
+		line-height: 1;
+		color: var(--color-brand);
+		white-space: nowrap;
+	}
+	.stat__figure span {
+		font-size: var(--text-2xl);
+		color: var(--color-fg-subtle);
+	}
+	.stat__label {
+		font-size: var(--text-base);
+		color: var(--color-fg-muted);
+		line-height: var(--leading-normal);
+	}
+	.stat__label strong {
+		color: var(--color-fg);
+	}
+	.stat__sub {
+		display: block;
+		font-size: var(--text-xs);
+		color: var(--color-fg-subtle);
+		margin-top: var(--space-1);
+	}
+
+	/* Article body: centre the prose column within the page `main`. */
+	.report {
+		margin: 0 auto;
+	}
+
+	/* `.prose` does not style tables; the data tables need their own rules
+	   plus a horizontal-scroll wrapper so they never force page-level scroll. */
+	.table-wrap {
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+	}
+	.report table.data {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--text-sm);
+		min-width: 520px;
+	}
+	.report table.data th,
+	.report table.data td {
+		padding: var(--space-2) var(--space-3);
+		text-align: left;
+		border-bottom: 1px solid var(--color-border);
+		vertical-align: top;
+	}
+	.report table.data thead th {
+		background: var(--color-surface);
+		font-weight: 600;
+		white-space: nowrap;
+		border-bottom: 2px solid var(--color-border-strong);
+	}
+	.report table.data tbody tr:last-child td {
+		border-bottom: none;
+	}
+	.report table.data tbody tr:hover {
+		background: var(--color-surface-2);
+	}
+</style>

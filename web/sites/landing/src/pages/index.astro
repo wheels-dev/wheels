@@ -29,6 +29,35 @@ wheels new myapp</code></pre>
 		</div>
 	</section>
 
+	<section class="ai-callout">
+		<div class="ai-callout__inner">
+			<p class="ai-callout__eyebrow">New</p>
+			<h2 class="ai-callout__heading">Seven AI models built every Wheels feature we gave them</h2>
+			<p class="ai-callout__lede">
+				In our latest evaluation — ten real Wheels feature tasks plus a hello-world control, three
+				attempts each (October 2026) — seven models finished every task with a perfect 33/33 (scores
+				after the corrections described on the results page):
+			</p>
+			<ul class="ai-callout__list">
+				<li>
+					<strong>With and without Wheels' AI docs:</strong> GPT-6 Astra (OpenAI) and Sonnet 5.5 (Anthropic).
+				</li>
+				<li>
+					<strong>With Wheels' AI docs:</strong> DeepSeek V4.1 Flash (DeepSeek), Fable 5.1 (Anthropic),
+					Grok 4.7 (xAI), and Kimi K3 (Moonshot).
+				</li>
+				<li>
+					<strong>On a stock app, without the AI docs:</strong> Opus 5.5 (Anthropic).
+				</li>
+			</ul>
+			<p class="ai-callout__context">
+				Across all 790 scored trials the agents passed 88.6% (after correcting two over-strict
+				hidden checks; 83.5% as first scored).
+			</p>
+			<a class="btn btn--primary" href="/ai">See the full AI results</a>
+		</div>
+	</section>
+
 	<section class="features">
 		<h2 class="features__heading">What you get out of the box</h2>
 		<ul class="features__grid">
@@ -255,6 +284,64 @@ wheels new myapp</code></pre>
 		font-size: var(--text-sm);
 		color: var(--color-fg-subtle);
 		margin: 0;
+	}
+
+	.ai-callout {
+		background: var(--color-surface);
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+		padding: 3.5rem 1.5rem;
+	}
+	.ai-callout__inner {
+		max-width: 820px;
+		margin: 0 auto;
+		text-align: center;
+	}
+	.ai-callout__eyebrow {
+		font-size: var(--text-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-brand);
+		margin: 0 0 var(--space-3);
+	}
+	.ai-callout__heading {
+		font-size: var(--text-3xl);
+		line-height: var(--leading-tight);
+		letter-spacing: var(--tracking-tight);
+		margin: 0 0 var(--space-4);
+	}
+	.ai-callout__lede {
+		font-size: var(--text-lg);
+		color: var(--color-fg-muted);
+		line-height: var(--leading-relaxed);
+		max-width: 680px;
+		margin: 0 auto var(--space-5);
+	}
+	.ai-callout__list {
+		list-style: none;
+		padding: 0;
+		margin: 0 auto var(--space-4);
+		max-width: 680px;
+		text-align: left;
+		display: grid;
+		gap: var(--space-3);
+	}
+	.ai-callout__list li {
+		padding: var(--space-3) var(--space-4);
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius);
+		color: var(--color-fg-muted);
+		line-height: var(--leading-relaxed);
+	}
+	.ai-callout__list strong {
+		color: var(--color-fg);
+	}
+	.ai-callout__context {
+		font-size: var(--text-sm);
+		color: var(--color-fg-subtle);
+		margin: 0 0 var(--space-5);
 	}
 
 	.features {

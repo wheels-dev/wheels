@@ -948,9 +948,9 @@ component output="false" {
 					local.key = trim(listFirst(local.trimmedLine, "="));
 					local.value = trim(listRest(local.trimmedLine, "="));
 					
-					// Remove surrounding quotes if present
-					if ((left(local.value, 1) == '"' && right(local.value, 1) == '"') ||
-						(left(local.value, 1) == "'" && right(local.value, 1) == "'")) {
+					// Strip only when there is an inner value, so a lone quote survives
+					if (len(local.value) >= 2 && ((left(local.value, 1) == '"' && right(local.value, 1) == '"') ||
+						(left(local.value, 1) == "'" && right(local.value, 1) == "'"))) {
 						local.value = mid(local.value, 2, len(local.value) - 2);
 					}
 					
@@ -961,8 +961,8 @@ component output="false" {
 					// true and made numeric settings silently take their defaults instead.
 					if (Compare(lCase(local.value), "true") == 0 || Compare(lCase(local.value), "false") == 0) {
 						local.value = (Compare(lCase(local.value), "true") == 0);
-					} else if (isNumeric(local.value) && !find(".", local.value)) {
-						// Only convert integers, leave decimals as strings
+					} else if (REFind("^-?(0|[1-9][0-9]*)$", local.value) > 0) {
+						// Only convert plain integers; 007, 1e3 and +5 stay strings
 						local.value = val(local.value);
 					}
 					

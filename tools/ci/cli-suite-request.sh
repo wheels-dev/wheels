@@ -29,7 +29,7 @@ progress() { tail -n +"$from" "$server_log" 2>/dev/null | { grep -a '^\[cli-suit
 last_bundle_event() { progress | { grep -a -E '^\[cli-suite\] [0-9]+ (start|end) ' || true; } | tail -1; }
 last_spec() { progress | { grep -a ' spec ' || true; } | tail -1 | cut -d' ' -f4-; }
 
-code_file="$(mktemp)"
+code_file="$(mktemp "${TMPDIR:-/tmp}/cli-suite-code.XXXXXX")"
 trap 'rm -f "$code_file"' EXIT
 # curl itself in the background (not a subshell), so the watchdog's kill reaches
 # it. On a failed or killed transfer --write-out still writes 000.

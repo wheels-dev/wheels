@@ -1,4 +1,4 @@
-FROM ortussolutions/commandbox:latest
+FROM ghcr.io/wheels-dev/mirror/ortussolutions/commandbox:latest
 
 LABEL maintainer "Wheels Core Team"
 

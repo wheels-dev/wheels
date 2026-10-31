@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { GUIDES_VERSIONS } from '@wheels-dev/ui/data/versions';
 import { rehypeBasePrefix } from '@wheels-dev/ui/markdown/rehype-base-prefix.mjs';
+import { rehypeTableScroll } from '@wheels-dev/ui/markdown/rehype-table-scroll.mjs';
 import { remarkBasePrefix } from '@wheels-dev/ui/markdown/remark-base-prefix.mjs';
 import cfmlGrammar from './languages/cfml.tmLanguage.json';
 import cfscriptGrammar from './languages/cfscript.tmLanguage.json';
@@ -96,6 +97,9 @@ const config = defineConfig({
 		// rewrites them at build time. No-op when base is unset.
 		rehypePlugins: [
 			[rehypeBasePrefix, { base: process.env.WHEELS_DOCS_BASE || '' }],
+			// Wrap markdown tables in the shared accessible scroll region so
+			// Starlight's `display: block` stopgap can be overridden (#4608).
+			rehypeTableScroll,
 		],
 	},
 	redirects: {

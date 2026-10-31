@@ -1,7 +1,7 @@
 {
   "name": "{{appName}}",
   "lucee": {
-    "version": "7.0.0.395"
+    "version": "7.0.5.41"
   },
   "port": {{port}},
   "shutdownPort": {{shutdownPort}},

@@ -73,6 +73,166 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(results.executionTime).toBeGTE(0);
 				});
 
+				describe("todo-comment detection", () => {
+
+					it("flags TODO in a /* block comment", () => {
+						var path = $writeTodoModel(
+							"TodoBlockComment.cfc",
+							'component extends="Model" {' & chr(10) &
+							'    /* TODO: replace the placeholder */' & chr(10) &
+							'    function config() {}' & chr(10) &
+							'}'
+						);
+						var smells = $todoSmells("TodoBlockComment.cfc");
+						expect(arrayLen(smells)).toBe(1);
+						expect(smells[1].line).toBe(2);
+						fileDelete(path);
+					});
+
+					it("flags FIXME on a doc-comment continuation line", () => {
+						var path = $writeTodoModel(
+							"TodoDocComment.cfc",
+							'component extends="Model" {' & chr(10) &
+							'    /**' & chr(10) &
+							'     * FIXME: drop the legacy branch' & chr(10) &
+							'     */' & chr(10) &
+							'    function config() {}' & chr(10) &
+							'}'
+						);
+						var smells = $todoSmells("TodoDocComment.cfc");
+						expect(arrayLen(smells)).toBe(1);
+						expect(smells[1].line).toBe(3);
+						fileDelete(path);
+					});
+
+					it("still flags a // line comment", () => {
+						var path = $writeTodoModel(
+							"TodoLineComment.cfc",
+							'component extends="Model" {' & chr(10) &
+							'    // TODO: still detected' & chr(10) &
+							'    function config() {}' & chr(10) &
+							'}'
+						);
+						var smells = $todoSmells("TodoLineComment.cfc");
+						expect(arrayLen(smells)).toBe(1);
+						expect(smells[1].line).toBe(2);
+						fileDelete(path);
+					});
+
+					it("still flags a <!--- tag comment", () => {
+						var path = $writeTodoModel(
+							"TodoTagComment.cfc",
+							'component extends="Model" {' & chr(10) &
+							'    <!--- HACK: workaround --->' & chr(10) &
+							'    function config() {}' & chr(10) &
+							'}'
+						);
+						var smells = $todoSmells("TodoTagComment.cfc");
+						expect(arrayLen(smells)).toBe(1);
+						fileDelete(path);
+					});
+
+					it("does not flag a marker that is part of a longer word", () => {
+						var path = $writeTodoModel(
+							"TodoPluralWord.cfc",
+							'component extends="Model" {' & chr(10) &
+							'    // TODOS: not a marker' & chr(10) &
+							'    function config() {}' & chr(10) &
+							'}'
+						);
+						var smells = $todoSmells("TodoPluralWord.cfc");
+						expect(arrayLen(smells)).toBe(0);
+						fileDelete(path);
+					});
+
+					it("does not flag a marker inside a string literal", () => {
+						var path = $writeTodoModel(
+							"TodoStringLiteral.cfc",
+							'component extends="Model" {' & chr(10) &
+							'    var label = "TODO: just text";' & chr(10) &
+							'    function config() {}' & chr(10) &
+							'}'
+						);
+						var smells = $todoSmells("TodoStringLiteral.cfc");
+						expect(arrayLen(smells)).toBe(0);
+						fileDelete(path);
+					});
+
+				});
+
+			});
+
+			describe("todo-comment word boundaries", () => {
+
+				it("flags each real marker form once with its line number", () => {
+					var modelDir = tempRoot & "/app/models";
+					directoryCreate(modelDir, true, true);
+					var fixturePath = modelDir & "/TodoWordBoundaryPositive.cfc";
+					fileWrite(
+						fixturePath,
+						'component extends="Model" {' & chr(10) &
+						'    // TODO: first item' & chr(10) &
+						'    // FIXME second item' & chr(10) &
+						'    <!--- HACK third item --->' & chr(10) &
+						'    // BUG: fourth item' & chr(10) &
+						'    //TODO' & chr(10) &
+						'    function config() {}' & chr(10) &
+						'}'
+					);
+
+					var results = analysis.analyze("all");
+					var smells = [];
+					for (var smell in results.codeSmells) {
+						if (findNoCase("TodoWordBoundaryPositive.cfc", smell.file)
+								&& Compare(smell.rule, "todo-comment") == 0) {
+							arrayAppend(smells, smell);
+						}
+					}
+
+					expect(arrayLen(smells)).toBe(5);
+
+					// One smell per real form, on the line the marker sits on.
+					var lineNumbers = [];
+					for (var smell in smells) {
+						arrayAppend(lineNumbers, smell.line);
+					}
+					arraySort(lineNumbers, "numeric");
+					expect(lineNumbers[1]).toBe(2);
+					expect(lineNumbers[2]).toBe(3);
+					expect(lineNumbers[3]).toBe(4);
+					expect(lineNumbers[4]).toBe(5);
+					expect(lineNumbers[5]).toBe(6);
+
+					fileDelete(fixturePath);
+				});
+
+				it("does not flag longer words that merely start with a marker", () => {
+					var modelDir = tempRoot & "/app/models";
+					directoryCreate(modelDir, true, true);
+					var fixturePath = modelDir & "/TodoWordBoundaryNegative.cfc";
+					fileWrite(
+						fixturePath,
+						'component extends="Model" {' & chr(10) &
+						'    // BUGGY path' & chr(10) &
+						'    // TODOS list' & chr(10) &
+						'    <!--- HACKATHON demo --->' & chr(10) &
+						'    // XXXL size' & chr(10) &
+						'    function config() {}' & chr(10) &
+						'}'
+					);
+
+					var results = analysis.analyze("all");
+					var count = 0;
+					for (var smell in results.codeSmells) {
+						if (findNoCase("TodoWordBoundaryNegative.cfc", smell.file)) {
+							count++;
+						}
+					}
+					expect(count).toBe(0);
+
+					fileDelete(fixturePath);
+				});
+
 			});
 
 			describe("validate()", () => {
@@ -262,6 +422,31 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+	}
+
+	/**
+	 * Write a CFC into the temp project's app/models directory and return its path.
+	 */
+	private string function $writeTodoModel(required string fileName, required string content) {
+		var modelDir = variables.tempRoot & "/app/models";
+		directoryCreate(modelDir, true, true);
+		var path = modelDir & "/" & arguments.fileName;
+		fileWrite(path, arguments.content);
+		return path;
+	}
+
+	/**
+	 * Return the todo-comment code smells reported for one temp-project file.
+	 */
+	private array function $todoSmells(required string fileName) {
+		var smells = [];
+		var results = variables.analysis.analyze("all");
+		for (var smell in results.codeSmells) {
+			if (smell.rule == "todo-comment" && findNoCase(arguments.fileName, smell.file)) {
+				arrayAppend(smells, smell);
+			}
+		}
+		return smells;
 	}
 
 }

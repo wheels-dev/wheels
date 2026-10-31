@@ -511,9 +511,9 @@ component output="false" extends="wheels.Global"{
 	 */
 	public void function $waitForMigrationLock(required struct migrationLock) {
 		local.timeout = $get("migrationLockTimeout");
-		local.deadline = GetTickCount() + local.timeout * 1000;
+		local.deadline = $tick() + local.timeout * 1000;
 		while (!$tryTakeMigrationLock(arguments.migrationLock)) {
-			if (GetTickCount() >= local.deadline) {
+			if ($tick() >= local.deadline) {
 				local.holder = $migrationLockHolder();
 				Throw(
 					type = "Wheels.MigrationLockTimeout",
@@ -521,8 +521,17 @@ component output="false" extends="wheels.Global"{
 					extendedInfo = "Held by #local.holder#. If that instance is gone, the lock frees itself when its lease expires. To clear it now, run `wheels migrate unlock --force`, or delete the row from #$migrationLockTable()#."
 				);
 			}
-			Sleep(1000);
+			$sleep(1000);
 		}
+	}
+
+	/**
+	 * Internal function. The migration lock's only wait primitive, so a spec can advance the
+	 * frozen clock instead of sleeping (see wheels.tests._assets.migrator.ClockMigrator).
+	 * Production calls Sleep() unchanged.
+	 */
+	public void function $sleep(required numeric milliseconds) {
+		Sleep(arguments.milliseconds);
 	}
 
 	/**
@@ -530,7 +539,7 @@ component output="false" extends="wheels.Global"{
 	 * it over when its lease has expired. True when this migration lock now owns the row.
 	 */
 	public boolean function $tryTakeMigrationLock(required struct migrationLock) {
-		local.now = GetTickCount();
+		local.now = $tick();
 		// Insert only when no row exists, so the duplicate-key path (which aborts an enclosing
 		// PostgreSQL transaction) is left to two instances inserting at the same moment.
 		if (Len($migrationLockOwner())) {
@@ -668,7 +677,7 @@ component output="false" extends="wheels.Global"{
 		if (!local.rows.recordCount) {
 			return local.rv;
 		}
-		local.now = GetTickCount();
+		local.now = $tick();
 		local.rv["held"] = true;
 		local.rv["owner"] = local.rows.lockowner;
 		local.rv["host"] = local.rows.lockhost;
@@ -702,7 +711,7 @@ component output="false" extends="wheels.Global"{
 			$migrationLease().releaseStatement(
 				name = $migrationLockName(),
 				owner = local.rv.lock.owner,
-				expiredBefore = arguments.force ? "" : GetTickCount()
+				expiredBefore = arguments.force ? "" : $tick()
 			)
 		);
 		// Read back, not compared with the old owner: an instance that took the lease between the
@@ -819,12 +828,13 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * Internal function. A new lease's expiry, in epoch milliseconds. Lease times use GetTickCount(),
-	 * which is epoch milliseconds on Lucee, Adobe, BoxLang and RustCFML (the same contract the
-	 * RateLimiter's database store relies on), so hosts compare them on one clock.
+	 * Internal function. A new lease's expiry, in epoch milliseconds. Lease times use $tick()
+	 * (GetTickCount() in production, a frozen clock under a spec's travelTo()), which is epoch
+	 * milliseconds on Lucee, Adobe, BoxLang and RustCFML (the same contract the RateLimiter's
+	 * database store relies on), so hosts compare them on one clock.
 	 */
 	public numeric function $migrationLockExpiry() {
-		return GetTickCount() + $get("migrationLockLease") * 1000;
+		return $tick() + $get("migrationLockLease") * 1000;
 	}
 
 	/**

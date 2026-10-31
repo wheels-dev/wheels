@@ -141,7 +141,7 @@ curl -s --max-time 900 \
 
 # --- parse + compare -----------------------------------------------------------
 python3 - "$OUT" "$BASELINE" "$MODE" "$VERSION" "$REPO_ROOT" <<'PY'
-import hashlib, importlib.util, json, os, sys
+import hashlib, importlib.util, json, os, platform, subprocess, sys
 
 out_path, baseline_path, mode, version, repo_root = sys.argv[1:6]
 
@@ -243,13 +243,41 @@ if mode == "write":
         "failing": sorted(failing.keys()),
     }
     # Preserve the human-maintained "_notes" (upstream issue links) across
-    # regenerations.
+    # regenerations, but rewrite the provenance note (where this baseline came
+    # from) so a regenerated baseline, e.g. an auto-bump PR, never carries the
+    # previous run's numbers. It is _notes[0]; any older provenance note,
+    # including the hand-written "Linux baseline from ..." forms,
+    # is dropped.
+    notes = []
     try:
         existing = json.load(open(baseline_path))
         if isinstance(existing.get("_notes"), list):
-            payload["_notes"] = existing["_notes"]
+            notes = existing["_notes"]
     except Exception:
         pass
+    provenance_prefixes = ("Baseline written by run-suite.sh", "Linux baseline from")
+    notes = [n for n in notes
+             if not (isinstance(n, str) and n.startswith(provenance_prefixes))]
+    run_id = os.environ.get("GITHUB_RUN_ID", "")
+    if run_id:
+        source = (f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/"
+                  f"{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{run_id}")
+        commit = os.environ.get("GITHUB_SHA", "")
+    else:
+        source = "a local run"
+        try:
+            commit = subprocess.run(["git", "-C", repo_root, "rev-parse", "HEAD"],
+                                    capture_output=True, text=True).stdout.strip()
+        except Exception:
+            commit = ""
+    system = {"Darwin": "macOS"}.get(platform.system(), platform.system())
+    payload["_notes"] = [
+        f"Baseline written by run-suite.sh --write-baseline from {source} "
+        f"({commit[:9] or 'unknown commit'}, {version}, {system}): "
+        f"{totals['totalPass']} pass / {totals['totalFail']} fail / "
+        f"{totals['totalError']} error / {totals['totalSkipped']} skipped. "
+        "totalSpecs is the sum of those reported categories."
+    ] + notes
     with open(baseline_path, "w") as fh:
         json.dump(payload, fh, indent=2)
         fh.write("\n")

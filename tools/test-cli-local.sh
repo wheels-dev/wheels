@@ -28,6 +28,27 @@
 # on the machine shares it. Stop it with `bash tools/deploy-sshd-down.sh`, or
 # set WHEELS_DEPLOY_SSHD_TEARDOWN=1 to stop it after each of those bundles.
 #
+# CLI home overrides (for sandboxed or isolated callers):
+#   LUCLI_HOME=/path   the CLI home: servers, Lucee Express installs and lib/ext.
+#   WHEELS_HOME=/path  the same, under the Wheels name; LUCLI_HOME wins if both are set.
+#   With either set, the script looks only there: it never falls back to
+#   ~/.wheels or ~/.lucli, and passes -Dlucli.home=<home> to the runtime
+#   (that outranks the LUCLI_HOME a launcher such as the Homebrew `wheels`
+#   wrapper re-exports). It also sets -Duser.home=<home> in JAVA_TOOL_OPTIONS,
+#   because LuCLI, Lucee and the specs resolve paths from every JVM's
+#   user.home, not $HOME (the test server and the JVMs specs start included;
+#   LUCLI_JAVA_ARGS reaches only the launcher); a user.home the caller
+#   already set (LUCLI_JAVA_ARGS, JAVA_TOOL_OPTIONS or JDK_JAVA_OPTIONS) is
+#   kept. A launcher that writes into the real ~/.wheels (the Homebrew `wheels`
+#   wrapper) is refused: set LUCLI_BIN to the runtime it launches. If the
+#   server still runs from a Lucee Express outside the override home, the
+#   SQLite driver is not installed there and the run stops. Unset, or set to
+#   the real ~/.wheels or ~/.lucli (e.g. an exported LUCLI_HOME=$HOME/.wheels),
+#   nothing changes from before these variables: ~/.wheels and ~/.lucli are
+#   searched as before. The exception: a default-home LUCLI_HOME with
+#   WHEELS_HOME set elsewhere uses WHEELS_HOME as the override, with a note
+#   on stderr.
+#
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -73,10 +94,71 @@ fi
 # JVM's -Dcatalina.home (below) is authoritative. The binary's name does not
 # tell us the home: the brew `wheels` wrapper sets LUCLI_HOME=~/.wheels and
 # execs a raw binary that is also named `wheels`.
-EXPRESS_HOMES=("$HOME/.wheels/express" "$HOME/.lucli/express")
-if [ -n "${LUCLI_HOME:-}" ]; then
-  EXPRESS_HOMES=("$LUCLI_HOME/express" "${EXPRESS_HOMES[@]}")
+# With a home override, a launcher that writes into the real ~/.wheels can't be
+# the runtime. The Homebrew `wheels` wrapper syncs its module, docs and SQLite
+# driver there and resets LUCLI_HOME before it execs the raw runtime.
+refuse_home_writing_launcher() {
+  local path
+  path="$(command -v "$CLI_BIN" 2>/dev/null || printf '%s' "$CLI_BIN")"
+  if [ -f "$path" ] && [ "$(head -c 2 "$path" 2>/dev/null)" = "#!" ] && grep -q 'HOME/\.wheels' "$path" 2>/dev/null; then
+    echo "::error::${path} writes into the real ~/.wheels, so it can't run with a CLI home override." >&2
+    echo "  Point LUCLI_BIN at the runtime it launches (e.g. \$(brew --prefix wheels)/libexec/wheels) or a raw lucli." >&2
+    exit 2
+  fi
+}
+# An override that resolves to a real default home (~/.wheels or ~/.lucli), such
+# as an exported LUCLI_HOME=$HOME/.wheels, isn't an isolated home: the run then
+# behaves exactly as it did before overrides existed.
+is_default_cli_home() {
+  local real d
+  real="$(cd "$1" 2>/dev/null && pwd -P || printf '%s' "${1%/}")"
+  for d in "$HOME/.wheels" "$HOME/.lucli"; do
+    [ "$real" = "$(cd "$d" 2>/dev/null && pwd -P || printf '%s' "$d")" ] && return 0
+  done
+  return 1
+}
+# CLI_HOMES: every home this run may read or write, in search order.
+CLI_HOME_OVERRIDE="${LUCLI_HOME:-${WHEELS_HOME:-}}"
+if [ -n "$CLI_HOME_OVERRIDE" ] && is_default_cli_home "$CLI_HOME_OVERRIDE"; then
+  CLI_HOME_OVERRIDE=""
+  # A default-home LUCLI_HOME (e.g. exported from a shell profile) must not mask
+  # an isolated WHEELS_HOME: fall through to WHEELS_HOME, and export it as
+  # LUCLI_HOME so processes the run starts don't inherit the real home.
+  if [ -n "${LUCLI_HOME:-}" ] && [ -n "${WHEELS_HOME:-}" ] && ! is_default_cli_home "$WHEELS_HOME"; then
+    echo "Note: LUCLI_HOME (${LUCLI_HOME}) is a default CLI home; using WHEELS_HOME (${WHEELS_HOME}) instead." >&2
+    CLI_HOME_OVERRIDE="$WHEELS_HOME"
+    export LUCLI_HOME="$WHEELS_HOME"
+  fi
 fi
+if [ -n "$CLI_HOME_OVERRIDE" ]; then
+  # Export the resolved override as LUCLI_HOME, so child processes (a nested
+  # wheels call, or a spec shelling out) don't fall back to their own default.
+  if [ "${LUCLI_HOME:-}" != "$CLI_HOME_OVERRIDE" ]; then
+    export LUCLI_HOME="$CLI_HOME_OVERRIDE"
+  fi
+  CLI_HOMES=("$CLI_HOME_OVERRIDE")
+  if [ -n "${WHEELS_HOME:-}" ] && [ "$WHEELS_HOME" != "$CLI_HOME_OVERRIDE" ] \
+    && ! is_default_cli_home "$WHEELS_HOME"; then
+    CLI_HOMES+=("$WHEELS_HOME")
+  fi
+  export LUCLI_JAVA_ARGS="${LUCLI_JAVA_ARGS:-} -Dlucli.home=$CLI_HOME_OVERRIDE"
+  # user.home goes through JAVA_TOOL_OPTIONS, which every JVM reads, so it reaches
+  # the test server's own JVM and any JVM a spec starts; LUCLI_JAVA_ARGS reaches
+  # only the launcher. A caller that already chose a user.home (LUCLI_JAVA_ARGS,
+  # JAVA_TOOL_OPTIONS or JDK_JAVA_OPTIONS) keeps it.
+  case "$LUCLI_JAVA_ARGS ${JAVA_TOOL_OPTIONS:-} ${JDK_JAVA_OPTIONS:-}" in
+    *-Duser.home=*) ;;
+    *) export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Duser.home=$CLI_HOME_OVERRIDE" ;;
+  esac
+  refuse_home_writing_launcher
+  echo "CLI home override: ${CLI_HOMES[*]} (not searching ~/.wheels or ~/.lucli)"
+else
+  CLI_HOMES=(${LUCLI_HOME:+"$LUCLI_HOME"} "$HOME/.wheels" "$HOME/.lucli")
+fi
+EXPRESS_HOMES=()
+for cli_home in "${CLI_HOMES[@]}"; do
+  EXPRESS_HOMES+=("$cli_home/express")
+done
 echo "Using runtime: ${CLI_BIN} ($(command -v "$CLI_BIN" 2>/dev/null || echo "$CLI_BIN"))"
 
 # Ensure JAVA_HOME is set (`server run` needs it explicitly on some macOS setups).
@@ -89,18 +171,20 @@ fi
 # ── Server ownership helpers ────────────────────────
 #
 # The CLI records which project a server belongs to in
-# ~/.wheels/servers/<name>/.project-path, and its JVM as "<pid>:<port>" in
+# <CLI home>/servers/<name>/.project-path, and its JVM as "<pid>:<port>" in
 # server.pid. Both are authoritative; probing the port is not, because any
 # HTTP responder there will answer — including a completely different app.
 project_server_dir() {
-  local d real
-  for d in "$HOME"/.wheels/servers/*/; do
-    [ -f "${d}.project-path" ] || continue
-    real="$(cd "$(cat "${d}.project-path")" 2>/dev/null && pwd -P)" || continue
-    if [ "$real" = "$(cd "$PROJECT_ROOT" && pwd -P)" ]; then
-      printf '%s\n' "${d%/}"
-      return 0
-    fi
+  local d real cli_home
+  for cli_home in "${CLI_HOMES[@]}"; do
+    for d in "$cli_home"/servers/*/; do
+      [ -f "${d}.project-path" ] || continue
+      real="$(cd "$(cat "${d}.project-path")" 2>/dev/null && pwd -P)" || continue
+      if [ "$real" = "$(cd "$PROJECT_ROOT" && pwd -P)" ]; then
+        printf '%s\n' "${d%/}"
+        return 0
+      fi
+    done
   done
   return 1
 }
@@ -110,10 +194,11 @@ listener_pid() {
 }
 
 # This run's own registration, under whichever home the runtime uses (the
-# brew `wheels` wrapper sets LUCLI_HOME=~/.wheels; a raw `lucli` uses ~/.lucli).
+# brew `wheels` wrapper sets LUCLI_HOME=~/.wheels; a raw `lucli` uses ~/.lucli;
+# an override is passed as -Dlucli.home).
 test_server_dirs() {
   local home
-  for home in ${LUCLI_HOME:+"$LUCLI_HOME"} "$HOME/.wheels" "$HOME/.lucli"; do
+  for home in "${CLI_HOMES[@]}"; do
     printf '%s\n' "$home/servers/$TEST_SERVER_NAME"
   done
 }
@@ -262,6 +347,21 @@ else
       LUCEE_LIB="$CATALINA_HOME_DIR/lib/ext"
     fi
   fi
+  # With an override, never install into a Lucee Express outside the override
+  # homes: that would write into the real ~/.wheels or ~/.lucli.
+  if [ -n "$CLI_HOME_OVERRIDE" ] && [ -n "$LUCEE_LIB" ]; then
+    lib_real="$(cd "$LUCEE_LIB" && pwd -P)"
+    inside=false
+    for cli_home in "${CLI_HOMES[@]}"; do
+      home_real="$(cd "$cli_home" 2>/dev/null && pwd -P)" || continue
+      case "$lib_real/" in "$home_real"/*) inside=true ;; esac
+    done
+    if [ "$inside" != "true" ]; then
+      echo "::error::The server runs from ${LUCEE_LIB}, outside the CLI home override (${CLI_HOMES[*]})." >&2
+      echo "  Not installing the SQLite driver there. Use a runtime that honours -Dlucli.home (LUCLI_BIN)." >&2
+      exit 1
+    fi
+  fi
   if [ -z "$LUCEE_LIB" ]; then
     for express_home in "${EXPRESS_HOMES[@]}"; do
       [ -d "$express_home" ] || continue
@@ -271,8 +371,9 @@ else
   fi
   if [ -n "$LUCEE_LIB" ] && ! ls "$LUCEE_LIB"/sqlite-jdbc*.jar 1>/dev/null 2>&1; then
     echo "Downloading SQLite JDBC driver to $LUCEE_LIB..."
-    curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar" \
-      -o "$LUCEE_LIB/sqlite-jdbc-3.49.1.0.jar"
+    # The CLI stages 3.49.1.0 (`wheels start`); pinned by SHA-256 like the release packages.
+    bash "$PROJECT_ROOT/tools/ci/fetch-sqlite-jdbc.sh" "$LUCEE_LIB/sqlite-jdbc-3.49.1.0.jar" \
+      3.49.1.0 5c8609d2ca341deb8c6f71778974b5ba4995c7d32d7c7c89d9392a3e72c39291
     echo "Restarting ${CLI_BIN} server to pick up new JAR..."
     kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true

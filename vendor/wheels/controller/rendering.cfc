@@ -288,9 +288,9 @@ component {
 
 			// If we do not have the local.content variable and we are not rendering html then try to create it.
 			if (!StructKeyExists(local, "content")) {
-				if(isStruct(arguments.data)){
-					for(local.item in arguments.data){
-						if(isInstanceOf(arguments.data[local.item], "oracle.sql.TIMESTAMP")){
+				if (isStruct(arguments.data)) {
+					for (local.item in arguments.data) {
+						if (StructKeyExists(arguments.data, local.item) && !isNull(arguments.data[local.item]) && isObject(arguments.data[local.item]) && isInstanceOf(arguments.data[local.item], "oracle.sql.TIMESTAMP")) {
 							arguments.data[local.item] = arguments.data[local.item].timestampValue();
 						}
 					}

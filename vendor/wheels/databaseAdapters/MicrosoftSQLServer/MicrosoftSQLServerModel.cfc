@@ -1233,10 +1233,11 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Override Base adapter's function.
-	 * SQL Server uses square brackets to quote identifiers.
+	 * SQL Server uses square brackets to quote identifiers; an embedded closing bracket is
+	 * doubled.
 	 */
 	public string function $quoteIdentifier(required string name) {
-		return "[#arguments.name#]";
+		return "[" & Replace(arguments.name, "]", "]]", "all") & "]";
 	}
 
 	/**

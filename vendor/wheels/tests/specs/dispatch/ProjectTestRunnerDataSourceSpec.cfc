@@ -54,6 +54,62 @@ component extends="wheels.WheelsTest" {
 				expect(decision.warn).toBeTrue();
 			});
 
+			it("honors allowTestsAgainstPrimaryDatasource for an omitted useTestDB even when <datasource>_test is registered", () => {
+				// #4643: the registered candidate used to win before the allowPrimary check, so
+				// setting the option had no effect for browser/CLI runs that omit useTestDB.
+				application.wheels.allowTestsAgainstPrimaryDatasource = true;
+				var decision = g.$testDataSourceDecision(primary = "myapp", requestUrl = {}, candidateRegistered = true);
+				expect(decision.action).toBe("primary");
+				expect(decision.target).toBe("myapp");
+				expect(decision.warn).toBeTrue();
+			});
+
+			it("still swaps for an omitted useTestDB when the app does not allow the primary datasource", () => {
+				application.wheels.allowTestsAgainstPrimaryDatasource = false;
+				var decision = g.$testDataSourceDecision(primary = "myapp", requestUrl = {}, candidateRegistered = true);
+				expect(decision.action).toBe("swap");
+				expect(decision.target).toBe("myapp_test");
+				expect(decision.warn).toBeFalse();
+			});
+
+			it("explicit useTestDB=true targets the test datasource when the app allows the primary datasource", () => {
+				application.wheels.allowTestsAgainstPrimaryDatasource = true;
+				var decision = g.$testDataSourceDecision(primary = "myapp", requestUrl = {useTestDB = true}, candidateRegistered = true);
+				expect(decision.action).toBe("swap");
+				expect(decision.target).toBe("myapp_test");
+				expect(decision.warn).toBeFalse();
+			});
+
+			it("explicit useTestDB=true targets the test datasource when the app forbids the primary datasource", () => {
+				application.wheels.allowTestsAgainstPrimaryDatasource = false;
+				var decision = g.$testDataSourceDecision(primary = "myapp", requestUrl = {useTestDB = true}, candidateRegistered = true);
+				expect(decision.action).toBe("swap");
+				expect(decision.target).toBe("myapp_test");
+			});
+
+			it("explicit useTestDB=false targets the primary datasource when the app allows it", () => {
+				application.wheels.allowTestsAgainstPrimaryDatasource = true;
+				var decision = g.$testDataSourceDecision(primary = "myapp", requestUrl = {useTestDB = false}, candidateRegistered = true);
+				expect(decision.action).toBe("primary");
+				expect(decision.target).toBe("myapp");
+				expect(decision.warn).toBeFalse();
+			});
+
+			it("explicit useTestDB=false targets the primary datasource when the app forbids it too", () => {
+				application.wheels.allowTestsAgainstPrimaryDatasource = false;
+				var decision = g.$testDataSourceDecision(primary = "myapp", requestUrl = {useTestDB = false}, candidateRegistered = true);
+				expect(decision.action).toBe("primary");
+				expect(decision.target).toBe("myapp");
+				expect(decision.warn).toBeFalse();
+			});
+
+			it("treats a non-boolean useTestDB as omitted for the allowPrimary decision, but still swaps to a registered candidate", () => {
+				application.wheels.allowTestsAgainstPrimaryDatasource = true;
+				var decision = g.$testDataSourceDecision(primary = "myapp", requestUrl = {useTestDB = "maybe"}, candidateRegistered = true);
+				expect(decision.action).toBe("swap");
+				expect(decision.target).toBe("myapp_test");
+			});
+
 			it("still refuses an explicit useTestDB=true when the app allows the primary datasource", () => {
 				application.wheels.allowTestsAgainstPrimaryDatasource = true;
 				var decision = g.$testDataSourceDecision(primary = "myapp", requestUrl = {useTestDB = true}, candidateRegistered = false);

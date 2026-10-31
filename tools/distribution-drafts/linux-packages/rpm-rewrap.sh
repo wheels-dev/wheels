@@ -25,8 +25,8 @@ set -euo pipefail
 
 IN="${1:?usage: rpm-rewrap.sh <nfpm.rpm> <out.rpm>}"
 OUT="${2:?usage: rpm-rewrap.sh <nfpm.rpm> <out.rpm>}"
-BUILD_IMAGE="${RPM_REWRAP_BUILD_IMAGE:-rockylinux/rockylinux:9}"
-CHECK_IMAGES="${RPM_REWRAP_CHECK_IMAGES:-rockylinux/rockylinux:10 rockylinux/rockylinux:9}"
+BUILD_IMAGE="${RPM_REWRAP_BUILD_IMAGE:-ghcr.io/wheels-dev/mirror/rockylinux/rockylinux:9}"
+CHECK_IMAGES="${RPM_REWRAP_CHECK_IMAGES:-ghcr.io/wheels-dev/mirror/rockylinux/rockylinux:10 ghcr.io/wheels-dev/mirror/rockylinux/rockylinux:9}"
 
 IN_ABS="$(cd "$(dirname "${IN}")" && pwd)/$(basename "${IN}")"
 OUT_DIR_ABS="$(mkdir -p "$(dirname "${OUT}")" && cd "$(dirname "${OUT}")" && pwd)"

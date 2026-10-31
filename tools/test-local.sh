@@ -6,8 +6,8 @@
 #     Wheels is built on the LuCLI runtime; we ship the runtime under the
 #     `wheels` brand. There is no separate `lucli` binary on a normal install.
 #   - Java 21+ installed
-#   - SQLite JDBC driver in ~/.wheels/express/*/lib/ext/ (auto-installed by
-#     recent Wheels CLI releases)
+#   - SQLite JDBC driver in the lib/ext/ of the Lucee Express version lucee.json
+#     pins, under the CLI home (below). This script installs it there.
 #
 # Usage:
 #   bash tools/test-local.sh                          # run all core tests
@@ -18,6 +18,7 @@
 #   bash tools/test-local.sh wheels.tests.specs.model # the dotted TestBox form
 #   bash tools/test-local.sh dispatch/TestScopeVisibilitySpec  # one spec file
 #   PORT=9090 bash tools/test-local.sh                # use custom port
+#   LUCLI_BIN=/path/to/runtime bash tools/test-local.sh   # pick the runtime (default: wheels)
 #
 # An area that is neither a directory nor a spec file under
 # vendor/wheels/tests/specs/ exits 2
@@ -31,6 +32,29 @@
 #   specs hit the right server; CI sets its own override before invoking
 #   this script so the ${VAR:-default} preserves it.
 #
+# CLI home overrides (for sandboxed or isolated callers):
+#   LUCLI_HOME=/path   the CLI home: servers, Lucee Express installs and lib/ext.
+#   WHEELS_HOME=/path  the same, under the Wheels name; LUCLI_HOME wins if both are set.
+#   With either set, the script uses only that home: it never falls back to
+#   ~/.wheels, and passes -Dlucli.home=<home> to the runtime (that outranks the
+#   LUCLI_HOME a launcher such as the Homebrew `wheels` wrapper re-exports). It
+#   also sets -Duser.home=<home> in JAVA_TOOL_OPTIONS, because LuCLI, Lucee and
+#   the specs resolve paths from every JVM's user.home, not $HOME (the test
+#   server's JVM included; LUCLI_JAVA_ARGS reaches only the launcher), and
+#   defaults WHEELS_BROWSER_HOME to <home>/browser. A user.home the caller
+#   already set (LUCLI_JAVA_ARGS, JAVA_TOOL_OPTIONS or JDK_JAVA_OPTIONS) is
+#   kept. A launcher that writes into the real ~/.wheels (the Homebrew `wheels`
+#   wrapper) is refused: set LUCLI_BIN to the runtime it launches. If the server
+#   still runs from another home, nothing is installed or cleaned up there.
+#   Unset, or set to the real ~/.wheels or ~/.lucli (e.g. an exported
+#   LUCLI_HOME=$HOME/.wheels), nothing changes from before these variables:
+#   the home is ~/.wheels (or that LUCLI_HOME) and the runtime is `wheels`.
+#   The exception: a default-home LUCLI_HOME with WHEELS_HOME set elsewhere
+#   uses WHEELS_HOME as the override, with a note on stderr.
+#   In override mode the per-checkout results JSON and the test-server log live
+#   under ${TMPDIR:-/tmp} rather than the shared /tmp; default mode keeps /tmp.
+#   An explicit WHEELS_TEST_RESULT_FILE still wins over the result path.
+#
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -40,11 +64,6 @@ DB="${DB:-sqlite}"
 # Must match set(reloadPassword=...) in config/settings.cfm — a mismatch never
 # reloads and, since #3062, counts against the per-IP reload rate limit.
 PASSWORD="wheels-dev"
-# Per-checkout results file. A single fixed /tmp path is shared by every checkout on
-# the machine, so two working copies running the suite overwrite each other's results —
-# and a develop-vs-branch comparison silently becomes two copies of the same run
-# (issue #3352). Keyed on the project root so concurrent checkouts stay separate.
-RESULT_FILE="${WHEELS_TEST_RESULT_FILE:-/tmp/wheels-local-test-results-$(echo "$PROJECT_ROOT" | shasum | cut -c1-12).json}"
 
 # Browser specs call back into the local Wheels CLI server — point Playwright
 # at the right port. CI sets this explicitly before invoking the script;
@@ -117,13 +136,132 @@ RUN_LOCK="$PROJECT_ROOT/.wheels-test-local.lock"
 # ran, and --force deleted another checkout's stopped registration (#3810).
 CHECKOUT_KEY="$(cd "$PROJECT_ROOT" && pwd -P | shasum | cut -c1-12)"
 TEST_SERVER_NAME="wheels-test-${CHECKOUT_KEY}"
-TEST_SERVER_DIR="$HOME/.wheels/servers/$TEST_SERVER_NAME"
-SERVER_LOG="/tmp/wheels-test-server-${CHECKOUT_KEY}.log"
+# The CLI keeps servers and Lucee Express installs in its home: the caller's
+# LUCLI_HOME or WHEELS_HOME when one is set (an isolated CLI), otherwise
+# ~/.wheels. A launcher can re-export its own LUCLI_HOME (the Homebrew `wheels`
+# sets ~/.wheels); -Dlucli.home outranks the variable, so an override is passed
+# that way too, with user.home so nothing the JVM resolves from it lands in
+# the real home.
+# The runtime: LUCLI_BIN when set, otherwise the `wheels` on PATH.
+CLI_BIN="${LUCLI_BIN:-wheels}"
+# With a home override, a launcher that writes into the real ~/.wheels can't be
+# the runtime. The Homebrew `wheels` wrapper syncs its module, docs and SQLite
+# driver there and resets LUCLI_HOME before it execs the raw runtime.
+refuse_home_writing_launcher() {
+  local path
+  path="$(command -v "$CLI_BIN" 2>/dev/null || printf '%s' "$CLI_BIN")"
+  if [ -f "$path" ] && [ "$(head -c 2 "$path" 2>/dev/null)" = "#!" ] && grep -q 'HOME/\.wheels' "$path" 2>/dev/null; then
+    echo "::error::${path} writes into the real ~/.wheels, so it can't run with a CLI home override." >&2
+    echo "  Point LUCLI_BIN at the runtime it launches (e.g. \$(brew --prefix wheels)/libexec/wheels) or a raw lucli." >&2
+    exit 2
+  fi
+}
+# An override that resolves to a real default home (~/.wheels or ~/.lucli), such
+# as an exported LUCLI_HOME=$HOME/.wheels, isn't an isolated home: the run then
+# behaves exactly as it did before overrides existed.
+is_default_cli_home() {
+  local real d
+  real="$(cd "$1" 2>/dev/null && pwd -P || printf '%s' "${1%/}")"
+  for d in "$HOME/.wheels" "$HOME/.lucli"; do
+    [ "$real" = "$(cd "$d" 2>/dev/null && pwd -P || printf '%s' "$d")" ] && return 0
+  done
+  return 1
+}
+CLI_HOME_OVERRIDE="${LUCLI_HOME:-${WHEELS_HOME:-}}"
+if [ -n "$CLI_HOME_OVERRIDE" ] && is_default_cli_home "$CLI_HOME_OVERRIDE"; then
+  CLI_HOME_OVERRIDE=""
+  # A default-home LUCLI_HOME (e.g. exported from a shell profile) must not mask
+  # an isolated WHEELS_HOME: fall through to WHEELS_HOME, and export it as
+  # LUCLI_HOME so processes the run starts don't inherit the real home.
+  if [ -n "${LUCLI_HOME:-}" ] && [ -n "${WHEELS_HOME:-}" ] && ! is_default_cli_home "$WHEELS_HOME"; then
+    echo "Note: LUCLI_HOME (${LUCLI_HOME}) is a default CLI home; using WHEELS_HOME (${WHEELS_HOME}) instead." >&2
+    CLI_HOME_OVERRIDE="$WHEELS_HOME"
+    export LUCLI_HOME="$WHEELS_HOME"
+  fi
+fi
+# The home this run must not swap for another: the override, or a caller's
+# LUCLI_HOME that names a default home.
+PINNED_HOME="${CLI_HOME_OVERRIDE:-${LUCLI_HOME:-}}"
+CLI_HOME="${PINNED_HOME:-$HOME/.wheels}"
+TEST_SERVER_DIR="$CLI_HOME/servers/$TEST_SERVER_NAME"
+if [ -z "$CLI_HOME_OVERRIDE" ] && [ -n "$PINNED_HOME" ]; then
+  export LUCLI_JAVA_ARGS="${LUCLI_JAVA_ARGS:-} -Dlucli.home=$PINNED_HOME"
+fi
+if [ -n "$CLI_HOME_OVERRIDE" ]; then
+  # Export the resolved override as LUCLI_HOME, so child processes (a nested
+  # wheels call, or a spec shelling out) don't fall back to their own default.
+  if [ "${LUCLI_HOME:-}" != "$CLI_HOME_OVERRIDE" ]; then
+    export LUCLI_HOME="$CLI_HOME_OVERRIDE"
+  fi
+  export LUCLI_JAVA_ARGS="${LUCLI_JAVA_ARGS:-} -Dlucli.home=$CLI_HOME_OVERRIDE"
+  # user.home goes through JAVA_TOOL_OPTIONS, which every JVM reads, so it reaches
+  # the test server's own JVM and any JVM a spec starts; LUCLI_JAVA_ARGS reaches
+  # only the launcher. A caller that already chose a user.home (LUCLI_JAVA_ARGS,
+  # JAVA_TOOL_OPTIONS or JDK_JAVA_OPTIONS) keeps it.
+  case "$LUCLI_JAVA_ARGS ${JAVA_TOOL_OPTIONS:-} ${JDK_JAVA_OPTIONS:-}" in
+    *-Duser.home=*) ;;
+    *) export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Duser.home=$CLI_HOME_OVERRIDE" ;;
+  esac
+  refuse_home_writing_launcher
+  export WHEELS_BROWSER_HOME="${WHEELS_BROWSER_HOME:-$CLI_HOME_OVERRIDE/browser}"
+  echo "CLI home override: ${CLI_HOME_OVERRIDE} (not using ~/.wheels)"
+fi
+# Per-checkout results file and server log. A single fixed /tmp path would be
+# shared by every checkout on the machine, so two working copies running the
+# suite would overwrite each other's results (#3352); both names are keyed on
+# the checkout. Default mode keeps the historical /tmp location. An isolated
+# (override) run keeps its state in ${TMPDIR:-/tmp} instead, out of the shared
+# /tmp. WHEELS_TEST_RESULT_FILE still wins over the result path.
+STATE_DIR="/tmp"
+if [ -n "$CLI_HOME_OVERRIDE" ]; then
+  STATE_DIR="${TMPDIR:-/tmp}"
+fi
+RESULT_FILE="${WHEELS_TEST_RESULT_FILE:-$STATE_DIR/wheels-local-test-results-$(echo "$PROJECT_ROOT" | shasum | cut -c1-12).json}"
+SERVER_LOG="$STATE_DIR/wheels-test-server-${CHECKOUT_KEY}.log"
+# Cleared when the server turns out to run from a home other than the pinned
+# one: this run then writes nothing into that home.
+STAGING_ALLOWED=true
+
+canonical_dir() {
+  (cd "$1" 2>/dev/null && pwd -P) || printf '%s\n' "$1"
+}
+
+# Once the server is up, settle the home it really uses: from the CATALINA_HOME
+# Tomcat logs (<home>/express/<version>), or from where the server registered.
+# With a pinned home, a different home is never adopted.
+resolve_cli_home() {
+  local home="" candidate catalina
+  catalina="$(sed -n 's/.*CATALINA_HOME:[[:space:]]*\([^[:space:]]*\).*/\1/p' "$SERVER_LOG" 2>/dev/null | tail -1)"
+  case "$catalina" in
+    */express/*) home="${catalina%/express/*}" ;;
+  esac
+  if [ -z "$home" ]; then
+    # An isolated override is the only candidate; otherwise as before.
+    local candidates=()
+    [ -n "$PINNED_HOME" ] && candidates+=("$PINNED_HOME")
+    [ -z "$CLI_HOME_OVERRIDE" ] && candidates+=("$HOME/.wheels")
+    for candidate in "${candidates[@]}"; do
+      if [ -d "$candidate/servers/$TEST_SERVER_NAME" ]; then
+        home="$candidate"
+        break
+      fi
+    done
+  fi
+  [ -n "$home" ] || return 0
+  if [ -n "$PINNED_HOME" ] && [ "$(canonical_dir "$home")" != "$(canonical_dir "$PINNED_HOME")" ]; then
+    echo "::warning::The server runs from ${home}, not ${PINNED_HOME}; not installing the SQLite driver or cleaning up there." >&2
+    STAGING_ALLOWED=false
+    return 0
+  fi
+  CLI_HOME="$home"
+  TEST_SERVER_DIR="$CLI_HOME/servers/$TEST_SERVER_NAME"
+  EXPRESS_ROOT="$CLI_HOME/express"
+}
 
 # ── Server ownership helpers ────────────────────────
 #
 # The CLI records which project a server belongs to in
-# ~/.wheels/servers/<name>/.project-path, and its JVM as "<pid>:<port>" in
+# $CLI_HOME/servers/<name>/.project-path, and its JVM as "<pid>:<port>" in
 # server.pid. Both are authoritative; probing the port is not, because any
 # HTTP responder there will answer — including a completely different app.
 #
@@ -140,14 +278,14 @@ project_server_dir() {
   local d real name project_real fallback=""
   project_real="$(cd "$PROJECT_ROOT" && pwd -P)"
   name="$(lucee_server_name)"
-  if [ -n "$name" ] && [ -f "$HOME/.wheels/servers/$name/.project-path" ]; then
-    real="$(cd "$(cat "$HOME/.wheels/servers/$name/.project-path")" 2>/dev/null && pwd -P)" || real=""
+  if [ -n "$name" ] && [ -f "$CLI_HOME/servers/$name/.project-path" ]; then
+    real="$(cd "$(cat "$CLI_HOME/servers/$name/.project-path")" 2>/dev/null && pwd -P)" || real=""
     if [ "$real" = "$project_real" ]; then
-      printf '%s\n' "$HOME/.wheels/servers/$name"
+      printf '%s\n' "$CLI_HOME/servers/$name"
       return 0
     fi
   fi
-  for d in "$HOME"/.wheels/servers/*/; do
+  for d in "$CLI_HOME"/servers/*/; do
     [ -f "${d}.project-path" ] || continue
     real="$(cd "$(cat "${d}.project-path")" 2>/dev/null && pwd -P)" || continue
     [ "$real" = "$project_real" ] || continue
@@ -310,31 +448,113 @@ stop_orphaned_test_server() {
   rm -f "$PROJECT_ROOT/.wheels-test-server.pid"
 }
 
+stop_test_server() {
+  ( cd "$PROJECT_ROOT" && "$CLI_BIN" server stop --name="$TEST_SERVER_NAME" >/dev/null 2>&1 ) || true
+  # `kill $SERVER_PID` only kills the launcher: the JVM survives it and keeps
+  # holding the port, so whichever project wants that port next silently gets
+  # THIS app's responses. Stop the JVMs this run recorded (the registry's, and
+  # the one that answered on PORT when the server came up), but only while
+  # they still hold PORT: never whatever happens to listen there now (#3771).
+  local jvm pids=""
+  jvm="$(cut -d: -f1 "$PROJECT_ROOT/.wheels-test-server.pid" 2>/dev/null || true)"
+  [ -n "$jvm" ] && pids="$jvm"
+  [ -n "${STARTED_PORT_PID:-}" ] && [ "$STARTED_PORT_PID" != "$jvm" ] && pids="$pids $STARTED_PORT_PID"
+  [ -n "${SERVER_PID:-}" ] && pids="$pids $SERVER_PID"
+  # shellcheck disable=SC2086
+  stop_pids "$PORT" $pids
+  rm -f "$PROJECT_ROOT/.wheels-test-server.pid"
+  # The registration is this run's alone (its name is per checkout), so
+  # remove it rather than leave a server directory behind per worktree.
+  case "$TEST_SERVER_NAME" in
+    wheels-test-?*) rm -rf "$TEST_SERVER_DIR" ;;
+  esac
+}
+
+# ── SQLite JDBC driver ──────────────────────────────
+#
+# The driver goes into the lib/ext of the Lucee Express version lucee.json
+# pins, in the CLI home, not whichever install `find` lists first.
+EXPRESS_ROOT="$CLI_HOME/express"
+SQLITE_JDBC_VERSION="3.49.1.0"
+SQLITE_JDBC_SHA256="5c8609d2ca341deb8c6f71778974b5ba4995c7d32d7c7c89d9392a3e72c39291"
+
+# The Lucee version a lucee.json pins: the first "version" inside its "lucee" block.
+pinned_lucee_version() {
+  awk '/"lucee"[[:space:]]*:/ { inLucee = 1 }
+       inLucee && /"version"[[:space:]]*:/ {
+         sub(/.*"version"[[:space:]]*:[[:space:]]*"/, ""); sub(/".*/, ""); print; exit
+       }' "$1" 2>/dev/null
+}
+
+# Returns 0 when it put the driver into Lucee Express <version>, 1 when that
+# version is not installed yet or already has a driver, 2 when the download failed.
+stage_sqlite_driver() {
+  local lib="$EXPRESS_ROOT/$1/lib/ext"
+  [ "$STAGING_ALLOWED" = "true" ] || return 1
+  [ -n "$1" ] && [ -d "$lib" ] || return 1
+  ls "$lib"/sqlite-jdbc*.jar 1>/dev/null 2>&1 && return 1
+  echo "Downloading SQLite JDBC driver into Lucee Express $1..."
+  if ! bash "$PROJECT_ROOT/tools/ci/fetch-sqlite-jdbc.sh" "$lib/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar" \
+    "$SQLITE_JDBC_VERSION" "$SQLITE_JDBC_SHA256"; then
+    echo "::warning::Could not download the SQLite JDBC driver into $lib" >&2
+    return 2
+  fi
+  return 0
+}
+
+start_test_server() {
+  STARTED_PORT_PID=""
+  nohup "$CLI_BIN" server run --port="$PORT" --name="$TEST_SERVER_NAME" --force > "$SERVER_LOG" 2>&1 &
+  SERVER_PID=$!
+  STARTED_SERVER=true
+
+  echo "Waiting for server..."
+  for i in $(seq 1 60); do
+    if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:${PORT}/" 2>/dev/null; then
+      echo "Server ready (attempt $i)"
+      # The port was free when this run started, so its listener now is ours.
+      STARTED_PORT_PID="$(listener_pid "$PORT" || true)"
+      break
+    fi
+    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+      echo "Server process died. Check ${SERVER_LOG}"
+      tail -20 "$SERVER_LOG" 2>/dev/null
+      exit 1
+    fi
+    sleep 2
+  done
+
+  resolve_cli_home
+
+  # Record the JVM (not the launcher) so cleanup can stop what actually holds
+  # the port. The registry writes "<pid>:<port>" once the server is up.
+  if [ -f "$TEST_SERVER_DIR/server.pid" ]; then
+    cp "$TEST_SERVER_DIR/server.pid" "$PROJECT_ROOT/.wheels-test-server.pid"
+  fi
+
+  # The listener captured above is this run's server only if it is the
+  # registry's JVM or a descendant of the launcher. Another process can bind
+  # the port between the free-port check and our JVM's bind; it then answers
+  # the test requests, and cleanup must not stop it (#3796).
+  if [ -n "${STARTED_PORT_PID:-}" ]; then
+    REGISTRY_JVM="$(cut -d: -f1 "$PROJECT_ROOT/.wheels-test-server.pid" 2>/dev/null || true)"
+    if [ "$STARTED_PORT_PID" != "$REGISTRY_JVM" ] && ! is_descendant_of "$STARTED_PORT_PID" "$SERVER_PID"; then
+      echo "::error::Port ${PORT} is answered by PID ${STARTED_PORT_PID}, which this run did not start." >&2
+      echo "  Refusing to run — testing a foreign server reports results for the wrong app." >&2
+      echo "  Fix: stop PID ${STARTED_PORT_PID}, or re-run with PORT=<free port>." >&2
+      STARTED_PORT_PID=""
+      exit 1
+    fi
+  fi
+}
+
 cleanup() {
   # Stop the server BEFORE restoring lucee.json: `wheels server stop` reads
   # the ports from lucee.json, and restoring first pointed it at 8080/8081
   # instead of the ports this run pinned (#3771).
   if [ "${STARTED_SERVER:-false}" = "true" ]; then
     echo "Stopping test server..."
-    ( cd "$PROJECT_ROOT" && wheels server stop --name="$TEST_SERVER_NAME" >/dev/null 2>&1 ) || true
-    # `kill $SERVER_PID` only kills the launcher: the JVM survives it and keeps
-    # holding the port, so whichever project wants that port next silently gets
-    # THIS app's responses. Stop the JVMs this run recorded (the registry's, and
-    # the one that answered on PORT when the server came up), but only while
-    # they still hold PORT: never whatever happens to listen there now (#3771).
-    local jvm pids=""
-    jvm="$(cut -d: -f1 "$PROJECT_ROOT/.wheels-test-server.pid" 2>/dev/null || true)"
-    [ -n "$jvm" ] && pids="$jvm"
-    [ -n "${STARTED_PORT_PID:-}" ] && [ "$STARTED_PORT_PID" != "$jvm" ] && pids="$pids $STARTED_PORT_PID"
-    [ -n "${SERVER_PID:-}" ] && pids="$pids $SERVER_PID"
-    # shellcheck disable=SC2086
-    stop_pids "$PORT" $pids
-    rm -f "$PROJECT_ROOT/.wheels-test-server.pid"
-    # The registration is this run's alone (its name is per checkout), so
-    # remove it rather than leave a server directory behind per worktree.
-    case "$TEST_SERVER_NAME" in
-      wheels-test-?*) rm -rf "$TEST_SERVER_DIR" ;;
-    esac
+    stop_test_server
   fi
   # Restore original lucee.json if we modified it
   if [ "${RESTORED_LUCEE_JSON:-false}" = "true" ] && [ -f "$LUCEE_BAK" ]; then
@@ -374,7 +594,7 @@ fi
 # Check if lucee.json has {project} and the runtime version is too old to
 # resolve the placeholder.
 if grep -q '{project}' lucee.json 2>/dev/null; then
-  WHEELS_VER=$(wheels --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")
+  WHEELS_VER=$("$CLI_BIN" --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")
   # For safety, always create a resolved copy for the server
   cp lucee.json "$LUCEE_BAK"
   sed -i '' "s|{project}|${PROJECT_ROOT}|g" lucee.json
@@ -426,56 +646,17 @@ else
     echo "Pinned lucee.json to port ${PORT}, shutdown ${SHUTDOWN_PORT} for this run"
   fi
 
-  # Locate Lucee Express's lib/ext so we can drop the SQLite JDBC there.
-  # `|| true` keeps `set -e` from killing the script when the directory is
-  # missing — `find` exits non-zero on missing path args (stderr suppressed
-  # via 2>/dev/null but the exit status survives pipefail).
-  LUCEE_LIB=$(find ~/.wheels/express -path "*/lib/ext" -type d 2>/dev/null | head -1 || true)
-  if [ -n "$LUCEE_LIB" ] && ! ls "$LUCEE_LIB"/sqlite-jdbc*.jar 1>/dev/null 2>&1; then
-    echo "Downloading SQLite JDBC driver..."
-    curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar" \
-      -o "$LUCEE_LIB/sqlite-jdbc-3.49.1.0.jar"
-  fi
-
-  nohup wheels server run --port="$PORT" --name="$TEST_SERVER_NAME" --force > "$SERVER_LOG" 2>&1 &
-  SERVER_PID=$!
-  STARTED_SERVER=true
-
-  echo "Waiting for server..."
-  for i in $(seq 1 60); do
-    if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:${PORT}/" 2>/dev/null; then
-      echo "Server ready (attempt $i)"
-      # The port was free when this run started, so its listener now is ours.
-      STARTED_PORT_PID="$(listener_pid "$PORT" || true)"
-      break
-    fi
-    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-      echo "Server process died. Check ${SERVER_LOG}"
-      tail -20 "$SERVER_LOG" 2>/dev/null
-      exit 1
-    fi
-    sleep 2
-  done
-
-  # Record the JVM (not the launcher) so cleanup can stop what actually holds
-  # the port. The registry writes "<pid>:<port>" once the server is up.
-  if [ -f "$TEST_SERVER_DIR/server.pid" ]; then
-    cp "$TEST_SERVER_DIR/server.pid" "$PROJECT_ROOT/.wheels-test-server.pid"
-  fi
-
-  # The listener captured above is this run's server only if it is the
-  # registry's JVM or a descendant of the launcher. Another process can bind
-  # the port between the free-port check and our JVM's bind; it then answers
-  # the test requests, and cleanup must not stop it (#3796).
-  if [ -n "${STARTED_PORT_PID:-}" ]; then
-    REGISTRY_JVM="$(cut -d: -f1 "$PROJECT_ROOT/.wheels-test-server.pid" 2>/dev/null || true)"
-    if [ "$STARTED_PORT_PID" != "$REGISTRY_JVM" ] && ! is_descendant_of "$STARTED_PORT_PID" "$SERVER_PID"; then
-      echo "::error::Port ${PORT} is answered by PID ${STARTED_PORT_PID}, which this run did not start." >&2
-      echo "  Refusing to run — testing a foreign server reports results for the wrong app." >&2
-      echo "  Fix: stop PID ${STARTED_PORT_PID}, or re-run with PORT=<free port>." >&2
-      STARTED_PORT_PID=""
-      exit 1
-    fi
+  # Tomcat reads lib/ext only when the JVM starts, so the SQLite driver must be
+  # in the pinned Lucee Express before the server boots. A version this run's
+  # start downloads gets the driver afterwards, and the server restarts once.
+  PINNED_LUCEE="$(pinned_lucee_version lucee.json)"
+  STAGED_BEFORE_START=0
+  stage_sqlite_driver "$PINNED_LUCEE" || STAGED_BEFORE_START=$?
+  start_test_server
+  if [ "$STAGED_BEFORE_START" = "1" ] && stage_sqlite_driver "$PINNED_LUCEE"; then
+    echo "Restarting so Lucee Express ${PINNED_LUCEE} loads the SQLite driver..."
+    stop_test_server
+    start_test_server
   fi
 fi
 

@@ -399,7 +399,7 @@
 			local.rv = ReReplaceNoCase(local.rv, "\[\[duplicate\]\]\d+", "", "all");
 
 			local.groupByItems = [];
-			local.selectItems = ListToArray(local.rv);
+			local.selectItems = $splitOutsideFunctions(local.rv, ",");
 
 			for (local.item in local.selectItems) {
 				// Only skip subqueries (items with SELECT inside parentheses)
@@ -689,72 +689,6 @@
 				local.rv = $createSQLFieldListDuplicatePrefix(local.classes, local.rv);
 			}
 
-
-			if (Len(arguments.include) && arguments.clause == "select") {
-				local.newSelect = "";
-				local.addedProperties = "";
-				local.filteredArray = ListToArray(local.rv);
-				local.iEnd = ArrayLen(local.filteredArray);
-				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.iItem = local.filteredArray[local.i];
-
-					// get the property part, done by taking everything from the end of the string to a . or a space (which would be found when using " AS ")
-					local.property = Reverse(SpanExcluding(Reverse(local.iItem), ". "));
-
-					// Strip dialect quotes added above so alias matching and downstream concatenation work on bare identifiers.
-					local.property = variables.wheels.class.adapter.$stripIdentifierQuotes(local.property);
-
-					// check if this one has been flagged as a duplicate, we get the number of classes to skip and also remove the flagged info from the item
-					local.duplicateCount = 0;
-					local.matches = ReFind("^\[\[duplicate\]\](\d+)(.+)$", local.iItem, 1, true);
-					if (local.matches.pos[1] > 0) {
-						local.duplicateCount = Mid(local.iItem, local.matches.pos[2], local.matches.len[2]);
-						local.iItem = Mid(local.iItem, local.matches.pos[3], local.matches.len[3]);
-					}
-
-					if (!local.duplicateCount) {
-						// this is not a duplicate so we can just insert it as is
-						local.newItem = local.iItem;
-						local.newProperty = local.property;
-					} else {
-						// this is a duplicate so we prepend the class name and then insert it unless a property with the resulting name already exist
-						local.classData = local.classes[local.duplicateCount];
-
-						// Initialize aliasFound
-						local.aliasFound = false;
-						local.alias = "";
-
-						// Check for join and extract alias
-						if (StructKeyExists(local.classData, "join")) {
-							local.match = ReFindNoCase("\sAS\s+(\w+)", local.classData.join, 1, true);
-							if (ArrayLen(local.match.len) >= 2 && local.match.len[2] > 0) {
-								local.alias = Mid(local.classData.join, local.match.pos[2], local.match.len[2]);
-								local.aliasFound = CompareNoCase(local.alias, local.classData.pluralizedName) EQ 0;
-							}
-						}
-
-						// Construct newProperty using alias or modelName
-						local.newProperty = (local.aliasFound ? local.alias : local.classData.modelName) & local.property;
-
-						// Determine newItem based on presence of " AS " in iItem
-						if (Find(" AS ", local.iItem)) {
-							local.newItem = ReplaceNoCase(local.iItem, " AS " & local.property, " AS " & local.newProperty);
-						} else {
-							if (local.aliasFound) {
-								local.newItem = local.alias & "." & variables.wheels.class.adapter.$quoteIdentifier(local.property) & " AS " & local.newProperty;
-							} else {
-								local.newItem = local.iItem & " AS " & local.newProperty;
-							}
-						}
-					}
-					if (!ListFindNoCase(local.addedProperties, local.newProperty)) {
-						local.newSelect = ListAppend(local.newSelect, local.newItem);
-						local.addedProperties = ListAppend(local.addedProperties, local.newProperty);
-					}
-				}
-				local.rv = local.newSelect;
-			}
-
 			if (arguments.clause == "groupBy" && Find(" AS ", local.rv)) {
 				local.rv = ReReplace(local.rv, variables.wheels.class.RESQLAs, "", "all");
 			}
@@ -886,7 +820,7 @@
 	public string function $createSQLFieldListDuplicatePrefix(required array classes, required string rv) {
 		local.newSelect = "";
 		local.addedProperties = "";
-		local.filteredArray = ListToArray(arguments.rv);
+		local.filteredArray = $splitOutsideFunctions(arguments.rv, ",");
 		local.iEnd = ArrayLen(local.filteredArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.iItem = local.filteredArray[local.i];
@@ -2367,7 +2301,12 @@
 			// the JOIN string depends on the calling context (soft-delete handling and whether the
 			// table needs to be aliased), so memoize it per context variant instead of globally
 			local.aliasJoin = ListFindNoCase(local.tables, local.classAssociations[local.name].tableName) > 0;
-			local.joinVariantKey = "sd" & (arguments.includeSoftDeletes ? 1 : 0) & "_alias" & (local.aliasJoin ? 1 : 0);
+			// Identifier quoting can differ per datasource fold case (H2 tenants), so the
+			// variant key carries the adapter's quoting mode as well as the soft-delete and
+			// alias state; an empty mode keeps the key stable for datasource-independent adapters.
+			local.joinVariantKey = "sd" & (arguments.includeSoftDeletes ? 1 : 0)
+				& "_alias" & (local.aliasJoin ? 1 : 0)
+				& "_ic" & variables.wheels.class.adapter.$identifierCase();
 
 			// create the join string if it hasn't already been done for this context variant
 			$expandedAssociationsJoin(

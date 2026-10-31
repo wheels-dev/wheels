@@ -48,6 +48,30 @@ jobs:
       - name: Install LuCLI
         uses: ./.github/actions/setup-lucli
 
+      - name: Cache Lucee Express
+        id: express-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.lucli/express
+          key: lucee-express-${{ runner.os }}-${{ hashFiles('tools/ci/lucee.ci.json', 'lucee.json', 'cli/lucli/templates/app/lucee.json') }}
+          restore-keys: |
+            lucee-express-${{ runner.os }}-
+
+      - name: Report Lucee Express cache
+        run: echo "Lucee Express cache hit=${{ steps.express-cache.outputs.cache-hit || 'false' }}"
+
+      - name: Cache Lucee Maven repository
+        id: maven-cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/.lucee-mvn
+          key: lucee-mvn-${{ runner.os }}-${{ hashFiles('.env', 'tools/ci/lucee.ci.json', 'lucee.json') }}
+          restore-keys: |
+            lucee-mvn-${{ runner.os }}-
+
+      - name: Report Lucee Maven cache
+        run: echo "Lucee Maven cache hit=${{ steps.maven-cache.outputs.cache-hit || 'false' }}"
+
       - name: Create test databases
         run: |
           sudo apt-get update -y && sudo apt-get install -y --no-install-recommends sqlite3
@@ -92,10 +116,11 @@ jobs:
 
       - name: Download SQLite JDBC driver
         run: |
-          curl -sL --retry 3 --retry-delay 2 --retry-all-errors "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar" \
-            -o /tmp/sqlite-jdbc.jar
+          bash tools/ci/fetch-sqlite-jdbc.sh /tmp/sqlite-jdbc.jar
 
       - name: Start Lucee server
+        env:
+          LUCEE_MAVEN_LOCAL_REPOSITORY: ${{ runner.temp }}/.lucee-mvn
         run: |
           cp tools/ci/lucee.ci.json lucee.json
 
@@ -118,46 +143,63 @@ jobs:
           done
 
       - name: Install SQLite JDBC into Lucee
+        env:
+          LUCEE_MAVEN_LOCAL_REPOSITORY: ${{ runner.temp }}/.lucee-mvn
         run: |
           # Find where LuCLI placed the Lucee Express lib directory
           LUCEE_LIB=$(find ~/.lucli/express -path "*/lib/ext" -type d 2>/dev/null | head -1)
           if [ -z "$LUCEE_LIB" ]; then
             LUCEE_LIB=$(find ~/.lucli/express -maxdepth 2 -name "lib" -type d 2>/dev/null | head -1)
           fi
-          if [ -n "$LUCEE_LIB" ]; then
-            cp /tmp/sqlite-jdbc.jar "$LUCEE_LIB/"
-            echo "SQLite JDBC installed to: $LUCEE_LIB"
-          else
+          if [ -z "$LUCEE_LIB" ]; then
             echo "::error::Could not find Lucee lib directory"
             find ~/.lucli/express -type d | head -20
             exit 1
           fi
 
-          # Stop server fully and restart to pick up the new JDBC driver
+          # Stop the first (Express-downloading) start before touching the install.
           kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
           lucli server stop 2>/dev/null || true
-          # Wait for port to be freed
           for i in $(seq 1 15); do
             if ! curl -s -o /dev/null --connect-timeout 1 "http://localhost:30007/" 2>/dev/null; then
               break
             fi
             sleep 1
           done
-          # Also kill any lingering java processes on the port
           fuser -k 30007/tcp 2>/dev/null || true
           sleep 2
 
-          nohup lucli server run --port=30007 --force > /tmp/lucli-server.log 2>&1 &
+          # Install the driver after the stop, so the restart picks it up.
+          cp /tmp/sqlite-jdbc.jar "$LUCEE_LIB/"
+          echo "SQLite JDBC installed to: $LUCEE_LIB"
+
+          # No --force here: keep ~/.lucli/servers (and the Lucee extensions installed in it).
+          nohup lucli server run --port=30007 > /tmp/lucli-server.log 2>&1 &
           echo $! > /tmp/lucli-server.pid
 
           echo "Waiting for Lucee to restart..."
+          RESTARTED=0
           for i in $(seq 1 60); do
             if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:30007/" 2>/dev/null; then
               echo "Lucee restarted with SQLite JDBC"
+              RESTARTED=1
               break
             fi
             sleep 2
           done
+          if [ "$RESTARTED" != "1" ]; then
+            echo "::error::Lucee did not restart"
+            cat /tmp/lucli-server.log
+            exit 1
+          fi
+
+          H2_EXT=$(find ~/.lucli/servers -iname '*h2*' 2>/dev/null | head -5)
+          if [ -n "$H2_EXT" ]; then
+            echo "H2 extension preserved after the no-force restart:"
+            echo "$H2_EXT"
+          else
+            echo "::warning::No H2 extension found under ~/.lucli/servers after the no-force restart"
+          fi
 
       - name: Run tests
         run: |
@@ -211,5 +253,31 @@ jobs:
       - name: Install LuCLI
         uses: ./.github/actions/setup-lucli
 
+      - name: Cache Lucee Express
+        id: express-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.lucli/express
+          key: lucee-express-${{ runner.os }}-${{ hashFiles('tools/ci/lucee.ci.json', 'lucee.json', 'cli/lucli/templates/app/lucee.json') }}
+          restore-keys: |
+            lucee-express-${{ runner.os }}-
+
+      - name: Report Lucee Express cache
+        run: echo "Lucee Express cache hit=${{ steps.express-cache.outputs.cache-hit || 'false' }}"
+
+      - name: Cache Lucee Maven repository
+        id: maven-cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/.lucee-mvn
+          key: lucee-mvn-${{ runner.os }}-${{ hashFiles('.env', 'tools/ci/lucee.ci.json', 'lucee.json') }}
+          restore-keys: |
+            lucee-mvn-${{ runner.os }}-
+
+      - name: Report Lucee Maven cache
+        run: echo "Lucee Maven cache hit=${{ steps.maven-cache.outputs.cache-hit || 'false' }}"
+
       - name: Run tutorial e2e
+        env:
+          LUCEE_MAVEN_LOCAL_REPOSITORY: ${{ runner.temp }}/.lucee-mvn
         run: bash tools/test-tutorial-e2e.sh

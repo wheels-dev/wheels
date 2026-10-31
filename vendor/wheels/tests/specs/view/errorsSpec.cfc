@@ -2,6 +2,8 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		enc = new wheels.tests._assets.view.HtmlEncoding()
+
 		describe("Tests that errorMessageOn", () => {
 
 			it("works with all options supplied", () => {
@@ -29,7 +31,8 @@ component extends="wheels.WheelsTest" {
 				e = _controller.errorMessageOn(argumentcollection = args)
 				r = '<span class="error-message" role="alert">lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;</span>'
 
-				expect(e).toBe(r)
+				expect(enc.normalize(e)).toBe(enc.normalize(r))
+				expect(enc.textProblem(enc.innerText(e, "span"), "lastname error with <strong>bold</strong>")).toBe("")
 			})
 
 			it("does not encode HTML in errorMessageOn when encode=false", () => {
@@ -62,7 +65,7 @@ component extends="wheels.WheelsTest" {
 				e = _controller.errorMessagesFor(argumentcollection = args)
 				r = '<ul class="errors-found" role="alert"><li>firstname error1</li><li>firstname error2</li><li>firstname error2</li><li>lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;</li></ul>'
 
-				expect(e).toBe(r)
+				expect(enc.normalize(e)).toBe(enc.normalize(r))
 			})
 
 			it("does not show duplicate errors", () => {
@@ -70,7 +73,7 @@ component extends="wheels.WheelsTest" {
 				e = _controller.errorMessagesFor(argumentcollection = args)
 				r = '<ul class="errors-found" role="alert"><li>firstname error1</li><li>firstname error2</li><li>lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;</li></ul>'
 
-				expect(e).toBe(r)
+				expect(enc.normalize(e)).toBe(enc.normalize(r))
 			})
 
 			it("shows association errors", () => {
@@ -90,7 +93,8 @@ component extends="wheels.WheelsTest" {
 
 				r = '<ul class="errors-found" role="alert"><li>firstname error1</li><li>firstname error2</li><li>lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;</li></ul>'
 				
-				expect(e).toBe(r)
+				expect(enc.normalize(e)).toBe(enc.normalize(r))
+				expect(enc.textProblem(enc.innerText(Mid(e, FindNoCase("<li>lastname", e), Len(e)), "li"), "lastname error with <strong>bold</strong>")).toBe("")
 			})
 
 			it("does not encode HTML in errorMessagesFor when encode=false", () => {

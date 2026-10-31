@@ -49,10 +49,13 @@ The spec's `beforeAll`/`afterAll` calls these via `DeployShellHelper`.
 
 ## Keys
 
-`test_key` / `test_key.pub` / `authorized_keys` are copied verbatim from
-the sibling `sshd/` fixture — a deterministic ed25519 keypair with NO
-production value. Duplicating them keeps `DeployShellHelper`'s path
-conventions happy without cross-fixture coupling.
+`test_key` is this fixture's own deterministic ed25519 private key and
+`test_key.pub` its public key; `authorized_keys` is a byte-identical
+copy of `test_key.pub`, bind-mounted into the container by
+`docker-compose.yml`. The keypair has NO production value. It lives
+here rather than being shared with the sibling `sshd/` fixture, so the
+fixtures stay independent and the `DeployShellHelper`-driven specs find
+it at the conventional `<fixtureDir>/test_key`.
 
 ## Phase 3 future work
 

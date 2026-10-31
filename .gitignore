@@ -120,3 +120,9 @@ lucee.json.test-local.bak
 
 # Built at release/snapshot time by tools/build/scripts/build-docs-index.mjs (wheels lookup)
 cli/lucli/data/docs-index.json
+
+# Written by the demo app and test runs (e.g. the RustCFML version check, #4577)
+public/logs/
+
+# Python bytecode from tools/ci scripts
+__pycache__/

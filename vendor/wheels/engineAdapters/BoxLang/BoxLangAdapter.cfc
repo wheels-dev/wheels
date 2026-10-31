@@ -82,7 +82,7 @@ component extends="wheels.engineAdapters.Base" output="false" {
 			local.dotPrefix &= ".";
 			local.cleanName = Right(local.cleanName, Len(local.cleanName) - 1);
 		}
-		local.cleanName = ReReplace(local.cleanName, "(^|-)([a-z])", "\u\2", "all");
+		local.cleanName = $upperCaseAfterDash(local.cleanName);
 		return local.dotPrefix & local.cleanName;
 	}
 

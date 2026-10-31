@@ -526,9 +526,9 @@ jobs:
       matrix:
         include:
           - label: "rocky 10, rpm 4.19"
-            image: rockylinux/rockylinux:10
+            image: ghcr.io/wheels-dev/mirror/rockylinux/rockylinux:10
           - label: "rocky 9, rpm 4.16"
-            image: rockylinux/rockylinux:9
+            image: ghcr.io/wheels-dev/mirror/rockylinux/rockylinux:9
     container:
       image: ${{ matrix.image }}
     env:
@@ -576,7 +576,7 @@ jobs:
     # Gates (hard-fail): as of 4.0.5 the rpm's wrapper resolves the RHEL/Fedora
     # Java-21 layout, so `wheels --version` works on Rocky 9 (was the 4.0.4 bug).
     container:
-      image: rockylinux:9
+      image: ghcr.io/wheels-dev/mirror/rockylinux:9
     env:
       EXPECTED: ${{ needs.resolve.outputs.version }}
     steps:
@@ -643,7 +643,7 @@ jobs:
     # dependency (#4237) is what makes it installable. Bleeding-edge only for
     # now; a stable Fedora leg is owed once 4.2.0 ships with that dependency.
     container:
-      image: fedora:44
+      image: ghcr.io/wheels-dev/mirror/fedora:44
     steps:
       - name: Add yum.wheels.dev bleeding-edge + install (the documented path)
         run: |

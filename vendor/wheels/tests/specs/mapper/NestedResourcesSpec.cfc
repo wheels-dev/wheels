@@ -84,15 +84,22 @@ component extends="wheels.WheelsTest" {
 				.end();
 				r = m.getRoutes();
 
-				// Check for named route like postComments or postComment
-				local.hasNamedRoute = false;
+				// Exact names captured from the pre-patch mapper (#4646), not a substring check.
+				local.names = [];
 				for (local.route in r) {
-					if (StructKeyExists(local.route, "name") && FindNoCase("postComment", local.route.name)) {
-						local.hasNamedRoute = true;
-						break;
+					if (
+						StructKeyExists(local.route, "name")
+						&& FindNoCase("postComment", local.route.name)
+						&& !ArrayFindNoCase(local.names, local.route.name)
+					) {
+						ArrayAppend(local.names, local.route.name);
 					}
 				}
-				expect(local.hasNamedRoute).toBeTrue();
+				expect(ArrayLen(local.names)).toBe(4);
+				expect(ArrayFindNoCase(local.names, "postComments")).toBeGT(0);
+				expect(ArrayFindNoCase(local.names, "postComment")).toBeGT(0);
+				expect(ArrayFindNoCase(local.names, "newPostComment")).toBeGT(0);
+				expect(ArrayFindNoCase(local.names, "editPostComment")).toBeGT(0);
 			});
 
 			it("supports multiple nested resources in a single callback", function() {

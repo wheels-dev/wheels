@@ -5,6 +5,7 @@ import remarkRehype from 'remark-rehype';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import rehypeShiki from '@shikijs/rehype';
 import rehypeStringify from 'rehype-stringify';
+import { rehypeTableScroll } from '@wheels-dev/ui/markdown/rehype-table-scroll.mjs';
 
 // Relax the sanitizer schema to keep shiki's syntax-highlighting
 // class names (which default-schema would strip from <pre>/<code>/<span>).
@@ -26,6 +27,9 @@ export async function renderMarkdown(src: string): Promise<string> {
     .use(remarkGfm)
     .use(remarkRehype, { allowDangerousHtml: false })
     .use(rehypeSanitize, schema)
+    // After the sanitizer, so the wrapper's role/aria-label/tabindex survive,
+    // and before stringify. Gives `.prose table` native display again (#4575).
+    .use(rehypeTableScroll)
     .use(rehypeShiki, { themes: { light: 'github-light', dark: 'github-dark' } })
     .use(rehypeStringify)
     .process(src);

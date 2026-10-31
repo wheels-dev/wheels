@@ -8,6 +8,8 @@ from the framework's inline documentation annotations.
 
 ## Available versions
 
+<div class="table-scroll" role="region" aria-label="Table" tabindex="0">
+
 | Version                | Functions | Status          |
 | ---------------------- | --------- | --------------- |
 | **[v4.2.0](/v4-2-0/)** | 406       | current release |
@@ -21,6 +23,8 @@ from the framework's inline documentation annotations.
 | [v2.1.0](/v2-1-0/)     | 298       |                 |
 | [v2.0.0](/v2-0-0/)     | 254       |                 |
 | [v1.4.5](/v1-4-5/)     | 219       |                 |
+
+</div>
 
 ## How to use
 

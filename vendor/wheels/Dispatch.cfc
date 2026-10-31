@@ -1368,8 +1368,9 @@ component output="false" extends="wheels.Global"{
 		// Convert controller to upperCamelCase via engine adapter
 		local.rv.controller = application.wheels.engineAdapter.controllerNameToUpperCamelCase(local.rv.controller);
 
-		// Action to normal camelCase.
-		local.rv.action = ReReplace(local.rv.action, "-([a-z])", "\u\1", "all");
+		// Action to normal camelCase. Manual walk, not a regex replacement: Adobe CF
+		// 2023 update 26 / 2025 update 14 parse the backslash-u case escape as a literal "u" (#4646).
+		local.rv.action = application.wheels.engineAdapter.$upperCaseAfterDash(value = local.rv.action, uppercaseFirst = false);
 
 		return local.rv;
 	}

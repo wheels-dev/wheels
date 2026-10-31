@@ -2,6 +2,8 @@ component extends="wheels.WheelsTest" {
 
     function run() {
 
+		enc = new wheels.tests._assets.view.HtmlEncoding()
+
         g = application.wo
 		
 		describe("Testing with plain text (no HTML)", () => {
@@ -23,8 +25,8 @@ component extends="wheels.WheelsTest" {
 				args.text = "Visit Wheels at http://wheels.dev"
 				args.encode = true
 				result = _controller.autoLink(argumentCollection=args)
-				expect(result).toInclude('Visit Wheels at <a href="http&##x3a;&##x2f;&##x2f;wheels.dev">http&##x3a;&##x2f;&##x2f;wheels.dev</a>')
-				expect(result).toInclude('&##x2f;')
+				expect(enc.normalize(result)).toInclude(enc.normalize('Visit Wheels at <a href="http&##x3a;&##x2f;&##x2f;wheels.dev">http&##x3a;&##x2f;&##x2f;wheels.dev</a>'))
+				expect(enc.attributeProblem(result, "href", "http://wheels.dev")).toBe("")
 				expect(result).notToInclude('<script')
 			})
 			
@@ -33,7 +35,7 @@ component extends="wheels.WheelsTest" {
 				args.text = "Visit Wheels at http://wheels.dev"
 				args.encode = "attributes"
 				result = _controller.autoLink(argumentCollection=args)
-				expect(result).toInclude('Visit Wheels at <a href="http&##x3a;&##x2f;&##x2f;wheels.dev">http://wheels.dev</a>')
+				expect(enc.normalize(result)).toInclude(enc.normalize('Visit Wheels at <a href="http&##x3a;&##x2f;&##x2f;wheels.dev">http://wheels.dev</a>'))
 				expect(result).notToInclude('&lt;')
 			})
 			
@@ -50,8 +52,8 @@ component extends="wheels.WheelsTest" {
 				args.text = "Contact us at info@wheels.dev"
 				args.encode = true
 				result = _controller.autoLink(argumentCollection=args)
-				expect(result).toInclude('Contact us at <a href="mailto&##x3a;info&##x40;wheels.dev">info&##x40;wheels.dev</a>')
-				expect(result).toInclude('&##x3a;')
+				expect(enc.normalize(result)).toInclude(enc.normalize('Contact us at <a href="mailto&##x3a;info&##x40;wheels.dev">info&##x40;wheels.dev</a>'))
+				expect(enc.attributeProblem(result, "href", "mailto:info@wheels.dev")).toBe("")
 				expect(result).notToInclude('<script')
 			})
 			
@@ -60,7 +62,7 @@ component extends="wheels.WheelsTest" {
 				args.text = "Contact us at info@wheels.dev"
 				args.encode = "attributes"
 				result = _controller.autoLink(argumentCollection=args)
-				expect(result).toInclude('Contact us at <a href="mailto&##x3a;info&##x40;wheels.dev">info@wheels.dev</a>')
+				expect(enc.normalize(result)).toInclude(enc.normalize('Contact us at <a href="mailto&##x3a;info&##x40;wheels.dev">info@wheels.dev</a>'))
 			})
 		})
     }

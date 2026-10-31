@@ -204,6 +204,9 @@
 		// a struct key is much faster than a list element
 		local.columnStruct = $listToStruct(arguments.properties.columnList);
 		local.prefix = Len(arguments.joinAlias)? arguments.joinAlias: arguments.name;
+		// Read once per row: extra query columns (select aliases, join columns, driver
+		// metadata) follow the same key-casing rule as the property keys above (#4640).
+		local.resetPropertyKeyCase = $get("resetPropertiesStructKeyCase");
 		for (local.item in local.allProperties) {
 			// Wrap in try/catch because coldfusion has a problem with empty strings in queries for bit types.
 			try {
@@ -218,8 +221,9 @@
 		}
 
 		for (local.column in arguments.properties.columnList) {
-			if (!StructKeyExists(local.rv, local.column)) {
-				local.rv[local.column] = arguments.properties[local.column][arguments.row];
+			local.columnKey = local.resetPropertyKeyCase ? LCase(local.column) : local.column;
+			if (!StructKeyExists(local.rv, local.columnKey)) {
+				local.rv[local.columnKey] = arguments.properties[local.column][arguments.row];
 			}
 		}
 		return local.rv;

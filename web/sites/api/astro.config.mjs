@@ -33,6 +33,12 @@ export default defineConfig({
 	// See the guides config: content links authored as `/v4-0-0/...` are not
 	// rewritten by Astro's `base`, so the local bundle prefixes them here.
 	markdown: {
+		// Deliberately no rehypeTableScroll here. Astro runs
+		// markdown.rehypePlugins before rehype-raw, so the plugin cannot see
+		// the raw <div class="wd-params-table"> wrapper around the generated
+		// parameter tables and would double-wrap them. The one plain table
+		// (docs/index.md) is hand-wrapped; the generated tables already get
+		// display:table back from starlight-theme.css.
 		rehypePlugins: [
 			[rehypeBasePrefix, { base: process.env.WHEELS_DOCS_BASE || '' }],
 		],

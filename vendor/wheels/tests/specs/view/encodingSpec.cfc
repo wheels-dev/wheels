@@ -30,7 +30,8 @@ component extends="wheels.WheelsTest" {
 
 			it("encodes double quotes", () => {
 				var result = _controller.h('He said "hello"');
-				expect(result).toInclude("&quot;");
+				// `&quot;` or `&#34;` depending on the engine's encoder.
+				expect(new wheels.tests._assets.view.HtmlEncoding().textProblem(result, 'He said "hello"')).toBe("");
 			});
 
 			it("handles numeric input by converting to string", () => {

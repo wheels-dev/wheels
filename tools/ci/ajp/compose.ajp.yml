@@ -14,7 +14,7 @@ services:
         source: ${AJP_SERVER_JSON:?run through tools/ci/ajp/run.sh, which generates it}
         target: /wheels-test-suite/server.json
   httpd:
-    image: ${AJP_HTTPD_IMAGE:-httpd:2.4}
+    image: ${AJP_HTTPD_IMAGE:-ghcr.io/wheels-dev/mirror/httpd:2.4}
     network_mode: "service:lucee7"
     volumes:
       - type: bind

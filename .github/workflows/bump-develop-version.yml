@@ -102,8 +102,13 @@ jobs:
           jq '.version' wheels.json
 
       - name: Open bump PR
+        # add-paths: commit only wheels.json, whatever else is in the tree.
+        # CI: a PR opened with GITHUB_TOKEN does not trigger workflows. Whoever
+        # handles the bump PR pushes a commit (an empty one is fine) to its
+        # branch to start CI.
         uses: peter-evans/create-pull-request@v8.1.1
         with:
+          add-paths: wheels.json
           branch: "auto-bump/develop-${{ env.NEW_VERSION }}"
           title: "chore: bump develop snapshot target to ${{ env.NEW_VERSION }}"
           body: |

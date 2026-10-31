@@ -120,7 +120,38 @@ component {
 		}
 
 		local.value = $dateOrTimeSelectNormalizeValue($formValue(argumentCollection = arguments));
+		// A null value must not reach the select renderers (direct reads throw on engines
+		// with null support off); render the empty-value select instead.
+		if (isNull(local.value)) {
+			local.value = "";
+		}
 		return $dateOrTimeSelectRender(attrs = arguments, value = local.value, combine = local.combine);
+	}
+
+	/**
+	 * Internal function. Unwrap engine-specific date/time objects (Adobe's
+	 * java.time.LocalDateTime and Oracle's TIMESTAMP) into CFML values. Extracted
+	 * from $dateOrTimeSelectNormalizeValue so that function's complexity stays
+	 * under the code-quality gate; null and non-object values pass through.
+	 */
+	public any function $normalizeDateOrTimeObjectValue(required any value) {
+		if (isNull(arguments.value) || !isObject(arguments.value)) {
+			return arguments.value;
+		}
+		if (isInstanceOf(arguments.value, "java.time.LocalDateTime")) {
+			return createDateTime(
+				arguments.value.getYear(),
+				arguments.value.getMonthValue(),
+				arguments.value.getDayOfMonth(),
+				arguments.value.getHour(),
+				arguments.value.getMinute(),
+				arguments.value.getSecond()
+			);
+		}
+		if (isInstanceOf(arguments.value, "oracle.sql.TIMESTAMP")) {
+			return arguments.value.timestampValue();
+		}
+		return arguments.value;
 	}
 
 	/**
@@ -129,13 +160,7 @@ component {
 	 * objects, and repair BoxLang's string date parsing quirks.
 	 */
 	public any function $dateOrTimeSelectNormalizeValue(required any value) {
-		local.value = arguments.value;
-		// Added this section for Adobe Coldfusion as it returns a "java.time.LocalDateTime" object for datetime data
-		if(isInstanceOf(local.value,"java.time.LocalDateTime")){
-			local.value = createDateTime(local.value.getYear(),local.value.getMonthValue(),local.value.getDayOfMonth(),local.value.getHour(),local.value.getMinute(),local.value.getSecond());
-		} else if (isInstanceOf(local.value, "oracle.sql.TIMESTAMP")){
-			local.value = local.value.timestampValue();
-		}
+		local.value = $normalizeDateOrTimeObjectValue(arguments.value);
 		if ($engineAdapter().isBoxLang() && IsSimpleValue(local.value) && Len(local.value)) {
 			// Engine compatibility: Fix date parsing issues
 			// Handle SQL Server format YYYY-MM-DD HH:MM:SS

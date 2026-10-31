@@ -73,7 +73,7 @@ jobs:
     # for ForgeBox publishing (its "Install CommandBox" step), just containerized
     # so the box server boots in the same userland it serves from.
     container:
-      image: ortussolutions/commandbox:latest
+      image: ghcr.io/wheels-dev/mirror/ortussolutions/commandbox:latest
     env:
       # Throwaway values for the CI app; not secrets.
       SMOKE_RELOAD_PASSWORD: "wheels-dev"

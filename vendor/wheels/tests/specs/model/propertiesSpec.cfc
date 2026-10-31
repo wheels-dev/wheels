@@ -400,6 +400,33 @@ component extends="wheels.WheelsTest" {
 				expect(user).toBeInstanceOf("user3")
 				expect(user.firstName).toBe("Calculated Property Column Override")
 			})
+
+			it("reads resetPropertiesStructKeyCase once per call, so a set between calls is visible", () => {
+				// The setting is read at the top of properties(), never cached across calls: toggling
+				// it changes the key casing of the very next call. This guards against the
+				// request-scoped memo that performance slice C explicitly rejects.
+				var saved = g.get("resetPropertiesStructKeyCase")
+				var author = g.model("author").new()
+				// The setting maps this-scope key casing to the canonical property spelling. Both
+				// spellings are engine-defined: Adobe stores this-scope keys upper case, Lucee lower.
+				var canonical = ListGetAt(author.propertyNames(), ListFindNoCase(author.propertyNames(), "firstName"))
+				var rawKeys = StructKeyList(author)
+				var rawSpelling = ListGetAt(rawKeys, ListFindNoCase(rawKeys, "firstName"))
+				try {
+					g.$set(resetPropertiesStructKeyCase = false)
+					var rawOut = StructKeyList(author.properties())
+					expect(ListFind(rawOut, rawSpelling)).toBeGT(0, "with the setting off the raw this-scope spelling should be returned")
+
+					g.$set(resetPropertiesStructKeyCase = true)
+					var resetOut = StructKeyList(author.properties())
+					expect(ListFind(resetOut, canonical)).toBeGT(0, "with the setting on the canonical property spelling should be returned")
+					if (Compare(rawSpelling, canonical) != 0) {
+						expect(ListFind(resetOut, rawSpelling)).toBe(0)
+					}
+				} finally {
+					g.$set(resetPropertiesStructKeyCase = saved)
+				}
+			})
 		})
 
 		describe("Defensive guard for struct/array values on non-association properties", () => {

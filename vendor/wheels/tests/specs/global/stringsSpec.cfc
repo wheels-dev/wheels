@@ -111,6 +111,36 @@ component extends="wheels.WheelsTest" {
 			it("singularizes address", () => {
 				expect(g.hyphenize("address")).toBeWithCase("address")
 			})
+
+			it("produces the exact patch-26 shapes without replacement case flags (##4646)", () => {
+				expect(g.hyphenize("aB")).toBeWithCase("a-b")
+				expect(g.hyphenize("aBcD")).toBeWithCase("a-bc-d")
+				expect(g.hyphenize("XMLHttpRequest")).toBeWithCase("xml-http-request")
+				expect(g.hyphenize("foo.Bar")).toBeWithCase("foo.-bar")
+				expect(g.hyphenize("a1B")).toBeWithCase("a1b")
+				expect(g.hyphenize("foo_Bar")).toBeWithCase("foo_-bar")
+				expect(g.hyphenize("éclair")).toBeWithCase("éclair")
+				expect(g.hyphenize("")).toBeWithCase("")
+			})
+
+			it("matches the legacy replacement on engines where its case flags still parse (##4646)", () => {
+				var legacyHealthy = (ReReplace("a", "(^a)", "\u\1") == "A")
+					&& (ReReplace("A", "(^A)", "\l\1") == "a")
+				if (!legacyHealthy) {
+					return
+				}
+				var corpus = [
+					"aB", "aBcD", "XMLHttpRequest", "foo.Bar", "a1B", "foo_Bar", "éclair", "",
+					"wheelsIsAFramework", "WheelsIsAFramework", "aURLVariable", "URLVariable",
+					"ERRORMESSAGE", "errormessage", "address", "a--B", "a b", "a/b", "a-b_c.d"
+				]
+				for (var input in corpus) {
+					var legacy = ReReplace(input, "([A-Z][a-z])", "-\l\1", "all")
+					legacy = ReReplace(legacy, "([a-z])([A-Z])", "\1-\l\2", "all")
+					legacy = LCase(ReReplace(legacy, "^-", "", "one"))
+					expect(g.hyphenize(input)).toBe(legacy, "hyphenize('##input##')")
+				}
+			})
 		})
 	}
 }

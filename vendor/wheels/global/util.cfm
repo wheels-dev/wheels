@@ -1055,6 +1055,13 @@
 	 * Internal function.
 	 */
 	public xml function $toXml(required any data) {
+		// A null can only be inspected with isNull() (a direct read throws when the engine
+		// has null support off). An xml-typed function cannot return an empty string, so a
+		// root-level null renders as a well-formed null document, mirroring the nested null
+		// element the toXML recursion emits.
+		if (isNull(arguments.data)) {
+			return '<?xml version="1.0" encoding="UTF-8"?><data type="null"/>';
+		}
 		// only instantiate the toXml object once per request
 		if (!StructKeyExists(request.wheels, "toXml")) {
 			request.wheels.toXml = $createObjectFromRoot(
@@ -1385,17 +1392,20 @@ public boolean function $dataSourceIsReachable(required string name) {
  * Internal. Which datasource an app test run may use, by the same rules as the
  * built-in runner (`vendor/wheels/tests/app-runner.cfm`):
  * - an explicit, valid `useTestDB=false` runs on the primary datasource (intentional);
+ * - an omitted `useTestDB` with `allowTestsAgainstPrimaryDatasource=true` runs on the
+ *   primary datasource with a warning, even when `<primary>_test` is registered (#4643);
  * - otherwise `<primary>_test` is used when it is registered or reachable ("swap");
- * - otherwise an omitted `useTestDB` with `allowTestsAgainstPrimaryDatasource=true`
- *   runs on the primary datasource with a warning;
  * - anything else is refused.
  * Returns `{action: swap|primary|refuse, primary, candidate, target, warn}`.
  * `candidateRegistered` is probed when not passed (passed by specs).
+ * `ignoreAllowPrimary` is for the framework's own suite, which never runs on the app's
+ * primary datasource through this compatibility setting.
  */
 public struct function $testDataSourceDecision(
 	required string primary,
 	required struct requestUrl,
-	candidateRegistered
+	candidateRegistered,
+	boolean ignoreAllowPrimary = false
 ) {
 	local.rv = {
 		action = "refuse",
@@ -1411,6 +1421,20 @@ public struct function $testDataSourceDecision(
 		local.rv.target = arguments.primary;
 		return local.rv;
 	}
+	// #4643: the setting is an explicit preference for an omitted flag, so it has to be
+	// checked before the registered candidate turns the run into a swap. Explicit
+	// useTestDB=true still requires the test datasource; useTestDB=false returned above.
+	local.allowPrimary = StructKeyExists(application.wheels, "allowTestsAgainstPrimaryDatasource")
+		&& IsBoolean(application.wheels.allowTestsAgainstPrimaryDatasource)
+		&& application.wheels.allowTestsAgainstPrimaryDatasource;
+	if (!local.paramPresent && local.allowPrimary) {
+		if (!arguments.ignoreAllowPrimary) {
+			local.rv.action = "primary";
+			local.rv.target = arguments.primary;
+			local.rv.warn = true;
+			return local.rv;
+		}
+	}
 	if (!StructKeyExists(arguments, "candidateRegistered") || IsNull(arguments.candidateRegistered)) {
 		arguments.candidateRegistered = $testDataSourceRegistered(local.rv.candidate);
 	}
@@ -1418,14 +1442,6 @@ public struct function $testDataSourceDecision(
 		local.rv.action = "swap";
 		local.rv.target = local.rv.candidate;
 		return local.rv;
-	}
-	local.allowPrimary = StructKeyExists(application.wheels, "allowTestsAgainstPrimaryDatasource")
-		&& IsBoolean(application.wheels.allowTestsAgainstPrimaryDatasource)
-		&& application.wheels.allowTestsAgainstPrimaryDatasource;
-	if (!local.paramPresent && local.allowPrimary) {
-		local.rv.action = "primary";
-		local.rv.target = arguments.primary;
-		local.rv.warn = true;
 	}
 	return local.rv;
 }
@@ -1507,13 +1523,18 @@ public struct function $coreTestDataSource(
 	if (StructKeyExists(arguments, "candidateRegistered") && !IsNull(arguments.candidateRegistered)) {
 		local.decisionArgs.candidateRegistered = arguments.candidateRegistered;
 	}
+	// The framework suite keeps its own rule: <primary>_test when it exists, never the
+	// primary through allowTestsAgainstPrimaryDatasource. Only app test runs honor it.
+	local.decisionArgs.ignoreAllowPrimary = true;
 	local.rv.decision = $testDataSourceDecision(argumentCollection = local.decisionArgs);
 	// allowTestsAgainstPrimaryDatasource is a compatibility setting for app tests from
 	// older CLIs. The framework's suite (and its populate.cfm, which drops and recreates
-	// tables) never uses it: only an explicit useTestDB=false reaches the primary.
-	if (local.rv.decision.action == "primary" && local.rv.decision.warn) {
-		local.rv.decision.action = "refuse";
-		local.rv.decision.warn = false;
+	// tables) never uses it: with a registered <primary>_test it keeps using it, and
+	// without one it refuses instead of falling back to the primary.
+	local.allowPrimary = StructKeyExists(application.wheels, "allowTestsAgainstPrimaryDatasource")
+		&& IsBoolean(application.wheels.allowTestsAgainstPrimaryDatasource)
+		&& application.wheels.allowTestsAgainstPrimaryDatasource;
+	if (local.rv.decision.action == "refuse" && local.allowPrimary) {
 		local.rv.ignoredAllowPrimary = true;
 		try {
 			WriteLog(

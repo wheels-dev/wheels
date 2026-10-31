@@ -2,7 +2,7 @@
 import Logo from './Logo.astro';
 
 interface Props {
-	current?: 'landing' | 'guides' | 'api' | 'blog' | 'packages';
+	current?: 'landing' | 'guides' | 'api' | 'blog' | 'packages' | 'ai';
 }
 const { current } = Astro.props;
 
@@ -11,11 +11,15 @@ const links = [
 	{ label: 'Guides', href: 'https://guides.wheels.dev/', key: 'guides' },
 	{ label: 'API', href: 'https://api.wheels.dev/', key: 'api' },
 	{ label: 'Blog', href: 'https://blog.wheels.dev/', key: 'blog' },
+	{ label: 'AI', href: 'https://wheels.dev/ai', key: 'ai' },
 	{ label: 'Packages', href: 'https://packages.wheels.dev/', key: 'packages' },
 ];
 ---
 
-<header class="wd-header" data-current={current ?? 'landing'}>
+<header
+	class:list={['wd-header', { 'wd-header--has-search': Astro.slots.has('search') }]}
+	data-current={current ?? 'landing'}
+>
 	<div class="wd-header__lockup">
 		<a class="wd-header__brand" href="https://wheels.dev/" aria-label="wheels.dev home">
 			<Logo variant="lockup" size="md" />
@@ -44,7 +48,11 @@ const links = [
 	<nav id="wd-header-nav" class="wd-header__nav" aria-label="Primary">
 		{
 			links.map((l) => (
-				<a href={l.href} class:list={['wd-header__link', { 'is-current': current === l.key }]}>
+				<a
+					href={l.href}
+					class:list={['wd-header__link', { 'is-current': current === l.key }]}
+					aria-current={current === l.key ? 'page' : undefined}
+				>
 					{l.label}
 				</a>
 			))
@@ -96,6 +104,11 @@ const links = [
 		padding: 0 var(--space-5);
 		height: var(--header-height);
 		background: var(--color-bg);
+		/* Clip the off-canvas drawer horizontally so it never adds page-level
+		   horizontal scroll. overflow-y stays visible, so the open drawer, which
+		   drops below the header, is unaffected. Scoped here (not on body) so
+		   wide page content like blog tables stays reachable. */
+		overflow-x: clip;
 		border-bottom: 1px solid transparent;
 		font-family: var(--font-sans);
 		transition:
@@ -143,6 +156,7 @@ const links = [
 		text-decoration: none;
 		font-size: var(--text-sm);
 		font-weight: 500;
+		white-space: nowrap;
 	}
 
 	.wd-header__link:hover {
@@ -203,6 +217,41 @@ const links = [
 		}
 
 		.wd-header.is-open .wd-header__nav {
+			transform: translateX(0);
+			visibility: visible;
+		}
+	}
+
+	/*
+	 * Headers that also carry search + the version pill (guides, api) run out of
+	 * horizontal room well before 720px, so they collapse to the drawer at 1100px.
+	 * This also clears the old 721–1020px overlap band on those sites. Plain
+	 * headers (landing, blog, packages) keep the 720px breakpoint above.
+	 */
+	@media (max-width: 1100px) {
+		.wd-header--has-search .wd-header__toggle {
+			display: flex;
+		}
+
+		.wd-header--has-search .wd-header__nav {
+			position: absolute;
+			top: var(--header-height);
+			right: 0;
+			flex-direction: column;
+			align-items: flex-start;
+			gap: var(--space-3);
+			padding: var(--space-5);
+			background: var(--color-bg);
+			border-left: 1px solid var(--color-border);
+			border-bottom: 1px solid var(--color-border);
+			box-shadow: var(--shadow);
+			min-width: 220px;
+			transform: translateX(100%);
+			transition: transform 0.2s ease;
+			visibility: hidden;
+		}
+
+		.wd-header--has-search.is-open .wd-header__nav {
 			transform: translateX(0);
 			visibility: visible;
 		}

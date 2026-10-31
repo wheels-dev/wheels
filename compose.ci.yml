@@ -1,0 +1,32 @@
+# CI-only override for compose.yml.
+#
+# Reverses the per-engine named volume (engine_<engine>) back to a host bind
+# mount at .engine/<engine>, because CI reaches that path from the runner host:
+#   - compat-matrix.yml downloads the Oracle JDBC driver into
+#     ./.engine/<engine>/WEB-INF/lib before the container starts, so the engine
+#     reads it through the bind mount;
+#   - cold-start-smoke.yml collects engine logs from ./.engine/<engine> on the
+#     host when a probe fails.
+# CI runners are ephemeral, so the file-handle leak the named volume prevents on
+# a long-lived local Docker Desktop does not apply here.
+#
+# Use with every `docker compose` call in an Adobe/BoxLang workflow:
+#   COMPOSE_FILE=compose.yml:compose.ci.yml
+# Compose merges each service's `volumes` by container path, so the host bind
+# below replaces the named volume from compose.yml at the same target.
+services:
+  adobe2018:
+    volumes:
+      - ./.engine/adobe2018:/wheels-test-suite/.engine/adobe2018
+  adobe2021:
+    volumes:
+      - ./.engine/adobe2021:/wheels-test-suite/.engine/adobe2021
+  adobe2023:
+    volumes:
+      - ./.engine/adobe2023:/wheels-test-suite/.engine/adobe2023
+  adobe2025:
+    volumes:
+      - ./.engine/adobe2025:/wheels-test-suite/.engine/adobe2025
+  boxlang:
+    volumes:
+      - ./.engine/boxlang:/wheels-test-suite/.engine/boxlang

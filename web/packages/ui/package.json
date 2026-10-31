@@ -25,6 +25,7 @@
 		"./styles/starlight-theme.css": "./src/styles/starlight-theme.css",
 		"./assets/*": "./src/assets/*",
 		"./markdown/rehype-base-prefix.mjs": "./src/markdown/rehype-base-prefix.mjs",
+		"./markdown/rehype-table-scroll.mjs": "./src/markdown/rehype-table-scroll.mjs",
 		"./markdown/remark-base-prefix.mjs": "./src/markdown/remark-base-prefix.mjs"
 	},
 	"peerDependencies": {

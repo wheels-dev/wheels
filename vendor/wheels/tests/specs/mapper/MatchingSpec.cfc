@@ -21,6 +21,36 @@ component extends="wheels.WheelsTest" {
                 structDelete(variables, "r");
             });
 
+            it("derives named routes without replacement case flags (##4646)", function(){
+                expect(m.$upperCaseAfterComma("admin,posts")).toBeWithCase("adminPosts")
+                expect(m.$upperCaseAfterComma("admin,,posts")).toBeWithCase("adminPosts")
+                expect(m.$upperCaseAfterComma("admin,posts,show")).toBeWithCase("adminPostsShow")
+                expect(m.$upperCaseAfterComma("admin,1show")).toBeWithCase("admin1show")
+                expect(m.$upperCaseAfterComma("admin,-show")).toBeWithCase("admin-show")
+                expect(m.$upperCaseAfterComma(",admin,posts,")).toBeWithCase("adminPosts")
+                expect(m.$upperCaseAfterComma("a,b,c")).toBeWithCase("aBC")
+                expect(m.$upperCaseAfterComma("a,,bc")).toBeWithCase("aBc")
+                expect(m.$upperCaseAfterComma("a,_b")).toBeWithCase("a_b")
+                expect(m.$upperCaseAfterComma("")).toBeWithCase("")
+            });
+
+            it("matches the legacy named-route replacement where its case flag still parses (##4646)", function(){
+                var legacyHealthy = (ReReplace("a", "(^a)", "\u\1") == "A")
+                    && (ReReplace("A", "(^A)", "\l\1") == "a")
+                if (!legacyHealthy) {
+                    return
+                }
+                var corpus = ["admin,posts", "admin,,posts", "admin,posts,show", "admin,1show", "admin,-show",
+                    ",admin,posts,", "a,b,c", "a,,bc", "a,_b", "", ",,,", "a,b,,c,", "admin,posts,",
+                    "admin,éshow", "é,É", "a,ñ"];
+                for (var input in corpus) {
+                    var legacy = ReReplace(input, "^,+|,+$", "", "all");
+                    legacy = ReReplace(legacy, ",+(\w)", "\U\1", "all");
+                    legacy = ReReplace(legacy, ",", "", "all");
+                    expect(m.$upperCaseAfterComma(input)).toBe(legacy, "upperCaseAfterComma('##input##')");
+                }
+            });
+
             it("Matches with Basic Arguments and provide default controller + action", function(){
                 m.$draw()
                 .$match(

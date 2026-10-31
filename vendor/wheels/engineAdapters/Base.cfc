@@ -174,6 +174,49 @@ component output="false" {
 	// --- Controller ---
 
 	/**
+	 * Upper-cases a lowercase ASCII letter after each "-" and, with the default
+	 * `uppercaseFirst`, the first character as well. Manual character walk instead of
+	 * a regex replacement because Adobe CF 2023 update 26 / 2025 update 14 changed
+	 * replacement parsing so the backslash-u case escape emits a literal "u" (#4646).
+	 * Produces the same output as the previous regex replacement did on pre-patch
+	 * engines, including leading/repeated/trailing dashes, digits, uppercase and
+	 * non-ASCII characters after a dash.
+	 *
+	 * @value The string to convert
+	 * @uppercaseFirst Whether to upper-case the first character too (false for actions)
+	 */
+	public string function $upperCaseAfterDash(required string value, boolean uppercaseFirst = true) {
+		local.rv = "";
+		local.i = 1;
+		local.iEnd = Len(arguments.value);
+		if (arguments.uppercaseFirst && local.iEnd) {
+			local.first = Mid(arguments.value, 1, 1);
+			local.firstCode = Asc(local.first);
+			if (local.firstCode >= 97 && local.firstCode <= 122) {
+				local.rv &= UCase(local.first);
+				local.i = 2;
+			}
+		}
+		while (local.i <= local.iEnd) {
+			local.char = Mid(arguments.value, local.i, 1);
+			// A dash directly before a lowercase ASCII letter is replaced by that letter's
+			// upper case (the dash disappears), exactly like the legacy regex replacement.
+			if (local.char == "-" && local.i < local.iEnd) {
+				local.next = Mid(arguments.value, local.i + 1, 1);
+				local.nextCode = Asc(local.next);
+				if (local.nextCode >= 97 && local.nextCode <= 122) {
+					local.rv &= UCase(local.next);
+					local.i = local.i + 2;
+					continue;
+				}
+			}
+			local.rv &= local.char;
+			local.i = local.i + 1;
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Converts a dot-delimited controller name to UpperCamelCase.
 	 * E.g. "admin.user-settings" -> "admin.UserSettings"
 	 *
@@ -181,7 +224,7 @@ component output="false" {
 	 */
 	public string function controllerNameToUpperCamelCase(required string name) {
 		local.cName = ListLast(arguments.name, ".");
-		local.cName = ReReplace(local.cName, "(^|-)([a-z])", "\u\2", "all");
+		local.cName = $upperCaseAfterDash(local.cName);
 		local.cLen = ListLen(arguments.name, ".");
 		if (local.cLen) {
 			return ListSetAt(arguments.name, local.cLen, local.cName, ".");

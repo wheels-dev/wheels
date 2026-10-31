@@ -11,7 +11,7 @@ services:
   # Port 22024 — distinct from the plain sshd fixture (22022/22023) so both
   # fixtures can coexist during development.
   e2e-host:
-    image: linuxserver/openssh-server:latest
+    image: ghcr.io/wheels-dev/mirror/linuxserver/openssh-server:latest
     environment:
       PUBLIC_KEY_FILE: /keys/authorized_keys
       USER_NAME: deploy
