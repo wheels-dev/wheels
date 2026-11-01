@@ -169,6 +169,88 @@ jobs:
             -o ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar \
             https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar
 
+      - name: Start database container
+        run: |
+          DB="${{ matrix.database }}"
+          case "$DB" in
+            mysql|postgres|sqlserver|oracle)
+              echo "Starting ${DB}..."
+              docker compose up -d "${DB}"
+              ;;
+            cockroachdb)
+              # The init sidecar creates the test database/user once the
+              # main node is healthy (depends_on: service_healthy).
+              echo "Starting cockroachdb + init sidecar..."
+              docker compose up -d cockroachdb cockroachdb-init
+              ;;
+            h2|sqlite)
+              echo "$DB requires no external container"
+              ;;
+          esac
+
+      - name: Wait for database to be ready
+        run: |
+          DB="${{ matrix.database }}"
+          case "$DB" in
+            mysql)
+              echo "Waiting for MySQL..."
+              timeout 120 bash -c 'until docker exec wheels-mysql-1 mysqladmin ping -h localhost -u root -pwheelstestdb --silent 2>/dev/null; do sleep 2; done'
+              echo "MySQL is ready"
+              ;;
+            postgres)
+              echo "Waiting for PostgreSQL..."
+              timeout 120 bash -c 'until docker exec wheels-postgres-1 pg_isready -U wheelstestdb 2>/dev/null; do sleep 2; done'
+              echo "PostgreSQL is ready"
+              ;;
+            sqlserver)
+              echo "Waiting for SQL Server..."
+              timeout 180 bash -c 'until docker exec wheels-sqlserver-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "x!bsT8t60yo0cTVTPq" -Q "SELECT 1" -C 2>/dev/null | grep -q "1"; do sleep 5; done'
+              echo "SQL Server is ready"
+              ;;
+            cockroachdb)
+              echo "Waiting for CockroachDB..."
+              timeout 120 bash -c 'until docker exec wheels-cockroachdb-1 cockroach sql --insecure -e "SELECT 1" 2>/dev/null; do sleep 2; done'
+              echo "CockroachDB is ready"
+              echo "Waiting for CockroachDB init to complete..."
+              timeout 60 bash -c 'while [ "$(docker inspect --format="{{.State.Status}}" wheels-cockroachdb-init-1 2>/dev/null)" != "exited" ]; do sleep 2; done'
+              echo "CockroachDB init complete"
+              ;;
+            oracle)
+              # Checked probe (#3738): tools/ci/oracle-ready.sh runs a real
+              # query against the wheelstestdb service and verifies the row.
+              # The old inline probe never delivered its SQL (docker exec
+              # without -i) and only warned on timeout, so a leg could start
+              # against a service that could not run SQL.
+              echo "Waiting for the Oracle wheelstestdb service to run SQL..."
+              MAX_WAIT=90
+              WAIT_COUNT=0
+              ORACLE_READY=false
+              while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
+                WAIT_COUNT=$((WAIT_COUNT + 1))
+                if PROBE_ERR=$(bash tools/ci/oracle-ready.sh 2>&1); then
+                  echo "Oracle is ready! (attempt ${WAIT_COUNT}/${MAX_WAIT})"
+                  ORACLE_READY=true
+                  break
+                fi
+                echo "Oracle not ready yet (attempt ${WAIT_COUNT}/${MAX_WAIT})"
+                # Show the probe's own diagnostic every 6th attempt (~30s).
+                if [ $((WAIT_COUNT % 6)) -eq 0 ]; then echo "$PROBE_ERR"; fi
+                if [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; then sleep 5; fi
+              done
+              # Same final-attempt boundary as the CF readiness loop (#3685).
+              if [ "$ORACLE_READY" != "true" ]; then
+                echo "::error::Oracle could not run SQL after ${MAX_WAIT} attempts"
+                echo "$PROBE_ERR"
+                echo "=== Oracle container logs (last 60 lines) ==="
+                docker logs wheels-oracle-1 2>&1 | tail -60
+                exit 1
+              fi
+              ;;
+            h2|sqlite)
+              echo "$DB requires no external container"
+              ;;
+          esac
+
       - name: Start CF engine
         # Retry the build to absorb transient external download failures
         # (GitHub Releases 503/504s for Adoptium JDK/JRE and similar). The
@@ -189,25 +271,6 @@ jobs:
             sleep 30
           done
           docker compose up -d "$CFENGINE"
-
-      - name: Start database container
-        run: |
-          DB="${{ matrix.database }}"
-          case "$DB" in
-            mysql|postgres|sqlserver|oracle)
-              echo "Starting ${DB}..."
-              docker compose up -d "${DB}"
-              ;;
-            cockroachdb)
-              # The init sidecar creates the test database/user once the
-              # main node is healthy (depends_on: service_healthy).
-              echo "Starting cockroachdb + init sidecar..."
-              docker compose up -d cockroachdb cockroachdb-init
-              ;;
-            h2|sqlite)
-              echo "$DB requires no external container"
-              ;;
-          esac
 
       - name: Wait for CF engine to be ready
         env:
@@ -372,69 +435,6 @@ jobs:
 
           echo "Failed to install CFPM packages after $MAX_RETRIES attempts"
           exit 1
-
-      - name: Wait for database to be ready
-        run: |
-          DB="${{ matrix.database }}"
-          case "$DB" in
-            mysql)
-              echo "Waiting for MySQL..."
-              timeout 60 bash -c 'until docker exec wheels-mysql-1 mysqladmin ping -h localhost -u root -pwheelstestdb --silent 2>/dev/null; do sleep 2; done'
-              echo "MySQL is ready"
-              ;;
-            postgres)
-              echo "Waiting for PostgreSQL..."
-              timeout 60 bash -c 'until docker exec wheels-postgres-1 pg_isready -U wheelstestdb 2>/dev/null; do sleep 2; done'
-              echo "PostgreSQL is ready"
-              ;;
-            sqlserver)
-              echo "Waiting for SQL Server..."
-              timeout 120 bash -c 'until docker exec wheels-sqlserver-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "x!bsT8t60yo0cTVTPq" -Q "SELECT 1" -C 2>/dev/null | grep -q "1"; do sleep 5; done'
-              echo "SQL Server is ready"
-              ;;
-            cockroachdb)
-              echo "Waiting for CockroachDB..."
-              timeout 60 bash -c 'until docker exec wheels-cockroachdb-1 cockroach sql --insecure -e "SELECT 1" 2>/dev/null; do sleep 2; done'
-              echo "CockroachDB is ready"
-              echo "Waiting for CockroachDB init to complete..."
-              timeout 60 bash -c 'while [ "$(docker inspect --format="{{.State.Status}}" wheels-cockroachdb-init-1 2>/dev/null)" != "exited" ]; do sleep 2; done'
-              echo "CockroachDB init complete"
-              ;;
-            oracle)
-              # Checked probe (#3738): tools/ci/oracle-ready.sh runs a real
-              # query against the wheelstestdb service and verifies the row.
-              # The old inline probe never delivered its SQL (docker exec
-              # without -i) and only warned on timeout, so a leg could start
-              # against a service that could not run SQL.
-              echo "Waiting for the Oracle wheelstestdb service to run SQL..."
-              MAX_WAIT=60
-              WAIT_COUNT=0
-              ORACLE_READY=false
-              while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
-                WAIT_COUNT=$((WAIT_COUNT + 1))
-                if PROBE_ERR=$(bash tools/ci/oracle-ready.sh 2>&1); then
-                  echo "Oracle is ready! (attempt ${WAIT_COUNT}/${MAX_WAIT})"
-                  ORACLE_READY=true
-                  break
-                fi
-                echo "Oracle not ready yet (attempt ${WAIT_COUNT}/${MAX_WAIT})"
-                # Show the probe's own diagnostic every 6th attempt (~30s).
-                if [ $((WAIT_COUNT % 6)) -eq 0 ]; then echo "$PROBE_ERR"; fi
-                if [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; then sleep 5; fi
-              done
-              # Same final-attempt boundary as the CF readiness loop (#3685).
-              if [ "$ORACLE_READY" != "true" ]; then
-                echo "::error::Oracle could not run SQL after ${MAX_WAIT} attempts"
-                echo "$PROBE_ERR"
-                echo "=== Oracle container logs (last 60 lines) ==="
-                docker logs wheels-oracle-1 2>&1 | tail -60
-                exit 1
-              fi
-              ;;
-            h2|sqlite)
-              echo "$DB requires no external container"
-              ;;
-          esac
 
       - name: Wait for the engine to reach ${{ matrix.database }}
         # A database-side probe proves the database answers its own client,
