@@ -20,6 +20,7 @@ excerpt: >-
   reserved-word tables and columns.
 coverImage: '/blog-images/4-2/wheels-4-2-1-released.png'
 announcement:
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/4681'
   title: 'Wheels 4.2.1 is out'
   body: |
     **[Wheels 4.2.1 is out](https://blog.wheels.dev/posts/wheels-4-2-1-released/)** — a patch release on 4.2.x with Adobe CF 2023 u26 / 2025 u14 regex fixes, a Lucee 7.0.5.41 pin and its ESAPI encoding change, and database fixes including migrator DDL quoting for reserved-word tables and columns.
