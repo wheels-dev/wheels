@@ -625,13 +625,22 @@ jobs:
 
           # jq -n --arg keeps the version and URL out of the JSON string itself, so
           # no value is interpolated into untrusted JSON. Slack renders *bold* and
-          # <url|text> as mrkdwn in an incoming webhook's text field.
-          payload=$(jq -n \
+          # <url|text> as mrkdwn in an incoming webhook's text field. The message is
+          # bump-type agnostic: this step runs for every stable GA, not only patches.
+          if ! payload=$(jq -n \
             --arg version "${RELEASE_VERSION}" \
             --arg url "${RELEASE_URL}" \
-            '{text: ("*Wheels " + $version + "* is released — patch release: see the notes.\n<" + $url + "|Release notes on GitHub>")}')
+            '{text: ("*Wheels " + $version + "* is released.\n<" + $url + "|Release notes on GitHub>")}'); then
+            echo "::warning::Could not build the Slack release payload; skipping notification."
+            exit 0
+          fi
 
-          if ! curl -fsS -X POST -H 'Content-type: application/json' --data "${payload}" "${SLACK_WEBHOOK_URL}"; then
+          # Bounded timeouts: a stalled webhook must not delay the downstream
+          # homebrew/scoop and apt/yum dispatch steps further down this job.
+          if ! curl -fsS --connect-timeout 10 --max-time 20 -X POST \
+            -H 'Content-type: application/json' \
+            --data "${payload}" \
+            "${SLACK_WEBHOOK_URL}"; then
             echo "::warning::Slack release notification failed; the release itself is unaffected."
             exit 0
           fi
