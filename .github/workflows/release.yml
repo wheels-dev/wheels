@@ -604,6 +604,40 @@ jobs:
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*_all.deb
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*.noarch.rpm
 
+      # Announce the stable release in Slack (v4.2.1 shipped with no notification).
+      # release.yml is also reused by snapshot.yml for develop snapshots, so this
+      # posts only for a stable main-branch release, and only after the GitHub
+      # Release publish step succeeded. A missing webhook is a no-op and a
+      # delivery failure is a warning: notification never fails or blocks a release.
+      - name: Notify Slack of stable release
+        if: github.ref == 'refs/heads/main' && steps.gh-release-final.outcome == 'success'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RELEASE_VERSION: ${{ env.WHEELS_VERSION }}
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/v${{ env.WHEELS_VERSION }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "no SLACK_WEBHOOK_URL — skipping release notification"
+            exit 0
+          fi
+
+          # jq -n --arg keeps the version and URL out of the JSON string itself, so
+          # no value is interpolated into untrusted JSON. Slack renders *bold* and
+          # <url|text> as mrkdwn in an incoming webhook's text field.
+          payload=$(jq -n \
+            --arg version "${RELEASE_VERSION}" \
+            --arg url "${RELEASE_URL}" \
+            '{text: ("*Wheels " + $version + "* is released — patch release: see the notes.\n<" + $url + "|Release notes on GitHub>")}')
+
+          if ! curl -fsS -X POST -H 'Content-type: application/json' --data "${payload}" "${SLACK_WEBHOOK_URL}"; then
+            echo "::warning::Slack release notification failed; the release itself is unaffected."
+            exit 0
+          fi
+
+          echo "Posted Slack release notification for ${RELEASE_VERSION}"
+
       #############################################
       # Create Snapshot Pre-Release (develop only)
       #############################################

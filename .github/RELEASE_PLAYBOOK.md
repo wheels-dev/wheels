@@ -168,6 +168,25 @@ wheels new myapp && cd myapp && wheels start
 If the smoke test fails: roll back (see below) before the formula propagates
 widely to other users.
 
+### Release announcement
+
+Release comms are automated; there is no separate maintainer announcement step.
+
+1. **Blog post → GitHub Discussion.** Publishing a post under
+   `web/content/blog/posts/**` on develop makes
+   `.github/workflows/blog-announce-on-publish.yml` post its `announcement`
+   frontmatter to the Discussions board (deduped against the slug, title and
+   blog URL).
+2. **Slack.** `release.yml` posts a short mrkdwn announcement to
+   `SLACK_WEBHOOK_URL` from the `Notify Slack of stable release` step,
+   immediately after the GitHub Release is published. It carries the version
+   and a link to the release notes. Stable `main` releases only; the step is a
+   no-op when the webhook is not configured and logs a warning (never fails the
+   release) if delivery fails.
+3. **Snapshots are silent.** `snapshot.yml` passes the webhook through to
+   `release.yml`, but the notification is gated to `refs/heads/main`, so
+   develop snapshots never post to Slack or the Discussions board.
+
 ## Rollback
 
 A bad GA can be rolled back by reverting the brew formula to the previous tag.
