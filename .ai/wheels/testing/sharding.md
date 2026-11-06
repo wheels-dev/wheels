@@ -89,3 +89,41 @@ lower). The spec pins these numbers.
 
 Sharding only partitions work — it does not reduce per-job setup/DB cost, which
 dominates at high shard counts.
+
+## Shard safety
+
+Sharding partitions bundles; it does **not** isolate CFML application or request
+state between shards. Each shard is a separate suite request, but a spec that
+assumes another bundle ran first in the same request — or assumes no other
+bundle ran — can pass unsharded and fail only in a shard.
+
+Measured on the full core suite (Lucee 7 + SQLite, 611 bundles / 7,560 specs,
+2026-11-06, as 8 weighted shards over the full-suite weights file): **5 shards
+green, 3 deterministically failed** on pre-existing order-dependent specs that
+pass unsharded:
+
+| bundle | failure in a shard | pass unsharded |
+|---|---|---|
+| `wheels.tests.specs.dispatch.setCorsHeadersSpec` | `Access-Control-Allow-Origin` header leaked from an earlier bundle (expected `SENTINEL-UNSET`, got `https://myapp.example`) | yes |
+| `wheels.tests.specs.model.polymorphicAssociationsSpec` | fixture rows missing (expected 2 comments, got 0) | yes |
+| `wheels.tests.specs.events.debugBarComplexityPanelSpec` | DebugBar request state (key `METHODS` missing from the arguments scope) | yes |
+
+Repeat runs reproduced the same three failures in the same shards, and the
+`dispatch`, `model` and `events` directories are green unsharded (268 / 1,514 /
+208 passing). These are suite shard-safety gaps, not partitioning bugs.
+
+**The union/coverage guard does not catch this.** It verifies that every bundle
+ran exactly once; a shard can have complete coverage and still fail because of
+leaked state.
+
+Before enabling full-suite sharding for an app:
+
+1. Run the sharded suite and compare each shard's failures with the unsharded
+   baseline. Treat any failure that is green unsharded as an order dependence to
+   fix (reset the state in the spec) or quarantine — not as a shard/planner bug.
+2. Start with scope or coarse-grained shards where cross-bundle dependencies are
+   already known, rather than jumping to many weighted shards.
+3. Each shard still needs its own app instance and database; sharding does not
+   make parallel requests safe against one shared database.
+4. Do not claim wall-clock wins until a green sharded run matches the unsharded
+   result set.
