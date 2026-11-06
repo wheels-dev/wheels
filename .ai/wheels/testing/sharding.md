@@ -8,19 +8,26 @@ The core runner accepts deterministic shard inputs, so CI can split the suite
 across jobs without precomputing bundle lists. Weights arrive in one of two ways:
 
 ```text
-# Inline — small scopes only. Encoded shardWeights is capped at 6000 chars.
+# Inline — small scopes only. The URL-ENCODED shardWeights is capped at 6000
+# chars; the runner re-encodes the decoded value before checking.
 GET /wheels/core/tests?format=json&db=sqlite&shards=8&shard=3&shardWeights=<url-encoded JSON>
 
 # File — full suite. The runner reads tests/shard-weights.json from the app root.
+# The flag accepts only the literal values 1 or true.
 GET /wheels/core/tests?format=json&db=sqlite&shards=8&shard=3&shardWeightsFile=1
 ```
 
 A full-suite weights map (~611 bundles here) is ~36 KB of JSON / ~43 KB
-URL-encoded, past Adobe's ~8 KB request-line limit — use the file form for it.
+URL-encoded, past Adobe's ~8 KB request-line limit — use the file form for it. The inline
+cap is deliberately measured **after URL-encoding** (~2000 characters of JSON)
+so the path and the other query params still fit; that is a margin below the
+~8 KB limit, not the decoded length of the value.
 The file path is fixed (`tests/shard-weights.json` under the app root); callers
 cannot point it at an arbitrary path. The file is capped at 131072 bytes, must
-exist, and must parse as a JSON object of bundle name -> seconds. Do not pass
-`shardWeights` and `shardWeightsFile` together.
+exist, and must parse as a JSON object of bundle name -> seconds. The
+`shardWeightsFile` flag accepts only `1` or `true`; any other value is a 400
+(it is never silently treated as absent). Do not pass `shardWeights` and
+`shardWeightsFile` together.
 
 (A POST JSON body was prototyped first and rejected: routing the suite request
 as POST changes redirect semantics and request-method-sensitive specs, and
@@ -36,9 +43,11 @@ keeps the normal GET execution path.)
   non-numeric/negative weights are rejected.
 
 Each shard input must be a single value: a duplicated query parameter (arriving
-as an array) returns 400, not 500. Inline weights over 6000 encoded characters
-return 400 with a pointer to `shardWeightsFile=1`. Absent shard inputs, the runner behaves
-exactly as before (full alphabetically sorted scope). Invalid inputs return
+as an array) returns 400, not 500. The runner re-encodes the decoded inline
+`shardWeights` value and returns 400 when its encoded form exceeds 6000
+characters (including the measured length in the error), pointing at
+`shardWeightsFile=1`. Absent shard inputs, the runner behaves exactly as
+before (full alphabetically sorted scope). Invalid inputs return
 HTTP 400 with `{"success":false,"error":"Invalid shard parameters","detail":"..."}`
 — the runner never silently falls back to the full suite.
 

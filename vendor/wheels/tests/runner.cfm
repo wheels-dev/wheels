@@ -279,8 +279,18 @@
             }
 
             local.hasInlineWeights = StructKeyExists(local.shardParams, "shardWeights");
-            local.hasFileWeights = StructKeyExists(local.shardParams, "shardWeightsFile")
-                && ListFindNoCase("1,true,yes,on", local.shardParams.shardWeightsFile);
+            local.hasFileWeights = false;
+            if (StructKeyExists(local.shardParams, "shardWeightsFile")) {
+                // Literal truthy flag only; 0/false/yes/on are a 400 rather than a
+                // silent no-op that would shard with default weights.
+                if (!ListFindNoCase("1,true", local.shardParams.shardWeightsFile)) {
+                    throw(
+                        type = "Wheels.InvalidShard",
+                        message = "shardWeightsFile accepts only 1 or true"
+                    );
+                }
+                local.hasFileWeights = true;
+            }
             if (local.hasInlineWeights && local.hasFileWeights) {
                 throw(
                     type = "Wheels.InvalidShard",
@@ -297,10 +307,14 @@
                     );
                 }
                 if (local.hasInlineWeights) {
-                    if (Len(local.shardParams.shardWeights) > local.MAX_URL_WEIGHTS) {
+                    // The cap applies to the ENCODED value: that is what must fit in
+                    // the request line (~8 KB on Adobe). Re-encode the decoded value so
+                    // a long JSON payload cannot slip through by decoding short.
+                    local.encodedWeightsLength = Len(URLEncodedFormat(local.shardParams.shardWeights));
+                    if (local.encodedWeightsLength > local.MAX_URL_WEIGHTS) {
                         throw(
                             type = "Wheels.InvalidShard",
-                            message = "shardWeights in the query string is limited to #local.MAX_URL_WEIGHTS# characters; use shardWeightsFile=1 for the full suite"
+                            message = "shardWeights in the query string is limited to #local.MAX_URL_WEIGHTS# characters once URL-encoded (got #local.encodedWeightsLength#); use shardWeightsFile=1 for the full suite"
                         );
                     }
                     local.rawWeights = local.shardParams.shardWeights;
