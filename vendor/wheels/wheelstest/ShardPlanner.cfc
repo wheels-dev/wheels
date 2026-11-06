@@ -5,8 +5,9 @@
  *
  *   /wheels/core/tests?format=json&shards=8&shard=3&shardWeights=<url-encoded JSON>
  *
- * `shardWeights` maps a discovered bundle name (dotted path, as returned by
- * `bundlesDiscovered`) to measured seconds. The planner uses Longest Processing
+ * `shardWeights` maps a discovered bundle name (dotted path, as reported in
+ * `bundleStats[].name`; `bundlesDiscovered` is the count) to measured seconds.
+ * The planner uses Longest Processing
  * Time first (LPT): bundles are sorted by weight descending (ties by bundle name
  * ascending) and each is placed on the currently lightest shard. That beats
  * round-robin partitioning on skewed suites, where a single hot bundle otherwise
@@ -17,6 +18,12 @@
  * anything in parallel and does not make a shared database safe.
  */
 component output="false" {
+
+	/**
+	 * Upper bound on shardCount, enforced here and by the runner. A request for
+	 * an absurd number of shards must be rejected before allocating partitions.
+	 */
+	variables.MAX_SHARDS = 64;
 
 	public ShardPlanner function init() {
 		return this;
@@ -58,7 +65,10 @@ component output="false" {
 			if (a.weight != b.weight) {
 				return a.weight > b.weight ? -1 : 1;
 			}
-			return CompareNoCase(a.name, b.name);
+			// Case-sensitive total order: CompareNoCase would both tie "a.X" and
+			// "A.X" (leaving their relative order to the input) and disagree with
+			// the runner's case-sensitive bundle names.
+			return Compare(a.name, b.name);
 		});
 
 		local.partitions = [];
@@ -133,6 +143,12 @@ component output="false" {
 			|| arguments.shardCount != Int(arguments.shardCount)
 		) {
 			throw(type = "Wheels.InvalidShard", message = "shardCount must be a positive integer");
+		}
+		if (arguments.shardCount > variables.MAX_SHARDS) {
+			throw(
+				type = "Wheels.InvalidShard",
+				message = "shardCount must be between 1 and #variables.MAX_SHARDS#"
+			);
 		}
 	}
 

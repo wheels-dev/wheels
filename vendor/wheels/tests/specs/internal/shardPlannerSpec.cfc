@@ -115,6 +115,32 @@ component extends="wheels.WheelsTest" {
 				}).toThrow("Wheels.InvalidShard");
 			});
 
+			it("caps the shard count at 64", () => {
+				var plan = planner.plan(bundles = ["a.A"], shardCount = 64);
+				expect(ArrayLen(plan.partitions)).toBe(64);
+				expect(function() {
+					planner.plan(bundles = ["a.A"], shardCount = 65);
+				}).toThrow("Wheels.InvalidShard");
+				expect(function() {
+					planner.partition(bundles = ["a.A"], shardCount = 65, shardIndex = 1);
+				}).toThrow("Wheels.InvalidShard");
+			});
+
+			it("breaks case-only name ties with a deterministic case-sensitive order", () => {
+				var bundles = ["b.Spec", "B.Spec", "a.Spec"];
+				var forward = planner.plan(bundles = bundles, shardCount = 3);
+				var reversed = [];
+				for (var i = ArrayLen(bundles); i >= 1; i--) {
+					ArrayAppend(reversed, bundles[i]);
+				}
+				var backward = planner.plan(bundles = reversed, shardCount = 3);
+				// Case-sensitive Compare: "B.Spec" < "a.Spec" < "b.Spec".
+				expect(forward.partitions[1]).toBe(["B.Spec"]);
+				expect(forward.partitions[2]).toBe(["a.Spec"]);
+				expect(forward.partitions[3]).toBe(["b.Spec"]);
+				expect(forward.partitions).toBe(backward.partitions);
+			});
+
 			it("reduces the slowest shard vs round-robin on the PMX skew (##4629)", () => {
 				// Weights from the 2026-11-06 PMX artifact (bundleStats.totalDuration).
 				var bundles = [

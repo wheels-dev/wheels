@@ -1,34 +1,61 @@
 # Sharding the test suite (maintainer note)
 
-The core runner accepts deterministic shard parameters, so CI can split the
-suite across jobs without precomputing bundle lists:
+> **Prototype status.** Sharding is exposed **only** as runner query
+> parameters. The Wheels CLI has no `--shards`/`--shard` flags yet; do not
+> document or script CLI flags for it.
+
+The core runner accepts deterministic shard inputs, so CI can split the suite
+across jobs without precomputing bundle lists. Weights arrive in one of two ways:
 
 ```text
+# Inline — small scopes only. Encoded shardWeights is capped at 6000 chars.
 GET /wheels/core/tests?format=json&db=sqlite&shards=8&shard=3&shardWeights=<url-encoded JSON>
+
+# File — full suite. The runner reads tests/shard-weights.json from the app root.
+GET /wheels/core/tests?format=json&db=sqlite&shards=8&shard=3&shardWeightsFile=1
 ```
 
-- `shards` — number of shards, integer >= 1.
-- `shard` — 1-based shard index, 1..shards (default 1).
-- `shardWeights` — optional URL-encoded JSON object: bundle name (as returned
-  in `bundlesDiscovered`) to measured seconds. Missing bundles weigh 1.
-  Non-numeric/negative weights are rejected.
+A full-suite weights map (~611 bundles here) is ~36 KB of JSON / ~43 KB
+URL-encoded, past Adobe's ~8 KB request-line limit — use the file form for it.
+The file path is fixed (`tests/shard-weights.json` under the app root); callers
+cannot point it at an arbitrary path. The file is capped at 131072 bytes, must
+exist, and must parse as a JSON object of bundle name -> seconds. Do not pass
+`shardWeights` and `shardWeightsFile` together.
 
-Absent shard parameters, the runner behaves exactly as before (full
-alphabetically sorted scope). Invalid parameters return HTTP 400 with
-`{"success":false,"error":"Invalid shard parameters","detail":"..."}` — the
-runner never silently falls back to the full suite.
+(A POST JSON body was prototyped first and rejected: routing the suite request
+as POST changes redirect semantics and request-method-sensitive specs, and
+`setCorsHeadersSpec`/redirect specs failed only in that mode. The file transport
+keeps the normal GET execution path.)
+
+- `shards` — number of shards, integer 1..64 (a cap keeps a typo like
+  `shards=1000000000` from allocating that many partitions).
+- `shard` — 1-based shard index, 1..shards (default 1).
+- `shardWeights` / `shardWeightsFile` — optional JSON object: bundle name (as
+  reported in `bundleStats[].name`; `bundlesDiscovered` is a count) to measured
+  seconds. Missing bundles weigh 1. Weights require `shards > 1`;
+  non-numeric/negative weights are rejected.
+
+Each shard input must be a single value: a duplicated query parameter (arriving
+as an array) returns 400, not 500. Inline weights over 6000 encoded characters
+return 400 with a pointer to `shardWeightsFile=1`. Absent shard inputs, the runner behaves
+exactly as before (full alphabetically sorted scope). Invalid inputs return
+HTTP 400 with `{"success":false,"error":"Invalid shard parameters","detail":"..."}`
+— the runner never silently falls back to the full suite.
 
 The payload adds `bundlesSelected`, `shardCount` and `shardIndex` alongside the
-existing `bundlesDiscovered`/scope metadata, so a union guard can verify that
-every bundle ran exactly once across shards (compare the union of each shard's
-`bundleStats[].name` with the unsharded `bundlesDiscovered`).
+existing `bundlesDiscovered`/scope metadata. A union guard compares the union of
+each shard's `bundleStats[].name` values with the unsharded run: the union's
+**length** must equal the unsharded `bundlesDiscovered` count, and the union
+must contain no duplicates (there is no bundle-name list in the payload).
 
 ## Planner
 
 `wheels.wheelstest.ShardPlanner` (unit specs:
 `vendor/wheels/tests/specs/internal/shardPlannerSpec.cfc`) uses LPT (longest
 processing time first): sort bundles by weight descending, tie-break bundle name
-ascending, assign each to the lightest shard (lowest index wins ties).
+ascending with case-sensitive `Compare` (a case-only difference is a total
+order, not an input-order artifact), assign each to the lightest shard (lowest
+index wins ties). The planner enforces the same 1..64 shard cap.
 `plan(bundles, shardCount, weights)` returns
 `{partitions, totals, total, shardCount}`; `partition(bundles, shardCount, shardIndex, weights)`
 returns one shard's array. The planner is deterministic — input order does not
@@ -47,9 +74,9 @@ lower). The spec pins these numbers.
 2. Each shard job gets its **own app instance and database** — never point two
    parallel shards at one database. Then run:
    `...&shards=$SHARD_COUNT&shard=$SHARD_INDEX&shardWeights=$(jq -rn --argjson w "$WEIGHTS" '$w|@uri')`
-3. A union job (or the aggregate) asserts the union of shard bundle names equals
-   the unsharded `bundlesDiscovered` and that no bundle appears twice; run the
-   unsharded suite or a discovery-only request to get the expected list.
+3. A union job (or the aggregate) collects `bundleStats[].name` from every
+   shard, asserts the union has no duplicates, and asserts `union.length` equals
+   the unsharded run's `bundlesDiscovered` count.
 
 Sharding only partitions work — it does not reduce per-job setup/DB cost, which
 dominates at high shard counts.
