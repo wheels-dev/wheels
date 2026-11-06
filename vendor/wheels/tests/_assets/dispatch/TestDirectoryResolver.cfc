@@ -159,7 +159,8 @@ component {
 		required string resultJson,
 		required struct scope,
 		required numeric bundlesDiscovered,
-		required array warnings
+		required array warnings,
+		struct shard = {}
 	) {
 		var meta = {
 			"directoryRequested" = arguments.scope.requested,
@@ -169,6 +170,13 @@ component {
 			"bundlesDiscovered" = arguments.bundlesDiscovered,
 			"warnings" = arguments.warnings
 		};
+		// Sharded runner requests (?shards=N&shard=K) add the selected slice and
+		// shard coordinates so CI can prove no bundle was lost or duplicated.
+		if (StructCount(arguments.shard)) {
+			meta["bundlesSelected"] = arguments.shard.bundlesSelected;
+			meta["shardCount"] = arguments.shard.shardCount;
+			meta["shardIndex"] = arguments.shard.shardIndex;
+		}
 		var metaJson = SerializeJSON(meta);
 		var body = Trim(arguments.resultJson);
 		if (!Len(body) || Left(body, 1) != "{" || body == "{}") {

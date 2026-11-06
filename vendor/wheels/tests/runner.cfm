@@ -1,4 +1,4 @@
-﻿<cfsetting requestTimeOut="1800">
+<cfsetting requestTimeOut="1800">
 <cfscript>
     // Flag this request as a test harness run so framework internals
     // (e.g. flash cookie writes) can short-circuit operations that are
@@ -206,12 +206,83 @@
     //Sorting the bundles Alphabetically
     local.sortedArray = testBox.getBundles()
     arraySort(local.sortedArray, "textNoCase")
+    // Count discovered bundles before any shard selection, so the 0-bundle
+    // "green single-file" trap stays detectable (issue #3083).
+    local.bundlesDiscovered = ArrayLen(local.sortedArray)
+
+    // ── Optional deterministic shard selection ──────────────────────────────
+    // CI gives each shard its own runner request (and its own app instance/DB):
+    //   ?format=json&shards=8&shard=3&shardWeights=<url-encoded JSON>
+    // `shardWeights` maps a discovered bundle name to measured seconds; missing
+    // bundles weigh 1. Without shard params this block is a no-op and the full
+    // alphabetically sorted suite runs as before.
+    local.shardCount = 1
+    local.shardIndex = 1
+    local.shardWeights = {}
+    local.shardRequested = StructKeyExists(url, "shards") || StructKeyExists(url, "shard") || StructKeyExists(url, "shardWeights")
+    if (local.shardRequested) {
+        try {
+            if (StructKeyExists(url, "shards")) {
+                if (!IsNumeric(url.shards) || Val(url.shards) < 1 || Val(url.shards) != Int(Val(url.shards))) {
+                    throw(type = "Wheels.InvalidShard", message = "shards must be a positive integer");
+                }
+                local.shardCount = Int(Val(url.shards));
+            }
+            if (StructKeyExists(url, "shard")) {
+                if (
+                    !IsNumeric(url.shard)
+                    || Val(url.shard) < 1
+                    || Val(url.shard) != Int(Val(url.shard))
+                    || Val(url.shard) > local.shardCount
+                ) {
+                    throw(
+                        type = "Wheels.InvalidShard",
+                        message = "shard must be an integer between 1 and #local.shardCount#"
+                    );
+                }
+                local.shardIndex = Int(Val(url.shard));
+            }
+            if (StructKeyExists(url, "shardWeights") && Len(Trim(url.shardWeights))) {
+                try {
+                    local.shardWeights = DeserializeJSON(url.shardWeights);
+                } catch (any e) {
+                    throw(
+                        type = "Wheels.InvalidShard",
+                        message = "shardWeights must be a JSON object of bundle name to seconds"
+                    );
+                }
+                if (!IsStruct(local.shardWeights)) {
+                    throw(
+                        type = "Wheels.InvalidShard",
+                        message = "shardWeights must be a JSON object of bundle name to seconds"
+                    );
+                }
+            }
+            if (local.shardCount > 1) {
+                local.shardPlanner = new wheels.wheelstest.ShardPlanner();
+                local.sortedArray = local.shardPlanner.partition(
+                    bundles = local.sortedArray,
+                    shardCount = local.shardCount,
+                    shardIndex = local.shardIndex,
+                    weights = local.shardWeights
+                );
+            }
+        } catch (Wheels.InvalidShard e) {
+            application.wo.$header(statuscode = "400");
+            application.wo.$content(type = "application/json");
+            writeOutput(SerializeJSON({
+                success = false,
+                error = "Invalid shard parameters",
+                detail = e.message
+            }));
+            abort;
+        }
+    }
     testBox.setBundles(local.sortedArray)
 
-    // Capture how many bundles the resolved scope actually discovered so the
-    // 0-bundle "green single-file" trap (e.g. directory=…callbacksSpec) is
-    // distinguishable from a real passing run (issue #3083).
-    local.bundlesDiscovered = ArrayLen(local.sortedArray)
+    // `bundlesSelected` is this shard's slice of the discovered set (equal to
+    // bundlesDiscovered when sharding is off).
+    local.bundlesSelected = ArrayLen(local.sortedArray)
     local.scopeWarnings = local.scopeResolver.scopeWarnings(
         scope = local.testScope,
         bundlesDiscovered = local.bundlesDiscovered
@@ -402,7 +473,12 @@
                         resultJson = result,
                         scope = local.testScope,
                         bundlesDiscovered = local.bundlesDiscovered,
-                        warnings = local.scopeWarnings
+                        warnings = local.scopeWarnings,
+                        shard = {
+                            bundlesSelected = local.bundlesSelected,
+                            shardCount = local.shardCount,
+                            shardIndex = local.shardIndex
+                        }
                     ))
                 }
             }
