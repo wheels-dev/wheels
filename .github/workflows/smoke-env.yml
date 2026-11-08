@@ -160,23 +160,14 @@ jobs:
       # (retry absorbs transient external download failures; the build is
       # idempotent, only `up -d` runs after success). No --no-cache: hosted
       # runners start with an empty build cache anyway.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Restore the same cached engine image compat-matrix populates, then seed
+      # the host .engine bind and boot a fresh container.
       - name: Build and start Adobe 2023
         run: |
-          set -e
-          MAX_ATTEMPTS=3
-          ATTEMPT=1
-          until docker compose build adobe2023; do
-            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
-              echo "::error::docker compose build failed after ${MAX_ATTEMPTS} attempts"
-              exit 1
-            fi
-            echo "::warning::Build attempt ${ATTEMPT} failed — sleeping 30s before retry"
-            ATTEMPT=$((ATTEMPT + 1))
-            sleep 30
-          done
-          # Seed the host .engine bind from the image's warm engine home so the
-          # container does not re-download the engine at startup (#4691).
-          bash tools/ci/seed-engine-home.sh adobe2023
+          bash tools/ci/build-engine-image.sh adobe2023
           docker compose up -d adobe2023
 
       # Adapted from compat-matrix.yml's readiness loop: restart on container

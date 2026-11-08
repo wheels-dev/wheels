@@ -120,24 +120,15 @@ jobs:
       # transient download failures and only `up -d` runs after a good build.
       # `up -d` creates a fresh container; the engine home (.engine/ in the
       # bind-mounted workspace) starts empty on a hosted runner.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Restore the same cached engine image compat-matrix populates, then seed
+      # the host .engine bind and start a FRESH container (cold-start semantics
+      # unchanged: the image is warm, the container/JVM is not).
       - name: Build and start ${{ matrix.engine }}
         run: |
-          set -e
-          MAX_ATTEMPTS=3
-          ATTEMPT=1
-          until docker compose build "${{ matrix.engine }}"; do
-            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
-              echo "::error::docker compose build failed after ${MAX_ATTEMPTS} attempts"
-              exit 1
-            fi
-            echo "::warning::Build attempt ${ATTEMPT} failed — sleeping 30s before retry"
-            ATTEMPT=$((ATTEMPT + 1))
-            sleep 30
-          done
-          # Seed the host .engine bind from the image's warm engine home; the
-          # empty bind would otherwise mask it and re-download the engine at
-          # startup (#4691).
-          bash tools/ci/seed-engine-home.sh "${{ matrix.engine }}"
+          bash tools/ci/build-engine-image.sh "${{ matrix.engine }}"
           docker compose up -d "${{ matrix.engine }}"
 
       # No readiness step before this one: any HTTP readiness poll would be the

@@ -324,55 +324,7 @@ jobs:
         env:
           CFENGINE: ${{ matrix.cfengine }}
         run: |
-          set -euo pipefail
-          # Read the image tag and Dockerfile from compose: duplicating them here
-          # once drifted from compose.yml, so the built image was never the one
-          # `docker compose up --no-build` started. Compose is the source of truth.
-          CONFIG=$(docker compose config --format json "$CFENGINE")
-          IMAGE=$(jq -er --arg s "$CFENGINE" '.services[$s].image' <<<"$CONFIG")
-          DOCKERFILE=$(jq -er --arg s "$CFENGINE" '.services[$s].build.dockerfile' <<<"$CONFIG")
-          CONTEXT=$(jq -er --arg s "$CFENGINE" '.services[$s].build.context // "."' <<<"$CONFIG")
-          DOCKERFILE_PATH="$CONTEXT/${DOCKERFILE#./}"
-          ENGINE_DIR=$(dirname "$DOCKERFILE_PATH")
-          echo "Building ${CFENGINE}: ${IMAGE} from ${DOCKERFILE_PATH} (context ${CONTEXT})"
-
-          # The cache scope covers the pinned engine version and base digest in
-          # the Dockerfile plus the ForgeBox manifest, so a bump starts a fresh
-          # scope (no stale archive can be restored).
-          CACHE_FILES=("$DOCKERFILE_PATH")
-          for f in box.json server.json CFConfig.json; do
-            if [ -f "${ENGINE_DIR}/${f}" ]; then
-              CACHE_FILES+=("${ENGINE_DIR}/${f}")
-            fi
-          done
-          CACHE_KEY=$(cat "${CACHE_FILES[@]}" | sha256sum | cut -c1-16)
-          CACHE_SCOPE="${CFENGINE}-${CACHE_KEY}"
-
-          MAX_ATTEMPTS=3
-          ATTEMPT=1
-          CACHE_ARGS=("--cache-from" "type=gha,scope=${CACHE_SCOPE}" "--cache-to" "type=gha,mode=max,scope=${CACHE_SCOPE}")
-          while true; do
-            if docker buildx build --load --tag "$IMAGE" --file "$DOCKERFILE_PATH" "${CACHE_ARGS[@]}" "$CONTEXT"; then
-              break
-            fi
-            if [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ]; then
-              echo "::error::${CFENGINE} image build failed after ${MAX_ATTEMPTS} attempts (engine/ForgeBox download; see the named URL and HTTP status in the build log above)"
-              exit 1
-            fi
-            echo "::warning::Build attempt ${ATTEMPT} failed — retrying with --no-cache so a poisoned cache entry cannot brick every attempt"
-            ATTEMPT=$((ATTEMPT + 1))
-            CACHE_ARGS=("--no-cache")
-            sleep 30
-          done
-
-          # compose.ci.yml bind-mounts .engine/<engine> over the image's warm
-          # engine home (so the runner can seed Oracle's jar and collect
-          # cold-start logs). An empty host directory would mask that warm
-          # engine and force the container to re-download it at start — the
-          # #4691 failure. Seed the host path from the built image; BoxLang's
-          # box_modules live under the same path and come along.
-          bash tools/ci/seed-engine-home.sh "$CFENGINE"
-
+          bash tools/ci/build-engine-image.sh "$CFENGINE"
           docker compose up -d --no-build "$CFENGINE"
 
       - name: Wait for CF engine to be ready
