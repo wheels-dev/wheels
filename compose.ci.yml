@@ -10,6 +10,11 @@
 # CI runners are ephemeral, so the file-handle leak the named volume prevents on
 # a long-lived local Docker Desktop does not apply here.
 #
+# The bind starts empty on a hosted runner, which masks the engine home baked
+# into the image; run `tools/ci/seed-engine-home.sh <engine>` after the image
+# build (and before `up`) to copy that warm home into ./.engine/<engine>, so a
+# container start does not re-download the engine (#4691).
+#
 # Use with every `docker compose` call in an Adobe/BoxLang workflow:
 #   COMPOSE_FILE=compose.yml:compose.ci.yml
 # Compose merges each service's `volumes` by container path, so the host bind

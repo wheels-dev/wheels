@@ -161,16 +161,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v5
 
-      # Oracle's download host has answered 502 under load (#4691). Keep one
-      # driver copy in the Actions cache (keyed by the pinned URL version) so
-      # Adobe legs after the first never touch the network, and bound the
-      # download with retries + a diagnostic naming the URL and HTTP status.
+      # Oracle's download host has answered 502 under load (#4691). Cache the
+      # driver keyed by the pinned URL version (artifact only: the Oracle JDBC
+      # driver is redistributed under Oracle's license and is never committed;
+      # the Actions cache is repository-scoped and ephemeral). Only a complete
+      # jar is cached/accepted — curl exit 0, HTTP 200, a plausible size and a
+      # valid zip — so a truncated 200 cannot occupy the immutable cache key.
       - name: Restore cached Oracle JDBC driver
         if: startsWith(matrix.cfengine, 'adobe')
         uses: actions/cache@v4
         with:
           path: .engine/ojdbc10-cache/ojdbc10.jar
-          key: ojdbc10-1927
+          key: ojdbc10-1927-v2
 
       - name: Download ojdbc10 for Adobe engines
         if: startsWith(matrix.cfengine, 'adobe')
@@ -178,27 +180,52 @@ jobs:
           OJDBC_URL: https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar
         run: |
           set -euo pipefail
-          mkdir -p .engine/ojdbc10-cache ./.engine/${{ matrix.cfengine }}/WEB-INF/lib
+          MIN_BYTES=1000000
+          mkdir -p .engine/ojdbc10-cache "./.engine/${{ matrix.cfengine }}/WEB-INF/lib"
           JAR=.engine/ojdbc10-cache/ojdbc10.jar
-          if [ ! -s "$JAR" ]; then
+          LAST_STATUS="no successful attempt yet"
+
+          # ojdbc10.jar is a zip archive: size + `unzip -t` reject a truncated
+          # or corrupt 200 that curl itself considers successful.
+          jar_ok() {
+            [ -s "$1" ] || return 1
+            [ "$(wc -c < "$1")" -ge "$MIN_BYTES" ] || return 1
+            unzip -tq "$1" >/dev/null 2>&1
+          }
+
+          if [ -f "$JAR" ]; then
+            if jar_ok "$JAR"; then
+              echo "Using cached ojdbc10.jar ($(wc -c < "$JAR") bytes, zip integrity OK)"
+            else
+              echo "::warning::Cached ojdbc10.jar is incomplete or corrupt; re-downloading."
+              rm -f "$JAR"
+            fi
+          fi
+
+          if [ ! -f "$JAR" ]; then
             for attempt in 1 2 3 4 5; do
-              CODE=$(curl -sS -fL --connect-timeout 10 --max-time 60 \
-                -o "$JAR.part" -w '%{http_code}' "$OJDBC_URL" 2>/dev/null || true)
-              if [ -s "$JAR.part" ] && [ "$CODE" = "200" ]; then
+              CODE=""
+              RC=0
+              CODE=$(curl -sS -fL --connect-timeout 10 --max-time 120 \
+                -o "$JAR.part" -w '%{http_code}' "$OJDBC_URL" 2>/dev/null) || RC=$?
+              BYTES=0
+              [ -f "$JAR.part" ] && BYTES=$(wc -c < "$JAR.part")
+              if [ "$RC" -eq 0 ] && [ "$CODE" = "200" ] && jar_ok "$JAR.part"; then
                 mv "$JAR.part" "$JAR"
                 break
               fi
-              echo "::warning::ojdbc10 download attempt ${attempt}/5 failed: ${OJDBC_URL} (HTTP ${CODE:-no-response})"
+              LAST_STATUS="HTTP ${CODE:-no-response}, curl exit ${RC}, ${BYTES} bytes"
+              echo "::warning::ojdbc10 download attempt ${attempt}/5 failed: ${OJDBC_URL} (${LAST_STATUS})"
+              rm -f "$JAR.part"
               sleep $((attempt * 5))
             done
-          else
-            echo "Using cached ojdbc10.jar ($(wc -c < "$JAR") bytes)"
           fi
-          if [ ! -s "$JAR" ]; then
-            echo "::error::ojdbc10 download failed after 5 attempts: ${OJDBC_URL} did not return HTTP 200; see the warnings above for the last status"
+
+          if [ ! -f "$JAR" ] || ! jar_ok "$JAR"; then
+            echo "::error::ojdbc10 download failed after 5 attempts: ${OJDBC_URL} (last attempt: ${LAST_STATUS}); refusing to cache or use an incomplete driver"
             exit 1
           fi
-          cp "$JAR" ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
+          cp "$JAR" "./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar"
           echo "Oracle JDBC driver ready ($(wc -c < "$JAR") bytes)"
 
       - name: Start database container
@@ -298,41 +325,54 @@ jobs:
           CFENGINE: ${{ matrix.cfengine }}
         run: |
           set -euo pipefail
-          case "$CFENGINE" in
-            lucee6) IMAGE=wheels-test-lucee6:v1.0.2 ;;
-            lucee7) IMAGE=wheels-test-lucee7:v1.0.1 ;;
-            adobe2023) IMAGE=wheels-test-adobe2023:v1.0.1 ;;
-            adobe2025) IMAGE=wheels-test-adobe2025:v1.0.0 ;;
-            boxlang) IMAGE=wheels-test-boxlang:v1.0.0 ;;
-            *) echo "::error::No image mapping for engine '$CFENGINE'"; exit 1 ;;
-          esac
-          # The cache key covers the pinned engine versions/digests in the
-          # Dockerfile (BOX_SERVER_APP_CFENGINE, base image digest) plus the
-          # ForgeBox manifest, so a version bump starts a fresh cache scope.
-          CACHE_FILES=("./tools/docker/${CFENGINE}/Dockerfile")
+          # Read the image tag and Dockerfile from compose: duplicating them here
+          # once drifted from compose.yml, so the built image was never the one
+          # `docker compose up --no-build` started. Compose is the source of truth.
+          CONFIG=$(docker compose config --format json "$CFENGINE")
+          IMAGE=$(jq -er --arg s "$CFENGINE" '.services[$s].image' <<<"$CONFIG")
+          DOCKERFILE=$(jq -er --arg s "$CFENGINE" '.services[$s].build.dockerfile' <<<"$CONFIG")
+          CONTEXT=$(jq -er --arg s "$CFENGINE" '.services[$s].build.context // "."' <<<"$CONFIG")
+          DOCKERFILE_PATH="$CONTEXT/${DOCKERFILE#./}"
+          ENGINE_DIR=$(dirname "$DOCKERFILE_PATH")
+          echo "Building ${CFENGINE}: ${IMAGE} from ${DOCKERFILE_PATH} (context ${CONTEXT})"
+
+          # The cache scope covers the pinned engine version and base digest in
+          # the Dockerfile plus the ForgeBox manifest, so a bump starts a fresh
+          # scope (no stale archive can be restored).
+          CACHE_FILES=("$DOCKERFILE_PATH")
           for f in box.json server.json CFConfig.json; do
-            if [ -f "./tools/docker/${CFENGINE}/${f}" ]; then
-              CACHE_FILES+=("./tools/docker/${CFENGINE}/${f}")
+            if [ -f "${ENGINE_DIR}/${f}" ]; then
+              CACHE_FILES+=("${ENGINE_DIR}/${f}")
             fi
           done
           CACHE_KEY=$(cat "${CACHE_FILES[@]}" | sha256sum | cut -c1-16)
+          CACHE_SCOPE="${CFENGINE}-${CACHE_KEY}"
+
           MAX_ATTEMPTS=3
           ATTEMPT=1
-          until docker buildx build \
-            --load \
-            --tag "$IMAGE" \
-            --file "./tools/docker/${CFENGINE}/Dockerfile" \
-            --cache-from "type=gha,scope=${CFENGINE}-${CACHE_KEY}" \
-            --cache-to "type=gha,mode=max,scope=${CFENGINE}-${CACHE_KEY}" \
-            .; do
-            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+          CACHE_ARGS=("--cache-from" "type=gha,scope=${CACHE_SCOPE}" "--cache-to" "type=gha,mode=max,scope=${CACHE_SCOPE}")
+          while true; do
+            if docker buildx build --load --tag "$IMAGE" --file "$DOCKERFILE_PATH" "${CACHE_ARGS[@]}" "$CONTEXT"; then
+              break
+            fi
+            if [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ]; then
               echo "::error::${CFENGINE} image build failed after ${MAX_ATTEMPTS} attempts (engine/ForgeBox download; see the named URL and HTTP status in the build log above)"
               exit 1
             fi
-            echo "::warning::Build attempt ${ATTEMPT} failed — sleeping 30s before retry"
+            echo "::warning::Build attempt ${ATTEMPT} failed — retrying with --no-cache so a poisoned cache entry cannot brick every attempt"
             ATTEMPT=$((ATTEMPT + 1))
+            CACHE_ARGS=("--no-cache")
             sleep 30
           done
+
+          # compose.ci.yml bind-mounts .engine/<engine> over the image's warm
+          # engine home (so the runner can seed Oracle's jar and collect
+          # cold-start logs). An empty host directory would mask that warm
+          # engine and force the container to re-download it at start — the
+          # #4691 failure. Seed the host path from the built image; BoxLang's
+          # box_modules live under the same path and come along.
+          bash tools/ci/seed-engine-home.sh "$CFENGINE"
+
           docker compose up -d --no-build "$CFENGINE"
 
       - name: Wait for CF engine to be ready

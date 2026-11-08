@@ -134,6 +134,10 @@ jobs:
             ATTEMPT=$((ATTEMPT + 1))
             sleep 30
           done
+          # Seed the host .engine bind from the image's warm engine home; the
+          # empty bind would otherwise mask it and re-download the engine at
+          # startup (#4691).
+          bash tools/ci/seed-engine-home.sh "${{ matrix.engine }}"
           docker compose up -d "${{ matrix.engine }}"
 
       # No readiness step before this one: any HTTP readiness poll would be the
