@@ -25,11 +25,6 @@ COPY tools/docker/adobe2025/box.json ${APP_DIR}/box.json
 # Copy CFConfig
 COPY tools/docker/adobe2025/CFConfig.json ${APP_DIR}/CFConfig.json
 
-# Warm the engine into the same server home the compose server.json uses
-# (.engine/adobe2025) so the image and runtime agree. compose.ci.yml seeds the
-# host bind from this home, avoiding a runtime engine download (#4691).
-COPY tools/docker/adobe2025/server.json ${APP_DIR}/server.json
-
 # Install dependencies
 RUN box install
 
