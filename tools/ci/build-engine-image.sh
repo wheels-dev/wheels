@@ -37,7 +37,14 @@ scope="${engine}-${cache_key}"
 echo "Building ${engine}: ${image} from ${dockerfile_path} (cache scope ${scope})"
 max_attempts="${MAX_ATTEMPTS:-3}"
 attempt=1
-cache_args=("--cache-from" "type=gha,scope=${scope}" "--cache-to" "type=gha,mode=max,scope=${scope}")
+# CACHE_WRITE=0 makes a job a read-only consumer: it can restore the image the
+# compat matrix produced but never exports its own. A build whose engine
+# download failed still exits 0 (CommandBox swallows the warm-up failure), so a
+# consumer must not be allowed to overwrite the producer's cache scope.
+cache_args=("--cache-from" "type=gha,scope=${scope}")
+if [ "${CACHE_WRITE:-1}" != "0" ]; then
+  cache_args+=("--cache-to" "type=gha,mode=max,scope=${scope}")
+fi
 while true; do
   if docker buildx build --load --tag "$image" --file "$dockerfile_path" "${cache_args[@]}" "$context"; then
     break

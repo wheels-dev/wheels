@@ -127,6 +127,9 @@ jobs:
       # the host .engine bind and start a FRESH container (cold-start semantics
       # unchanged: the image is warm, the container/JVM is not).
       - name: Build and start ${{ matrix.engine }}
+        env:
+          # Consumer only: never export a cache scope the compat matrix owns.
+          CACHE_WRITE: "0"
         run: |
           bash tools/ci/build-engine-image.sh "${{ matrix.engine }}"
           docker compose up -d "${{ matrix.engine }}"

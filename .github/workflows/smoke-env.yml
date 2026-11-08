@@ -166,6 +166,9 @@ jobs:
       # Restore the same cached engine image compat-matrix populates, then seed
       # the host .engine bind and boot a fresh container.
       - name: Build and start Adobe 2023
+        env:
+          # Consumer only: never export a cache scope the compat matrix owns.
+          CACHE_WRITE: "0"
         run: |
           bash tools/ci/build-engine-image.sh adobe2023
           docker compose up -d adobe2023
