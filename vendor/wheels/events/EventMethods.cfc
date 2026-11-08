@@ -354,8 +354,50 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			$header(statusCode = 500);
 			local.rv = $toXml(arguments.exception);
 		} else {
-			// Default behavior: throw the exception for HTML display
-			Throw(object = arguments.exception);
+			// Generic HTML error: normalize it to the Wheels error shape and render
+			// the styled page. Throwing here relied on the engine's onError, but the
+			// app's outer catch intercepted it and showed the minimal "Application
+			// Error" fallback, losing the file/line/stack/copy page (#4688). This
+			// branch only runs with showErrorInformation on; the production path
+			// ($runOnErrorRenderTemplate) and startup/teardown are unchanged.
+			local.root = arguments.exception;
+			if (
+				StructKeyExists(arguments.exception, "rootCause")
+				&& IsStruct(arguments.exception.rootCause)
+			) {
+				local.root = arguments.exception.rootCause;
+			}
+			local.type = "Application";
+			if (
+				StructKeyExists(local.root, "type")
+				&& IsSimpleValue(local.root.type)
+				&& Len(local.root.type)
+			) {
+				local.type = local.root.type;
+			}
+			local.message = "Application error";
+			if (
+				StructKeyExists(local.root, "message")
+				&& IsSimpleValue(local.root.message)
+				&& Len(local.root.message)
+			) {
+				local.message = local.root.message;
+			}
+			local.extendedInfo = "";
+			if (StructKeyExists(local.root, "detail") && IsSimpleValue(local.root.detail)) {
+				local.extendedInfo = local.root.detail;
+			}
+			local.tagContext = [];
+			if (StructKeyExists(local.root, "tagContext") && IsArray(local.root.tagContext)) {
+				local.tagContext = local.root.tagContext;
+			}
+			local.wheelsError = {
+				"type" = local.type,
+				"message" = local.message,
+				"extendedInfo" = local.extendedInfo,
+				"tagContext" = local.tagContext
+			};
+			local.rv = $runOnErrorRenderWheelsError(local.wheelsError, "html");
 		}
 		return local.rv;
 	}
