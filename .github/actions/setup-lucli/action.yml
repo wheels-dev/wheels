@@ -9,12 +9,6 @@ runs:
         set -euo pipefail
         repo=$(jq -er '.LUCLI_REPO | select(test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"))' tools/lucli.json)
         version=$(jq -er '.LUCLI_VERSION | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?$"))' tools/lucli.json)
-        echo "LUCLI_REPO=$repo" >> "$GITHUB_ENV"
-        echo "LUCLI_VERSION=$version" >> "$GITHUB_ENV"
-    - name: Install LuCLI
-      shell: bash
-      run: |
-        set -euo pipefail
         case "$RUNNER_OS" in
           Linux) suffix=linux ;;
           macOS) suffix=macos ;;
@@ -22,28 +16,81 @@ runs:
         esac
         # The pinned checksum for this asset. A missing or malformed value
         # fails the step: the runtime is never installed unverified.
-        expected=$(jq -er --arg k "$suffix" '.LUCLI_SHA256[$k] | select(test("^[0-9a-f]{64}$"))' tools/lucli.json) || {
+        sha=$(jq -er --arg k "$suffix" '.LUCLI_SHA256[$k] | select(test("^[0-9a-f]{64}$"))' tools/lucli.json) || {
           echo "::error::tools/lucli.json has no valid LUCLI_SHA256.${suffix} (64 lowercase hex characters)." >&2
           exit 1
         }
+        echo "LUCLI_REPO=$repo" >> "$GITHUB_ENV"
+        echo "LUCLI_VERSION=$version" >> "$GITHUB_ENV"
+        echo "LUCLI_SUFFIX=$suffix" >> "$GITHUB_ENV"
+        echo "LUCLI_SHA256=$sha" >> "$GITHUB_ENV"
+
+    # The GitHub release host intermittently answers 504/502 for the LuCLI
+    # binary (the #4691 outage also hit `Install LuCLI`, failing jobs before
+    # any test). Cache the verified binary under the pinned version + SHA-256
+    # from tools/lucli.json: a version or checksum bump changes the key, and
+    # the install step still re-verifies SHA-256 and `--version` on every run.
+    - name: Restore cached LuCLI runtime
+      id: lucli-cache
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ runner.temp }}/wheels-lucli-bin
+        key: lucli-${{ runner.os }}-${{ env.LUCLI_VERSION }}-${{ env.LUCLI_SHA256 }}
+
+    - name: Install LuCLI
+      shell: bash
+      run: |
+        set -euo pipefail
+        suffix="$LUCLI_SUFFIX"
+        expected="$LUCLI_SHA256"
+        url="https://github.com/${LUCLI_REPO}/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-${suffix}"
         install_dir="$RUNNER_TEMP/wheels-lucli-bin"
         mkdir -p "$install_dir"
+
+        if command -v sha256sum >/dev/null 2>&1; then
+          sha_of() { sha256sum "$1" | cut -d' ' -f1; }
+        else
+          sha_of() { shasum -a 256 "$1" | cut -d' ' -f1; }
+        fi
+
+        # A restored cache entry is only trusted after the same checksum the
+        # download path enforces; a mismatch falls through to a fresh download.
+        if [ -f "$install_dir/lucli" ]; then
+          actual=$(sha_of "$install_dir/lucli")
+          if [ "$actual" = "$expected" ]; then
+            echo "Using cached LuCLI ${LUCLI_VERSION} (sha256 ${actual})"
+          else
+            echo "::warning::Cached LuCLI binary failed checksum verification (expected ${expected}, got ${actual}); re-downloading."
+            rm -f "$install_dir/lucli"
+          fi
+        fi
+
+        if [ ! -f "$install_dir/lucli" ]; then
+          for attempt in 1 2 3 4; do
+            code=$(curl -sS -fL --connect-timeout 10 --max-time 180 \
+              -o "$install_dir/lucli.part" -w '%{http_code}' "$url" 2>/dev/null || true)
+            if [ -s "$install_dir/lucli.part" ] && [ "$code" = "200" ]; then
+              mv "$install_dir/lucli.part" "$install_dir/lucli"
+              break
+            fi
+            echo "::warning::LuCLI download attempt ${attempt}/4 failed: ${url} (HTTP ${code:-no-response})"
+            sleep $((attempt * 5))
+          done
+        fi
+        if [ ! -s "$install_dir/lucli" ]; then
+          echo "::error::LuCLI ${LUCLI_VERSION} download failed after 4 attempts: ${url} did not return HTTP 200; see the warnings above for the last status" >&2
+          exit 1
+        fi
+
         # Installed as plain `lucli`: a versioned file name would be taken
         # for a module alias.
-        curl --fail --location --retry 3 --retry-delay 2 --retry-all-errors \
-          "https://github.com/${LUCLI_REPO}/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-${suffix}" \
-          --output "$install_dir/lucli"
-        if command -v sha256sum >/dev/null 2>&1; then
-          actual=$(sha256sum "$install_dir/lucli" | cut -d' ' -f1)
-        else
-          actual=$(shasum -a 256 "$install_dir/lucli" | cut -d' ' -f1)
-        fi
+        chmod +x "$install_dir/lucli"
+        actual=$(sha_of "$install_dir/lucli")
         if [ "$actual" != "$expected" ]; then
           echo "::error::LuCLI ${LUCLI_VERSION} (${suffix}) checksum mismatch: expected ${expected}, got ${actual}. Refusing to use it." >&2
           rm -f "$install_dir/lucli"
           exit 1
         fi
-        chmod +x "$install_dir/lucli"
         reported=$("$install_dir/lucli" --version 2>&1 | head -1)
         if [ "$reported" != "LuCLI Version: ${LUCLI_VERSION}" ]; then
           echo "::error::The installed LuCLI reports '${reported}', expected 'LuCLI Version: ${LUCLI_VERSION}'." >&2
@@ -51,3 +98,10 @@ runs:
         fi
         echo "$reported (sha256 ${actual})"
         echo "$install_dir" >> "$GITHUB_PATH"
+
+    - name: Save LuCLI runtime
+      if: steps.lucli-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ runner.temp }}/wheels-lucli-bin
+        key: lucli-${{ runner.os }}-${{ env.LUCLI_VERSION }}-${{ env.LUCLI_SHA256 }}
