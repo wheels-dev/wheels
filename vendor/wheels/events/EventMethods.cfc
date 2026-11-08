@@ -392,8 +392,16 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			// attacker-influenced SQL or request text, so encode at this seam —
 			// the same protection the minimal fallback provided. Wheels.* errors
 			// keep their own (already-safe) shape and are not re-encoded.
+			// Some engines (RustCFML) encode the backtick itself, which would stop
+			// wheelserror.cfm's backtick-><code> rewrite from matching. Restore only
+			// the backtick entity to a literal backtick; everything else stays
+			// encoded, so the rewrite wraps already-escaped text.
 			local.message = EncodeForHTML(local.message);
 			local.extendedInfo = EncodeForHTML(local.extendedInfo);
+			for (local.encodedBacktick in [Chr(38) & Chr(35) & "x60;", Chr(38) & Chr(35) & "96;"]) {
+				local.message = Replace(local.message, local.encodedBacktick, "`", "all");
+				local.extendedInfo = Replace(local.extendedInfo, local.encodedBacktick, "`", "all");
+			}
 			local.tagContext = [];
 			if (StructKeyExists(local.root, "tagContext") && IsArray(local.root.tagContext)) {
 				local.tagContext = local.root.tagContext;
