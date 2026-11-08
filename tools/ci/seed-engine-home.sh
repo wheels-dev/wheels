@@ -15,8 +15,17 @@ set -euo pipefail
 
 engine="${1:?usage: tools/ci/seed-engine-home.sh <engine>}"
 config=$(docker compose config --format json "$engine")
-image=$(jq -er --arg s "$engine" '.services[$s].image' <<<"$config")
 
+# Only engines whose compose.ci.yml override bind-mounts .engine/<engine> need
+# seeding (Adobe + BoxLang). Lucee's engine home stays inside the image and is
+# not masked by any bind, so copy nothing for it.
+if ! jq -e --arg s "$engine" --arg t "/wheels-test-suite/.engine/${engine}" \
+    '.services[$s].volumes[]? | select(.target == $t)' <<<"$config" >/dev/null; then
+  echo "No .engine/${engine} bind for ${engine}; nothing to seed"
+  exit 0
+fi
+
+image=$(jq -er --arg s "$engine" '.services[$s].image' <<<"$config")
 dest=".engine/${engine}"
 mkdir -p "$dest"
 
