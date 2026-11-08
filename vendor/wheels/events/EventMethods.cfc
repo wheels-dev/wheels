@@ -393,15 +393,16 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			// the same protection the minimal fallback provided. Wheels.* errors
 			// keep their own (already-safe) shape and are not re-encoded.
 			// Some engines (RustCFML) encode the backtick itself, which would stop
-			// wheelserror.cfm's backtick-><code> rewrite from matching. Restore only
-			// the backtick entity to a literal backtick; everything else stays
-			// encoded, so the rewrite wraps already-escaped text.
+			// wheelserror.cfm's backtick-><code> rewrite from matching. Restore the
+			// backtick entity to a literal backtick (hex `&#x60;` / `&#X60;` or
+			// decimal `&#96;`, zero-padded too); backticks are not XSS-dangerous on
+			// their own, and everything else (<, >, &, quotes) stays encoded. The
+			// regex is built with Chr() so CFML does not interpolate the '#'.
 			local.message = EncodeForHTML(local.message);
 			local.extendedInfo = EncodeForHTML(local.extendedInfo);
-			for (local.encodedBacktick in [Chr(38) & Chr(35) & "x60;", Chr(38) & Chr(35) & "96;"]) {
-				local.message = Replace(local.message, local.encodedBacktick, "`", "all");
-				local.extendedInfo = Replace(local.extendedInfo, local.encodedBacktick, "`", "all");
-			}
+			local.backtickEntity = Chr(38) & Chr(35) & "([xX]0*60|0*96);";
+			local.message = ReReplaceNoCase(local.message, local.backtickEntity, "`", "all");
+			local.extendedInfo = ReReplaceNoCase(local.extendedInfo, local.backtickEntity, "`", "all");
 			local.tagContext = [];
 			if (StructKeyExists(local.root, "tagContext") && IsArray(local.root.tagContext)) {
 				local.tagContext = local.root.tagContext;
