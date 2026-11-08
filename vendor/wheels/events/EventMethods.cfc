@@ -387,6 +387,13 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			if (StructKeyExists(local.root, "detail") && IsSimpleValue(local.root.detail)) {
 				local.extendedInfo = local.root.detail;
 			}
+			// The styled template interpolates message/extendedInfo raw (it only
+			// rewrites backticks to <code>). A generic DB/Java exception can carry
+			// attacker-influenced SQL or request text, so encode at this seam —
+			// the same protection the minimal fallback provided. Wheels.* errors
+			// keep their own (already-safe) shape and are not re-encoded.
+			local.message = EncodeForHTML(local.message);
+			local.extendedInfo = EncodeForHTML(local.extendedInfo);
 			local.tagContext = [];
 			if (StructKeyExists(local.root, "tagContext") && IsArray(local.root.tagContext)) {
 				local.tagContext = local.root.tagContext;

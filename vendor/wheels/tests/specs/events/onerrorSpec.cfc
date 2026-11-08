@@ -194,6 +194,58 @@ component extends="wheels.WheelsTest" {
 				}
 			})
 
+			it("escapes HTML in a generic exception message and detail (##4688 XSS)", () => {
+				// Exercise the REAL template, not the event double: the template
+				// interpolates message/extendedInfo raw, so the seam must encode.
+				var saved = application.wheels.showErrorInformation
+				try {
+					application.wheels.showErrorInformation = true
+					var em = CreateObject("component", "wheels.tests._assets.events.OnErrorRealTemplateDouble").init()
+					var body = em.$runOnError(
+						exception = {
+							type = "java.sql.SQLException",
+							message = "<img src=x onerror=alert(1)>",
+							detail = "<script>alert(1)</script>",
+							tagContext = []
+						},
+						eventName = "onRequest"
+					)
+					expect(em.$lastStatusCode()).toBe(500)
+					expect(body).toInclude("&lt;img")
+					expect(body).toInclude("&lt;script")
+					expect(body).notToInclude("<img src=x")
+					expect(body).notToInclude("<script>alert(1)</script>")
+				} finally {
+					application.wheels.showErrorInformation = saved
+				}
+			})
+
+			it("still renders backticked code after message encoding (##4688)", () => {
+				var saved = application.wheels.showErrorInformation
+				try {
+					application.wheels.showErrorInformation = true
+					var em = CreateObject("component", "wheels.tests._assets.events.OnErrorRealTemplateDouble").init()
+					var body = em.$runOnError(
+						exception = {
+							type = "java.sql.SQLException",
+							message = "bad `<b>` value",
+							detail = "",
+							tagContext = []
+						},
+						eventName = "onRequest"
+					)
+					// Target the message heading, not the page's embedded JS (which
+					// contains "<b>" in asset code).
+					var headings = ReMatchNoCase("<h1[^>]*>[\s\S]*?bad[\s\S]*?</h1>", body)
+					expect(ArrayLen(headings)).toBe(1)
+					expect(headings[1]).toInclude("<code")
+					expect(headings[1]).toInclude("&lt;b&gt;")
+					expect(headings[1]).notToInclude("<b>")
+				} finally {
+					application.wheels.showErrorInformation = saved
+				}
+			})
+
 			it("keeps the JSON path serializing the raw exception", () => {
 				var saved = application.wheels.showErrorInformation
 				try {
