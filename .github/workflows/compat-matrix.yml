@@ -161,13 +161,45 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v5
 
+      # Oracle's download host has answered 502 under load (#4691). Keep one
+      # driver copy in the Actions cache (keyed by the pinned URL version) so
+      # Adobe legs after the first never touch the network, and bound the
+      # download with retries + a diagnostic naming the URL and HTTP status.
+      - name: Restore cached Oracle JDBC driver
+        if: startsWith(matrix.cfengine, 'adobe')
+        uses: actions/cache@v4
+        with:
+          path: .engine/ojdbc10-cache/ojdbc10.jar
+          key: ojdbc10-1927
+
       - name: Download ojdbc10 for Adobe engines
         if: startsWith(matrix.cfengine, 'adobe')
+        env:
+          OJDBC_URL: https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar
         run: |
-          mkdir -p ./.engine/${{ matrix.cfengine }}/WEB-INF/lib
-          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors \
-            -o ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar \
-            https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar
+          set -euo pipefail
+          mkdir -p .engine/ojdbc10-cache ./.engine/${{ matrix.cfengine }}/WEB-INF/lib
+          JAR=.engine/ojdbc10-cache/ojdbc10.jar
+          if [ ! -s "$JAR" ]; then
+            for attempt in 1 2 3 4 5; do
+              CODE=$(curl -sS -fL --connect-timeout 10 --max-time 60 \
+                -o "$JAR.part" -w '%{http_code}' "$OJDBC_URL" 2>/dev/null || true)
+              if [ -s "$JAR.part" ] && [ "$CODE" = "200" ]; then
+                mv "$JAR.part" "$JAR"
+                break
+              fi
+              echo "::warning::ojdbc10 download attempt ${attempt}/5 failed: ${OJDBC_URL} (HTTP ${CODE:-no-response})"
+              sleep $((attempt * 5))
+            done
+          else
+            echo "Using cached ojdbc10.jar ($(wc -c < "$JAR") bytes)"
+          fi
+          if [ ! -s "$JAR" ]; then
+            echo "::error::ojdbc10 download failed after 5 attempts: ${OJDBC_URL} did not return HTTP 200; see the warnings above for the last status"
+            exit 1
+          fi
+          cp "$JAR" ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
+          echo "Oracle JDBC driver ready ($(wc -c < "$JAR") bytes)"
 
       - name: Start database container
         run: |
@@ -251,26 +283,57 @@ jobs:
               ;;
           esac
 
+      # BuildKit + the Actions cache keep CommandBox's engine archive and
+      # ForgeBox downloads (Lucee/Adobe/BoxLang, `bx-compat-cfml`, …) warm
+      # across matrix jobs. #4691 saw downloads.ortussolutions.com answer
+      # 403/502 and GitHub Releases 504 before any test ran.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Start CF engine
-        # Retry the build to absorb transient external download failures
+        # Retry the cached build to absorb transient external download failures
         # (GitHub Releases 503/504s for Adoptium JDK/JRE and similar). The
         # build itself is idempotent; only `up -d` runs after success.
         env:
           CFENGINE: ${{ matrix.cfengine }}
         run: |
-          set -e
+          set -euo pipefail
+          case "$CFENGINE" in
+            lucee6) IMAGE=wheels-test-lucee6:v1.0.2 ;;
+            lucee7) IMAGE=wheels-test-lucee7:v1.0.1 ;;
+            adobe2023) IMAGE=wheels-test-adobe2023:v1.0.1 ;;
+            adobe2025) IMAGE=wheels-test-adobe2025:v1.0.0 ;;
+            boxlang) IMAGE=wheels-test-boxlang:v1.0.0 ;;
+            *) echo "::error::No image mapping for engine '$CFENGINE'"; exit 1 ;;
+          esac
+          # The cache key covers the pinned engine versions/digests in the
+          # Dockerfile (BOX_SERVER_APP_CFENGINE, base image digest) plus the
+          # ForgeBox manifest, so a version bump starts a fresh cache scope.
+          CACHE_FILES=("./tools/docker/${CFENGINE}/Dockerfile")
+          for f in box.json server.json CFConfig.json; do
+            if [ -f "./tools/docker/${CFENGINE}/${f}" ]; then
+              CACHE_FILES+=("./tools/docker/${CFENGINE}/${f}")
+            fi
+          done
+          CACHE_KEY=$(cat "${CACHE_FILES[@]}" | sha256sum | cut -c1-16)
           MAX_ATTEMPTS=3
           ATTEMPT=1
-          until docker compose build --no-cache "$CFENGINE"; do
+          until docker buildx build \
+            --load \
+            --tag "$IMAGE" \
+            --file "./tools/docker/${CFENGINE}/Dockerfile" \
+            --cache-from "type=gha,scope=${CFENGINE}-${CACHE_KEY}" \
+            --cache-to "type=gha,mode=max,scope=${CFENGINE}-${CACHE_KEY}" \
+            .; do
             if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
-              echo "::error::docker compose build failed after ${MAX_ATTEMPTS} attempts"
+              echo "::error::${CFENGINE} image build failed after ${MAX_ATTEMPTS} attempts (engine/ForgeBox download; see the named URL and HTTP status in the build log above)"
               exit 1
             fi
             echo "::warning::Build attempt ${ATTEMPT} failed — sleeping 30s before retry"
             ATTEMPT=$((ATTEMPT + 1))
             sleep 30
           done
-          docker compose up -d "$CFENGINE"
+          docker compose up -d --no-build "$CFENGINE"
 
       - name: Wait for CF engine to be ready
         env:
@@ -311,7 +374,7 @@ jobs:
               RESTARTS=$((RESTARTS + 1))
               if [ "$RESTARTS" -le "$MAX_RESTARTS" ]; then
                 echo "Container $CONTAINER has status '$CONTAINER_STATUS' — restarting (attempt $RESTARTS/$MAX_RESTARTS)..."
-                docker compose up -d "${CFENGINE}"
+                docker compose up -d --no-build "${CFENGINE}"
                 sleep 10
                 continue
               else
