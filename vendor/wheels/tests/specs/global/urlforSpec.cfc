@@ -118,6 +118,33 @@ component extends="wheels.WheelsTest" {
 
 			})
 
+			it("keeps namespace segments in unnamed generic routes (##4695)", () => {
+				$clearRoutes()
+				mapper = $mapper()
+				mapper
+					.$draw()
+					.namespace("admin")
+						.get(pattern="users/[action]/[key]", to="users##[action]")
+					.end()
+				.end()
+				g.$setNamedRoutePositions()
+				application.wheels.URLRewriting = "On"
+
+				// Ambient params.controller is camelized `admin.Users`; explicit callers
+				// may pass `admin/users`; deeper packages split on every dot.
+				expect(g.urlFor(controller = "admin.Users", action = "show", key = 1)).toBe("/admin/users/show/1")
+				expect(g.urlFor(controller = "admin/users", action = "show", key = 1)).toBe("/admin/users/show/1")
+				expect(g.urlFor(controller = "admin.v1.Users", action = "show", key = 1)).toBe("/admin/v1/users/show/1")
+				// Non-namespaced controller/action hyphenation is unchanged.
+				expect(g.urlFor(controller = "SurveyTemplates", action = "MyAction")).toBe("/survey-templates/my-action")
+
+				// Query-string form keeps the value URL-encoded (slashes as %2F), as before.
+				application.wheels.URLRewriting = "Off"
+				expect(g.urlFor(controller = "admin/users", action = "show", key = 1)).toBe(
+					"/index.cfm?controller=admin%2Fusers&action=show&key=1"
+				)
+			})
+
 			it("encodes URL parameters with special characters when encode=true", () => {
 				mapper = $mapper()
 				mapper

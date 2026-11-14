@@ -580,6 +580,43 @@
 
 
 	/**
+	 * Internal function. Builds a controller/action path value for URLFor.
+	 *
+	 * Controllers are packages: `params.controller` is dot-separated (`admin.Users`)
+	 * and callers may pass slash-separated values (`admin/users`). Split on both,
+	 * hyphenize each segment (camelCase -> kebab-case), then re-join with `/` so a
+	 * namespace survives. Segments are URL-encoded individually for a path
+	 * (URLRewriting On/Partial) so `/` is never turned into `%2F`; the query-string
+	 * form (URLRewriting Off) encodes the joined value, preserving the previous
+	 * `controller=admin%2Fusers` shape. (#4695)
+	 */
+	public string function $urlForPathValue(
+		required string value,
+		boolean controller = false,
+		boolean encode = true,
+		boolean $encodeForHtmlAttribute = false,
+		boolean encodeSlashes = false
+	) {
+		local.value = arguments.controller ? Replace(arguments.value, ".", "/", "all") : arguments.value;
+		local.parts = ListToArray(local.value, "/");
+		for (local.i = 1; local.i <= ArrayLen(local.parts); local.i++) {
+			local.parts[local.i] = hyphenize(local.parts[local.i]);
+			if (arguments.encode && !arguments.encodeSlashes) {
+				local.parts[local.i] = $encodeUrlParam(local.parts[local.i]);
+			}
+		}
+		local.value = ArrayToList(local.parts, "/");
+		if (arguments.encode && arguments.encodeSlashes) {
+			local.value = $encodeUrlParam(local.value);
+		}
+		if (arguments.$encodeForHtmlAttribute) {
+			local.value = EncodeForHTMLAttribute(local.value);
+		}
+		return local.value;
+	}
+
+
+	/**
 	 * Internal function. Substitutes route/path variables into the URL, appending
 	 * unmatched variables to `args.params` and returning the updated path. Extracted
 	 * from URLFor; behavior (including the Wheels.IncorrectRoutingArguments throw)
@@ -621,7 +658,21 @@
 			local.rawValue = local.value;
 
 			// Any value we find from above, URL encode it here.
-			if (arguments.args.encode && $get("encodeURLs")) {
+			local.encodeValue = arguments.args.encode && $get("encodeURLs");
+			if (arguments.args.$encodeForHtmlAttribute) {
+				local.encodeHtmlAttribute = true;
+			} else {
+				local.encodeHtmlAttribute = false;
+			}
+			if (
+				arguments.args.encode
+				&& $get("encodeURLs")
+				&& local.property != "controller"
+				&& local.property != "action"
+			) {
+				// Controller/action values are encoded per path segment by
+				// $urlForPathValue below; encoding them whole first would turn `/`
+				// into %2F before hyphenize() ever runs (#4695).
 				local.value = $encodeUrlParam(local.value);
 				if (arguments.args.$encodeForHtmlAttribute) {
 					local.value = EncodeForHTMLAttribute(local.value);
@@ -652,9 +703,20 @@
 				continue;
 			}
 
-			// Transform value before setting it in pattern.
+			// Transform value before setting it in pattern. Controller/action are
+			// path segments: a dotted package (params.controller is `admin.Users`) or
+			// slash-separated explicit value must keep its separators, and hyphenize
+			// only sees one segment at a time (#4695). Encoding happens per segment
+			// for a path so `/` stays a separator; the query-string form
+			// (URLRewriting=Off) encodes the joined value as before.
 			if (local.property == "controller" || local.property == "action") {
-				local.value = hyphenize(local.value);
+				local.value = $urlForPathValue(
+					value = local.value,
+					controller = local.property == "controller",
+					encode = local.encodeValue,
+					$encodeForHtmlAttribute = local.encodeHtmlAttribute,
+					encodeSlashes = arguments.args.$URLRewriting == "Off"
+				);
 			} else if (application.wheels.obfuscateUrls) {
 				local.value = obfuscateParam(local.value);
 			}

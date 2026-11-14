@@ -84,6 +84,25 @@ component extends="wheels.WheelsTest" {
 				expect(result).toInclude("?page=")
 			})
 
+			it("keeps namespace segments for action-only and explicit-controller links (##4695)", () => {
+				$clearRoutes()
+				g.mapper()
+					.namespace("admin")
+						.get(pattern = "users/[action]/[key]", to = "users##[action]")
+					.end()
+				.end()
+				g.$setNamedRoutePositions()
+				application.wheels.URLRewriting = "On"
+
+				// The namespace route is unnamed/not memo-matchable; the default path
+				// must still preserve the package separator.
+				c = g.controller("dummy", {controller = "admin.Users", action = "show"})
+				actionOnly = c.linkTo(text = "View User", action = "show", key = 1)
+				expect(actionOnly).toInclude('href="/admin/users/show/1"')
+				explicit = c.linkTo(text = "View User", controller = "admin/users", action = "show", key = 1)
+				expect(explicit).toInclude('href="/admin/users/show/1"')
+			})
+
 			it("does not adopt an ambiguous ambient route name (##3638)", () => {
 				// `wildcard()` registers six candidates under the single name
 				// `wildcard` (2 methods x 3 patterns). paginationLinks() passes
