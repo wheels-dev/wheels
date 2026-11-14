@@ -85,6 +85,11 @@ component extends="wheels.WheelsTest" {
 					expect(function() {
 						shardRequest.parse(url = {shards = "2", shardWeightsFile = "1"}, weightsPath = path);
 					}).toThrow("Wheels.InvalidShard");
+
+					FileWrite(path, RepeatString(" ", 131073));
+					expect(function() {
+						shardRequest.parse(url = {shards = "2", shardWeightsFile = "1"}, weightsPath = path);
+					}).toThrow("Wheels.InvalidShard");
 				} finally {
 					if (FileExists(path)) {
 						FileDelete(path);
