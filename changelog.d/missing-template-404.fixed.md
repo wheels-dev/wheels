@@ -1,0 +1,1 @@
+- Direct requests for a missing physical `.cfm` template (e.g. `/login.cfm`, `/press/index.cfm`) now answer HTTP 404 through `onMissingTemplate` instead of throwing inside `onRequest` and landing in `onError` (500 plus the configured error email). Missing templates are always 404, regardless of `showErrorInformation`; real `.cfm` entry points keep working (#4694)

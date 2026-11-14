@@ -668,9 +668,10 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	}
 
 	public void function $runOnMissingTemplate(required targetpage) {
-		if (!$get("showErrorInformation")) {
-			$header(statusCode = 404);
-		}
+		// Missing templates are always 404, regardless of showErrorInformation:
+		// the status clients and monitoring see must not depend on how much error
+		// detail the environment renders. (#4694)
+		$header(statusCode = 404);
 		$includeAndOutput(template = "#application.wheels.eventPath#/onmissingtemplate.cfm");
 		abort;
 	}
