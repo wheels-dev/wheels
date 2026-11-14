@@ -29,135 +29,167 @@ component output="false" {
 			shardIndex = 1,
 			weights = {}
 		};
+		local.params = $collectParams(url = arguments.url);
+		if (!StructCount(local.params)) {
+			return local.rv;
+		}
+		local.rv.requested = true;
+		local.rv.shardCount = $parseShardCount(params = local.params);
+		local.rv.shardIndex = $parseShardIndex(params = local.params, shardCount = local.rv.shardCount);
+		local.rv.weights = $parseWeights(
+			params = local.params,
+			shardCount = local.rv.shardCount,
+			weightsPath = arguments.weightsPath
+		);
+		return local.rv;
+	}
+
+	/** Collect only single, simple query parameters; duplicates are a 400. */
+	private struct function $collectParams(required struct url) {
 		local.params = {};
-		// Each key must be a single simple value: a duplicated query parameter
-		// arrives as an array and must 400, not 500.
 		for (local.key in ["shards", "shard", "shardWeights", "shardWeightsFile"]) {
 			if (StructKeyExists(arguments.url, local.key)) {
 				if (!IsSimpleValue(arguments.url[local.key])) {
 					throw(type = "Wheels.InvalidShard", message = "#local.key# must be a single value");
 				}
 				local.params[local.key] = arguments.url[local.key];
-				local.rv.requested = true;
 			}
 		}
-		if (!local.rv.requested) {
-			return local.rv;
-		}
+		return local.params;
+	}
 
-		if (StructKeyExists(local.params, "shards")) {
-			local.rawShards = local.params.shards;
-			if (
-				!IsNumeric(local.rawShards)
-				|| Val(local.rawShards) < 1
-				|| Val(local.rawShards) != Int(Val(local.rawShards))
-			) {
-				throw(type = "Wheels.InvalidShard", message = "shards must be a positive integer");
-			}
-			local.rv.shardCount = Int(Val(local.rawShards));
-			if (local.rv.shardCount > variables.MAX_SHARDS) {
-				throw(
-					type = "Wheels.InvalidShard",
-					message = "shards must be between 1 and #variables.MAX_SHARDS#"
-				);
-			}
+	private numeric function $parseShardCount(required struct params) {
+		if (!StructKeyExists(arguments.params, "shards")) {
+			return 1;
 		}
-		if (StructKeyExists(local.params, "shard")) {
-			if (
-				!IsNumeric(local.params.shard)
-				|| Val(local.params.shard) < 1
-				|| Val(local.params.shard) != Int(Val(local.params.shard))
-				|| Val(local.params.shard) > local.rv.shardCount
-			) {
-				throw(
-					type = "Wheels.InvalidShard",
-					message = "shard must be an integer between 1 and #local.rv.shardCount#"
-				);
-			}
-			local.rv.shardIndex = Int(Val(local.params.shard));
+		local.raw = arguments.params.shards;
+		if (!IsNumeric(local.raw) || Val(local.raw) < 1 || Val(local.raw) != Int(Val(local.raw))) {
+			throw(type = "Wheels.InvalidShard", message = "shards must be a positive integer");
 		}
+		local.count = Int(Val(local.raw));
+		if (local.count > variables.MAX_SHARDS) {
+			throw(
+				type = "Wheels.InvalidShard",
+				message = "shards must be between 1 and #variables.MAX_SHARDS#"
+			);
+		}
+		return local.count;
+	}
 
-		local.hasInlineWeights = StructKeyExists(local.params, "shardWeights");
-		local.hasFileWeights = false;
-		if (StructKeyExists(local.params, "shardWeightsFile")) {
-			// Literal truthy flag only; 0/false/yes/on are a 400 rather than a
-			// silent no-op that would shard with default weights.
-			if (!ListFindNoCase("1,true", local.params.shardWeightsFile)) {
-				throw(type = "Wheels.InvalidShard", message = "shardWeightsFile accepts only 1 or true");
-			}
-			local.hasFileWeights = true;
+	private numeric function $parseShardIndex(required struct params, required numeric shardCount) {
+		if (!StructKeyExists(arguments.params, "shard")) {
+			return 1;
 		}
-		if (local.hasInlineWeights && local.hasFileWeights) {
+		local.raw = arguments.params.shard;
+		if (
+			!IsNumeric(local.raw)
+			|| Val(local.raw) < 1
+			|| Val(local.raw) != Int(Val(local.raw))
+			|| Val(local.raw) > arguments.shardCount
+		) {
+			throw(
+				type = "Wheels.InvalidShard",
+				message = "shard must be an integer between 1 and #arguments.shardCount#"
+			);
+		}
+		return Int(Val(local.raw));
+	}
+
+	/** Resolve and validate the optional weights (inline JSON or fixed file). */
+	private struct function $parseWeights(
+		required struct params,
+		required numeric shardCount,
+		required string weightsPath
+	) {
+		local.hasInline = StructKeyExists(arguments.params, "shardWeights");
+		local.hasFile = $parseFileFlag(params = arguments.params);
+		if (local.hasInline && local.hasFile) {
 			throw(
 				type = "Wheels.InvalidShard",
 				message = "use either shardWeights or shardWeightsFile, not both"
 			);
 		}
-		if (local.hasInlineWeights || local.hasFileWeights) {
-			// Weights only make sense when actually sharding; validate them even
-			// when shards is absent/1 so bad input never runs a full suite.
-			if (local.rv.shardCount <= 1) {
-				throw(type = "Wheels.InvalidShard", message = "shard weights require shards > 1");
-			}
-			if (local.hasInlineWeights) {
-				// The cap applies to the ENCODED value: that is what must fit in
-				// the request line (~8 KB on Adobe). Re-encode the decoded value
-				// so a long JSON payload cannot slip through by decoding short.
-				local.encodedWeightsLength = Len(URLEncodedFormat(local.params.shardWeights));
-				if (local.encodedWeightsLength > variables.MAX_URL_WEIGHTS) {
-					throw(
-						type = "Wheels.InvalidShard",
-						message = "shardWeights in the query string is limited to #variables.MAX_URL_WEIGHTS# characters once URL-encoded (got #local.encodedWeightsLength#); use shardWeightsFile=1 for the full suite"
-					);
-				}
-				local.rawWeights = local.params.shardWeights;
-			} else {
-				// Fixed location under the app's tests directory: the caller
-				// cannot point this at an arbitrary path.
-				local.weightsPath = Len(arguments.weightsPath)
-					? arguments.weightsPath
-					: ExpandPath("/tests/shard-weights.json");
-				if (!FileExists(local.weightsPath)) {
-					throw(
-						type = "Wheels.InvalidShard",
-						message = "tests/shard-weights.json was not found in the app root"
-					);
-				}
-				if (FileInfo(local.weightsPath).size > variables.MAX_WEIGHTS_FILE_BYTES) {
-					throw(
-						type = "Wheels.InvalidShard",
-						message = "tests/shard-weights.json must be at most #variables.MAX_WEIGHTS_FILE_BYTES# bytes"
-					);
-				}
-				local.rawWeights = FileRead(local.weightsPath);
-			}
-			if (IsSimpleValue(local.rawWeights)) {
-				try {
-					local.rawWeights = DeserializeJSON(local.rawWeights);
-				} catch (any e) {
-					throw(
-						type = "Wheels.InvalidShard",
-						message = "shard weights must be a JSON object of bundle name to seconds"
-					);
-				}
-			}
-			if (!IsStruct(local.rawWeights)) {
+		if (!local.hasInline && !local.hasFile) {
+			return {};
+		}
+		// Weights only make sense when actually sharding; validate them even when
+		// shards is absent/1 so bad input never runs a full suite.
+		if (arguments.shardCount <= 1) {
+			throw(type = "Wheels.InvalidShard", message = "shard weights require shards > 1");
+		}
+		local.raw = local.hasInline
+			? $inlineWeights(params = arguments.params)
+			: $fileWeights(weightsPath = arguments.weightsPath);
+		return $validateWeights(raw = local.raw);
+	}
+
+	/** Literal truthy flag only; 0/false/yes/on are a 400, never silently absent. */
+	private boolean function $parseFileFlag(required struct params) {
+		if (!StructKeyExists(arguments.params, "shardWeightsFile")) {
+			return false;
+		}
+		if (!ListFindNoCase("1,true", arguments.params.shardWeightsFile)) {
+			throw(type = "Wheels.InvalidShard", message = "shardWeightsFile accepts only 1 or true");
+		}
+		return true;
+	}
+
+	/** Inline weights: the cap applies to the ENCODED value (request-line fit). */
+	private string function $inlineWeights(required struct params) {
+		local.encodedLength = Len(URLEncodedFormat(arguments.params.shardWeights));
+		if (local.encodedLength > variables.MAX_URL_WEIGHTS) {
+			throw(
+				type = "Wheels.InvalidShard",
+				message = "shardWeights in the query string is limited to #variables.MAX_URL_WEIGHTS# characters once URL-encoded (got #local.encodedLength#); use shardWeightsFile=1 for the full suite"
+			);
+		}
+		return arguments.params.shardWeights;
+	}
+
+	/** File weights: fixed app-root path, size-capped, never caller-chosen. */
+	private string function $fileWeights(required string weightsPath) {
+		local.path = Len(arguments.weightsPath) ? arguments.weightsPath : ExpandPath("/tests/shard-weights.json");
+		if (!FileExists(local.path)) {
+			throw(
+				type = "Wheels.InvalidShard",
+				message = "tests/shard-weights.json was not found in the app root"
+			);
+		}
+		local.content = FileRead(local.path);
+		if (Len(local.content) > variables.MAX_WEIGHTS_FILE_BYTES) {
+			throw(
+				type = "Wheels.InvalidShard",
+				message = "tests/shard-weights.json must be at most #variables.MAX_WEIGHTS_FILE_BYTES# bytes"
+			);
+		}
+		return local.content;
+	}
+
+	/** Parse the JSON and require an object of bundle name -> non-negative number. */
+	private struct function $validateWeights(required string raw) {
+		try {
+			local.weights = DeserializeJSON(arguments.raw);
+		} catch (any e) {
+			throw(
+				type = "Wheels.InvalidShard",
+				message = "shard weights must be a JSON object of bundle name to seconds"
+			);
+		}
+		if (!IsStruct(local.weights)) {
+			throw(
+				type = "Wheels.InvalidShard",
+				message = "shard weights must be a JSON object of bundle name to seconds"
+			);
+		}
+		for (local.bundleName in local.weights) {
+			if (!IsNumeric(local.weights[local.bundleName]) || local.weights[local.bundleName] < 0) {
 				throw(
 					type = "Wheels.InvalidShard",
-					message = "shard weights must be a JSON object of bundle name to seconds"
+					message = "weight for bundle '#local.bundleName#' must be a non-negative number"
 				);
 			}
-			local.rv.weights = local.rawWeights;
-			for (local.bundleName in local.rv.weights) {
-				if (!IsNumeric(local.rv.weights[local.bundleName]) || local.rv.weights[local.bundleName] < 0) {
-					throw(
-						type = "Wheels.InvalidShard",
-						message = "weight for bundle '#local.bundleName#' must be a non-negative number"
-					);
-				}
-			}
 		}
-		return local.rv;
+		return local.weights;
 	}
 
 }
