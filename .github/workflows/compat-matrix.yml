@@ -310,22 +310,26 @@ jobs:
               ;;
           esac
 
-      # BuildKit + the Actions cache keep CommandBox's engine archive and
-      # ForgeBox downloads (Lucee/Adobe/BoxLang, `bx-compat-cfml`, …) warm
-      # across matrix jobs. #4691 saw downloads.ortussolutions.com answer
-      # 403/502 and GitHub Releases 504 before any test ran.
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Start CF engine
-        # Retry the cached build to absorb transient external download failures
+        # Retry the build to absorb transient external download failures
         # (GitHub Releases 503/504s for Adoptium JDK/JRE and similar). The
         # build itself is idempotent; only `up -d` runs after success.
         env:
           CFENGINE: ${{ matrix.cfengine }}
         run: |
-          bash tools/ci/build-engine-image.sh "$CFENGINE"
-          docker compose up -d --no-build "$CFENGINE"
+          set -e
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          until docker compose build --no-cache "$CFENGINE"; do
+            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+              echo "::error::docker compose build failed after ${MAX_ATTEMPTS} attempts"
+              exit 1
+            fi
+            echo "::warning::Build attempt ${ATTEMPT} failed — sleeping 30s before retry"
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 30
+          done
+          docker compose up -d "$CFENGINE"
 
       - name: Wait for CF engine to be ready
         env:
@@ -366,7 +370,7 @@ jobs:
               RESTARTS=$((RESTARTS + 1))
               if [ "$RESTARTS" -le "$MAX_RESTARTS" ]; then
                 echo "Container $CONTAINER has status '$CONTAINER_STATUS' — restarting (attempt $RESTARTS/$MAX_RESTARTS)..."
-                docker compose up -d --no-build "${CFENGINE}"
+                docker compose up -d "${CFENGINE}"
                 sleep 10
                 continue
               else
