@@ -432,6 +432,18 @@ component output="false" {
 	}
 
 	public boolean function onRequest( string targetPage ) {
+		// A direct request for a missing physical template must be a 404 through
+		// onMissingTemplate, not an include() failure inside onRequest: that lands
+		// in onError (500 + the configured error email) and bypasses
+		// onMissingTemplate. FileExists keeps every real entry point working
+		// (index.cfm, runner.cfm, app scripts). If an app intentionally forwards a
+		// virtual target resolved by a CFML mapping rather than a file, add that
+		// exact name to an explicit allowlist here — do not allow missing paths by
+		// basename. (#4694)
+		if (!FileExists(ExpandPath(arguments.targetPage))) {
+			return onMissingTemplate(arguments.targetPage);
+		}
+
 		lock name="reloadLock#this.name#" type="readOnly" timeout="180" {
 			include "#arguments.targetpage#";
 		}
