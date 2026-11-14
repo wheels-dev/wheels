@@ -161,13 +161,72 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v5
 
+      # Oracle's download host has answered 502 under load (#4691). Cache the
+      # driver keyed by the pinned URL version (artifact only: the Oracle JDBC
+      # driver is redistributed under Oracle's license and is never committed;
+      # the Actions cache is repository-scoped and ephemeral). Only a complete
+      # jar is cached/accepted — curl exit 0, HTTP 200, a plausible size and a
+      # valid zip — so a truncated 200 cannot occupy the immutable cache key.
+      - name: Restore cached Oracle JDBC driver
+        if: startsWith(matrix.cfengine, 'adobe')
+        uses: actions/cache@v4
+        with:
+          path: .engine/ojdbc10-cache/ojdbc10.jar
+          key: ojdbc10-1927-v2
+
       - name: Download ojdbc10 for Adobe engines
         if: startsWith(matrix.cfengine, 'adobe')
+        env:
+          OJDBC_URL: https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar
         run: |
-          mkdir -p ./.engine/${{ matrix.cfengine }}/WEB-INF/lib
-          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors \
-            -o ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar \
-            https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar
+          set -euo pipefail
+          MIN_BYTES=1000000
+          mkdir -p .engine/ojdbc10-cache "./.engine/${{ matrix.cfengine }}/WEB-INF/lib"
+          JAR=.engine/ojdbc10-cache/ojdbc10.jar
+          LAST_STATUS="no successful attempt yet"
+
+          # ojdbc10.jar is a zip archive: size + `unzip -t` reject a truncated
+          # or corrupt 200 that curl itself considers successful.
+          jar_ok() {
+            [ -s "$1" ] || return 1
+            [ "$(wc -c < "$1")" -ge "$MIN_BYTES" ] || return 1
+            unzip -tq "$1" >/dev/null 2>&1
+          }
+
+          if [ -f "$JAR" ]; then
+            if jar_ok "$JAR"; then
+              echo "Using cached ojdbc10.jar ($(wc -c < "$JAR") bytes, zip integrity OK)"
+            else
+              echo "::warning::Cached ojdbc10.jar is incomplete or corrupt; re-downloading."
+              rm -f "$JAR"
+            fi
+          fi
+
+          if [ ! -f "$JAR" ]; then
+            for attempt in 1 2 3 4 5; do
+              CODE=""
+              RC=0
+              CODE=$(curl -sS -fL --connect-timeout 10 --max-time 120 \
+                -o "$JAR.part" -w '%{http_code}' "$OJDBC_URL" 2>/dev/null) || RC=$?
+              BYTES=0
+              [ -f "$JAR.part" ] && BYTES=$(wc -c < "$JAR.part")
+              if [ "$RC" -eq 0 ] && [ "$CODE" = "200" ] && jar_ok "$JAR.part"; then
+                mv "$JAR.part" "$JAR"
+                break
+              fi
+              LAST_STATUS="HTTP ${CODE:-no-response}, curl exit ${RC}, ${BYTES} bytes"
+              echo "::warning::ojdbc10 download attempt ${attempt}/5 failed: ${OJDBC_URL} (${LAST_STATUS})"
+              rm -f "$JAR.part"
+              sleep $((attempt * 5))
+            done
+          fi
+
+          if [ ! -f "$JAR" ] || ! jar_ok "$JAR"; then
+            echo "::error::ojdbc10 download failed after 5 attempts: ${OJDBC_URL} (last attempt: ${LAST_STATUS}); refusing to cache or use an incomplete driver"
+            exit 1
+          fi
+          cp "$JAR" "./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar"
+          echo "Oracle JDBC driver ready ($(wc -c < "$JAR") bytes)"
 
       - name: Start database container
         run: |
