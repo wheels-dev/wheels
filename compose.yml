@@ -486,9 +486,15 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1536M
+          # Oracle Database Free needs at least ~2 GB of memory. The previous
+          # 1536M made gvenzl/oracle-free restart endlessly ("less than 2 GB
+          # memory available"; ORA-03113 on the matrix legs, #4698). 3G leaves
+          # headroom for the database, listener and healthcheck probes; matrix
+          # jobs start one database and one CF engine, so this still fits a
+          # 16 GB hosted runner alongside the 4G Adobe engines.
+          memory: 3G
         reservations:
-          memory: 512M
+          memory: 1G
     networks:
       - wheels-network
 
