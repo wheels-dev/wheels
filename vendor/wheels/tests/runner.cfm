@@ -211,169 +211,26 @@
     local.bundlesDiscovered = ArrayLen(local.sortedArray)
 
     // ── Optional deterministic shard selection ──────────────────────────────
-    // Prototype: exposed only as runner URL parameters — the Wheels CLI has no
-    // shard flags yet. Each shard still needs its own app instance and DB.
-    // Weights come in two ways:
-    //   inline  &shardWeights=<url-encoded JSON>   (small scopes; capped at
-    //           6000 encoded chars so Adobe's ~8 KB request line is never hit)
-    //   file    &shardWeightsFile=1                (full suite; reads
-    //           tests/shard-weights.json in the app root, max 128 KB — no
-    //           arbitrary path reads)
+    // Contract shared with tests/app-runner.cfm through ShardRequest:
+    //   ?shards=N&shard=K
+    //   ?shardWeights=<url-encoded JSON> (small scopes; encoded cap)
+    //   ?shardWeightsFile=1              (tests/shard-weights.json)
     // Without shard inputs the full alphabetically sorted suite runs as before.
-    local.MAX_SHARDS = 64
-    local.MAX_URL_WEIGHTS = 6000
-    local.MAX_WEIGHTS_FILE_BYTES = 131072
-    local.shardParams = {}
+    // Each shard still needs its own app instance and DB.
     local.shardCount = 1
     local.shardIndex = 1
-    local.shardWeights = {}
-    local.shardRequested = false
-
     try {
-        // Each key must be a single simple value: a duplicated query parameter
-        // arrives as an array and must 400, not 500.
-        for (local.key in ["shards", "shard", "shardWeights", "shardWeightsFile"]) {
-            if (StructKeyExists(url, local.key)) {
-                if (!IsSimpleValue(url[local.key])) {
-                    throw(
-                        type = "Wheels.InvalidShard",
-                        message = "#local.key# must be a single value"
-                    );
-                }
-                local.shardParams[local.key] = url[local.key];
-                local.shardRequested = true;
-            }
-        }
-
-        if (local.shardRequested) {
-            if (StructKeyExists(local.shardParams, "shards")) {
-                local.rawShards = local.shardParams.shards;
-                if (
-                    !IsNumeric(local.rawShards)
-                    || Val(local.rawShards) < 1
-                    || Val(local.rawShards) != Int(Val(local.rawShards))
-                ) {
-                    throw(type = "Wheels.InvalidShard", message = "shards must be a positive integer");
-                }
-                local.shardCount = Int(Val(local.rawShards));
-                if (local.shardCount > local.MAX_SHARDS) {
-                    throw(
-                        type = "Wheels.InvalidShard",
-                        message = "shards must be between 1 and #local.MAX_SHARDS#"
-                    );
-                }
-            }
-            if (StructKeyExists(local.shardParams, "shard")) {
-                if (
-                    !IsNumeric(local.shardParams.shard)
-                    || Val(local.shardParams.shard) < 1
-                    || Val(local.shardParams.shard) != Int(Val(local.shardParams.shard))
-                    || Val(local.shardParams.shard) > local.shardCount
-                ) {
-                    throw(
-                        type = "Wheels.InvalidShard",
-                        message = "shard must be an integer between 1 and #local.shardCount#"
-                    );
-                }
-                local.shardIndex = Int(Val(local.shardParams.shard));
-            }
-
-            local.hasInlineWeights = StructKeyExists(local.shardParams, "shardWeights");
-            local.hasFileWeights = false;
-            if (StructKeyExists(local.shardParams, "shardWeightsFile")) {
-                // Literal truthy flag only; 0/false/yes/on are a 400 rather than a
-                // silent no-op that would shard with default weights.
-                if (!ListFindNoCase("1,true", local.shardParams.shardWeightsFile)) {
-                    throw(
-                        type = "Wheels.InvalidShard",
-                        message = "shardWeightsFile accepts only 1 or true"
-                    );
-                }
-                local.hasFileWeights = true;
-            }
-            if (local.hasInlineWeights && local.hasFileWeights) {
-                throw(
-                    type = "Wheels.InvalidShard",
-                    message = "use either shardWeights or shardWeightsFile, not both"
-                );
-            }
-            if (local.hasInlineWeights || local.hasFileWeights) {
-                // Weights only make sense when actually sharding; validate them
-                // even when shards is absent/1 so bad input never runs a full suite.
-                if (local.shardCount <= 1) {
-                    throw(
-                        type = "Wheels.InvalidShard",
-                        message = "shard weights require shards > 1"
-                    );
-                }
-                if (local.hasInlineWeights) {
-                    // The cap applies to the ENCODED value: that is what must fit in
-                    // the request line (~8 KB on Adobe). Re-encode the decoded value so
-                    // a long JSON payload cannot slip through by decoding short.
-                    local.encodedWeightsLength = Len(URLEncodedFormat(local.shardParams.shardWeights));
-                    if (local.encodedWeightsLength > local.MAX_URL_WEIGHTS) {
-                        throw(
-                            type = "Wheels.InvalidShard",
-                            message = "shardWeights in the query string is limited to #local.MAX_URL_WEIGHTS# characters once URL-encoded (got #local.encodedWeightsLength#); use shardWeightsFile=1 for the full suite"
-                        );
-                    }
-                    local.rawWeights = local.shardParams.shardWeights;
-                } else {
-                    // Fixed location under the app's tests directory: the caller
-                    // cannot point this at an arbitrary path.
-                    local.weightsPath = ExpandPath("/tests/shard-weights.json");
-                    if (!FileExists(local.weightsPath)) {
-                        throw(
-                            type = "Wheels.InvalidShard",
-                            message = "tests/shard-weights.json was not found in the app root"
-                        );
-                    }
-                    if (FileInfo(local.weightsPath).size > local.MAX_WEIGHTS_FILE_BYTES) {
-                        throw(
-                            type = "Wheels.InvalidShard",
-                            message = "tests/shard-weights.json must be at most #local.MAX_WEIGHTS_FILE_BYTES# bytes"
-                        );
-                    }
-                    local.rawWeights = FileRead(local.weightsPath);
-                }
-                if (IsSimpleValue(local.rawWeights)) {
-                    try {
-                        local.rawWeights = DeserializeJSON(local.rawWeights);
-                    } catch (any e) {
-                        throw(
-                            type = "Wheels.InvalidShard",
-                            message = "shard weights must be a JSON object of bundle name to seconds"
-                        );
-                    }
-                }
-                if (!IsStruct(local.rawWeights)) {
-                    throw(
-                        type = "Wheels.InvalidShard",
-                        message = "shard weights must be a JSON object of bundle name to seconds"
-                    );
-                }
-                local.shardWeights = local.rawWeights;
-                for (local.bundleName in local.shardWeights) {
-                    if (
-                        !IsNumeric(local.shardWeights[local.bundleName])
-                        || local.shardWeights[local.bundleName] < 0
-                    ) {
-                        throw(
-                            type = "Wheels.InvalidShard",
-                            message = "weight for bundle '#local.bundleName#' must be a non-negative number"
-                        );
-                    }
-                }
-            }
-            if (local.shardCount > 1) {
-                local.shardPlanner = new wheels.wheelstest.ShardPlanner();
-                local.sortedArray = local.shardPlanner.partition(
-                    bundles = local.sortedArray,
-                    shardCount = local.shardCount,
-                    shardIndex = local.shardIndex,
-                    weights = local.shardWeights
-                );
-            }
+        local.shardRequest = new wheels.wheelstest.ShardRequest().parse(url = url)
+        local.shardCount = local.shardRequest.shardCount
+        local.shardIndex = local.shardRequest.shardIndex
+        if (local.shardRequest.requested && local.shardCount > 1) {
+            local.shardPlanner = new wheels.wheelstest.ShardPlanner()
+            local.sortedArray = local.shardPlanner.partition(
+                bundles = local.sortedArray,
+                shardCount = local.shardCount,
+                shardIndex = local.shardIndex,
+                weights = local.shardRequest.weights
+            )
         }
     } catch (Wheels.InvalidShard e) {
         application.wo.$header(statuscode = "400");

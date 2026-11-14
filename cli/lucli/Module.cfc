@@ -509,6 +509,9 @@ component extends="modules.BaseModule" {
 			.option(name = "db",        default = "sqlite", choices = "sqlite,h2,mysql,postgres,sqlserver,sqlserver_cicd,oracle,cockroachdb", description = "--core only: the database the framework core suite runs against. The app suite ignores it and uses the app's test datasource")
 			.option(name = "base-path", default = "", description = "URL prefix the app is mounted under (e.g. /myapp). Auto-derived from WHEELS_SUBPATH or set(subpath=...) when omitted.")
 			.option(name = "timeout",   default = "", description = "Seconds to wait for the suite to finish (default 900). Also settable with WHEELS_TEST_TIMEOUT. On the terminal use --test-timeout=<seconds>: it works on every LuCLI runtime, while a plain --timeout only reaches this command on LuCLI builds that include the module-timeout fix")
+			.option(name = "shards",    default = "", description = "Run one deterministic shard of the suite: total number of shards (1..64). Combine with --shard; each shard needs its own app instance/database")
+			.option(name = "shard",     default = "", description = "1-based shard to run (1..--shards). Default 1")
+			.flag(name = "shard-weights", default = false, description = "Weight shard selection by tests/shard-weights.json (bundle name -> seconds). Requires --shards > 1")
 			.flag(name = "verbose", default = false, description = "Print per-spec detail instead of the summary rollup")
 			.flag(name = "ci",      default = false, description = "CI mode output")
 			.flag(name = "core",    default = false, description = "Run the framework core suite (vendor/wheels/tests) instead of the app suite")
@@ -1569,8 +1572,38 @@ component extends="modules.BaseModule" {
 		}
 		var resolvedTimeout = $resolveTestTimeout(rawTimeout);
 
+		// Deterministic sharding (core and app runners share the contract). Validate
+		// here, before any HTTP request, so a bad combination fails fast instead of
+		// running the full suite by accident.
+		var shardCount = 1;
+		var shardIndex = 1;
+		var shardWeights = false;
+		if (len(trim(parsed.shards))) {
+			if (!isNumeric(trim(parsed.shards)) || val(trim(parsed.shards)) != int(val(trim(parsed.shards))) || val(trim(parsed.shards)) < 1 || val(trim(parsed.shards)) > 64) {
+				throw(type = "Wheels.InvalidArguments", message = "wheels test: --shards must be an integer between 1 and 64.");
+			}
+			shardCount = int(val(trim(parsed.shards)));
+		}
+		if (len(trim(parsed.shard))) {
+			if (!isNumeric(trim(parsed.shard)) || val(trim(parsed.shard)) != int(val(trim(parsed.shard))) || val(trim(parsed.shard)) < 1 || val(trim(parsed.shard)) > shardCount) {
+				throw(type = "Wheels.InvalidArguments", message = "wheels test: --shard must be an integer between 1 and #shardCount#.");
+			}
+			shardIndex = int(val(trim(parsed.shard)));
+		}
+		if (parsed["shard-weights"]) {
+			if (shardCount <= 1) {
+				throw(type = "Wheels.InvalidArguments", message = "wheels test: --shard-weights requires --shards > 1.");
+			}
+			shardWeights = true;
+		}
+		var shardRequested = len(trim(parsed.shards)) || len(trim(parsed.shard)) || shardWeights;
+
 		return {
 			filter = filter,
+			shardRequested = shardRequested,
+			shardCount = shardCount,
+			shardIndex = shardIndex,
+			shardWeights = shardWeights,
 			reporter = parsed.reporter,
 			format = "json",
 			verbose = verbose,
@@ -1685,7 +1718,8 @@ component extends="modules.BaseModule" {
 
 		return runTests(
 			filter, reporter, format, verboseOutput, coreTests,
-			db, ciMode, useTestDB, dbExplicit, basePath, timeoutSeconds
+			db, ciMode, useTestDB, dbExplicit, basePath, timeoutSeconds,
+			opts.shardRequested, opts.shardCount, opts.shardIndex, opts.shardWeights
 		);
 	}
 
@@ -10957,7 +10991,11 @@ component extends="modules.BaseModule" {
 		boolean useTestDB = true,
 		boolean dbExplicit = false,
 		string basePath = "",
-		numeric timeoutSeconds = 900
+		numeric timeoutSeconds = 900,
+		boolean shardRequested = false,
+		numeric shardCount = 1,
+		numeric shardIndex = 1,
+		boolean shardWeights = false
 	) {
 		var serverPort = $requireOwnRunningServer($testServerHints());
 
@@ -11040,6 +11078,16 @@ component extends="modules.BaseModule" {
 			}
 			if (len(filter)) {
 				testUrl &= "&directory=#filter#";
+			}
+			testUrl = $appendTestShardParams(
+				url = testUrl,
+				shardRequested = arguments.shardRequested,
+				shardCount = arguments.shardCount,
+				shardIndex = arguments.shardIndex,
+				shardWeights = arguments.shardWeights
+			);
+			if (arguments.shardRequested) {
+				out("Shard " & arguments.shardIndex & "/" & arguments.shardCount & (arguments.shardWeights ? " (weighted)" : ""), "cyan");
 			}
 
 			var httpResult = makeHttpRequest(testUrl, arguments.timeoutSeconds * 1000);
@@ -14023,6 +14071,28 @@ component extends="modules.BaseModule" {
 	public string function $buildTestRunnerPath(boolean coreTests = false, string basePath = "") {
 		var prefix = $normalizeBasePath(arguments.basePath);
 		return prefix & (arguments.coreTests ? "/wheels/core/tests" : "/wheels/app/tests");
+	}
+
+	/**
+	 * Append the shard query parameters to a test-runner URL (core and app share
+	 * the contract). Public `$`-prefixed so specs can test the URL without a live
+	 * server; hidden from MCP by the structural `$`-prefix sweep.
+	 */
+	public string function $appendTestShardParams(
+		required string url,
+		boolean shardRequested = false,
+		numeric shardCount = 1,
+		numeric shardIndex = 1,
+		boolean shardWeights = false
+	) {
+		if (!arguments.shardRequested) {
+			return arguments.url;
+		}
+		local.rv = arguments.url & "&shards=" & arguments.shardCount & "&shard=" & arguments.shardIndex;
+		if (arguments.shardWeights) {
+			local.rv &= "&shardWeightsFile=1";
+		}
+		return local.rv;
 	}
 
 	/**
