@@ -1,11 +1,15 @@
 # Sharding the test suite (maintainer note)
 
-> **Prototype status.** Sharding is exposed **only** as runner query
-> parameters. The Wheels CLI has no `--shards`/`--shard` flags yet; do not
-> document or script CLI flags for it.
+> **Status.** Sharding is available from both test runners and from the Wheels
+> CLI. The runners accept query parameters directly; the CLI wraps them as
+> `wheels test --shards N --shard K [--shard-weights]`.
 
-The core runner accepts deterministic shard inputs, so CI can split the suite
-across jobs without precomputing bundle lists. Weights arrive in one of two ways:
+Both the **core** runner (`/wheels/core/tests`) and the **app** runner
+(`/wheels/app/tests`, used by PMX/CounterPro) accept the same deterministic
+shard inputs, so CI can split either suite across jobs without precomputing
+bundle lists. The validation/selection contract lives in
+`wheels.wheelstest.ShardRequest` (used by both runners), so the two cannot
+drift. Weights arrive in one of two ways:
 
 ```text
 # Inline — small scopes only. The URL-ENCODED shardWeights is capped at 6000
@@ -57,6 +61,49 @@ each shard's `bundleStats[].name` values with the unsharded run: the union's
 **length** must equal the unsharded `bundlesDiscovered` count, and the union
 must contain no duplicates (there is no bundle-name list in the payload).
 
+## App runner and CLI
+
+The app runner uses the same parameters against `/wheels/app/tests`:
+
+```text
+GET /wheels/app/tests?format=json&shards=8&shard=3
+GET /wheels/app/tests?format=json&shards=8&shard=3&shardWeightsFile=1
+```
+
+`shardWeightsFile=1` reads `tests/shard-weights.json` from the app root (the
+same fixed path the core runner uses). The JSON payload reports
+`bundlesDiscovered` (full count), `bundlesSelected`, `shardCount` and
+`shardIndex` for either runner.
+
+The CLI exposes the same contract (app suite by default; add `--core` for the
+framework suite):
+
+```bash
+wheels test --shards 8 --shard 3 --shard-weights
+wheels test --core --shards 8 --shard 3 --shard-weights
+```
+
+`--shards` is 1..64, `--shard` is 1..shards, and `--shard-weights` requires
+`--shards > 1` (it sends `shardWeightsFile=1`). Invalid combinations fail
+before the HTTP request. Weights are only consulted when the file transport is
+requested; generate it from a full run's `bundleStats.totalDuration`.
+
+CI matrix example (each job must have its own app instance and database):
+
+```yaml
+strategy:
+  fail-fast: false
+  matrix:
+    shard: [1, 2, 3, 4, 5, 6, 7, 8]
+steps:
+  - run: wheels start
+  - run: wheels test --shards 8 --shard ${{ matrix.shard }} --shard-weights
+  - run: wheels stop
+```
+
+For a raw runner call add
+`&shards=$SHARD_COUNT&shard=$SHARD_INDEX&shardWeightsFile=1` to the suite URL.
+
 ## Planner
 
 `wheels.wheelstest.ShardPlanner` (unit specs:
@@ -81,8 +128,11 @@ lower). The spec pins these numbers.
    (the current full-suite run is the source of truth; PMX and CounterPro keep
    these per repo).
 2. Each shard job gets its **own app instance and database** — never point two
-   parallel shards at one database. Then run:
-   `...&shards=$SHARD_COUNT&shard=$SHARD_INDEX&shardWeights=$(jq -rn --argjson w "$WEIGHTS" '$w|@uri')`
+   parallel shards at one database. Then run either:
+   `wheels test --shards $SHARD_COUNT --shard $SHARD_INDEX --shard-weights`
+   (app suite) or add
+   `...&shards=$SHARD_COUNT&shard=$SHARD_INDEX&shardWeightsFile=1` to the raw
+   runner URL (core or app).
 3. A union job (or the aggregate) collects `bundleStats[].name` from every
    shard, asserts the union has no duplicates, and asserts `union.length` equals
    the unsharded run's `bundlesDiscovered` count.

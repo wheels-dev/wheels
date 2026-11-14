@@ -248,11 +248,43 @@
             // Sort bundles for stable output
             local.sortedBundles = testBox.getBundles();
             arraySort(local.sortedBundles, "textNoCase");
+            local.bundlesDiscovered = ArrayLen(local.sortedBundles);
+
+            // Optional deterministic shard selection — same contract as the core
+            // runner (wheels.wheelstest.ShardRequest): ?shards=N&shard=K, inline
+            // shardWeights (encoded cap) or shardWeightsFile=1 reading
+            // tests/shard-weights.json. Absent params keep the full suite. Each
+            // shard still needs its own app instance/DB.
+            local.shardCount = 1;
+            local.shardIndex = 1;
+            try {
+                local.shardRequest = new wheels.wheelstest.ShardRequest().parse(url = url);
+                local.shardCount = local.shardRequest.shardCount;
+                local.shardIndex = local.shardRequest.shardIndex;
+                if (local.shardRequest.requested && local.shardCount > 1) {
+                    local.shardPlanner = new wheels.wheelstest.ShardPlanner();
+                    local.sortedBundles = local.shardPlanner.partition(
+                        bundles = local.sortedBundles,
+                        shardCount = local.shardCount,
+                        shardIndex = local.shardIndex,
+                        weights = local.shardRequest.weights
+                    );
+                }
+            } catch (Wheels.InvalidShard e) {
+                cfheader(statuscode = "400");
+                cfcontent(type = "application/json");
+                writeOutput(SerializeJSON({
+                    success = false,
+                    error = "Invalid shard parameters",
+                    detail = e.message
+                }));
+                abort;
+            }
             testBox.setBundles(local.sortedBundles);
+            local.bundlesSelected = ArrayLen(local.sortedBundles);
 
             // Surface a rejected directory or a 0-bundle discovery so neither
             // silently reports green for the wrong scope (issue #3083).
-            local.bundlesDiscovered = ArrayLen(local.sortedBundles);
             local.scopeWarnings = local.dirResolver.scopeWarnings(
                 scope = local.testScope,
                 bundlesDiscovered = local.bundlesDiscovered
@@ -344,7 +376,12 @@
                         resultJson = result,
                         scope = local.testScope,
                         bundlesDiscovered = local.bundlesDiscovered,
-                        warnings = local.scopeWarnings
+                        warnings = local.scopeWarnings,
+                        shard = {
+                            bundlesSelected = local.bundlesSelected,
+                            shardCount = local.shardCount,
+                            shardIndex = local.shardIndex
+                        }
                     ));
                 } else {
                     // txt / junit: emit the reporter output verbatim under the

@@ -414,6 +414,58 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(probe.$parseTestArgs({timeout: "60"}).timeoutWarning).toBe("");
 			});
 
+			it("defaults sharding off", () => {
+				var o = probe.$parseTestArgs({});
+				expect(o.shardRequested).toBeFalse();
+				expect(o.shardCount).toBe(1);
+				expect(o.shardIndex).toBe(1);
+				expect(o.shardWeights).toBeFalse();
+			});
+
+			it("parses --shards / --shard", () => {
+				var o = probe.$parseTestArgs({shards: "8", shard: "2"});
+				expect(o.shardRequested).toBeTrue();
+				expect(o.shardCount).toBe(8);
+				expect(o.shardIndex).toBe(2);
+				expect(o.shardWeights).toBeFalse();
+			});
+
+			it("accepts --shards 1 as an explicit full run", () => {
+				var o = probe.$parseTestArgs({shards: "1"});
+				expect(o.shardRequested).toBeTrue();
+				expect(o.shardCount).toBe(1);
+				expect(o.shardIndex).toBe(1);
+			});
+
+			it("rejects invalid shard counts and indexes before any HTTP call", () => {
+				expect(function() { probe.$parseTestArgs({shards: "0"}); }).toThrow("Wheels.InvalidArguments");
+				expect(function() { probe.$parseTestArgs({shards: "65"}); }).toThrow("Wheels.InvalidArguments");
+				expect(function() { probe.$parseTestArgs({shards: "abc"}); }).toThrow("Wheels.InvalidArguments");
+				expect(function() { probe.$parseTestArgs({shards: "2", shard: "0"}); }).toThrow("Wheels.InvalidArguments");
+				expect(function() { probe.$parseTestArgs({shards: "2", shard: "3"}); }).toThrow("Wheels.InvalidArguments");
+			});
+
+			it("requires --shards > 1 for --shard-weights", () => {
+				expect(function() { probe.$parseTestArgs({"shard-weights": true}); }).toThrow("Wheels.InvalidArguments");
+				expect(function() { probe.$parseTestArgs({shards: "1", "shard-weights": true}); }).toThrow("Wheels.InvalidArguments");
+				var o = probe.$parseTestArgs({shards: "2", shard: "1", "shard-weights": true});
+				expect(o.shardWeights).toBeTrue();
+				expect(o.shardRequested).toBeTrue();
+			});
+
+			it("appends shard params to the runner URL", () => {
+				var base = "/wheels/app/tests?format=json";
+				expect(probe.$appendTestShardParams(url = base)).toBe(base);
+				expect(
+					probe.$appendTestShardParams(
+						url = base, shardRequested = true, shardCount = 8, shardIndex = 2, shardWeights = true
+					)
+				).toBe(base & "&shards=8&shard=2&shardWeightsFile=1");
+				expect(
+					probe.$appendTestShardParams(url = base, shardRequested = true, shardCount = 1, shardIndex = 1)
+				).toBe(base & "&shards=1&shard=1");
+			});
+
 			it("lower-cases --db, since the core runner matches its dialect list case-sensitively", () => {
 				// `--db=MySQL` passed the case-insensitive choice check but the
 				// runner's listFind() missed it and used the default datasource.
