@@ -98,9 +98,9 @@ component extends="wheels.WheelsTest" {
 				// must still preserve the package separator.
 				c = g.controller("dummy", {controller = "admin.Users", action = "show"})
 				actionOnly = c.linkTo(text = "View User", action = "show", key = 1)
-				expect(actionOnly).toInclude('href="/admin/users/show/1"')
+				expect($decodeHref(actionOnly)).toInclude('href="/admin/users/show/1"')
 				explicit = c.linkTo(text = "View User", controller = "admin/users", action = "show", key = 1)
-				expect(explicit).toInclude('href="/admin/users/show/1"')
+				expect($decodeHref(explicit)).toInclude('href="/admin/users/show/1"')
 			})
 
 			it("does not adopt an ambiguous ambient route name (##3638)", () => {
@@ -329,4 +329,13 @@ component extends="wheels.WheelsTest" {
 		})
 	}
 
+
+	/**
+	 * Adobe 2023, BoxLang and RustCFML HTML-encode `/` in attributes as `&#x2f;`
+	 * (valid, browser-equivalent); Lucee leaves it literal. Decode for the
+	 * semantic URL assertion so the spec is engine-neutral.
+	 */
+	private string function $decodeHref(required string link) {
+		return Replace(ReplaceNoCase(arguments.link, "&##x2f;", "/", "all"), "&##47;", "/", "all")
+	}
 }
