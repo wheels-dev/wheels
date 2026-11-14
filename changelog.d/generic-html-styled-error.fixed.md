@@ -1,0 +1,1 @@
+- Generic (non-`Wheels.*`) exceptions in HTML now render the styled Wheels error page — file/line, stack, copy payload and HTTP 500 — instead of escaping to the engine and landing on the minimal "Application Error" fallback. `Wheels.*` errors, production (`showErrorInformation` off), JSON/XML/agent formats and the startup/teardown fallback are unchanged (#4688)

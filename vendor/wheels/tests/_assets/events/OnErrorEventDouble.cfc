@@ -24,6 +24,9 @@ component extends="wheels.events.EventMethods" {
 		this.acceptHeader = "";
 		this.payloadShouldThrow = false;
 		this.contentResets = 0;
+		// Capturing seam for the HTML error page (#4688): records every template
+		// include and returns a marker the spec can assert on.
+		this.includeCalls = [];
 		return this;
 	}
 
@@ -78,6 +81,25 @@ component extends="wheels.events.EventMethods" {
 	}
 
 	public string function $includeAndReturnOutput() {
+		var recorded = {};
+		for (var key in arguments) {
+			recorded[key] = arguments[key];
+		}
+		ArrayAppend(this.includeCalls, recorded);
+		var template = StructKeyExists(arguments, "$template") ? arguments["$template"] : "";
+		if (FindNoCase("wheelserror.cfm", template)) {
+			var message = StructKeyExists(arguments, "wheelsError")
+				&& IsStruct(arguments.wheelsError)
+				&& StructKeyExists(arguments.wheelsError, "message")
+				? arguments.wheelsError.message : "";
+			return "<div id=""wheels-styled-error"" data-template=""" & EncodeForHTML(template) & """>Wheels - Error " & EncodeForHTML(message) & "</div>";
+		}
+		if (FindNoCase("_header_simple.cfm", template)) {
+			return "<header>Wheels - Error</header>";
+		}
+		if (FindNoCase("_footer_simple.cfm", template)) {
+			return "<footer></footer>";
+		}
 		return "on-error-double-body";
 	}
 

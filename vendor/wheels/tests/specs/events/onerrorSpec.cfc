@@ -133,6 +133,138 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		// GH ##4688: a generic (non-Wheels) exception in HTML used to be rethrown
+		// for the engine to render; the app's outer onError fallback caught it and
+		// showed the minimal "Application Error" page. It must render the styled
+		// Wheels error page when showErrorInformation is on.
+		describe("generic HTML exceptions render the styled error page (##4688)", () => {
+
+			it("renders wheelserror.cfm for a plain java.sql.SQLException", () => {
+				var saved = application.wheels.showErrorInformation
+				try {
+					application.wheels.showErrorInformation = true
+					var em = CreateObject("component", "wheels.tests._assets.events.OnErrorEventDouble").init()
+					em.formatOverride = "html"
+					var body = em.$runOnError(
+						exception = {
+							type = "java.sql.SQLException",
+							message = "db down",
+							detail = "could not connect to the database",
+							tagContext = [{template = "/app/controllers/ErrorTest.cfc", line = 3}]
+						},
+						eventName = "onRequest"
+					)
+					expect(em.$lastStatusCode()).toBe(500)
+					expect(body).toInclude("Wheels - Error")
+					expect(body).toInclude("db down")
+					expect($includedTemplate(em, "/wheels/events/onerror/wheelserror.cfm")).toBeTrue()
+					expect($includedError(em).message).toBe("db down")
+					expect($includedError(em).type).toBe("java.sql.SQLException")
+					expect($includedError(em).extendedInfo).toBe("could not connect to the database")
+				} finally {
+					application.wheels.showErrorInformation = saved
+				}
+			})
+
+			it("unwraps a rootCause struct into the styled page", () => {
+				var saved = application.wheels.showErrorInformation
+				try {
+					application.wheels.showErrorInformation = true
+					var em = CreateObject("component", "wheels.tests._assets.events.OnErrorEventDouble").init()
+					em.formatOverride = "html"
+					var body = em.$runOnError(
+						exception = {
+							type = "java.lang.RuntimeException",
+							message = "wrapper",
+							rootCause = {
+								type = "java.sql.SQLException",
+								message = "root db down",
+								detail = "root cause detail",
+								tagContext = []
+							}
+						},
+						eventName = "onRequest"
+					)
+					expect(em.$lastStatusCode()).toBe(500)
+					expect(body).toInclude("root db down")
+					expect($includedError(em).type).toBe("java.sql.SQLException")
+					expect($includedError(em).message).toBe("root db down")
+				} finally {
+					application.wheels.showErrorInformation = saved
+				}
+			})
+
+			it("escapes HTML in a generic exception message and detail (##4688 XSS)", () => {
+				// Exercise the REAL template, not the event double: the template
+				// interpolates message/extendedInfo raw, so the seam must encode.
+				var saved = application.wheels.showErrorInformation
+				try {
+					application.wheels.showErrorInformation = true
+					var em = CreateObject("component", "wheels.tests._assets.events.OnErrorRealTemplateDouble").init()
+					var body = em.$runOnError(
+						exception = {
+							type = "java.sql.SQLException",
+							message = "<img src=x onerror=alert(1)>",
+							detail = "<script>alert(1)</script>",
+							tagContext = []
+						},
+						eventName = "onRequest"
+					)
+					expect(em.$lastStatusCode()).toBe(500)
+					expect(body).toInclude("&lt;img")
+					expect(body).toInclude("&lt;script")
+					expect(body).notToInclude("<img src=x")
+					expect(body).notToInclude("<script>alert(1)</script>")
+				} finally {
+					application.wheels.showErrorInformation = saved
+				}
+			})
+
+			it("still renders backticked code after message encoding (##4688)", () => {
+				var saved = application.wheels.showErrorInformation
+				try {
+					application.wheels.showErrorInformation = true
+					var em = CreateObject("component", "wheels.tests._assets.events.OnErrorRealTemplateDouble").init()
+					var body = em.$runOnError(
+						exception = {
+							type = "java.sql.SQLException",
+							message = "bad `<b>` value",
+							detail = "",
+							tagContext = []
+						},
+						eventName = "onRequest"
+					)
+					// Target the message heading, not the page's embedded JS (which
+					// contains "<b>" in asset code).
+					var headings = ReMatchNoCase("<h1[^>]*>[\s\S]*?bad[\s\S]*?</h1>", body)
+					expect(ArrayLen(headings)).toBe(1)
+					expect(headings[1]).toInclude("<code")
+					expect(headings[1]).toInclude("&lt;b&gt;")
+					expect(headings[1]).notToInclude("<b>")
+				} finally {
+					application.wheels.showErrorInformation = saved
+				}
+			})
+
+			it("keeps the JSON path serializing the raw exception", () => {
+				var saved = application.wheels.showErrorInformation
+				try {
+					application.wheels.showErrorInformation = true
+					var em = CreateObject("component", "wheels.tests._assets.events.OnErrorEventDouble").init()
+					em.formatOverride = "json"
+					var result = em.$runOnError(
+						exception = {type = "java.sql.SQLException", message = "db down", detail = "raw-detail"},
+						eventName = "onRequest"
+					)
+					expect(em.$lastStatusCode()).toBe(500)
+					expect(result).toInclude("raw-detail")
+					expect($includedTemplate(em, "/wheels/events/onerror/wheelserror.cfm")).toBeFalse()
+				} finally {
+					application.wheels.showErrorInformation = saved
+				}
+			})
+		})
+
 		// Security regression: $getRequestFormat must reject non-alphanumeric url.format (LFI via $runOnError's error-template include path).
 		describe("$getRequestFormat rejects unsafe format tokens (T4 LFI)", () => {
 
@@ -174,6 +306,25 @@ component extends="wheels.WheelsTest" {
 			}
 		}
 		return result
+	}
+
+	private boolean function $includedTemplate(required any em, required string template) {
+		for (var call in arguments.em.includeCalls) {
+			if (StructKeyExists(call, "$template") && call["$template"] == arguments.template) {
+				return true
+			}
+		}
+		return false
+	}
+
+	private struct function $includedError(required any em) {
+		for (var i = ArrayLen(arguments.em.includeCalls); i >= 1; i--) {
+			var call = arguments.em.includeCalls[i]
+			if (StructKeyExists(call, "$template") && FindNoCase("wheelserror.cfm", call["$template"])) {
+				return call.wheelsError
+			}
+		}
+		return {}
 	}
 
 	private numeric function $expectedStatusFor(required string wheelsType) {
