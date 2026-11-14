@@ -11,6 +11,14 @@ name: RustCFML — version check
 #
 # A workflow_dispatch from another branch tests that branch's scripts but
 # never opens a bump PR or an issue (the notifier runs in dry-run mode).
+#
+# Runner: ubuntu-26.04 (GA) because RustCFML v0.748.0's linux-x86_64 binary
+# requires GLIBC_2.43 and ubuntu-24.04 ships glibc 2.39, so the candidate never
+# booted there (#4696). The Ubuntu 26.04 image ships glibc 2.43; the pinned
+# v0.746.2 binary runs on both, so only this job moves. When a candidate is
+# accepted and the pin bumps, the RustCFML CI lane (rustcfml-ci.yml, still on
+# ubuntu-24.04) must move to ubuntu-26.04 in the same bump or the bump PR will
+# fail to boot the new engine.
 
 on:
   schedule:
@@ -25,7 +33,7 @@ permissions:
 jobs:
   check:
     name: Check for newer RustCFML
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout develop (or the dispatched ref)
         uses: actions/checkout@v6
