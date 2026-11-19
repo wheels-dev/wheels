@@ -2,29 +2,28 @@ FROM ghcr.io/wheels-dev/mirror/ortussolutions/commandbox:latest@sha256:1f180edf8
 
 LABEL maintainer "Wheels Core Team"
 
-# Install Lucee extensions (H2, Oracle) and SQLite JDBC driver in a single layer.
-#
+# Install Lucee extensions (H2, Oracle). These still download from
+# ext.lucee.org; each has bounded retries because the host intermittently
+# answers 5xx/429, and its CloudFront edge answers 403 (not 404) on an edge
+# error as well as for a missing object, so 403 is retried too. `wget -nv -S`
+# logs each URL with its response status on every attempt.
 # The SQLite driver goes in /opt/wheels-lib, which server.json names as
-# app.libDirs. Lucee 7 does not load jars from lucee-server/context/lib (the
-# Lucee 6 image's location), and a libDirs path under /wheels-test-suite would
-# be hidden by the compose source bind mount, so it must live outside it (#3688).
-# Each download retries: ext.lucee.org and Maven Central intermittently answer
-# 5xx or 429, and one failed fetch fails the whole image build. ext.lucee.org is
-# S3 behind CloudFront, which answers 403 (not 404) on an edge error as well as
-# for a missing object, so 403 is retried too; these pinned URLs do exist.
-# `wget -nv -S` logs each URL with the response status and headers on every attempt,
-# so a failed build names the download and its status. (Without -S, wget does not
-# print the status of an attempt it is going to retry.)
-# The SQLite JDBC jar is checked against Maven Central's published SHA-256, so a
-# damaged or substituted download fails the build instead of the tests.
+# app.libDirs. Lucee 7 does not load jars from lucee-server/context/lib
+# (the Lucee 6 image's location), and a libDirs path under
+# /wheels-test-suite would be hidden by the compose source bind mount, so
+# it must live outside it (#3688).
+#
+# The SQLite JDBC driver is VENDORED in this repository (tools/docker/lib/sqlite-jdbc-3.50.3.0.jar)
+# and COPY'd in below, not fetched at build time: Maven Central answered 404 on
+# some CI edges and a 404 is not retried, which failed every Lucee leg (#4708).
+# The COPY'd jar is still verified against the published SHA-256, so a corrupted
+# or substituted repo copy fails the build instead of the tests.
+COPY tools/docker/lib/sqlite-jdbc-3.50.3.0.jar /opt/wheels-lib/sqlite-jdbc-3.50.3.0.jar
 RUN mkdir -p /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy \
  && wget -nv -S --tries=5 --waitretry=3 --retry-connrefused --retry-on-http-error=403,429,500,502,503,504 -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex \
       https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex \
  && wget -nv -S --tries=5 --waitretry=3 --retry-connrefused --retry-on-http-error=403,429,500,502,503,504 -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.oracle-21.8.0.0-ojdbc11.lex \
       https://ext.lucee.org/org.lucee.oracle-21.8.0.0-ojdbc11.lex \
- && mkdir -p /opt/wheels-lib \
- && wget -nv -S --tries=5 --waitretry=3 --retry-connrefused --retry-on-http-error=403,429,500,502,503,504 -O /opt/wheels-lib/sqlite-jdbc-3.50.3.0.jar \
-      https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar \
  && echo "a3f53a2aa15ae9425a9e793bbe9c8e5288febeb4b65ef5c1a4e80d4c2045cf08  /opt/wheels-lib/sqlite-jdbc-3.50.3.0.jar" | sha256sum -c -
 
 # Install SQLite and create test database
