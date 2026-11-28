@@ -32,7 +32,7 @@ component {
 	 * check-version.sh bumps ENGINE_VERSION, and RustCFMLEnginePinSpec fails
 	 * on drift (#3812).
 	 */
-	variables.engineVersion = "v0.751.0";
+	variables.engineVersion = "v0.754.0";
 
 	/**
 	 * sha256 of each release asset of the pinned version. install() refuses a
@@ -42,9 +42,9 @@ component {
 	 * on drift.
 	 */
 	variables.engineSha256 = {};
-	variables.engineSha256["rustcfml-linux-aarch64"] = "6c4bb147e583078f26f9cbd174f5b05b033e6a63f55eeeb7028e7e3bf01dfa34";
-	variables.engineSha256["rustcfml-linux-x86_64"] = "c2f162ba51175851499465b039362b5060b72828111838ebab0abe6078b0b662";
-	variables.engineSha256["rustcfml-macos-aarch64"] = "4f9d5289cd842d392fb9880342282904dfb31af6bbf6f83e21be31ba16ec4b7c";
+	variables.engineSha256["rustcfml-linux-aarch64"] = "e102aa4d531fc3a70e766cee369067cb589f0cf507a8e58eb1985905e92915a9";
+	variables.engineSha256["rustcfml-linux-x86_64"] = "ccd5ff7c14ee8e91cbb831650c02d21ff45a4d9356a7a2fd0933c03dea87d79b";
+	variables.engineSha256["rustcfml-macos-aarch64"] = "fde396bb8e609fe4f8a0b00d8e15cc5da0626bfbd60f41749be3d297bf8c8051";
 
 	variables.wheelsHome = "";
 

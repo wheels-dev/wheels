@@ -1,5 +1,5 @@
 {
-  "engineVersion": "v0.751.0",
+  "engineVersion": "v0.754.0",
   "totals": {
     "totalSpecs": 7581,
     "totalPass": 7389,
@@ -9,7 +9,7 @@
   },
   "failing": [],
   "_notes": [
-    "Baseline written by run-suite.sh --write-baseline from https://github.com/wheels-dev/wheels/actions/runs/43931997832 (f206d7aee, v0.751.0, Linux): 7389 pass / 0 fail / 0 error / 192 skipped. totalSpecs is the sum of those reported categories.",
+    "Baseline written by run-suite.sh --write-baseline from https://github.com/wheels-dev/wheels/actions/runs/46168383870 (2c2a1354a, v0.754.0, Linux): 7389 pass / 0 fail / 0 error / 192 skipped. totalSpecs is the sum of those reported categories.",
     "RustCFML#431 (an exception thrown from an included template lost its custom type and detail, so TestClient assertNotFound() saw 500 instead of 404) is fixed in v0.693.0 (https://github.com/RustCFML/RustCFML/issues/431, closed 2026-09-28). Its baseline entry is removed; the strict 404 assertion passes.",
     "The previous migrationSpec multi-column index failure was a Wheels metadata-shape assumption, fixed in wheels-dev/wheels#3697, not the closed RustCFML#377. Both previously baselined Linux StorageSpec errors pass on this v0.691.0 run and are removed.",
     "SystemUtilSpec retains missing-property default/error assertions on every engine; java.version is required only when EngineCapabilities confirms real JVM class loading. RustCFML is JVM-free, so a null Java-version placeholder is not an engine defect."
